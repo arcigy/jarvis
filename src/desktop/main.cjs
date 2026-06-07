@@ -55,6 +55,7 @@ app.whenReady().then(() => {
   ipcMain.handle("jarvis:getSmartleadCampaignStatus", (_event, payload) => getSmartleadCampaignStatus(payload));
   ipcMain.handle("jarvis:discoverLeads", (_event, payload) => discoverLeads(payload));
   ipcMain.handle("jarvis:appendLeadsToGoogleSheet", (_event, payload) => appendLeadsToGoogleSheet(payload));
+  ipcMain.handle("contracts:draftIntake", (_event, payload) => draftContractIntake(payload));
   ipcMain.handle("contracts:generate", (_event, payload) => generateContracts(payload));
   createWindow();
   createTray();
@@ -718,6 +719,66 @@ async function appendLeadsToGoogleSheet(payload) {
   );
   if (!response.ok) throw new Error(`Google Sheets append failed: ${response.status}`);
   return response.json();
+}
+
+async function draftContractIntake(payload) {
+  const brief = String(payload?.brief ?? "").trim();
+  if (!brief) throw new Error("Contract brief is required.");
+  const response = await generateGeminiTextForContract({
+    brief,
+    baseIntake: payload?.baseIntake && typeof payload.baseIntake === "object" ? payload.baseIntake : {},
+  });
+  return parseJsonObject(response.text);
+}
+
+async function generateGeminiTextForContract(input) {
+  const apiKey = requireRuntimeEnv("GEMINI_API_KEY");
+  const model = "gemini-2.5-flash";
+  const prompt = [
+    "Create a filled Arcigy contract intake JSON object from this business brief.",
+    "Keep Arcigy/provider details unchanged when present in the base intake.",
+    "If a value is unknown, use a clear placeholder like [doplnit].",
+    "Return only valid JSON. Do not include markdown, comments, signatures, or legal advice.",
+    "The JSON must include client, contacts, project, pricing, dates, specialTerms, and additionalAttachments when useful.",
+    "Base intake JSON:",
+    JSON.stringify(input.baseIntake ?? {}, null, 2),
+    "Business brief:",
+    input.brief,
+  ].join("\n");
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        systemInstruction: {
+          parts: [
+            {
+              text: "You are Arcigy Jarvis. Return only valid JSON for the Arcigy contract intake schema.",
+            },
+          ],
+        },
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.2 },
+      }),
+    }
+  );
+  if (!response.ok) throw new Error(`Gemini request failed: ${response.status}`);
+  const data = await response.json();
+  const text = data?.candidates?.[0]?.content?.parts?.map((part) => part.text || "").join("").trim();
+  if (!text) throw new Error("Gemini returned an empty response.");
+  return { model, text };
+}
+
+function parseJsonObject(text) {
+  const trimmed = String(text).trim();
+  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i)?.[1]?.trim();
+  const candidate = fenced || trimmed.slice(trimmed.indexOf("{"), trimmed.lastIndexOf("}") + 1);
+  const parsed = JSON.parse(candidate);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Gemini did not return a JSON object.");
+  }
+  return parsed;
 }
 
 function generateContracts(payload) {

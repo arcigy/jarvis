@@ -4,6 +4,7 @@ import type { ClientNeedSignal, ColdOutreachMetrics, LocalPerson } from "./types
 
 export type JarvisMcpToolName =
   | "arcigy.generate_contract_documents"
+  | "arcigy.draft_contract_intake"
   | "arcigy.get_cold_outreach_brief"
   | "arcigy.get_cold_outreach_brief_from_db"
   | "arcigy.add_cold_outreach_event"
@@ -42,6 +43,12 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
       description: "Vygeneruje rámcovú zmluvu a projektovú prílohu z vyplneného Arcigy JSON formulára.",
       inputSchemaRef: "docs/contracts/contract-intake.schema.json",
       requiresApproval: true,
+    },
+    {
+      name: "arcigy.draft_contract_intake",
+      description: "Použije Gemini na návrh Arcigy contract intake JSON z krátkeho briefu bez generovania dokumentov.",
+      inputSchemaRef: "docs/contracts/contract-intake.schema.json",
+      requiresApproval: false,
     },
     {
       name: "arcigy.get_cold_outreach_brief",

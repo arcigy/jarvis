@@ -4,6 +4,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
+import { draftContractIntake } from "./contract-intake-draft.ts";
 import { runIntegrationDiagnostics } from "./diagnostics.ts";
 import { getIntegrationHealth, loadLocalEnv, summarizeIntegrationHealth } from "./env.ts";
 import { buildClientReplyPrompt, generateGeminiText } from "./gemini.ts";
@@ -61,6 +62,25 @@ export function createJarvisMcpServer(): McpServer {
       const result = runPython(args);
       return textResult(result.stdout.trim() || "Contract documents generated.");
     }
+  );
+
+  server.registerTool(
+    "arcigy.draft_contract_intake",
+    {
+      title: "Draft contract intake",
+      description: "Use Gemini to draft an Arcigy contract intake JSON object from a short business brief.",
+      inputSchema: {
+        brief: z.string().min(1),
+        baseIntake: z.record(z.string(), z.unknown()).optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async ({ brief, baseIntake }) => jsonResult(await draftContractIntake({ brief, baseIntake }))
   );
 
   server.registerTool(

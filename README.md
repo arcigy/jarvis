@@ -22,6 +22,7 @@ npm run mcp
 Server tools:
 
 - `arcigy.generate_contract_documents`
+- `arcigy.draft_contract_intake`
 - `arcigy.get_cold_outreach_brief`
 - `arcigy.get_cold_outreach_brief_from_db`
 - `arcigy.add_cold_outreach_event`
@@ -102,6 +103,7 @@ It serves the same UI at `http://127.0.0.1:8765` and exposes local HTTP endpoint
 - `POST /api/identify-email`
 - `POST /api/ingest-client-message`
 - `POST /api/generate-ai-reply`
+- `POST /api/draft-contract-intake`
 - `POST /api/generate-contracts`
 - `POST /api/sync-gmail-recent-messages`
 - `POST /api/smartlead-campaign-status`
@@ -111,6 +113,7 @@ It serves the same UI at `http://127.0.0.1:8765` and exposes local HTTP endpoint
 - `POST /api/append-leads-to-google-sheet`
 - `POST /api/mcp/arcigy.get_system_health`
 - `POST /api/mcp/arcigy.run_integration_diagnostics`
+- `POST /api/mcp/arcigy.draft_contract_intake`
 - `POST /api/mcp/arcigy.generate_ai_reply`
 - `POST /api/mcp/arcigy.get_cold_outreach_brief_from_db`
 - `POST /api/mcp/arcigy.identify_email`

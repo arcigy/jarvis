@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { draftContractIntake } from "../automation-system/contract-intake-draft.ts";
 import { runIntegrationDiagnostics } from "../automation-system/diagnostics.ts";
 import { getIntegrationHealth, loadLocalEnv } from "../automation-system/env.ts";
 import { buildClientReplyPrompt, generateGeminiText } from "../automation-system/gemini.ts";
@@ -138,6 +139,19 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
     return;
   }
 
+  if (request.method === "POST" && url.pathname === "/api/draft-contract-intake") {
+    const payload = await readJson(request);
+    writeJson(
+      response,
+      200,
+      await draftContractIntake({
+        brief: String(payload.brief ?? ""),
+        baseIntake: typeof payload.baseIntake === "object" && payload.baseIntake !== null ? (payload.baseIntake as Record<string, unknown>) : undefined,
+      })
+    );
+    return;
+  }
+
   if (request.method === "POST" && url.pathname === "/api/sync-gmail-recent-messages") {
     const payload = await readJson(request);
     writeJson(response, 200, await syncGmailRecentMessages(payload));
@@ -262,6 +276,15 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
   if (name === "arcigy.run_integration_diagnostics") {
     writeJson(response, 200, {
       result: await runIntegrationDiagnostics({ live: payload.live === true, dbPath: optionalString(payload.dbPath) ?? defaultDbPath }),
+    });
+    return;
+  }
+  if (name === "arcigy.draft_contract_intake") {
+    writeJson(response, 200, {
+      result: await draftContractIntake({
+        brief: String(payload.brief ?? ""),
+        baseIntake: typeof payload.baseIntake === "object" && payload.baseIntake !== null ? (payload.baseIntake as Record<string, unknown>) : undefined,
+      }),
     });
     return;
   }

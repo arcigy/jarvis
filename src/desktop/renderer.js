@@ -37,6 +37,8 @@ const elements = {
   discoverLeads: document.querySelector("#discoverLeads"),
   exportLeads: document.querySelector("#exportLeads"),
   leadResult: document.querySelector("#leadResult"),
+  draftContractIntake: document.querySelector("#draftContractIntake"),
+  contractBrief: document.querySelector("#contractBrief"),
   applyContractForm: document.querySelector("#applyContractForm"),
   contractBusinessName: document.querySelector("#contractBusinessName"),
   contractAddress: document.querySelector("#contractAddress"),
@@ -70,6 +72,7 @@ const arcigyApi = window.arcigyDesktop ?? {
   getSmartleadCampaignStatus: (payload) => postJson("/api/smartlead-campaign-status", payload),
   discoverLeads: (payload) => postJson("/api/discover-leads", payload),
   appendLeadsToGoogleSheet: (payload) => postJson("/api/append-leads-to-google-sheet", payload),
+  draftContractIntake: (payload) => postJson("/api/draft-contract-intake", payload),
   generateContracts: (payload) => postJson("/api/generate-contracts", payload),
 };
 
@@ -520,6 +523,21 @@ elements.exportLeads.addEventListener("click", async () => {
     elements.leadResult.textContent = error instanceof Error ? error.message : String(error);
   }
 });
+elements.draftContractIntake.addEventListener("click", async () => {
+  try {
+    elements.contractResult.textContent = "Drafting contract intake with Gemini...";
+    const baseIntake = safeParseContractIntake();
+    const intake = await arcigyApi.draftContractIntake({
+      brief: elements.contractBrief.value,
+      baseIntake,
+    });
+    fillContractForm(intake);
+    elements.contractIntake.value = JSON.stringify(intake, null, 2);
+    elements.contractResult.textContent = "AI contract intake draft applied. Review it before generating DOCX files.";
+  } catch (error) {
+    elements.contractResult.textContent = error instanceof Error ? error.message : String(error);
+  }
+});
 elements.applyContractForm.addEventListener("click", () => {
   try {
     const intake = buildContractIntakeFromForm();
@@ -547,6 +565,8 @@ elements.generateContracts.addEventListener("click", async () => {
 const initialContractIntake = sampleContractIntake();
 fillContractForm(initialContractIntake);
 elements.contractIntake.value = JSON.stringify(initialContractIntake, null, 2);
+elements.contractBrief.value =
+  "Klient Test Klient s. r. o. chce klientsky automatizacny portal na spracovanie leadov, internych uloh a reportov. Implementacia 2000 EUR, mesacne 200 EUR, trvanie 6 mesiacov.";
 elements.memoryEmail.value = "client@example.com";
 elements.memorySubject.value = "Onboarding automatizacia";
 elements.memoryMessage.value = "Potrebujem upravit onboarding automatizaciu do piatku.";

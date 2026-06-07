@@ -11,6 +11,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /Arcigy Jarvis/);
   assert.match(html, /Enable/);
   assert.match(html, /Contract generator/);
+  assert.match(html, /draftContractIntake/);
+  assert.match(html, /contractBrief/);
   assert.match(html, /applyContractForm/);
   assert.match(html, /contractBusinessName/);
   assert.match(html, /contractProjectGoal/);
@@ -41,6 +43,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /arcigyApi\.identifyEmail/);
   assert.match(renderer, /arcigyApi\.ingestClientMessage/);
   assert.match(renderer, /arcigyApi\.generateContracts/);
+  assert.match(renderer, /arcigyApi\.draftContractIntake/);
   assert.match(renderer, /arcigyApi\.systemHealth/);
   assert.match(renderer, /arcigyApi\.generateAiReply/);
   assert.match(renderer, /arcigyApi\.syncGmailRecentMessages/);
@@ -55,6 +58,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /\/api\/smartlead-campaign-status/);
   assert.match(renderer, /\/api\/discover-leads/);
   assert.match(renderer, /\/api\/append-leads-to-google-sheet/);
+  assert.match(renderer, /\/api\/draft-contract-intake/);
   assert.match(renderer, /sampleContractIntake/);
   assert.match(renderer, /buildContractIntakeFromForm/);
   assert.match(renderer, /fillContractForm/);
@@ -82,6 +86,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /searchGooglePlacesLeads/);
   assert.match(main, /getSerperApiKeys/);
   assert.match(main, /ipcMain\.handle\("contracts:generate"/);
+  assert.match(main, /ipcMain\.handle\("contracts:draftIntake"/);
+  assert.match(main, /generateGeminiTextForContract/);
+  assert.match(main, /parseJsonObject/);
   assert.match(main, /jarvis_local_db\.py/);
   assert.match(main, /cold-brief/);
   assert.match(main, /defaultDbPath/);
@@ -100,4 +107,5 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(preload, /discoverLeads/);
   assert.match(preload, /appendLeadsToGoogleSheet/);
   assert.match(preload, /generateContracts/);
+  assert.match(preload, /draftContractIntake/);
 });

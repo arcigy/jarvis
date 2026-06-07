@@ -18,6 +18,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
 
   const tools = await client.listTools();
   const names = tools.tools.map((tool) => tool.name);
+  assert.ok(names.includes("arcigy.draft_contract_intake"));
   assert.ok(names.includes("arcigy.get_cold_outreach_brief"));
   assert.ok(names.includes("arcigy.get_cold_outreach_brief_from_db"));
   assert.ok(names.includes("arcigy.add_cold_outreach_event"));

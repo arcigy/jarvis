@@ -14,5 +14,6 @@ contextBridge.exposeInMainWorld("arcigyDesktop", {
   getSmartleadCampaignStatus: (payload) => ipcRenderer.invoke("jarvis:getSmartleadCampaignStatus", payload),
   discoverLeads: (payload) => ipcRenderer.invoke("jarvis:discoverLeads", payload),
   appendLeadsToGoogleSheet: (payload) => ipcRenderer.invoke("jarvis:appendLeadsToGoogleSheet", payload),
+  draftContractIntake: (payload) => ipcRenderer.invoke("contracts:draftIntake", payload),
   generateContracts: (payload) => ipcRenderer.invoke("contracts:generate", payload),
 });

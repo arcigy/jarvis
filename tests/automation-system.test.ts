@@ -6,6 +6,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { matchLocalIdentity } from "../src/automation-system/identity-matching.ts";
+import { draftContractIntake, parseJsonObject } from "../src/automation-system/contract-intake-draft.ts";
 import { runIntegrationDiagnostics } from "../src/automation-system/diagnostics.ts";
 import { getIntegrationHealth } from "../src/automation-system/env.ts";
 import { buildClientReplyPrompt, generateGeminiText } from "../src/automation-system/gemini.ts";
@@ -28,6 +29,7 @@ test("MCP tools expose the requested automation surface", () => {
   const names = listJarvisMcpTools().map((tool) => tool.name);
   assert.deepEqual(names, [
     "arcigy.generate_contract_documents",
+    "arcigy.draft_contract_intake",
     "arcigy.get_cold_outreach_brief",
     "arcigy.get_cold_outreach_brief_from_db",
     "arcigy.add_cold_outreach_event",
@@ -46,6 +48,31 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.discover_leads",
     "arcigy.append_leads_to_google_sheet",
   ]);
+});
+
+test("contract intake draft parses Gemini JSON output", async () => {
+  const fetchImpl = async () =>
+    responseJson({
+      candidates: [
+        {
+          content: {
+            parts: [
+              {
+                text: "```json\n{\"client\":{\"businessName\":\"ACME\"},\"project\":{\"name\":\"Portal\"},\"pricing\":{\"implementationFeeEur\":1000}}\n```",
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+  const intake = await draftContractIntake(
+    { brief: "ACME wants a portal.", baseIntake: { contacts: { arcigyAuthorizedContact: "Arcigy" } } },
+    { GEMINI_API_KEY: "gemini-key" },
+    fetchImpl as typeof fetch
+  );
+  assert.deepEqual((intake.client as { businessName: string }).businessName, "ACME");
+  assert.equal(parseJsonObject("{\"ok\":true}").ok, true);
 });
 
 test("contract generation command points to the JSON form generator", () => {
