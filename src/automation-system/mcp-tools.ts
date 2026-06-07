@@ -9,6 +9,7 @@ export type JarvisMcpToolName =
   | "arcigy.add_cold_outreach_event"
   | "arcigy.upsert_local_person"
   | "arcigy.add_client_need_signal"
+  | "arcigy.ingest_client_message"
   | "arcigy.identify_email"
   | "arcigy.jarvis_voice_event";
 
@@ -61,6 +62,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.add_client_need_signal",
       description: "Uloží lokálny signál, že klient niečo chce alebo potrebuje.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.ingest_client_message",
+      description: "Uloží prijatú správu/email, spáruje odosielateľa a pri požiadavke vytvorí Jarvis alert.",
       requiresApproval: false,
     },
     {

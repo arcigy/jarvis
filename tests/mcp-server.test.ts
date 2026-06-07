@@ -22,6 +22,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(names.includes("arcigy.get_cold_outreach_brief_from_db"));
   assert.ok(names.includes("arcigy.add_cold_outreach_event"));
   assert.ok(names.includes("arcigy.identify_email"));
+  assert.ok(names.includes("arcigy.ingest_client_message"));
   assert.ok(names.includes("arcigy.jarvis_voice_event"));
 
   const result = await client.callTool({
@@ -117,6 +118,51 @@ test("Jarvis MCP server generates contracts from inline intake payload", async (
   const text = content[0]?.type === "text" ? content[0].text ?? "" : "";
   assert.match(text, /generation-manifest\.json/);
   assert.equal(existsSync(join(outputDir, "generation-manifest.json")), true);
+
+  await client.close();
+  await server.close();
+});
+
+test("Jarvis MCP server ingests client messages and returns a need alert", async () => {
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  const server = createJarvisMcpServer();
+  const client = new Client({ name: "test-client", version: "0.1.0" });
+  const dbPath = join(mkdtempSync(join(tmpdir(), "jarvis-mcp-message-")), "jarvis.db");
+
+  await server.connect(serverTransport);
+  await client.connect(clientTransport);
+
+  await client.callTool({
+    name: "arcigy.upsert_local_person",
+    arguments: {
+      dbPath,
+      kind: "client",
+      primaryEmail: "founder@example.com",
+      displayName: "Founder",
+      companyName: "Example",
+    },
+  });
+
+  const result = await client.callTool({
+    name: "arcigy.ingest_client_message",
+    arguments: {
+      dbPath,
+      fromEmail: "founder@example.com",
+      source: "email",
+      subject: "Report",
+      text: "Prosím, priprav nový report pre cold outreach.",
+      occurredAt: "2026-06-07T10:00:00Z",
+    },
+  });
+  const ingested = getStructuredResult(result) as {
+    jarvisAlert: string;
+    needSignal: { summary: string };
+    identity: { openNeedSignals: Array<{ summary: string }> };
+  };
+
+  assert.match(ingested.jarvisAlert, /Founder chce alebo potrebuje/);
+  assert.equal(ingested.needSignal.summary, "Prosím, priprav nový report pre cold outreach.");
+  assert.equal(ingested.identity.openNeedSignals[0].summary, "Prosím, priprav nový report pre cold outreach.");
 
   await client.close();
   await server.close();

@@ -227,6 +227,154 @@ def identify(db_path: Path, email: str) -> dict[str, Any]:
     }
 
 
+def ingest_message(db_path: Path, payload: dict[str, Any]) -> dict[str, Any]:
+    init_db(db_path)
+    email = normalize_email(payload.get("email") or payload.get("fromEmail") or required(payload, "fromEmail"))
+    text = payload.get("text") or payload.get("body") or payload.get("message") or ""
+    if not str(text).strip():
+        raise ValueError("Missing required field: text")
+
+    identity = identify(db_path, email)
+    person = identity.get("person")
+    if person is None and payload.get("createIfUnknown", True):
+        person = upsert_person(
+            db_path,
+            {
+                "kind": payload.get("kind", "lead"),
+                "primaryEmail": email,
+                "displayName": payload.get("displayName"),
+                "companyName": payload.get("companyName"),
+                "status": payload.get("status", "active"),
+                "data": {
+                    "source": payload.get("source", "message"),
+                    "firstSeenFromIngest": True,
+                    **(payload.get("personData") or {}),
+                },
+            },
+        )
+        identity = identify(db_path, email)
+
+    person_id = identity["person"]["id"] if identity.get("person") else None
+    occurred_at = payload.get("occurredAt") or payload.get("occurred_at") or datetime.now(timezone.utc).isoformat()
+    activity_id = payload.get("id") or f"email_{uuid.uuid4().hex}"
+    conn = connect(db_path)
+    conn.execute(
+        """
+        insert into local_email_activity
+          (id, person_id, email, source, event_type, occurred_at, data_json)
+        values (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            activity_id,
+            person_id,
+            email,
+            payload.get("source", "message"),
+            payload.get("eventType", "message_received"),
+            occurred_at,
+            json.dumps(
+                {
+                    "subject": payload.get("subject"),
+                    "text": text,
+                    "threadId": payload.get("threadId"),
+                    "externalId": payload.get("externalId"),
+                    **(payload.get("data") or {}),
+                },
+                ensure_ascii=False,
+            ),
+        ),
+    )
+    conn.commit()
+    activity = row_to_email_activity(
+        conn.execute("select * from local_email_activity where id = ?", (activity_id,)).fetchone()
+    )
+
+    detected = resolve_need_signal_payload(payload, str(text))
+    need_signal = None
+    if detected and person_id:
+        need_signal = add_need_signal(
+            db_path,
+            {
+                "personId": person_id,
+                "source": payload.get("source", "message"),
+                "signalType": detected.get("signalType", "request"),
+                "summary": detected["summary"],
+                "status": detected.get("status", "new"),
+                "confidence": detected.get("confidence", 0.74),
+                "occurredAt": occurred_at,
+                "data": {
+                    "activityId": activity_id,
+                    "email": email,
+                    "subject": payload.get("subject"),
+                    "textPreview": compact_text(str(text), 240),
+                    **(detected.get("data") or {}),
+                },
+            },
+        )
+        identity = identify(db_path, email)
+
+    return {
+        "identity": identity,
+        "messageActivity": activity,
+        "needSignal": need_signal,
+        "jarvisAlert": build_jarvis_need_alert(identity, need_signal),
+    }
+
+
+def resolve_need_signal_payload(payload: dict[str, Any], text: str) -> dict[str, Any] | None:
+    explicit = payload.get("needSignal")
+    if explicit is False:
+        return None
+    if isinstance(explicit, dict):
+        if "summary" not in explicit:
+            raise ValueError("needSignal.summary is required when needSignal is provided")
+        return explicit
+    return infer_need_signal(text)
+
+
+def infer_need_signal(text: str) -> dict[str, Any] | None:
+    normalized = compact_text(text, 220)
+    lowered = normalized.lower()
+    strong_keywords = [
+        "potrebujem",
+        "potrebujeme",
+        "chcem",
+        "chcel by som",
+        "chceli by sme",
+        "prosím",
+        "treba",
+        "vieš mi",
+        "viete mi",
+        "môžeš",
+        "mohli by ste",
+        "need",
+        "want",
+        "can you",
+        "could you",
+        "please",
+    ]
+    if not any(keyword in lowered for keyword in strong_keywords):
+        return None
+    return {
+        "signalType": "request",
+        "summary": normalized,
+        "confidence": 0.84 if any(keyword in lowered for keyword in strong_keywords[:8]) else 0.7,
+    }
+
+
+def compact_text(text: str, limit: int) -> str:
+    value = " ".join(text.split())
+    return value if len(value) <= limit else f"{value[: limit - 1].rstrip()}…"
+
+
+def build_jarvis_need_alert(identity: dict[str, Any], need_signal: dict[str, Any] | None) -> str | None:
+    if not need_signal:
+        return None
+    person = identity.get("person") or {}
+    name = person.get("displayName") or person.get("companyName") or identity.get("email")
+    summary = str(need_signal["summary"]).rstrip(".!?")
+    return f"Jarvis: {name} chce alebo potrebuje: {summary}. Mám ti pripraviť odpoveď?"
+
+
 def build_cold_outreach_summary(metrics: dict[str, Any]) -> str:
     contacted = int(metrics["contacted"])
     opened = int(metrics["opened"])
@@ -292,6 +440,18 @@ def row_to_cold_event(row: sqlite3.Row) -> dict[str, Any]:
     }
 
 
+def row_to_email_activity(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "personId": row["person_id"],
+        "email": row["email"],
+        "source": row["source"],
+        "eventType": row["event_type"],
+        "occurredAt": row["occurred_at"],
+        "data": json.loads(row["data_json"] or "{}"),
+    }
+
+
 def required(payload: dict[str, Any], key: str) -> str:
     value = payload.get(key)
     if value in (None, ""):
@@ -304,13 +464,13 @@ def load_payload(raw: str | None) -> dict[str, Any]:
         return {}
     path = Path(raw)
     if path.exists():
-        return json.loads(path.read_text(encoding="utf-8"))
+        return json.loads(path.read_text(encoding="utf-8-sig"))
     return json.loads(raw)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Jarvis local SQLite DB helper.")
-    parser.add_argument("command", choices=["init", "upsert-person", "add-need-signal", "add-cold-event", "cold-brief", "identify"])
+    parser.add_argument("command", choices=["init", "upsert-person", "add-need-signal", "add-cold-event", "cold-brief", "identify", "ingest-message"])
     parser.add_argument("--db", type=Path, default=ROOT / "data" / "jarvis-local.db")
     parser.add_argument("--payload")
     parser.add_argument("--email")
@@ -327,6 +487,8 @@ def main() -> None:
             result = add_cold_event(args.db, load_payload(args.payload))
         elif args.command == "cold-brief":
             result = cold_brief(args.db, load_payload(args.payload))
+        elif args.command == "ingest-message":
+            result = ingest_message(args.db, load_payload(args.payload))
         else:
             if not args.email:
                 raise ValueError("--email is required for identify")

@@ -24,6 +24,7 @@ Claude, ChatGPT, or another MCP client can connect over stdio with:
 - `arcigy.get_cold_outreach_brief_from_db`: computes Slovak cold outreach summary from SQLite events.
 - `arcigy.upsert_local_person`: local client/lead/contact upsert into SQLite.
 - `arcigy.add_client_need_signal`: stores that a client needs something.
+- `arcigy.ingest_client_message`: stores a received email/message, identifies the sender, and returns a Jarvis alert when the message contains a request.
 - `arcigy.identify_email`: exact email/domain identity lookup with open need signals.
 - `arcigy.jarvis_voice_event`: wake-word state handling for the desktop voice layer.
 

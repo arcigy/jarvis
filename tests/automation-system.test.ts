@@ -28,6 +28,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.identify_email",
     "arcigy.upsert_local_person",
     "arcigy.add_client_need_signal",
+    "arcigy.ingest_client_message",
     "arcigy.jarvis_voice_event",
   ]);
 });
@@ -244,6 +245,46 @@ test("local SQLite CLI persists people and need signals", () => {
 
   assert.equal(match.reason, "exact_email_match");
   assert.equal(match.openNeedSignals[0].summary, "chce nový report pre cold outreach");
+});
+
+test("local SQLite CLI ingests client messages and raises need alerts", () => {
+  const dir = mkdtempSync(join(tmpdir(), "jarvis-message-db-"));
+  const dbPath = join(dir, "jarvis.db");
+  const python = process.env.JARVIS_PYTHON || "python";
+
+  runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "upsert-person",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify({
+      kind: "client",
+      primaryEmail: "ceo@acme.com",
+      displayName: "ACME CEO",
+      companyName: "ACME",
+    }),
+  ]);
+
+  const ingested = runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "ingest-message",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify({
+      fromEmail: "ceo@acme.com",
+      source: "email",
+      subject: "Onboarding",
+      text: "Potrebujem upraviť onboarding automatizáciu do piatku.",
+      occurredAt: "2026-06-07T10:00:00Z",
+    }),
+  ]);
+
+  assert.equal(ingested.identity.reason, "exact_email_match");
+  assert.equal(ingested.needSignal.signalType, "request");
+  assert.match(ingested.jarvisAlert, /ACME CEO chce alebo potrebuje/);
+  assert.equal(ingested.identity.openNeedSignals[0].summary, "Potrebujem upraviť onboarding automatizáciu do piatku.");
 });
 
 test("local SQLite CLI summarizes cold outreach events by period", () => {

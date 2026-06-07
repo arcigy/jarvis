@@ -27,6 +27,7 @@ Server tools:
 - `arcigy.add_cold_outreach_event`
 - `arcigy.upsert_local_person`
 - `arcigy.add_client_need_signal`
+- `arcigy.ingest_client_message`
 - `arcigy.identify_email`
 - `arcigy.jarvis_voice_event`
 
@@ -68,6 +69,7 @@ Initialize or use the SQLite DB:
 $env:PYTHONIOENCODING='utf-8'
 python scripts\jarvis_local_db.py init --db data\jarvis-local.db
 python scripts\jarvis_local_db.py identify --db data\jarvis-local.db --email klient@example.com
+python scripts\jarvis_local_db.py ingest-message --db data\jarvis-local.db --payload "{""fromEmail"":""klient@example.com"",""source"":""email"",""text"":""Potrebujem upraviť automatizáciu.""}"
 ```
 
 Cold outreach events can also be stored locally and summarized by period:

@@ -180,6 +180,55 @@ export function createJarvisMcpServer(): McpServer {
   );
 
   server.registerTool(
+    "arcigy.ingest_client_message",
+    {
+      title: "Ingest client message",
+      description:
+        "Store a received email/message, identify the sender locally, and create a Jarvis need alert when the client asks for something.",
+      inputSchema: {
+        dbPath: z.string().optional(),
+        id: z.string().optional(),
+        email: z.string().email().optional(),
+        fromEmail: z.string().email().optional(),
+        displayName: z.string().optional(),
+        companyName: z.string().optional(),
+        kind: z.enum(["client", "lead", "contact"]).default("lead"),
+        source: z.string().default("message"),
+        eventType: z.string().default("message_received"),
+        subject: z.string().optional(),
+        text: z.string().optional(),
+        body: z.string().optional(),
+        message: z.string().optional(),
+        occurredAt: z.string().optional(),
+        threadId: z.string().optional(),
+        externalId: z.string().optional(),
+        createIfUnknown: z.boolean().default(true),
+        personData: z.record(z.string(), z.unknown()).optional(),
+        data: z.record(z.string(), z.unknown()).optional(),
+        needSignal: z
+          .union([
+            z.literal(false),
+            z.object({
+              signalType: z.string().default("request"),
+              summary: z.string().min(1),
+              status: z.enum(["new", "seen", "resolved", "ignored"]).default("new"),
+              confidence: z.number().min(0).max(1).default(0.8),
+              data: z.record(z.string(), z.unknown()).optional(),
+            }),
+          ])
+          .optional(),
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+    },
+    async ({ dbPath, ...payload }) => jsonDbTool("ingest-message", payload, dbPath)
+  );
+
+  server.registerTool(
     "arcigy.identify_email",
     {
       title: "Identify email",
@@ -298,7 +347,7 @@ function runPython(args: string[]): { stdout: string; stderr: string } {
 }
 
 function jsonDbTool(
-  command: "upsert-person" | "add-need-signal" | "add-cold-event" | "cold-brief",
+  command: "upsert-person" | "add-need-signal" | "add-cold-event" | "cold-brief" | "ingest-message",
   payload: Record<string, unknown>,
   dbPath?: string
 ) {

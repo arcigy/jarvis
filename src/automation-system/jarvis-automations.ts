@@ -48,7 +48,7 @@ export const jarvisAutomations: AutomationDefinition[] = [
     enabledByDefault: true,
     channels: ["mcp", "dashboard"],
     description:
-      "Podľa emailu páruje lokálnych klientov, leadov a komunikáciu, aby MCP vedel povedať kto je kto a čo klient potrebuje.",
+      "Podľa emailu páruje lokálnych klientov, leadov a komunikáciu, ukladá klientské požiadavky zo správ a vracia Jarvis alert.",
     trigger: {
       type: "email_or_message_seen",
     },
