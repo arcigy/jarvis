@@ -97,6 +97,84 @@ def add_need_signal(db_path: Path, payload: dict[str, Any]) -> dict[str, Any]:
     return row_to_need_signal(row)
 
 
+def add_cold_event(db_path: Path, payload: dict[str, Any]) -> dict[str, Any]:
+    init_db(db_path)
+    event_id = payload.get("id") or f"cold_{uuid.uuid4().hex}"
+    lead_email = normalize_email(required(payload, "leadEmail"))
+    occurred_at = payload.get("occurredAt") or payload.get("occurred_at") or datetime.now(timezone.utc).isoformat()
+    conn = connect(db_path)
+    conn.execute(
+        """
+        insert into cold_outreach_events
+          (id, lead_email, campaign_id, campaign_name, event_type, occurred_at, data_json)
+        values (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            event_id,
+            lead_email,
+            payload.get("campaignId"),
+            payload.get("campaignName"),
+            required(payload, "eventType"),
+            occurred_at,
+            json.dumps(payload.get("data") or {}, ensure_ascii=False),
+        ),
+    )
+    conn.commit()
+    row = conn.execute("select * from cold_outreach_events where id = ?", (event_id,)).fetchone()
+    return row_to_cold_event(row)
+
+
+def cold_brief(db_path: Path, payload: dict[str, Any]) -> dict[str, Any]:
+    init_db(db_path)
+    since = required(payload, "since")
+    until = payload.get("until") or datetime.now(timezone.utc).isoformat()
+    period_label = payload.get("periodLabel") or f"{since} - {until}"
+    conn = connect(db_path)
+    params = (since, until)
+
+    counts = {
+        event_type: conn.execute(
+            """
+            select count(distinct lead_email) as count
+            from cold_outreach_events
+            where event_type = ? and occurred_at >= ? and occurred_at <= ?
+            """,
+            (event_type, *params),
+        ).fetchone()["count"]
+        for event_type in ["sent", "opened", "replied", "positive_reply", "prepared_reply"]
+    }
+
+    pending_approval = conn.execute(
+        """
+        select count(distinct p.lead_email) as count
+        from cold_outreach_events p
+        where p.event_type = 'prepared_reply'
+          and p.occurred_at >= ? and p.occurred_at <= ?
+          and not exists (
+            select 1 from cold_outreach_events a
+            where a.lead_email = p.lead_email
+              and a.event_type = 'approved_reply_sent'
+              and a.occurred_at >= p.occurred_at
+          )
+        """,
+        params,
+    ).fetchone()["count"]
+
+    metrics = {
+        "periodLabel": period_label,
+        "contacted": counts["sent"],
+        "opened": counts["opened"],
+        "replied": counts["replied"],
+        "positiveReplies": counts["positive_reply"],
+        "preparedPositiveReplyCount": counts["prepared_reply"],
+        "pendingApprovalCount": pending_approval,
+    }
+    return {
+        "metrics": metrics,
+        "summary": build_cold_outreach_summary(metrics),
+    }
+
+
 def identify(db_path: Path, email: str) -> dict[str, Any]:
     init_db(db_path)
     normalized = normalize_email(email)
@@ -149,6 +227,33 @@ def identify(db_path: Path, email: str) -> dict[str, Any]:
     }
 
 
+def build_cold_outreach_summary(metrics: dict[str, Any]) -> str:
+    contacted = int(metrics["contacted"])
+    opened = int(metrics["opened"])
+    replied = int(metrics["replied"])
+    positive = int(metrics["positiveReplies"])
+    prepared = int(metrics["preparedPositiveReplyCount"])
+    pending = int(metrics["pendingApprovalCount"])
+    open_rate = round((opened / contacted) * 100, 1) if contacted else 0
+    parts = [
+        f"Za {metrics['periodLabel']} sme napísali {contacted} ľuďom.",
+        f"{open_rate}% si email otvorilo, {replied} ľudí odpísalo, z toho {positive} pozitívne.",
+    ]
+    if prepared:
+        parts.append(f"Pripravil som ti {prepared_reply_label(prepared)} na pozitívne reakcie a pošlem ich až na tvoje potvrdenie.")
+    if pending:
+        parts.append(f"Čaká {pending} odpovedí na schválenie.")
+    return " ".join(parts)
+
+
+def prepared_reply_label(count: int) -> str:
+    if count == 1:
+        return "1 odpoveď"
+    if 1 < count < 5:
+        return f"{count} odpovede"
+    return f"{count} odpovedí"
+
+
 def row_to_person(row: sqlite3.Row) -> dict[str, Any]:
     return {
         "id": row["id"],
@@ -175,6 +280,18 @@ def row_to_need_signal(row: sqlite3.Row) -> dict[str, Any]:
     }
 
 
+def row_to_cold_event(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "leadEmail": row["lead_email"],
+        "campaignId": row["campaign_id"],
+        "campaignName": row["campaign_name"],
+        "eventType": row["event_type"],
+        "occurredAt": row["occurred_at"],
+        "data": json.loads(row["data_json"] or "{}"),
+    }
+
+
 def required(payload: dict[str, Any], key: str) -> str:
     value = payload.get(key)
     if value in (None, ""):
@@ -193,7 +310,7 @@ def load_payload(raw: str | None) -> dict[str, Any]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Jarvis local SQLite DB helper.")
-    parser.add_argument("command", choices=["init", "upsert-person", "add-need-signal", "identify"])
+    parser.add_argument("command", choices=["init", "upsert-person", "add-need-signal", "add-cold-event", "cold-brief", "identify"])
     parser.add_argument("--db", type=Path, default=ROOT / "data" / "jarvis-local.db")
     parser.add_argument("--payload")
     parser.add_argument("--email")
@@ -206,6 +323,10 @@ def main() -> None:
             result = upsert_person(args.db, load_payload(args.payload))
         elif args.command == "add-need-signal":
             result = add_need_signal(args.db, load_payload(args.payload))
+        elif args.command == "add-cold-event":
+            result = add_cold_event(args.db, load_payload(args.payload))
+        elif args.command == "cold-brief":
+            result = cold_brief(args.db, load_payload(args.payload))
         else:
             if not args.email:
                 raise ValueError("--email is required for identify")

@@ -23,6 +23,8 @@ test("MCP tools expose the requested automation surface", () => {
   assert.deepEqual(names, [
     "arcigy.generate_contract_documents",
     "arcigy.get_cold_outreach_brief",
+    "arcigy.get_cold_outreach_brief_from_db",
+    "arcigy.add_cold_outreach_event",
     "arcigy.identify_email",
     "arcigy.upsert_local_person",
     "arcigy.add_client_need_signal",
@@ -219,6 +221,51 @@ test("local SQLite CLI persists people and need signals", () => {
 
   assert.equal(match.reason, "exact_email_match");
   assert.equal(match.openNeedSignals[0].summary, "chce nový report pre cold outreach");
+});
+
+test("local SQLite CLI summarizes cold outreach events by period", () => {
+  const dir = mkdtempSync(join(tmpdir(), "jarvis-cold-db-"));
+  const dbPath = join(dir, "jarvis.db");
+  const python = process.env.JARVIS_PYTHON || "python";
+  const since = "2026-06-01T00:00:00Z";
+  const until = "2026-06-08T00:00:00Z";
+
+  for (const event of [
+    ["a@example.com", "sent"],
+    ["b@example.com", "sent"],
+    ["a@example.com", "opened"],
+    ["a@example.com", "replied"],
+    ["a@example.com", "positive_reply"],
+    ["a@example.com", "prepared_reply"],
+  ] as const) {
+    runPythonJson(python, [
+      "scripts/jarvis_local_db.py",
+      "add-cold-event",
+      "--db",
+      dbPath,
+      "--payload",
+      JSON.stringify({
+        leadEmail: event[0],
+        eventType: event[1],
+        occurredAt: "2026-06-07T10:00:00Z",
+      }),
+    ]);
+  }
+
+  const brief = runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "cold-brief",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify({ since, until, periodLabel: "posledných 7 dní" }),
+  ]);
+
+  assert.equal(brief.metrics.contacted, 2);
+  assert.equal(brief.metrics.opened, 1);
+  assert.equal(brief.metrics.positiveReplies, 1);
+  assert.match(brief.summary, /Za posledných 7 dní sme napísali 2 ľuďom/);
+  assert.match(brief.summary, /Pripravil som ti 1 odpoveď/);
 });
 
 function runPythonJson(python: string, args: string[]) {

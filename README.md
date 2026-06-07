@@ -23,6 +23,8 @@ Server tools:
 
 - `arcigy.generate_contract_documents`
 - `arcigy.get_cold_outreach_brief`
+- `arcigy.get_cold_outreach_brief_from_db`
+- `arcigy.add_cold_outreach_event`
 - `arcigy.upsert_local_person`
 - `arcigy.add_client_need_signal`
 - `arcigy.identify_email`
@@ -65,6 +67,13 @@ Initialize or use the SQLite DB:
 $env:PYTHONIOENCODING='utf-8'
 python scripts\jarvis_local_db.py init --db data\jarvis-local.db
 python scripts\jarvis_local_db.py identify --db data\jarvis-local.db --email klient@example.com
+```
+
+Cold outreach events can also be stored locally and summarized by period:
+
+```powershell
+python scripts\jarvis_local_db.py add-cold-event --db data\jarvis-local.db --payload "{""leadEmail"":""lead@example.com"",""eventType"":""sent"",""occurredAt"":""2026-06-07T10:00:00Z""}"
+python scripts\jarvis_local_db.py cold-brief --db data\jarvis-local.db --payload "{""since"":""2026-06-01T00:00:00Z"",""until"":""2026-06-08T00:00:00Z"",""periodLabel"":""posledných 7 dní""}"
 ```
 
 ## Contract templates

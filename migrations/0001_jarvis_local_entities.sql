@@ -25,6 +25,20 @@ CREATE INDEX IF NOT EXISTS idx_local_people_email ON local_people(primary_email)
 CREATE INDEX IF NOT EXISTS idx_local_email_activity_email ON local_email_activity(email);
 CREATE INDEX IF NOT EXISTS idx_local_email_activity_event_time ON local_email_activity(event_type, occurred_at);
 
+CREATE TABLE IF NOT EXISTS cold_outreach_events (
+  id TEXT PRIMARY KEY,
+  lead_email TEXT NOT NULL,
+  campaign_id TEXT,
+  campaign_name TEXT,
+  event_type TEXT NOT NULL CHECK (event_type IN ('sent', 'opened', 'replied', 'positive_reply', 'prepared_reply', 'approved_reply_sent')),
+  occurred_at TEXT NOT NULL,
+  data_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_cold_outreach_events_type_time ON cold_outreach_events(event_type, occurred_at);
+CREATE INDEX IF NOT EXISTS idx_cold_outreach_events_lead_time ON cold_outreach_events(lead_email, occurred_at);
+
 CREATE TABLE IF NOT EXISTS client_need_signals (
   id TEXT PRIMARY KEY,
   person_id TEXT REFERENCES local_people(id) ON DELETE CASCADE,

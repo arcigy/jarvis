@@ -27,6 +27,13 @@ Implementácia sumarizácie je v `src/automation-system/cold-outreach-summary.ts
 
 MCP entrypoint je `src/automation-system/mcp-server.ts`, tool `arcigy.get_cold_outreach_brief`.
 
+Ak sú cold outreach eventy uložené lokálne v SQLite, MCP môže použiť:
+
+- `arcigy.add_cold_outreach_event`
+- `arcigy.get_cold_outreach_brief_from_db`
+
+Eventy používajú typy `sent`, `opened`, `replied`, `positive_reply`, `prepared_reply`, `approved_reply_sent`. Brief sa počíta za obdobie podľa `since`, `until` a `periodLabel`.
+
 ## Lokálni klienti a leads
 
 Email je primárny identifikátor v `local_people.primary_email`. Variabilné údaje sú v `data_json`, aby sa pre každú klientsku automatizáciu nevytvárali nové tabuľky.

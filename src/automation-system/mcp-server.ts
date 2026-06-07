@@ -69,6 +69,52 @@ export function createJarvisMcpServer(): McpServer {
   );
 
   server.registerTool(
+    "arcigy.add_cold_outreach_event",
+    {
+      title: "Add cold outreach event",
+      description: "Store a local cold outreach event for period summaries.",
+      inputSchema: {
+        dbPath: z.string().optional(),
+        id: z.string().optional(),
+        leadEmail: z.string().email(),
+        campaignId: z.string().optional(),
+        campaignName: z.string().optional(),
+        eventType: z.enum(["sent", "opened", "replied", "positive_reply", "prepared_reply", "approved_reply_sent"]),
+        occurredAt: z.string().optional(),
+        data: z.record(z.string(), z.unknown()).optional(),
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+    },
+    async ({ dbPath, ...payload }) => jsonDbTool("add-cold-event", payload, dbPath)
+  );
+
+  server.registerTool(
+    "arcigy.get_cold_outreach_brief_from_db",
+    {
+      title: "Cold outreach brief from DB",
+      description: "Calculate a concise Slovak cold outreach brief from local SQLite events.",
+      inputSchema: {
+        dbPath: z.string().optional(),
+        since: z.string().min(1),
+        until: z.string().optional(),
+        periodLabel: z.string().optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async ({ dbPath, ...payload }) => jsonDbTool("cold-brief", payload, dbPath)
+  );
+
+  server.registerTool(
     "arcigy.upsert_local_person",
     {
       title: "Upsert local person",
@@ -238,7 +284,11 @@ function runPython(args: string[]): { stdout: string; stderr: string } {
   };
 }
 
-function jsonDbTool(command: "upsert-person" | "add-need-signal", payload: Record<string, unknown>, dbPath?: string) {
+function jsonDbTool(
+  command: "upsert-person" | "add-need-signal" | "add-cold-event" | "cold-brief",
+  payload: Record<string, unknown>,
+  dbPath?: string
+) {
   const args = ["scripts/jarvis_local_db.py", command, "--payload", JSON.stringify(payload)];
   if (dbPath) {
     args.push("--db", dbPath);

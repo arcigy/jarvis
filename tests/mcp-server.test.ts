@@ -19,6 +19,8 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   const tools = await client.listTools();
   const names = tools.tools.map((tool) => tool.name);
   assert.ok(names.includes("arcigy.get_cold_outreach_brief"));
+  assert.ok(names.includes("arcigy.get_cold_outreach_brief_from_db"));
+  assert.ok(names.includes("arcigy.add_cold_outreach_event"));
   assert.ok(names.includes("arcigy.identify_email"));
   assert.ok(names.includes("arcigy.jarvis_voice_event"));
 
@@ -88,6 +90,53 @@ test("Jarvis MCP server persists and identifies local people through SQLite tool
 
   assert.equal(match.reason, "exact_email_match");
   assert.equal(match.openNeedSignals[0].summary, "chce pripraviť novú automatizáciu");
+
+  await client.close();
+  await server.close();
+});
+
+test("Jarvis MCP server summarizes cold outreach from local SQLite events", async () => {
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  const server = createJarvisMcpServer();
+  const client = new Client({ name: "test-client", version: "0.1.0" });
+  const dbPath = join(mkdtempSync(join(tmpdir(), "jarvis-mcp-cold-")), "jarvis.db");
+
+  await server.connect(serverTransport);
+  await client.connect(clientTransport);
+
+  for (const [leadEmail, eventType] of [
+    ["one@example.com", "sent"],
+    ["two@example.com", "sent"],
+    ["one@example.com", "opened"],
+    ["one@example.com", "replied"],
+    ["one@example.com", "positive_reply"],
+    ["one@example.com", "prepared_reply"],
+  ]) {
+    await client.callTool({
+      name: "arcigy.add_cold_outreach_event",
+      arguments: {
+        dbPath,
+        leadEmail,
+        eventType,
+        occurredAt: "2026-06-07T10:00:00Z",
+      },
+    });
+  }
+
+  const result = await client.callTool({
+    name: "arcigy.get_cold_outreach_brief_from_db",
+    arguments: {
+      dbPath,
+      since: "2026-06-01T00:00:00Z",
+      until: "2026-06-08T00:00:00Z",
+      periodLabel: "posledných 7 dní",
+    },
+  });
+  const brief = getStructuredResult(result) as { summary: string; metrics: { contacted: number } };
+
+  assert.equal(brief.metrics.contacted, 2);
+  assert.match(brief.summary, /Za posledných 7 dní sme napísali 2 ľuďom/);
+  assert.match(brief.summary, /Pripravil som ti 1 odpoveď/);
 
   await client.close();
   await server.close();

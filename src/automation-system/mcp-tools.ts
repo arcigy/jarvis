@@ -5,6 +5,8 @@ import type { ClientNeedSignal, ColdOutreachMetrics, LocalPerson } from "./types
 export type JarvisMcpToolName =
   | "arcigy.generate_contract_documents"
   | "arcigy.get_cold_outreach_brief"
+  | "arcigy.get_cold_outreach_brief_from_db"
+  | "arcigy.add_cold_outreach_event"
   | "arcigy.upsert_local_person"
   | "arcigy.add_client_need_signal"
   | "arcigy.identify_email"
@@ -34,6 +36,16 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.get_cold_outreach_brief",
       description: "Vráti stručný Slovak brief o cold outreach aktivite za zvolené obdobie.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.get_cold_outreach_brief_from_db",
+      description: "Vypočíta cold outreach brief z lokálnych SQLite eventov za zvolené obdobie.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.add_cold_outreach_event",
+      description: "Uloží lokálny cold outreach event, napríklad sent, opened, replied alebo positive_reply.",
       requiresApproval: false,
     },
     {
