@@ -88,6 +88,7 @@ function checkRequiredFiles(): DoctorCheck {
     "docs/contracts/templates/doplnkova-priloha-univerzalna.docx",
     "scripts/generate_contract_documents.py",
     "scripts/jarvis_local_db.py",
+    "scripts/start_web_tunnel.ts",
   ];
   const missing = requiredFiles.filter((file) => !existsSync(join(repoRoot, file)));
   return {

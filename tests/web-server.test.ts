@@ -263,6 +263,8 @@ test("local web bridge preflight reports tunnel readiness without leaking secret
       tokenConfigured: boolean;
       readyForTunnel: boolean;
       manifestUrl: string;
+      tunnelCommand: string;
+      tunnelProvider: string;
       mcpToolCount: number;
       riskyToolsRequiringApproval: string[];
       pathPolicy: string;
@@ -271,6 +273,8 @@ test("local web bridge preflight reports tunnel readiness without leaking secret
     assert.equal(body.tokenConfigured, true);
     assert.equal(body.readyForTunnel, true);
     assert.match(body.manifestUrl, /\/\.well-known\/arcigy-jarvis\.json$/);
+    assert.equal(body.tunnelCommand, "npm run web:tunnel");
+    assert.equal(body.tunnelProvider, "ngrok");
     assert.ok(body.mcpToolCount >= 19);
     assert.ok(body.riskyToolsRequiringApproval.includes("arcigy.generate_contract_documents"));
     assert.ok(body.riskyToolsRequiringApproval.includes("arcigy.append_leads_to_google_sheet"));

@@ -323,13 +323,15 @@ function buildWebBridgePreflight(request: IncomingMessage) {
   const warnings: string[] = [];
   if (!tokenConfigured) warnings.push("Set JARVIS_WEB_TOKEN before exposing the bridge through a tunnel.");
   if (localhostBypass) warnings.push("Localhost auth bypass is enabled for desktop/local use.");
-  if (!isCommandAvailable("ngrok")) warnings.push("ngrok command was not found on PATH; npm run web:tunnel may need local ngrok setup.");
+  if (!isCommandAvailable("ngrok") && !isCommandAvailable("npx")) warnings.push("Neither ngrok nor npx was found on PATH; npm run web:tunnel needs one of them.");
 
   return {
     mode: "local-web-bridge",
     host: getRequestHost(request),
     origin,
     manifestUrl: `${origin}/.well-known/arcigy-jarvis.json`,
+    tunnelCommand: "npm run web:tunnel",
+    tunnelProvider: "ngrok",
     authRequiredForExternalHosts: true,
     tokenConfigured,
     localhostBypass,

@@ -16,12 +16,20 @@ Claude, ChatGPT, or another MCP client can connect over stdio with:
 }
 ```
 
-For browser or remote-agent use, run `npm run web` and expose it with `npm run web:tunnel`. The web bridge publishes its protected manifest at:
+For browser or remote-agent use, set `JARVIS_WEB_TOKEN` in `.env.local` and run:
+
+```powershell
+npm run web:tunnel
+```
+
+The tunnel runner starts the local web bridge if needed, checks `/api/web-bridge-preflight`, starts ngrok, finds the public HTTPS URL, and verifies the protected manifest before printing remote MCP URLs.
+
+The web bridge publishes its protected manifest at:
 
 - `GET /api/mcp`
 - `GET /.well-known/arcigy-jarvis.json`
 
-Before exposing the bridge, check `GET /api/web-bridge-preflight`. External hosts require `Authorization: Bearer <JARVIS_WEB_TOKEN>`. The manifest returns concrete `tools[].url` values for POST calls.
+External hosts require `Authorization: Bearer <JARVIS_WEB_TOKEN>`. The manifest returns concrete `tools[].url` values for POST calls.
 
 ## Tools
 

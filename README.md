@@ -145,16 +145,23 @@ It serves the same UI at `http://127.0.0.1:8765` and exposes local HTTP endpoint
 - `POST /api/mcp/arcigy.discover_leads`
 - `POST /api/mcp/arcigy.append_leads_to_google_sheet`
 
-For a temporary external URL, run `npm run web:tunnel` after configuring ngrok locally. Keep this local-first; do not expose it publicly without access controls.
+For a temporary external URL, run the guarded ngrok runner after configuring `JARVIS_WEB_TOKEN` in `.env.local`:
 
 External agent setup flow:
 
-1. Run `npm run web`.
-2. Open `http://127.0.0.1:8765/api/web-bridge-preflight` and confirm `readyForTunnel: true`.
-3. Run `npm run web:tunnel`.
-4. Open `https://<your-tunnel-host>/.well-known/arcigy-jarvis.json` with `Authorization: Bearer <JARVIS_WEB_TOKEN>`.
+1. Set `JARVIS_WEB_TOKEN` to a non-dummy secret in `.env.local`.
+2. Run `npm run web:tunnel`.
+3. The runner starts `npm run web` if needed, checks `/api/web-bridge-preflight`, starts ngrok, finds the public HTTPS URL, and verifies the protected manifest.
+4. Give Claude, ChatGPT, or another remote agent the printed external manifest URL plus `Authorization: Bearer <JARVIS_WEB_TOKEN>`.
 5. Use the returned `tools[].url` values for web MCP-style calls. Each tool expects JSON in the POST body and returns `{ "result": ... }`.
 6. For manifest tools with `requiresApproval: true`, include `"approval": { "approved": true }` only after explicit user confirmation.
+
+Advanced/manual flow:
+
+```powershell
+npm run web
+npm run web:tunnel -- --no-start-web
+```
 
 API security:
 
