@@ -35,10 +35,14 @@ test("Jarvis doctor reports local readiness without leaking secrets", () => {
     mcpToolCallReady?: boolean;
     externalAuthReady?: boolean;
     deniedExternalManifestStatus?: number;
+    approvalGateReady?: boolean;
+    deniedContractStatus?: number;
   };
   assert.equal(webBridgeDetails?.expectedToolCount, 19);
   assert.equal(webBridgeDetails?.uiAssetsReady, true);
   assert.equal(webBridgeDetails?.mcpToolCallReady, true);
   assert.equal(webBridgeDetails?.externalAuthReady, true);
   assert.equal(webBridgeDetails?.deniedExternalManifestStatus, 401);
+  assert.equal(webBridgeDetails?.approvalGateReady, true);
+  assert.equal(webBridgeDetails?.deniedContractStatus, 409);
 });

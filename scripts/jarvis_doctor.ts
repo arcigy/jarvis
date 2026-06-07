@@ -334,6 +334,17 @@ async function checkWebBridgeSmoke(): Promise<DoctorCheck> {
       preparedPositiveReplyCount: 1,
       pendingApprovalCount: 1,
     });
+    const contractIntake = JSON.parse(readFileSync(join(repoRoot, "docs/contracts/examples/sample-intake.json"), "utf-8")) as unknown;
+    const webContractOutputDir = safeGeneratedPath(`doctor-web-contracts-${Date.now()}-${process.pid}`);
+    const deniedContractStatus = await postJsonStatus(`${origin}/api/mcp/arcigy.generate_contract_documents`, {
+      intake: contractIntake,
+      outputDir: webContractOutputDir,
+    });
+    const approvedContract = await postJson(`${origin}/api/mcp/arcigy.generate_contract_documents`, {
+      approval: { approved: true },
+      intake: contractIntake,
+      outputDir: webContractOutputDir,
+    });
     const expectedToolCount = listJarvisMcpTools().length;
     const mcpToolCount = Number((preflight as { mcpToolCount?: unknown }).mcpToolCount);
     const manifestToolCount = Array.isArray((manifest as { tools?: unknown }).tools) ? (manifest as { tools: unknown[] }).tools.length : 0;
@@ -349,7 +360,12 @@ async function checkWebBridgeSmoke(): Promise<DoctorCheck> {
       (allowedExternalManifest as { baseUrl?: unknown }).baseUrl === "https://doctor.example.ngrok-free.app" &&
       Array.isArray((allowedExternalManifest as { tools?: unknown }).tools) &&
       (allowedExternalManifest as { tools: unknown[] }).tools.length === expectedToolCount;
-    const ready = mcpToolCount === expectedToolCount && manifestToolCount === expectedToolCount && uiAssetsReady && mcpToolCallReady && externalAuthReady;
+    const approvalGateReady =
+      deniedContractStatus === 409 &&
+      typeof (approvedContract as { result?: unknown }).result === "string" &&
+      String((approvedContract as { result: string }).result).includes("generation-manifest.json") &&
+      existsSync(join(webContractOutputDir, "generation-manifest.json"));
+    const ready = mcpToolCount === expectedToolCount && manifestToolCount === expectedToolCount && uiAssetsReady && mcpToolCallReady && externalAuthReady && approvalGateReady;
 
     return {
       key: "webBridgeSmoke",
@@ -366,6 +382,8 @@ async function checkWebBridgeSmoke(): Promise<DoctorCheck> {
         mcpToolCallReady,
         externalAuthReady,
         deniedExternalManifestStatus,
+        approvalGateReady,
+        deniedContractStatus,
       },
     };
   } catch (error) {
@@ -421,6 +439,15 @@ async function postJson(url: string, payload: unknown): Promise<unknown> {
   });
   if (!response.ok) throw new Error(`${url} returned ${response.status}`);
   return response.json();
+}
+
+async function postJsonStatus(url: string, payload: unknown): Promise<number> {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return response.status;
 }
 
 async function fetchStatus(url: string, headers?: Record<string, string>): Promise<number> {
