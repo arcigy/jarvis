@@ -82,6 +82,18 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
     return;
   }
 
+  if (request.method === "POST" && url.pathname === "/api/identify-email") {
+    const payload = await readJson(request);
+    writeJson(response, 200, identifyEmail(payload));
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/ingest-client-message") {
+    const payload = await readJson(request);
+    writeJson(response, 200, ingestClientMessage(payload));
+    return;
+  }
+
   if (request.method === "POST" && url.pathname === "/api/generate-ai-reply") {
     const payload = await readJson(request);
     const result = await generateGeminiText(
@@ -262,6 +274,14 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
     writeJson(response, 200, { result: JSON.parse(result.stdout) });
     return;
   }
+  if (name === "arcigy.identify_email") {
+    writeJson(response, 200, { result: identifyEmail(payload) });
+    return;
+  }
+  if (name === "arcigy.ingest_client_message") {
+    writeJson(response, 200, { result: ingestClientMessage(payload) });
+    return;
+  }
   if (name === "arcigy.sync_gmail_recent_messages") {
     writeJson(response, 200, { result: await syncGmailRecentMessages(payload) });
     return;
@@ -360,6 +380,46 @@ async function syncGmailRecentMessages(payload: Record<string, unknown>) {
     });
   }
   return { dryRun, synced };
+}
+
+function identifyEmail(payload: Record<string, unknown>) {
+  const email = optionalString(payload.email);
+  if (!email) throw new Error("Email is required.");
+  return JSON.parse(
+    runPython([
+      "scripts/jarvis_local_db.py",
+      "identify",
+      "--db",
+      String(payload.dbPath ?? defaultDbPath),
+      "--email",
+      email,
+    ]).stdout
+  );
+}
+
+function ingestClientMessage(payload: Record<string, unknown>) {
+  const email = optionalString(payload.email) ?? optionalString(payload.fromEmail);
+  const text = optionalString(payload.text) ?? optionalString(payload.message);
+  if (!email) throw new Error("Email is required.");
+  if (!text) throw new Error("Message text is required.");
+  return JSON.parse(
+    runPython([
+      "scripts/jarvis_local_db.py",
+      "ingest-message",
+      "--db",
+      String(payload.dbPath ?? defaultDbPath),
+      "--payload",
+      JSON.stringify({
+        fromEmail: email,
+        displayName: optionalString(payload.displayName),
+        companyName: optionalString(payload.companyName),
+        subject: optionalString(payload.subject),
+        text,
+        source: optionalString(payload.source) ?? "jarvis-ui",
+        createIfUnknown: payload.createIfUnknown !== false,
+      }),
+    ]).stdout
+  );
 }
 
 function serveStatic(pathname: string, response: ServerResponse, headOnly: boolean) {

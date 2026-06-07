@@ -15,6 +15,7 @@ This opens a local Electron desktop window. It is a working fallback shell until
 - Jarvis answers through `speechSynthesis` in Slovak.
 - If speech recognition is not available, use the transcript text box and `Send transcript`.
 - The renderer calls the local Electron preload bridge for Jarvis voice events and cold outreach briefs.
+- The client memory panel identifies email addresses and ingests client requests into the local SQLite database.
 - The Gemini panel drafts client replies without sending them.
 - The operations panel syncs recent Gmail messages into the local SQLite memory and checks Smartlead campaign status.
 - The lead discovery panel runs read-only company discovery through Serper and Google Places.

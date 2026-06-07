@@ -97,6 +97,34 @@
           <div class="response compact" id="smartleadResult">Ready for read-only Smartlead status.</div>
         </article>
 
+        <article class="panel clientMemoryPanel">
+          <div class="panelHead">
+            <div>
+              <h2>Client memory</h2>
+              <p>Identify a sender and store client requests in local SQLite memory.</p>
+            </div>
+            <div class="buttonGroup">
+              <button id="identifyEmail">Identify</button>
+              <button id="ingestClientMessage">Ingest</button>
+            </div>
+          </div>
+          <div class="splitControls">
+            <label>
+              Email
+              <input id="memoryEmail" spellcheck="false" placeholder="client@example.com" />
+            </label>
+            <label>
+              Subject
+              <input id="memorySubject" spellcheck="false" placeholder="Request subject" />
+            </label>
+          </div>
+          <label>
+            Message
+            <textarea id="memoryMessage" spellcheck="false" placeholder="Client request or email body"></textarea>
+          </label>
+          <div class="response compact" id="memoryResult">Ready to identify email or save a client need.</div>
+        </article>
+
         <article class="panel">
           <div class="panelHead">
             <div>

@@ -47,6 +47,8 @@ app.whenReady().then(() => {
   ipcMain.handle("jarvis:coldOutreachBrief", (_event, payload) => getColdOutreachBrief(payload));
   ipcMain.handle("jarvis:voiceEvent", (_event, payload) => handleVoiceEvent(payload));
   ipcMain.handle("jarvis:systemHealth", () => getSystemHealth());
+  ipcMain.handle("jarvis:identifyEmail", (_event, payload) => identifyEmail(payload));
+  ipcMain.handle("jarvis:ingestClientMessage", (_event, payload) => ingestClientMessage(payload));
   ipcMain.handle("jarvis:generateAiReply", (_event, payload) => generateAiReply(payload));
   ipcMain.handle("jarvis:syncGmailRecentMessages", (_event, payload) => syncGmailRecentMessages(payload));
   ipcMain.handle("jarvis:getSmartleadCampaignStatus", (_event, payload) => getSmartleadCampaignStatus(payload));
@@ -198,6 +200,44 @@ function getColdOutreachBrief(payload) {
   ]);
   const parsed = JSON.parse(result.stdout);
   return parsed.summary;
+}
+
+function identifyEmail(payload) {
+  const email = String(payload?.email ?? "").trim();
+  if (!email) throw new Error("Email is required.");
+  const result = runPython([
+    "scripts/jarvis_local_db.py",
+    "identify",
+    "--db",
+    payload?.dbPath || defaultDbPath,
+    "--email",
+    email,
+  ]);
+  return JSON.parse(result.stdout);
+}
+
+function ingestClientMessage(payload) {
+  const email = String(payload?.email ?? payload?.fromEmail ?? "").trim();
+  const text = String(payload?.text ?? payload?.message ?? "").trim();
+  if (!email) throw new Error("Email is required.");
+  if (!text) throw new Error("Message text is required.");
+  const result = runPython([
+    "scripts/jarvis_local_db.py",
+    "ingest-message",
+    "--db",
+    payload?.dbPath || defaultDbPath,
+    "--payload",
+    JSON.stringify({
+      fromEmail: email,
+      displayName: payload?.displayName,
+      companyName: payload?.companyName,
+      subject: payload?.subject,
+      text,
+      source: payload?.source || "jarvis-ui",
+      createIfUnknown: payload?.createIfUnknown !== false,
+    }),
+  ]);
+  return JSON.parse(result.stdout);
 }
 
 function resolveColdOutreachPeriod(text) {

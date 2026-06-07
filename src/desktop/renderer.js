@@ -15,6 +15,12 @@ const elements = {
   simulateWake: document.querySelector("#simulateWake"),
   submitTranscript: document.querySelector("#submitTranscript"),
   coldBrief: document.querySelector("#coldBrief"),
+  memoryEmail: document.querySelector("#memoryEmail"),
+  memorySubject: document.querySelector("#memorySubject"),
+  memoryMessage: document.querySelector("#memoryMessage"),
+  identifyEmail: document.querySelector("#identifyEmail"),
+  ingestClientMessage: document.querySelector("#ingestClientMessage"),
+  memoryResult: document.querySelector("#memoryResult"),
   clientMessage: document.querySelector("#clientMessage"),
   draftReply: document.querySelector("#draftReply"),
   draftResult: document.querySelector("#draftResult"),
@@ -38,6 +44,8 @@ const arcigyApi = window.arcigyDesktop ?? {
   systemHealth: () => getJson("/api/system-health"),
   coldOutreachBrief: (payload) => postJson("/api/cold-outreach-brief", payload),
   jarvisVoiceEvent: (payload) => postJson("/api/jarvis/voice-event", payload),
+  identifyEmail: (payload) => postJson("/api/identify-email", payload),
+  ingestClientMessage: (payload) => postJson("/api/ingest-client-message", payload),
   generateAiReply: (payload) => postJson("/api/generate-ai-reply", payload),
   syncGmailRecentMessages: (payload) => postJson("/api/sync-gmail-recent-messages", payload),
   getSmartleadCampaignStatus: (payload) => postJson("/api/smartlead-campaign-status", payload),
@@ -125,6 +133,30 @@ function renderGmailSync(result) {
       ].join("\n")
     )
     .join("\n\n");
+}
+
+function renderIdentity(result) {
+  if (!result.person) {
+    return `No local identity match for ${result.email}.`;
+  }
+  const needs = result.openNeedSignals ?? [];
+  return [
+    `${result.person.displayName ?? result.person.companyName ?? result.person.primaryEmail}`,
+    `Email: ${result.person.primaryEmail}`,
+    `Kind: ${result.person.kind}`,
+    `Match: ${result.reason} (${Math.round((result.confidence ?? 0) * 100)}%)`,
+    needs.length ? `Open needs: ${needs.length}` : "Open needs: 0",
+    ...needs.slice(0, 5).map((need) => `- ${need.summary}`),
+  ].join("\n");
+}
+
+function renderIngestedMessage(result) {
+  return [
+    result.jarvisAlert ?? "Message saved. No new client request detected.",
+    "",
+    "Identity:",
+    renderIdentity(result.identity),
+  ].join("\n");
 }
 
 function renderSmartleadStatus(result) {
@@ -276,6 +308,29 @@ elements.submitTranscript.addEventListener("click", () => void handleTranscript(
 elements.coldBrief.addEventListener("click", async () => {
   speak(await arcigyApi.coldOutreachBrief({ text: "cold outreach za posledných 7 dní" }));
 });
+elements.identifyEmail.addEventListener("click", async () => {
+  try {
+    elements.memoryResult.textContent = "Identifying...";
+    const result = await arcigyApi.identifyEmail({ email: elements.memoryEmail.value });
+    elements.memoryResult.textContent = renderIdentity(result);
+  } catch (error) {
+    elements.memoryResult.textContent = error instanceof Error ? error.message : String(error);
+  }
+});
+elements.ingestClientMessage.addEventListener("click", async () => {
+  try {
+    elements.memoryResult.textContent = "Saving message...";
+    const result = await arcigyApi.ingestClientMessage({
+      email: elements.memoryEmail.value,
+      subject: elements.memorySubject.value,
+      text: elements.memoryMessage.value,
+    });
+    elements.memoryResult.textContent = renderIngestedMessage(result);
+    if (result.jarvisAlert) speak(result.jarvisAlert);
+  } catch (error) {
+    elements.memoryResult.textContent = error instanceof Error ? error.message : String(error);
+  }
+});
 elements.draftReply.addEventListener("click", async () => {
   try {
     elements.draftResult.textContent = "Drafting...";
@@ -341,6 +396,9 @@ elements.generateContracts.addEventListener("click", async () => {
 });
 
 elements.contractIntake.value = JSON.stringify(sampleContractIntake(), null, 2);
+elements.memoryEmail.value = "client@example.com";
+elements.memorySubject.value = "Onboarding automatizacia";
+elements.memoryMessage.value = "Potrebujem upravit onboarding automatizaciu do piatku.";
 elements.clientMessage.value = "Potrebujem upraviť onboarding automatizáciu do piatku.";
 elements.gmailQuery.value = "newer_than:7d";
 elements.leadQuery.value = "automation agency Bratislava";

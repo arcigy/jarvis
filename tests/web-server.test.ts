@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { mkdtempSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 
 import { createLocalApiServer } from "../src/server/local-api-server.ts";
 
@@ -28,6 +31,31 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(voice.status, 200);
     const voiceBody = (await voice.json()) as { shouldStartRecording: boolean };
     assert.equal(voiceBody.shouldStartRecording, true);
+
+    const dbPath = join(mkdtempSync(join(tmpdir(), "jarvis-web-")), "memory.db");
+    const ingested = await fetch(`${baseUrl}/api/ingest-client-message`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        dbPath,
+        email: "client@example.com",
+        subject: "Request",
+        text: "Potrebujem upravit onboarding automatizaciu do piatku.",
+      }),
+    });
+    assert.equal(ingested.status, 200);
+    const ingestedBody = (await ingested.json()) as { jarvisAlert?: string };
+    assert.match(ingestedBody.jarvisAlert ?? "", /Jarvis:/);
+
+    const identified = await fetch(`${baseUrl}/api/identify-email`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ dbPath, email: "client@example.com" }),
+    });
+    assert.equal(identified.status, 200);
+    const identifiedBody = (await identified.json()) as { person?: { primaryEmail: string }; openNeedSignals: unknown[] };
+    assert.equal(identifiedBody.person?.primaryEmail, "client@example.com");
+    assert.equal(identifiedBody.openNeedSignals.length, 1);
   } finally {
     await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   }

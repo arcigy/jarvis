@@ -6,6 +6,8 @@ contextBridge.exposeInMainWorld("arcigyDesktop", {
   coldOutreachBrief: (metrics) => ipcRenderer.invoke("jarvis:coldOutreachBrief", metrics),
   jarvisVoiceEvent: (payload) => ipcRenderer.invoke("jarvis:voiceEvent", payload),
   systemHealth: () => ipcRenderer.invoke("jarvis:systemHealth"),
+  identifyEmail: (payload) => ipcRenderer.invoke("jarvis:identifyEmail", payload),
+  ingestClientMessage: (payload) => ipcRenderer.invoke("jarvis:ingestClientMessage", payload),
   generateAiReply: (payload) => ipcRenderer.invoke("jarvis:generateAiReply", payload),
   syncGmailRecentMessages: (payload) => ipcRenderer.invoke("jarvis:syncGmailRecentMessages", payload),
   getSmartleadCampaignStatus: (payload) => ipcRenderer.invoke("jarvis:getSmartleadCampaignStatus", payload),
