@@ -50,6 +50,7 @@ app.whenReady().then(() => {
   ipcMain.handle("jarvis:voiceEvent", (_event, payload) => handleVoiceEvent(payload));
   ipcMain.handle("jarvis:systemHealth", () => getSystemHealth());
   ipcMain.handle("jarvis:runDiagnostics", (_event, payload) => runDiagnostics(payload));
+  ipcMain.handle("jarvis:webBridgePreflight", () => getWebBridgePreflight());
   ipcMain.handle("jarvis:identifyEmail", (_event, payload) => identifyEmail(payload));
   ipcMain.handle("jarvis:ingestClientMessage", (_event, payload) => ingestClientMessage(payload));
   ipcMain.handle("jarvis:generateAiReply", (_event, payload) => generateAiReply(payload));
@@ -225,6 +226,74 @@ async function runDiagnostics(payload) {
     checkedAt: new Date().toISOString(),
     checks,
   };
+}
+
+function getWebBridgePreflight() {
+  const tools = listWebMcpTools();
+  const riskyToolsRequiringApproval = tools.filter((tool) => tool.requiresApproval).map((tool) => tool.name);
+  const tokenConfigured = getWebToken() !== null;
+  const localhostBypass = process.env.JARVIS_WEB_REQUIRE_AUTH !== "true";
+  const warnings = [];
+  if (!tokenConfigured) warnings.push("Set JARVIS_WEB_TOKEN before exposing the bridge through a tunnel.");
+  if (localhostBypass) warnings.push("Localhost auth bypass is enabled for desktop/local use.");
+  if (!isCommandAvailable("ngrok")) warnings.push("ngrok command was not found on PATH; npm run web:tunnel may need local ngrok setup.");
+
+  return {
+    mode: "desktop-preflight",
+    host: process.env.JARVIS_WEB_HOST || "127.0.0.1",
+    manifestUrl: `http://${process.env.JARVIS_WEB_HOST || "127.0.0.1"}:${process.env.JARVIS_WEB_PORT || "8765"}/.well-known/arcigy-jarvis.json`,
+    authRequiredForExternalHosts: true,
+    tokenConfigured,
+    localhostBypass,
+    maxJsonBytes: getMaxJsonBytes(),
+    mcpToolCount: tools.length,
+    riskyToolsRequiringApproval,
+    pathPolicy: "repo-only",
+    readyForTunnel: tokenConfigured && riskyToolsRequiringApproval.length > 0,
+    warnings,
+  };
+}
+
+function listWebMcpTools() {
+  return [
+    { name: "arcigy.generate_contract_documents", requiresApproval: true },
+    { name: "arcigy.draft_contract_intake", requiresApproval: false },
+    { name: "arcigy.get_cold_outreach_brief", requiresApproval: false },
+    { name: "arcigy.get_cold_outreach_brief_from_db", requiresApproval: false },
+    { name: "arcigy.add_cold_outreach_event", requiresApproval: false },
+    { name: "arcigy.upsert_local_person", requiresApproval: false },
+    { name: "arcigy.add_client_need_signal", requiresApproval: false },
+    { name: "arcigy.ingest_client_message", requiresApproval: false },
+    { name: "arcigy.identify_email", requiresApproval: false },
+    { name: "arcigy.get_system_health", requiresApproval: false },
+    { name: "arcigy.run_integration_diagnostics", requiresApproval: false },
+    { name: "arcigy.generate_ai_reply", requiresApproval: false },
+    { name: "arcigy.sync_gmail_recent_messages", requiresApproval: false },
+    { name: "arcigy.get_smartlead_campaign_status", requiresApproval: false },
+    { name: "arcigy.search_serper", requiresApproval: false },
+    { name: "arcigy.search_google_places", requiresApproval: false },
+    { name: "arcigy.discover_leads", requiresApproval: false },
+    { name: "arcigy.append_leads_to_google_sheet", requiresApproval: true },
+    { name: "arcigy.jarvis_voice_event", requiresApproval: false },
+  ];
+}
+
+function getWebToken() {
+  const value = (process.env.JARVIS_WEB_TOKEN || process.env.API_SECRET_KEY || "").trim();
+  return value && value !== "dummy" ? value : null;
+}
+
+function getMaxJsonBytes() {
+  const value = Number(process.env.JARVIS_MAX_JSON_BYTES || 1000000);
+  return Number.isFinite(value) && value > 0 ? value : 1000000;
+}
+
+function isCommandAvailable(command) {
+  const check =
+    process.platform === "win32"
+      ? spawnSync("where.exe", [command], { stdio: "ignore" })
+      : spawnSync("sh", ["-lc", `command -v ${command}`], { stdio: "ignore" });
+  return check.status === 0;
 }
 
 async function updateDiagnosticCheck(checks, key, run) {

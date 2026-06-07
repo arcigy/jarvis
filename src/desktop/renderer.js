@@ -34,6 +34,8 @@ const elements = {
   smartleadCampaignId: document.querySelector("#smartleadCampaignId"),
   checkSmartlead: document.querySelector("#checkSmartlead"),
   smartleadResult: document.querySelector("#smartleadResult"),
+  checkWebBridge: document.querySelector("#checkWebBridge"),
+  webBridgeResult: document.querySelector("#webBridgeResult"),
   leadQuery: document.querySelector("#leadQuery"),
   discoverLeads: document.querySelector("#discoverLeads"),
   exportLeads: document.querySelector("#exportLeads"),
@@ -69,6 +71,7 @@ const arcigyApi = window.arcigyDesktop ?? {
   identifyEmail: (payload) => postJson("/api/identify-email", payload),
   ingestClientMessage: (payload) => postJson("/api/ingest-client-message", payload),
   generateAiReply: (payload) => postJson("/api/generate-ai-reply", payload),
+  webBridgePreflight: () => getJson("/api/web-bridge-preflight"),
   syncGmailRecentMessages: (payload) => postJson("/api/sync-gmail-recent-messages", payload),
   getSmartleadCampaignStatus: (payload) => postJson("/api/smartlead-campaign-status", payload),
   discoverLeads: (payload) => postJson("/api/discover-leads", payload),
@@ -250,6 +253,18 @@ function renderSmartleadStatus(result) {
     ].join("\n");
   }
   return JSON.stringify(result, null, 2);
+}
+
+function renderWebBridgePreflight(result) {
+  return [
+    `Tunnel ready: ${result.readyForTunnel ? "yes" : "no"}`,
+    `Token configured: ${result.tokenConfigured ? "yes" : "no"}`,
+    `MCP tools: ${result.mcpToolCount}`,
+    `Approval tools: ${(result.riskyToolsRequiringApproval ?? []).join(", ") || "none"}`,
+    `Path policy: ${result.pathPolicy}`,
+    `Manifest: ${result.manifestUrl}`,
+    ...(result.warnings?.length ? ["", ...result.warnings.map((warning) => `Warning: ${warning}`)] : []),
+  ].join("\n");
 }
 
 async function getJson(url) {
@@ -525,6 +540,15 @@ elements.checkSmartlead.addEventListener("click", async () => {
     elements.smartleadResult.textContent = renderSmartleadStatus(result);
   } catch (error) {
     elements.smartleadResult.textContent = error instanceof Error ? error.message : String(error);
+  }
+});
+elements.checkWebBridge.addEventListener("click", async () => {
+  try {
+    elements.webBridgeResult.textContent = "Checking web bridge...";
+    const result = await arcigyApi.webBridgePreflight();
+    elements.webBridgeResult.textContent = renderWebBridgePreflight(result);
+  } catch (error) {
+    elements.webBridgeResult.textContent = error instanceof Error ? error.message : String(error);
   }
 });
 elements.discoverLeads.addEventListener("click", async () => {

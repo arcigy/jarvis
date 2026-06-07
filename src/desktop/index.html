@@ -161,7 +161,14 @@
         </article>
 
         <article class="panel" id="mcpPanel">
-          <h2>MCP tools</h2>
+          <div class="panelHead">
+            <div>
+              <h2>MCP tools</h2>
+              <p>Check the local web bridge before exposing MCP tools through a tunnel.</p>
+            </div>
+            <button id="checkWebBridge">Preflight</button>
+          </div>
+          <div class="response compact" id="webBridgeResult">Ready to check tunnel readiness.</div>
           <ul>
             <li>generate_contract_documents</li>
             <li>get_cold_outreach_brief</li>
