@@ -48,6 +48,8 @@ app.whenReady().then(() => {
   ipcMain.handle("jarvis:voiceEvent", (_event, payload) => handleVoiceEvent(payload));
   ipcMain.handle("jarvis:systemHealth", () => getSystemHealth());
   ipcMain.handle("jarvis:generateAiReply", (_event, payload) => generateAiReply(payload));
+  ipcMain.handle("jarvis:syncGmailRecentMessages", (_event, payload) => syncGmailRecentMessages(payload));
+  ipcMain.handle("jarvis:getSmartleadCampaignStatus", (_event, payload) => getSmartleadCampaignStatus(payload));
   ipcMain.handle("jarvis:discoverLeads", (_event, payload) => discoverLeads(payload));
   ipcMain.handle("contracts:generate", (_event, payload) => generateContracts(payload));
   createWindow();
@@ -276,6 +278,141 @@ function normalizeTranscript(text) {
     .toLowerCase()
     .replace(/[^\p{Letter}\p{Number}\s]/gu, " ")
     .trim();
+}
+
+async function syncGmailRecentMessages(payload) {
+  const accountEnvKey = String(payload?.accountEnvKey ?? "").trim();
+  const query = String(payload?.query ?? "newer_than:7d").trim() || "newer_than:7d";
+  const maxResults = Math.max(1, Math.min(Number(payload?.maxResults ?? 10), 25));
+  const dryRun = payload?.dryRun === true;
+  const dbPath = payload?.dbPath || defaultDbPath;
+  const accounts = listConfiguredGmailAccounts().filter((account) => !accountEnvKey || account.envKey === accountEnvKey);
+  if (!accounts.length) {
+    throw new Error(accountEnvKey ? `Configured Gmail account not found: ${accountEnvKey}` : "No configured Gmail accounts found.");
+  }
+
+  const synced = [];
+  for (const account of accounts) {
+    const events = await listRecentGmailMessageEvents(account, { query, maxResults });
+    const ingested = [];
+    if (!dryRun) {
+      for (const event of events) {
+        const result = runPython([
+          "scripts/jarvis_local_db.py",
+          "ingest-message",
+          "--db",
+          dbPath,
+          "--payload",
+          JSON.stringify(event),
+        ]);
+        ingested.push(JSON.parse(result.stdout));
+      }
+    }
+    synced.push({
+      account: account.label,
+      fetched: events.length,
+      ingested: ingested.length,
+      alerts: ingested.map((item) => item.jarvisAlert).filter(Boolean),
+      preview: events.slice(0, 3).map((event) => ({
+        fromEmail: event.fromEmail,
+        subject: event.subject,
+        text: event.text,
+      })),
+    });
+  }
+  return { dryRun, synced };
+}
+
+function listConfiguredGmailAccounts() {
+  return [
+    "GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP",
+    "GMAIL_REFRESH_TOKEN_BRANISLAV_L_ARCIGY_GROUP",
+    "GMAIL_REFRESH_TOKEN_ANDREJ_ARCIGY_GROUP",
+    "GMAIL_REFRESH_TOKEN_ANDREJ_R_ARCIGY_GROUP",
+  ]
+    .map((envKey) => ({
+      envKey,
+      label: envKey.replace("GMAIL_REFRESH_TOKEN_", "").toLowerCase(),
+      refreshToken: process.env[envKey]?.trim(),
+    }))
+    .filter((account) => account.refreshToken && account.refreshToken !== "dummy");
+}
+
+async function listRecentGmailMessageEvents(account, options) {
+  const accessToken = await refreshGoogleAccessToken(account.refreshToken);
+  const params = new URLSearchParams({
+    maxResults: String(options.maxResults ?? 10),
+    q: options.query ?? "newer_than:7d",
+  });
+  const listed = await gmailFetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages?${params.toString()}`, accessToken);
+  const events = [];
+  for (const message of listed.messages ?? []) {
+    const detail = await gmailFetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(message.id)}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
+      accessToken
+    );
+    const headers = new Map((detail.payload?.headers ?? []).map((header) => [String(header.name).toLowerCase(), header.value]));
+    const from = parseFromHeader(headers.get("from") ?? "");
+    if (!from.email || !detail.snippet) continue;
+    events.push({
+      fromEmail: from.email,
+      displayName: from.displayName,
+      source: "gmail",
+      subject: headers.get("subject"),
+      text: detail.snippet,
+      occurredAt: detail.internalDate ? new Date(Number(detail.internalDate)).toISOString() : headers.get("date"),
+      threadId: detail.threadId,
+      externalId: detail.id,
+      data: {
+        account: account.label,
+        gmailMessageId: detail.id,
+      },
+    });
+  }
+  return events;
+}
+
+async function refreshGoogleAccessToken(refreshToken) {
+  const body = new URLSearchParams({
+    client_id: requireRuntimeEnv("GOOGLE_CLIENT_ID"),
+    client_secret: requireRuntimeEnv("GOOGLE_CLIENT_SECRET"),
+    refresh_token: refreshToken,
+    grant_type: "refresh_token",
+  });
+  const response = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body,
+  });
+  if (!response.ok) throw new Error(`Google OAuth refresh failed: ${response.status}`);
+  const data = await response.json();
+  if (!data.access_token) throw new Error("Google OAuth refresh did not return an access token.");
+  return data.access_token;
+}
+
+async function gmailFetch(url, accessToken) {
+  const response = await fetch(url, { headers: { authorization: `Bearer ${accessToken}` } });
+  if (!response.ok) throw new Error(`Gmail request failed: ${response.status}`);
+  return response.json();
+}
+
+function parseFromHeader(header) {
+  const match = String(header).match(/^(?:"?([^"<]*)"?\s*)?<([^>]+)>$/);
+  if (!match) return { email: String(header).trim().toLowerCase() };
+  return {
+    displayName: match[1]?.trim() || undefined,
+    email: match[2].trim().toLowerCase(),
+  };
+}
+
+async function getSmartleadCampaignStatus(payload) {
+  const apiKey = requireRuntimeEnv("SMARTLEAD_API_KEY");
+  const campaignId = String(payload?.campaignId ?? "").trim();
+  const pathPart = campaignId ? `/campaigns/${encodeURIComponent(campaignId)}/statistics` : "/campaigns/";
+  const response = await fetch(`https://server.smartlead.ai/api/v1${pathPart}?api_key=${encodeURIComponent(apiKey)}`);
+  if (!response.ok) throw new Error(`Smartlead request failed: ${response.status}`);
+  const data = await response.json();
+  return campaignId ? { campaignId, statistics: data } : { campaigns: data };
 }
 
 async function discoverLeads(payload) {

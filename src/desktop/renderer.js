@@ -18,6 +18,12 @@ const elements = {
   clientMessage: document.querySelector("#clientMessage"),
   draftReply: document.querySelector("#draftReply"),
   draftResult: document.querySelector("#draftResult"),
+  gmailQuery: document.querySelector("#gmailQuery"),
+  syncGmail: document.querySelector("#syncGmail"),
+  gmailResult: document.querySelector("#gmailResult"),
+  smartleadCampaignId: document.querySelector("#smartleadCampaignId"),
+  checkSmartlead: document.querySelector("#checkSmartlead"),
+  smartleadResult: document.querySelector("#smartleadResult"),
   leadQuery: document.querySelector("#leadQuery"),
   discoverLeads: document.querySelector("#discoverLeads"),
   leadResult: document.querySelector("#leadResult"),
@@ -33,6 +39,8 @@ const arcigyApi = window.arcigyDesktop ?? {
   coldOutreachBrief: (payload) => postJson("/api/cold-outreach-brief", payload),
   jarvisVoiceEvent: (payload) => postJson("/api/jarvis/voice-event", payload),
   generateAiReply: (payload) => postJson("/api/generate-ai-reply", payload),
+  syncGmailRecentMessages: (payload) => postJson("/api/sync-gmail-recent-messages", payload),
+  getSmartleadCampaignStatus: (payload) => postJson("/api/smartlead-campaign-status", payload),
   discoverLeads: (payload) => postJson("/api/discover-leads", payload),
   generateContracts: (payload) => postJson("/api/generate-contracts", payload),
 };
@@ -103,6 +111,32 @@ function renderLeadDiscovery(result) {
         .join("\n")
     ),
   ].join("\n");
+}
+
+function renderGmailSync(result) {
+  const synced = result.synced ?? [];
+  if (!synced.length) return "No Gmail accounts were synced.";
+  return synced
+    .map((item) =>
+      [
+        `${item.account}: fetched ${item.fetched}, ingested ${item.ingested}`,
+        ...(item.alerts ?? []).map((alert) => `Alert: ${alert}`),
+        ...(item.preview ?? []).map((event) => `Preview: ${event.fromEmail} - ${event.subject ?? "no subject"}`),
+      ].join("\n")
+    )
+    .join("\n\n");
+}
+
+function renderSmartleadStatus(result) {
+  if (Array.isArray(result.campaigns)) {
+    const campaigns = result.campaigns.slice(0, 8);
+    return [
+      `Campaigns: ${result.campaigns.length}`,
+      "",
+      ...campaigns.map((campaign) => `${campaign.id ?? "-"} - ${campaign.name ?? "unnamed"}${campaign.status ? ` (${campaign.status})` : ""}`),
+    ].join("\n");
+  }
+  return JSON.stringify(result, null, 2);
 }
 
 async function getJson(url) {
@@ -255,6 +289,30 @@ elements.draftReply.addEventListener("click", async () => {
     elements.draftResult.textContent = error instanceof Error ? error.message : String(error);
   }
 });
+elements.syncGmail.addEventListener("click", async () => {
+  try {
+    elements.gmailResult.textContent = "Syncing Gmail...";
+    const result = await arcigyApi.syncGmailRecentMessages({
+      query: elements.gmailQuery.value,
+      maxResults: 5,
+      dryRun: false,
+    });
+    elements.gmailResult.textContent = renderGmailSync(result);
+  } catch (error) {
+    elements.gmailResult.textContent = error instanceof Error ? error.message : String(error);
+  }
+});
+elements.checkSmartlead.addEventListener("click", async () => {
+  try {
+    elements.smartleadResult.textContent = "Checking Smartlead...";
+    const result = await arcigyApi.getSmartleadCampaignStatus({
+      campaignId: elements.smartleadCampaignId.value,
+    });
+    elements.smartleadResult.textContent = renderSmartleadStatus(result);
+  } catch (error) {
+    elements.smartleadResult.textContent = error instanceof Error ? error.message : String(error);
+  }
+});
 elements.discoverLeads.addEventListener("click", async () => {
   try {
     elements.leadResult.textContent = "Searching...";
@@ -284,6 +342,7 @@ elements.generateContracts.addEventListener("click", async () => {
 
 elements.contractIntake.value = JSON.stringify(sampleContractIntake(), null, 2);
 elements.clientMessage.value = "Potrebujem upraviť onboarding automatizáciu do piatku.";
+elements.gmailQuery.value = "newer_than:7d";
 elements.leadQuery.value = "automation agency Bratislava";
 void refreshHealth();
 setMode("idle");

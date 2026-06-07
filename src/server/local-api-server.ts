@@ -6,8 +6,10 @@ import { fileURLToPath } from "node:url";
 
 import { getIntegrationHealth, loadLocalEnv } from "../automation-system/env.ts";
 import { buildClientReplyPrompt, generateGeminiText } from "../automation-system/gemini.ts";
+import { listConfiguredGmailAccounts, listRecentGmailMessageEvents } from "../automation-system/gmail.ts";
 import { handleJarvisVoiceEvent, type JarvisVoiceSession } from "../automation-system/jarvis-voice.ts";
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "../automation-system/lead-discovery.ts";
+import { getSmartleadCampaignStatus } from "../automation-system/smartlead.ts";
 
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
 const desktopRoot = join(repoRoot, "src", "desktop");
@@ -118,6 +120,18 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
       generatedFiles: manifest.generatedFiles,
       stdout: result.stdout,
     });
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/sync-gmail-recent-messages") {
+    const payload = await readJson(request);
+    writeJson(response, 200, await syncGmailRecentMessages(payload));
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/smartlead-campaign-status") {
+    const payload = await readJson(request);
+    writeJson(response, 200, await getSmartleadCampaignStatus({ campaignId: optionalString(payload.campaignId) }));
     return;
   }
 
@@ -248,6 +262,14 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
     writeJson(response, 200, { result: JSON.parse(result.stdout) });
     return;
   }
+  if (name === "arcigy.sync_gmail_recent_messages") {
+    writeJson(response, 200, { result: await syncGmailRecentMessages(payload) });
+    return;
+  }
+  if (name === "arcigy.get_smartlead_campaign_status") {
+    writeJson(response, 200, { result: await getSmartleadCampaignStatus({ campaignId: optionalString(payload.campaignId) }) });
+    return;
+  }
   if (name === "arcigy.discover_leads") {
     writeJson(response, 200, {
       result: await discoverLeads({
@@ -292,6 +314,52 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
     return;
   }
   writeJson(response, 404, { error: `Unsupported web MCP bridge tool: ${name}` });
+}
+
+async function syncGmailRecentMessages(payload: Record<string, unknown>) {
+  const accountEnvKey = optionalString(payload.accountEnvKey);
+  const query = optionalString(payload.query) ?? "newer_than:7d";
+  const maxResults = typeof payload.maxResults === "number" ? Math.max(1, Math.min(payload.maxResults, 25)) : 10;
+  const dryRun = payload.dryRun === true;
+  const dbPath = String(payload.dbPath ?? defaultDbPath);
+  const accounts = listConfiguredGmailAccounts().filter((account) => !accountEnvKey || account.envKey === accountEnvKey);
+  if (!accounts.length) {
+    throw new Error(accountEnvKey ? `Configured Gmail account not found: ${accountEnvKey}` : "No configured Gmail accounts found.");
+  }
+
+  const synced = [];
+  for (const account of accounts) {
+    const events = await listRecentGmailMessageEvents(account, { query, maxResults });
+    const ingested = [];
+    if (!dryRun) {
+      for (const event of events) {
+        ingested.push(
+          JSON.parse(
+            runPython([
+              "scripts/jarvis_local_db.py",
+              "ingest-message",
+              "--db",
+              dbPath,
+              "--payload",
+              JSON.stringify(event),
+            ]).stdout
+          )
+        );
+      }
+    }
+    synced.push({
+      account: account.label,
+      fetched: events.length,
+      ingested: ingested.length,
+      alerts: ingested.map((item) => item.jarvisAlert).filter(Boolean),
+      preview: events.slice(0, 3).map((event) => ({
+        fromEmail: event.fromEmail,
+        subject: event.subject,
+        text: event.text,
+      })),
+    });
+  }
+  return { dryRun, synced };
 }
 
 function serveStatic(pathname: string, response: ServerResponse, headOnly: boolean) {

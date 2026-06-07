@@ -244,7 +244,21 @@ textarea {
   line-height: 1.45;
 }
 
+input {
+  min-height: 38px;
+  border: 1px solid #2c3937;
+  border-radius: 8px;
+  background: #090f10;
+  color: #eef4f2;
+  padding: 9px 11px;
+  font: inherit;
+}
+
 textarea:focus {
+  outline: 1px solid #43d9c4;
+}
+
+input:focus {
   outline: 1px solid #43d9c4;
 }
 
@@ -268,6 +282,14 @@ textarea:focus {
 
 .leadResult {
   font-size: 13px;
+}
+
+.splitControls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  margin-top: 14px;
 }
 
 dl {
@@ -310,5 +332,9 @@ ul {
   .listener {
     grid-column: auto;
     grid-row: auto;
+  }
+
+  .splitControls {
+    grid-template-columns: 1fr;
   }
 }

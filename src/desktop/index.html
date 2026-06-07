@@ -72,6 +72,31 @@
           <button id="coldBrief">Ask Jarvis</button>
         </article>
 
+        <article class="panel operationsPanel">
+          <div class="panelHead">
+            <div>
+              <h2>Operations sync</h2>
+              <p>Pull recent Gmail signals into local memory and inspect Smartlead campaigns.</p>
+            </div>
+          </div>
+          <div class="splitControls">
+            <label>
+              Gmail query
+              <input id="gmailQuery" spellcheck="false" placeholder="newer_than:7d" />
+            </label>
+            <button id="syncGmail">Sync Gmail</button>
+          </div>
+          <div class="response compact" id="gmailResult">Ready to sync local client memory.</div>
+          <div class="splitControls">
+            <label>
+              Smartlead campaign ID
+              <input id="smartleadCampaignId" spellcheck="false" placeholder="empty = list campaigns" />
+            </label>
+            <button id="checkSmartlead">Check Smartlead</button>
+          </div>
+          <div class="response compact" id="smartleadResult">Ready for read-only Smartlead status.</div>
+        </article>
+
         <article class="panel">
           <div class="panelHead">
             <div>

@@ -99,6 +99,8 @@ It serves the same UI at `http://127.0.0.1:8765` and exposes local HTTP endpoint
 - `POST /api/cold-outreach-brief`
 - `POST /api/generate-ai-reply`
 - `POST /api/generate-contracts`
+- `POST /api/sync-gmail-recent-messages`
+- `POST /api/smartlead-campaign-status`
 - `POST /api/discover-leads`
 - `POST /api/search-serper`
 - `POST /api/search-google-places`
@@ -106,6 +108,8 @@ It serves the same UI at `http://127.0.0.1:8765` and exposes local HTTP endpoint
 - `POST /api/mcp/arcigy.get_system_health`
 - `POST /api/mcp/arcigy.generate_ai_reply`
 - `POST /api/mcp/arcigy.get_cold_outreach_brief_from_db`
+- `POST /api/mcp/arcigy.sync_gmail_recent_messages`
+- `POST /api/mcp/arcigy.get_smartlead_campaign_status`
 - `POST /api/mcp/arcigy.search_serper`
 - `POST /api/mcp/arcigy.search_google_places`
 - `POST /api/mcp/arcigy.discover_leads`
