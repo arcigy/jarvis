@@ -89,6 +89,12 @@ Tauri is the preferred target for a production desktop build, but this machine c
 
 ## Local web bridge
 
+Run the local production smoke first:
+
+```powershell
+npm run doctor
+```
+
 Run the browser-ready Jarvis bridge:
 
 ```powershell
