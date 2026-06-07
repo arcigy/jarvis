@@ -185,10 +185,67 @@
           <div class="panelHead">
             <div>
               <h2>Contract generator</h2>
-              <p>Paste or edit the same JSON intake used by MCP.</p>
+              <p>Fill the form or edit the same JSON intake used by MCP.</p>
             </div>
-            <button id="generateContracts">Generate</button>
+            <div class="buttonGroup">
+              <button id="applyContractForm">Apply form</button>
+              <button id="generateContracts">Generate</button>
+            </div>
           </div>
+          <div class="contractForm">
+            <label>
+              Client business name
+              <input id="contractBusinessName" spellcheck="false" />
+            </label>
+            <label>
+              Registered address
+              <input id="contractAddress" spellcheck="false" />
+            </label>
+            <label>
+              Company ID
+              <input id="contractCompanyId" spellcheck="false" />
+            </label>
+            <label>
+              VAT / tax ID
+              <input id="contractTaxId" spellcheck="false" />
+            </label>
+            <label>
+              Representative
+              <input id="contractRepresentativeName" spellcheck="false" />
+            </label>
+            <label>
+              Role
+              <input id="contractRepresentativeRole" spellcheck="false" />
+            </label>
+            <label>
+              Email
+              <input id="contractEmail" spellcheck="false" />
+            </label>
+            <label>
+              Phone
+              <input id="contractPhone" spellcheck="false" />
+            </label>
+            <label>
+              Project name
+              <input id="contractProjectName" spellcheck="false" />
+            </label>
+            <label>
+              Implementation fee EUR
+              <input id="contractImplementationFee" inputmode="numeric" />
+            </label>
+            <label>
+              Monthly fee EUR
+              <input id="contractMonthlyFee" inputmode="numeric" />
+            </label>
+            <label>
+              Initial term months
+              <input id="contractTermMonths" inputmode="numeric" />
+            </label>
+          </div>
+          <label>
+            Project goal
+            <textarea id="contractProjectGoal" spellcheck="false"></textarea>
+          </label>
           <label>
             Intake JSON
             <textarea id="contractIntake" spellcheck="false"></textarea>

@@ -192,6 +192,13 @@ h2 {
   grid-column: 1 / -1;
 }
 
+.contractForm {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
 .orb {
   position: relative;
   width: 150px;
@@ -341,6 +348,10 @@ ul {
   }
 
   .splitControls {
+    grid-template-columns: 1fr;
+  }
+
+  .contractForm {
     grid-template-columns: 1fr;
   }
 }

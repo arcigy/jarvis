@@ -11,6 +11,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /Arcigy Jarvis/);
   assert.match(html, /Enable/);
   assert.match(html, /Contract generator/);
+  assert.match(html, /applyContractForm/);
+  assert.match(html, /contractBusinessName/);
+  assert.match(html, /contractProjectGoal/);
   assert.match(html, /contractIntake/);
   assert.match(html, /healthGrid/);
   assert.match(html, /draftReply/);
@@ -53,6 +56,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /\/api\/discover-leads/);
   assert.match(renderer, /\/api\/append-leads-to-google-sheet/);
   assert.match(renderer, /sampleContractIntake/);
+  assert.match(renderer, /buildContractIntakeFromForm/);
+  assert.match(renderer, /fillContractForm/);
   assert.doesNotMatch(renderer, /demoColdOutreachMetrics/);
   assert.doesNotMatch(renderer, /Za dnes sme napísali/);
   assert.doesNotMatch(main, /[\u0102\u00c4\u0139\u00e2]/);

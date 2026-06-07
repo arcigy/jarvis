@@ -37,6 +37,20 @@ const elements = {
   discoverLeads: document.querySelector("#discoverLeads"),
   exportLeads: document.querySelector("#exportLeads"),
   leadResult: document.querySelector("#leadResult"),
+  applyContractForm: document.querySelector("#applyContractForm"),
+  contractBusinessName: document.querySelector("#contractBusinessName"),
+  contractAddress: document.querySelector("#contractAddress"),
+  contractCompanyId: document.querySelector("#contractCompanyId"),
+  contractTaxId: document.querySelector("#contractTaxId"),
+  contractRepresentativeName: document.querySelector("#contractRepresentativeName"),
+  contractRepresentativeRole: document.querySelector("#contractRepresentativeRole"),
+  contractEmail: document.querySelector("#contractEmail"),
+  contractPhone: document.querySelector("#contractPhone"),
+  contractProjectName: document.querySelector("#contractProjectName"),
+  contractProjectGoal: document.querySelector("#contractProjectGoal"),
+  contractImplementationFee: document.querySelector("#contractImplementationFee"),
+  contractMonthlyFee: document.querySelector("#contractMonthlyFee"),
+  contractTermMonths: document.querySelector("#contractTermMonths"),
   contractIntake: document.querySelector("#contractIntake"),
   generateContracts: document.querySelector("#generateContracts"),
   contractResult: document.querySelector("#contractResult"),
@@ -272,6 +286,75 @@ function sampleContractIntake() {
   };
 }
 
+function fillContractForm(intake) {
+  elements.contractBusinessName.value = intake.client.businessName ?? "";
+  elements.contractAddress.value = intake.client.registeredAddress ?? "";
+  elements.contractCompanyId.value = intake.client.companyId ?? "";
+  elements.contractTaxId.value = intake.client.taxId ?? "";
+  elements.contractRepresentativeName.value = intake.client.representativeName ?? "";
+  elements.contractRepresentativeRole.value = intake.client.representativeRole ?? "";
+  elements.contractEmail.value = intake.client.email ?? "";
+  elements.contractPhone.value = intake.client.phone ?? "";
+  elements.contractProjectName.value = intake.project.name ?? "";
+  elements.contractProjectGoal.value = intake.project.goal ?? "";
+  elements.contractImplementationFee.value = String(intake.pricing.implementationFeeEur ?? "");
+  elements.contractMonthlyFee.value = String(intake.pricing.monthlyFeeEur ?? "");
+  elements.contractTermMonths.value = String(intake.pricing.initialTermMonths ?? "");
+}
+
+function buildContractIntakeFromForm() {
+  const current = safeParseContractIntake();
+  const representative = elements.contractRepresentativeName.value.trim();
+  const role = elements.contractRepresentativeRole.value.trim();
+  const email = elements.contractEmail.value.trim();
+  const phone = elements.contractPhone.value.trim();
+  const clientContact = [representative, role, email, phone].filter(Boolean).join(", ");
+  return {
+    ...current,
+    client: {
+      ...current.client,
+      businessName: elements.contractBusinessName.value.trim(),
+      registeredAddress: elements.contractAddress.value.trim(),
+      companyId: elements.contractCompanyId.value.trim(),
+      taxId: elements.contractTaxId.value.trim(),
+      representativeName: representative,
+      representativeRole: role,
+      email,
+      phone,
+    },
+    contacts: {
+      ...current.contacts,
+      clientAuthorizedContact: clientContact,
+      arcigyAuthorizedContact:
+        current.contacts?.arcigyAuthorizedContact ?? "Branislav Laubert, Co-Founder & CEO, branislav@arcigy.group, +421 951 268 376",
+    },
+    project: {
+      ...current.project,
+      name: elements.contractProjectName.value.trim(),
+      goal: elements.contractProjectGoal.value.trim(),
+    },
+    pricing: {
+      ...current.pricing,
+      implementationFeeEur: numberFromInput(elements.contractImplementationFee.value),
+      monthlyFeeEur: numberFromInput(elements.contractMonthlyFee.value),
+      initialTermMonths: numberFromInput(elements.contractTermMonths.value),
+    },
+  };
+}
+
+function safeParseContractIntake() {
+  try {
+    return JSON.parse(elements.contractIntake.value || "{}");
+  } catch {
+    return sampleContractIntake();
+  }
+}
+
+function numberFromInput(value) {
+  const parsed = Number(String(value).replace(",", "."));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 async function handleTranscript(text) {
   const trimmed = text.trim();
   elements.transcript.value = trimmed;
@@ -437,6 +520,15 @@ elements.exportLeads.addEventListener("click", async () => {
     elements.leadResult.textContent = error instanceof Error ? error.message : String(error);
   }
 });
+elements.applyContractForm.addEventListener("click", () => {
+  try {
+    const intake = buildContractIntakeFromForm();
+    elements.contractIntake.value = JSON.stringify(intake, null, 2);
+    elements.contractResult.textContent = "Contract form applied to intake JSON.";
+  } catch (error) {
+    elements.contractResult.textContent = error instanceof Error ? error.message : String(error);
+  }
+});
 elements.generateContracts.addEventListener("click", async () => {
   try {
     elements.contractResult.textContent = "Generating...";
@@ -452,7 +544,9 @@ elements.generateContracts.addEventListener("click", async () => {
   }
 });
 
-elements.contractIntake.value = JSON.stringify(sampleContractIntake(), null, 2);
+const initialContractIntake = sampleContractIntake();
+fillContractForm(initialContractIntake);
+elements.contractIntake.value = JSON.stringify(initialContractIntake, null, 2);
 elements.memoryEmail.value = "client@example.com";
 elements.memorySubject.value = "Onboarding automatizacia";
 elements.memoryMessage.value = "Potrebujem upravit onboarding automatizaciu do piatku.";

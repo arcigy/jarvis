@@ -68,7 +68,7 @@ The Electron shell opens a local Arcigy Jarvis console with:
 - voice cold outreach answers backed by `data\jarvis-local.db`
 - runtime integration health for Gemini, Gmail, Smartlead, Postgres, Redis, Serper
 - Gemini draft replies that are prepared locally and not sent automatically
-- local contract JSON intake form that generates DOCX files through the same generator as MCP
+- local contract intake form plus editable JSON that generates DOCX files through the same generator as MCP
 
 ## Runtime secrets
 
