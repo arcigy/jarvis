@@ -1,5 +1,6 @@
 const state = {
   mode: "idle",
+  session: { state: "idle", wakeWord: "jarvis" },
   recognition: null,
   listening: false,
 };
@@ -33,36 +34,32 @@ function speak(text) {
   }
 }
 
-function containsWakeWord(text) {
-  return text
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .split(/\s+/)
-    .includes("jarvis");
+function demoColdOutreachMetrics() {
+  return {
+    periodLabel: "dnes",
+    contacted: 128,
+    opened: 61,
+    replied: 14,
+    positiveReplies: 5,
+    preparedPositiveReplyCount: 5,
+    pendingApprovalCount: 5,
+  };
 }
 
-function coldOutreachBrief() {
-  return "Za dnes sme napísali 128 ľuďom. 47.7% si email otvorilo, 14 ľudí odpísalo, z toho 5 pozitívne. Pripravil som ti 5 odpovedí na pozitívne reakcie a pošlem ich až na tvoje potvrdenie.";
-}
-
-function handleTranscript(text) {
+async function handleTranscript(text) {
   const trimmed = text.trim();
   elements.transcript.value = trimmed;
 
-  if (state.mode === "idle" && containsWakeWord(trimmed)) {
-    setMode("awake");
-    speak("Áno, počúvam.");
-    return;
-  }
+  const result = await window.arcigyDesktop.jarvisVoiceEvent({
+    session: state.session,
+    text: trimmed,
+    metrics: demoColdOutreachMetrics(),
+  });
 
-  if (state.mode === "awake") {
-    setMode("idle");
-    if (trimmed.toLowerCase().includes("cold")) {
-      speak(coldOutreachBrief());
-      return;
-    }
-    speak("Rozumiem. Tento príkaz pošlem lokálnemu MCP nástroju, keď bude pripojený desktop bridge.");
+  state.session = result.session;
+  setMode(result.session.state);
+  if (result.speakText) {
+    speak(result.speakText);
   }
 }
 
@@ -83,7 +80,7 @@ function startRecognition() {
   recognition.onresult = (event) => {
     const latest = event.results[event.results.length - 1];
     const text = latest?.[0]?.transcript ?? "";
-    if (text) handleTranscript(text);
+    if (text) void handleTranscript(text);
   };
   recognition.onend = () => {
     if (state.listening) recognition.start();
@@ -111,8 +108,10 @@ elements.listenButton.addEventListener("click", () => {
   else startRecognition();
 });
 
-elements.simulateWake.addEventListener("click", () => handleTranscript("Jarvis"));
-elements.submitTranscript.addEventListener("click", () => handleTranscript(elements.transcript.value));
-elements.coldBrief.addEventListener("click", () => speak(coldOutreachBrief()));
+elements.simulateWake.addEventListener("click", () => void handleTranscript("Jarvis"));
+elements.submitTranscript.addEventListener("click", () => void handleTranscript(elements.transcript.value));
+elements.coldBrief.addEventListener("click", async () => {
+  speak(await window.arcigyDesktop.coldOutreachBrief(demoColdOutreachMetrics()));
+});
 
 setMode("idle");
