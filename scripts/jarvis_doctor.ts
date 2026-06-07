@@ -311,22 +311,43 @@ async function checkWebBridgeSmoke(): Promise<DoctorCheck> {
     const origin = `http://127.0.0.1:${port}`;
     const preflight = await fetchJsonWithRetry(`${origin}/api/web-bridge-preflight`);
     const manifest = await fetchJsonWithRetry(`${origin}/api/mcp`);
+    const indexHtml = await fetchTextWithRetry(`${origin}/index.html`);
+    const stylesCss = await fetchTextWithRetry(`${origin}/styles.css`);
+    const rendererJs = await fetchTextWithRetry(`${origin}/renderer.js`);
+    const mcpBrief = await postJson(`${origin}/api/mcp/arcigy.get_cold_outreach_brief`, {
+      periodLabel: "doctor period",
+      contacted: 2,
+      opened: 1,
+      replied: 1,
+      positiveReplies: 1,
+      preparedPositiveReplyCount: 1,
+      pendingApprovalCount: 1,
+    });
     const expectedToolCount = listJarvisMcpTools().length;
     const mcpToolCount = Number((preflight as { mcpToolCount?: unknown }).mcpToolCount);
     const manifestToolCount = Array.isArray((manifest as { tools?: unknown }).tools) ? (manifest as { tools: unknown[] }).tools.length : 0;
-    const ready = mcpToolCount === expectedToolCount && manifestToolCount === expectedToolCount;
+    const uiAssetsReady =
+      indexHtml.includes("Arcigy Jarvis") &&
+      indexHtml.includes("checkWebBridge") &&
+      stylesCss.includes(".orb") &&
+      rendererJs.includes("arcigyApi") &&
+      rendererJs.includes("webBridgePreflight");
+    const mcpToolCallReady = typeof (mcpBrief as { result?: unknown }).result === "string" && String((mcpBrief as { result: string }).result).includes("doctor period");
+    const ready = mcpToolCount === expectedToolCount && manifestToolCount === expectedToolCount && uiAssetsReady && mcpToolCallReady;
 
     return {
       key: "webBridgeSmoke",
       status: ready ? "ready" : "failed",
       message: ready
-        ? `Web bridge served preflight and MCP manifest with ${expectedToolCount} tool(s).`
-        : "Web bridge returned a tool count mismatch.",
+        ? `Web bridge served UI assets, MCP manifest, and a tool call with ${expectedToolCount} tool(s).`
+        : "Web bridge smoke returned unexpected UI, manifest, or tool call data.",
       details: {
         origin,
         mcpToolCount,
         manifestToolCount,
         expectedToolCount,
+        uiAssetsReady,
+        mcpToolCallReady,
       },
     };
   } catch (error) {
@@ -357,6 +378,31 @@ async function fetchJsonWithRetry(url: string): Promise<unknown> {
     }
   }
   throw lastError instanceof Error ? lastError : new Error(`Timed out fetching ${url}`);
+}
+
+async function fetchTextWithRetry(url: string): Promise<string> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`${url} returned ${response.status}`);
+      return await response.text();
+    } catch (error) {
+      lastError = error;
+      await delay(100);
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(`Timed out fetching ${url}`);
+}
+
+async function postJson(url: string, payload: unknown): Promise<unknown> {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error(`${url} returned ${response.status}`);
+  return response.json();
 }
 
 function getFreePort(): Promise<number> {

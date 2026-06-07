@@ -29,5 +29,8 @@ test("Jarvis doctor reports local readiness without leaking secrets", () => {
   assert.equal(body.checks.find((check) => check.key === "contractGeneration")?.status, "ready");
   const webBridge = body.checks.find((check) => check.key === "webBridgeSmoke");
   assert.equal(webBridge?.status, "ready");
-  assert.equal((webBridge?.details as { expectedToolCount?: number })?.expectedToolCount, 19);
+  const webBridgeDetails = webBridge?.details as { expectedToolCount?: number; uiAssetsReady?: boolean; mcpToolCallReady?: boolean };
+  assert.equal(webBridgeDetails?.expectedToolCount, 19);
+  assert.equal(webBridgeDetails?.uiAssetsReady, true);
+  assert.equal(webBridgeDetails?.mcpToolCallReady, true);
 });
