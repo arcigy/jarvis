@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://arcigy.local/schemas/contract-intake.schema.json",
+  "title": "Arcigy klientsky zmluvny formular",
+  "type": "object",
+  "required": ["client", "project", "pricing", "contacts"],
+  "properties": {
+    "client": {
+      "type": "object",
+      "required": ["businessName", "registeredAddress", "companyId", "representativeName", "representativeRole", "email"],
+      "properties": {
+        "businessName": { "type": "string" },
+        "registeredAddress": { "type": "string" },
+        "companyId": { "type": "string" },
+        "taxId": { "type": "string" },
+        "registration": { "type": "string" },
+        "representativeName": { "type": "string" },
+        "representativeRole": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" }
+      }
+    },
+    "contacts": {
+      "type": "object",
+      "properties": {
+        "clientAuthorizedContact": { "type": "string" },
+        "arcigyAuthorizedContact": {
+          "type": "string",
+          "default": "Branislav Laubert, Co-Founder & CEO, branislav@arcigy.group, +421 951 268 376"
+        }
+      }
+    },
+    "project": {
+      "type": "object",
+      "required": ["name", "goal", "includedModules", "outputs"],
+      "properties": {
+        "name": { "type": "string" },
+        "goal": { "type": "string" },
+        "includedModules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "purpose", "inputs", "outputs"],
+            "properties": {
+              "name": { "type": "string" },
+              "purpose": { "type": "string" },
+              "inputs": { "type": "string" },
+              "outputs": { "type": "string" },
+              "outOfScope": { "type": "string" }
+            }
+          }
+        },
+        "outputs": { "type": "array", "items": { "type": "string" } },
+        "aiFeatures": { "type": "array", "items": { "type": "string" } },
+        "acceptanceCriteria": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "pricing": {
+      "type": "object",
+      "required": ["implementationFeeEur", "monthlyFeeEur", "initialTermMonths"],
+      "properties": {
+        "implementationFeeEur": { "type": "number" },
+        "depositPercent": { "type": "number", "default": 30 },
+        "monthlyFeeEur": { "type": "number" },
+        "initialTermMonths": { "type": "number" },
+        "invoiceDueDays": { "type": "number", "default": 14 }
+      }
+    },
+    "dates": {
+      "type": "object",
+      "properties": {
+        "frameworkAgreementDate": { "type": "string" },
+        "projectAppendixDate": { "type": "string" },
+        "plannedLaunchDate": { "type": "string" }
+      }
+    }
+  }
+}
