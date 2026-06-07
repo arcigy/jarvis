@@ -16,7 +16,22 @@ test("local web bridge serves UI and API health", async () => {
   try {
     const page = await fetch(`${baseUrl}/index.html`);
     assert.equal(page.status, 200);
-    assert.match(await page.text(), /Arcigy Jarvis/);
+    const html = await page.text();
+    assert.match(html, /Arcigy Jarvis/);
+    assert.match(html, /commandDeck/);
+    assert.match(html, /readyIntegrations/);
+
+    const css = await fetch(`${baseUrl}/styles.css`);
+    assert.equal(css.status, 200);
+    const styles = await css.text();
+    assert.match(styles, /commandDeck/);
+    assert.match(styles, /scanFrame/);
+
+    const renderer = await fetch(`${baseUrl}/renderer.js`);
+    assert.equal(renderer.status, 200);
+    const rendererText = await renderer.text();
+    assert.match(rendererText, /renderCommandDeck/);
+    assert.match(rendererText, /buildCommandTimeline/);
 
     const health = await fetch(`${baseUrl}/api/system-health`);
     assert.equal(health.status, 200);

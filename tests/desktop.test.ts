@@ -15,6 +15,12 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /data-target="jarvisPanel"/);
   assert.match(html, /id="operationsPanel"/);
   assert.match(html, /id="mcpPanel"/);
+  assert.match(html, /id="commandDeck"/);
+  assert.match(html, /id="readyIntegrations"/);
+  assert.match(html, /id="mcpToolCount"/);
+  assert.match(html, /id="approvalLockCount"/);
+  assert.match(html, /id="liveBlockerCount"/);
+  assert.match(html, /id="commandTimeline"/);
   assert.match(html, /checkWebBridge/);
   assert.match(html, /webBridgeResult/);
   assert.match(html, /Contract generator/);
@@ -61,6 +67,12 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /arcigyApi\.getSmartleadCampaignStatus/);
   assert.match(renderer, /arcigyApi\.discoverLeads/);
   assert.match(renderer, /arcigyApi\.appendLeadsToGoogleSheet/);
+  assert.match(renderer, /renderCommandDeck/);
+  assert.match(renderer, /buildCommandTimeline/);
+  assert.match(renderer, /readyIntegrations/);
+  assert.match(renderer, /approvalLockCount/);
+  assert.match(renderer, /liveBlockerCount/);
+  assert.match(renderer, /Tunnel command/);
   assert.match(renderer, /\/api\/system-health/);
   assert.match(renderer, /\/api\/run-diagnostics/);
   assert.match(renderer, /\/api\/web-bridge-preflight/);

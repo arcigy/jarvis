@@ -36,6 +36,7 @@ test("Jarvis doctor reports local readiness without leaking secrets", () => {
   const webBridgeDetails = webBridge?.details as {
     expectedToolCount?: number;
     uiAssetsReady?: boolean;
+    commandDeckReady?: boolean;
     mcpToolCallReady?: boolean;
     externalAuthReady?: boolean;
     deniedExternalManifestStatus?: number;
@@ -45,6 +46,7 @@ test("Jarvis doctor reports local readiness without leaking secrets", () => {
   };
   assert.equal(webBridgeDetails?.expectedToolCount, 19);
   assert.equal(webBridgeDetails?.uiAssetsReady, true);
+  assert.equal(webBridgeDetails?.commandDeckReady, true);
   assert.equal(webBridgeDetails?.mcpToolCallReady, true);
   assert.equal(webBridgeDetails?.externalAuthReady, true);
   assert.equal(webBridgeDetails?.deniedExternalManifestStatus, 401);

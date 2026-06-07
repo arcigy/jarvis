@@ -11,6 +11,7 @@
 }
 
 body {
+  position: relative;
   margin: 0;
   display: grid;
   grid-template-columns: 248px 1fr;
@@ -21,6 +22,18 @@ body {
     radial-gradient(circle at 50% 0%, rgb(34 154 135 / 16%), transparent 42%),
     #080b0d;
   background-size: 38px 38px, 38px 38px, auto, auto;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent, rgb(67 217 196 / 5%), transparent);
+  background-size: 100% 220px;
+  mix-blend-mode: screen;
+  opacity: 0.42;
+  animation: scanWash 9s linear infinite;
 }
 
 .sidebar {
@@ -158,6 +171,105 @@ h2 {
   margin-bottom: 16px;
 }
 
+.commandDeck {
+  display: grid;
+  grid-template-columns: 190px repeat(4, minmax(112px, 1fr));
+  gap: 12px;
+  align-items: stretch;
+  margin-bottom: 16px;
+}
+
+.deckVisual,
+.deckMetric,
+.deckStatus {
+  border: 1px solid #26302f;
+  background:
+    linear-gradient(135deg, rgb(67 217 196 / 10%), transparent 42%),
+    rgb(10 15 16 / 86%);
+  border-radius: 8px;
+  min-height: 92px;
+}
+
+.deckVisual {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+.deckVisual::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, transparent 0 48%, rgb(67 217 196 / 26%) 49% 51%, transparent 52%),
+    linear-gradient(0deg, transparent 0 48%, rgb(240 184 79 / 18%) 49% 51%, transparent 52%);
+  background-size: 34px 34px;
+  animation: driftGrid 12s linear infinite;
+}
+
+.scanFrame {
+  position: relative;
+  width: 122px;
+  aspect-ratio: 1;
+  border: 1px solid rgb(67 217 196 / 48%);
+  border-radius: 8px;
+  transform: rotate(45deg);
+  box-shadow: inset 0 0 28px rgb(67 217 196 / 18%), 0 0 22px rgb(240 184 79 / 14%);
+}
+
+.scanFrame span {
+  position: absolute;
+  inset: 14px;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 6px;
+}
+
+.scanFrame span:nth-child(2) {
+  inset: 31px;
+  border-color: rgb(240 184 79 / 42%);
+}
+
+.scanFrame span:nth-child(3) {
+  inset: 48px;
+  border-color: rgb(67 217 196 / 52%);
+  animation: pingFrame 2.6s ease-in-out infinite;
+}
+
+.deckMetric,
+.deckStatus {
+  padding: 14px;
+}
+
+.deckMetric {
+  display: grid;
+  align-content: center;
+  gap: 8px;
+}
+
+.deckMetric span,
+.deckStatus {
+  color: #91a19d;
+  font-size: 12px;
+}
+
+.deckMetric strong {
+  color: #eef4f2;
+  font-size: 30px;
+  line-height: 1;
+}
+
+.deckMetric.blocker strong {
+  color: #ffd893;
+}
+
+.deckStatus {
+  grid-column: 2 / -1;
+  min-height: auto;
+  line-height: 1.45;
+  color: #c8d6d2;
+}
+
 .health {
   border: 1px solid #283634;
   background: rgb(14 20 20 / 82%);
@@ -268,6 +380,9 @@ h2 {
     scroll-behavior: auto;
   }
 
+  body::before,
+  .deckVisual::before,
+  .scanFrame span:nth-child(3),
   .orb {
     animation: none;
   }
@@ -290,6 +405,25 @@ h2 {
 @keyframes pulse {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes scanWash {
+  to {
+    background-position: 0 220px;
+  }
+}
+
+@keyframes driftGrid {
+  to {
+    background-position: 68px 34px;
+  }
+}
+
+@keyframes pingFrame {
+  50% {
+    opacity: 0.4;
+    transform: scale(1.18);
   }
 }
 
@@ -399,8 +533,13 @@ ul {
   }
 
   .statusGrid,
+  .commandDeck,
   .grid {
     grid-template-columns: 1fr;
+  }
+
+  .deckStatus {
+    grid-column: auto;
   }
 
   nav {

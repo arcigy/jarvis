@@ -384,6 +384,13 @@ async function checkWebBridgeSmoke(): Promise<DoctorCheck> {
       stylesCss.includes(".orb") &&
       rendererJs.includes("arcigyApi") &&
       rendererJs.includes("webBridgePreflight");
+    const commandDeckReady =
+      indexHtml.includes("commandDeck") &&
+      indexHtml.includes("readyIntegrations") &&
+      stylesCss.includes(".commandDeck") &&
+      stylesCss.includes(".scanFrame") &&
+      rendererJs.includes("renderCommandDeck") &&
+      rendererJs.includes("buildCommandTimeline");
     const mcpToolCallReady = typeof (mcpBrief as { result?: unknown }).result === "string" && String((mcpBrief as { result: string }).result).includes("doctor period");
     const externalAuthReady =
       deniedExternalManifestStatus === 401 &&
@@ -395,7 +402,14 @@ async function checkWebBridgeSmoke(): Promise<DoctorCheck> {
       typeof (approvedContract as { result?: unknown }).result === "string" &&
       String((approvedContract as { result: string }).result).includes("generation-manifest.json") &&
       existsSync(join(webContractOutputDir, "generation-manifest.json"));
-    const ready = mcpToolCount === expectedToolCount && manifestToolCount === expectedToolCount && uiAssetsReady && mcpToolCallReady && externalAuthReady && approvalGateReady;
+    const ready =
+      mcpToolCount === expectedToolCount &&
+      manifestToolCount === expectedToolCount &&
+      uiAssetsReady &&
+      commandDeckReady &&
+      mcpToolCallReady &&
+      externalAuthReady &&
+      approvalGateReady;
 
     return {
       key: "webBridgeSmoke",
@@ -409,6 +423,7 @@ async function checkWebBridgeSmoke(): Promise<DoctorCheck> {
         manifestToolCount,
         expectedToolCount,
         uiAssetsReady,
+        commandDeckReady,
         mcpToolCallReady,
         externalAuthReady,
         deniedExternalManifestStatus,

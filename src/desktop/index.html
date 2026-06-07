@@ -36,6 +36,33 @@
 
       <section class="statusGrid" id="healthGrid" aria-label="Integration status"></section>
 
+      <section class="commandDeck" id="commandDeck" aria-label="Production command deck">
+        <div class="deckVisual" aria-hidden="true">
+          <div class="scanFrame">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+        </div>
+        <div class="deckMetric">
+          <span>Ready integrations</span>
+          <strong id="readyIntegrations">--</strong>
+        </div>
+        <div class="deckMetric">
+          <span>MCP tools</span>
+          <strong id="mcpToolCount">--</strong>
+        </div>
+        <div class="deckMetric">
+          <span>Approval locks</span>
+          <strong id="approvalLockCount">--</strong>
+        </div>
+        <div class="deckMetric blocker">
+          <span>Live blockers</span>
+          <strong id="liveBlockerCount">--</strong>
+        </div>
+        <div class="deckStatus" id="commandTimeline">Loading production gates...</div>
+      </section>
+
       <section class="grid">
         <article class="panel listener" id="jarvisPanel">
           <div class="panelHead">

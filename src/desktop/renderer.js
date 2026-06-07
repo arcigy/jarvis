@@ -10,6 +10,11 @@ const elements = {
   navButtons: [...document.querySelectorAll("nav button[data-target]")],
   statusBadge: document.querySelector("#statusBadge"),
   healthGrid: document.querySelector("#healthGrid"),
+  readyIntegrations: document.querySelector("#readyIntegrations"),
+  mcpToolCount: document.querySelector("#mcpToolCount"),
+  approvalLockCount: document.querySelector("#approvalLockCount"),
+  liveBlockerCount: document.querySelector("#liveBlockerCount"),
+  commandTimeline: document.querySelector("#commandTimeline"),
   listenButton: document.querySelector("#listenButton"),
   transcript: document.querySelector("#transcript"),
   response: document.querySelector("#response"),
@@ -150,11 +155,41 @@ function renderHealth(health) {
   }
 }
 
+function renderCommandDeck(health, bridge = null) {
+  const integrations = health.integrations ?? [];
+  const readyCount = integrations.filter((item) => item.configured).length;
+  const blockers = integrations.filter((item) => !item.configured);
+  const approvalTools = bridge?.riskyToolsRequiringApproval ?? [];
+  elements.readyIntegrations.textContent = `${readyCount}/${integrations.length || "--"}`;
+  elements.mcpToolCount.textContent = bridge?.mcpToolCount ? String(bridge.mcpToolCount) : "--";
+  elements.approvalLockCount.textContent = bridge ? String(approvalTools.length) : "--";
+  elements.liveBlockerCount.textContent = String(blockers.length);
+  elements.commandTimeline.textContent = buildCommandTimeline(blockers, bridge);
+}
+
+function buildCommandTimeline(blockers, bridge) {
+  const bridgeState = bridge ? (bridge.readyForTunnel ? "MCP bridge ready for tunnel." : "MCP bridge needs attention.") : "MCP bridge preflight not loaded.";
+  if (!blockers.length) return `All configured integration gates are ready. ${bridgeState}`;
+  const blockerText = blockers
+    .map((item) => `${item.key}: ${(item.missing ?? []).join(", ")}`)
+    .slice(0, 3)
+    .join(" | ");
+  return `${blockers.length} integration gate(s) need attention. ${blockerText}. ${bridgeState}`;
+}
+
 async function refreshHealth() {
   try {
-    renderHealth(await arcigyApi.systemHealth());
+    const health = await arcigyApi.systemHealth();
+    renderHealth(health);
+    renderCommandDeck(health);
+    try {
+      renderCommandDeck(health, await arcigyApi.webBridgePreflight());
+    } catch {
+      renderCommandDeck(health, null);
+    }
   } catch (error) {
     elements.healthGrid.textContent = error instanceof Error ? error.message : String(error);
+    elements.commandTimeline.textContent = error instanceof Error ? error.message : String(error);
   }
 }
 
@@ -259,6 +294,7 @@ function renderWebBridgePreflight(result) {
   return [
     `Tunnel ready: ${result.readyForTunnel ? "yes" : "no"}`,
     `Token configured: ${result.tokenConfigured ? "yes" : "no"}`,
+    `Tunnel command: ${result.tunnelCommand ?? "npm run web:tunnel"}`,
     `MCP tools: ${result.mcpToolCount}`,
     `Approval tools: ${(result.riskyToolsRequiringApproval ?? []).join(", ") || "none"}`,
     `Path policy: ${result.pathPolicy}`,
@@ -547,6 +583,8 @@ elements.checkWebBridge.addEventListener("click", async () => {
     elements.webBridgeResult.textContent = "Checking web bridge...";
     const result = await arcigyApi.webBridgePreflight();
     elements.webBridgeResult.textContent = renderWebBridgePreflight(result);
+    const health = await arcigyApi.systemHealth();
+    renderCommandDeck(health, result);
   } catch (error) {
     elements.webBridgeResult.textContent = error instanceof Error ? error.message : String(error);
   }
