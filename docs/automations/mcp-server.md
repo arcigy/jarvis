@@ -21,7 +21,7 @@ For browser or remote-agent use, run `npm run web` and expose it with `npm run w
 - `GET /api/mcp`
 - `GET /.well-known/arcigy-jarvis.json`
 
-External hosts require `Authorization: Bearer <JARVIS_WEB_TOKEN>`. The manifest returns concrete `tools[].url` values for POST calls.
+Before exposing the bridge, check `GET /api/web-bridge-preflight`. External hosts require `Authorization: Bearer <JARVIS_WEB_TOKEN>`. The manifest returns concrete `tools[].url` values for POST calls.
 
 ## Tools
 

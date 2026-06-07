@@ -234,6 +234,57 @@ test("local web bridge requires bearer auth on external hosts", async () => {
   }
 });
 
+test("local web bridge preflight reports tunnel readiness without leaking secrets", async () => {
+  const previousToken = process.env.JARVIS_WEB_TOKEN;
+  const previousApiSecret = process.env.API_SECRET_KEY;
+  const secretValue = "preflight-secret-token";
+  delete process.env.JARVIS_WEB_TOKEN;
+  process.env.API_SECRET_KEY = "dummy";
+  const server = createLocalApiServer();
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  const baseUrl = `http://127.0.0.1:${address.port}`;
+
+  try {
+    const unconfigured = await fetch(`${baseUrl}/api/web-bridge-preflight`);
+    assert.equal(unconfigured.status, 200);
+    const unconfiguredBody = (await unconfigured.json()) as { tokenConfigured: boolean; readyForTunnel: boolean; warnings: string[] };
+    assert.equal(unconfiguredBody.tokenConfigured, false);
+    assert.equal(unconfiguredBody.readyForTunnel, false);
+    assert.ok(unconfiguredBody.warnings.some((warning) => warning.includes("JARVIS_WEB_TOKEN")));
+
+    process.env.JARVIS_WEB_TOKEN = secretValue;
+    const configured = await fetch(`${baseUrl}/api/web-bridge-preflight`);
+    assert.equal(configured.status, 200);
+    const configuredText = await configured.text();
+    assert.equal(configuredText.includes(secretValue), false);
+    const body = JSON.parse(configuredText) as {
+      tokenConfigured: boolean;
+      readyForTunnel: boolean;
+      manifestUrl: string;
+      mcpToolCount: number;
+      riskyToolsRequiringApproval: string[];
+      pathPolicy: string;
+      maxJsonBytes: number;
+    };
+    assert.equal(body.tokenConfigured, true);
+    assert.equal(body.readyForTunnel, true);
+    assert.match(body.manifestUrl, /\/\.well-known\/arcigy-jarvis\.json$/);
+    assert.ok(body.mcpToolCount >= 19);
+    assert.ok(body.riskyToolsRequiringApproval.includes("arcigy.generate_contract_documents"));
+    assert.ok(body.riskyToolsRequiringApproval.includes("arcigy.append_leads_to_google_sheet"));
+    assert.equal(body.pathPolicy, "repo-only");
+    assert.equal(body.maxJsonBytes > 0, true);
+  } finally {
+    if (previousToken === undefined) delete process.env.JARVIS_WEB_TOKEN;
+    else process.env.JARVIS_WEB_TOKEN = previousToken;
+    if (previousApiSecret === undefined) delete process.env.API_SECRET_KEY;
+    else process.env.API_SECRET_KEY = previousApiSecret;
+    await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
 test("local web bridge rejects malformed or oversized JSON bodies", async () => {
   const previousLimit = process.env.JARVIS_MAX_JSON_BYTES;
   process.env.JARVIS_MAX_JSON_BYTES = "64";

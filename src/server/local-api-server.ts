@@ -53,6 +53,11 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
     return;
   }
 
+  if (request.method === "GET" && url.pathname === "/api/web-bridge-preflight") {
+    writeJson(response, 200, buildWebBridgePreflight(request));
+    return;
+  }
+
   if (request.method === "GET" && url.pathname === "/api/system-health") {
     writeJson(response, 200, {
       integrations: getIntegrationHealth(),
@@ -277,6 +282,7 @@ function getBearerToken(request: IncomingMessage): string | null {
 function buildWebBridgeManifest(request: IncomingMessage) {
   const origin = getRequestOrigin(request);
   const mcpBaseUrl = `${origin}/api/mcp`;
+  const localhostBypass = process.env.JARVIS_WEB_REQUIRE_AUTH !== "true";
   return {
     name: "Arcigy Jarvis local web bridge",
     version: "0.1.0",
@@ -286,7 +292,7 @@ function buildWebBridgeManifest(request: IncomingMessage) {
       type: "bearer",
       requiredForExternalHosts: true,
       header: "Authorization: Bearer <JARVIS_WEB_TOKEN>",
-      localhostBypass: process.env.JARVIS_WEB_REQUIRE_AUTH !== "true",
+      localhostBypass,
     },
     endpoints: {
       ui: `${origin}/index.html`,
@@ -305,6 +311,34 @@ function buildWebBridgeManifest(request: IncomingMessage) {
       method: "POST",
       url: `${mcpBaseUrl}/${tool.name}`,
     })),
+  };
+}
+
+function buildWebBridgePreflight(request: IncomingMessage) {
+  const origin = getRequestOrigin(request);
+  const tools = listJarvisMcpTools();
+  const riskyToolsRequiringApproval = tools.filter((tool) => tool.requiresApproval).map((tool) => tool.name);
+  const tokenConfigured = getWebToken() !== null;
+  const localhostBypass = process.env.JARVIS_WEB_REQUIRE_AUTH !== "true";
+  const warnings: string[] = [];
+  if (!tokenConfigured) warnings.push("Set JARVIS_WEB_TOKEN before exposing the bridge through a tunnel.");
+  if (localhostBypass) warnings.push("Localhost auth bypass is enabled for desktop/local use.");
+  if (!isCommandAvailable("ngrok")) warnings.push("ngrok command was not found on PATH; npm run web:tunnel may need local ngrok setup.");
+
+  return {
+    mode: "local-web-bridge",
+    host: getRequestHost(request),
+    origin,
+    manifestUrl: `${origin}/.well-known/arcigy-jarvis.json`,
+    authRequiredForExternalHosts: true,
+    tokenConfigured,
+    localhostBypass,
+    maxJsonBytes: getMaxJsonBytes(),
+    mcpToolCount: tools.length,
+    riskyToolsRequiringApproval,
+    pathPolicy: "repo-only",
+    readyForTunnel: tokenConfigured && riskyToolsRequiringApproval.length > 0,
+    warnings,
   };
 }
 
@@ -645,6 +679,14 @@ function httpError(statusCode: number, message: string): Error {
 function getMaxJsonBytes(): number {
   const value = Number(process.env.JARVIS_MAX_JSON_BYTES ?? defaultMaxJsonBytes);
   return Number.isFinite(value) && value > 0 ? value : defaultMaxJsonBytes;
+}
+
+function isCommandAvailable(command: string): boolean {
+  const check =
+    process.platform === "win32"
+      ? spawnSync("where.exe", [command], { stdio: "ignore" })
+      : spawnSync("sh", ["-lc", `command -v ${command}`], { stdio: "ignore" });
+  return check.status === 0;
 }
 
 async function handleWebVoiceEvent(payload: Record<string, unknown>) {

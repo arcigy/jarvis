@@ -99,6 +99,7 @@ It serves the same UI at `http://127.0.0.1:8765` and exposes local HTTP endpoint
 
 - `GET /api/mcp`
 - `GET /.well-known/arcigy-jarvis.json`
+- `GET /api/web-bridge-preflight`
 - `GET /api/system-health`
 - `POST /api/run-diagnostics`
 - `POST /api/jarvis/voice-event`
@@ -133,10 +134,11 @@ For a temporary external URL, run `npm run web:tunnel` after configuring ngrok l
 External agent setup flow:
 
 1. Run `npm run web`.
-2. Run `npm run web:tunnel`.
-3. Open `https://<your-tunnel-host>/.well-known/arcigy-jarvis.json` with `Authorization: Bearer <JARVIS_WEB_TOKEN>`.
-4. Use the returned `tools[].url` values for web MCP-style calls. Each tool expects JSON in the POST body and returns `{ "result": ... }`.
-5. For manifest tools with `requiresApproval: true`, include `"approval": { "approved": true }` only after explicit user confirmation.
+2. Open `http://127.0.0.1:8765/api/web-bridge-preflight` and confirm `readyForTunnel: true`.
+3. Run `npm run web:tunnel`.
+4. Open `https://<your-tunnel-host>/.well-known/arcigy-jarvis.json` with `Authorization: Bearer <JARVIS_WEB_TOKEN>`.
+5. Use the returned `tools[].url` values for web MCP-style calls. Each tool expects JSON in the POST body and returns `{ "result": ... }`.
+6. For manifest tools with `requiresApproval: true`, include `"approval": { "approved": true }` only after explicit user confirmation.
 
 API security:
 
