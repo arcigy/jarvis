@@ -293,6 +293,7 @@ function parseJson(value: string): any {
 
 async function checkWebBridgeSmoke(): Promise<DoctorCheck> {
   const port = await getFreePort();
+  const doctorToken = "doctor-web-token";
   const stdout: string[] = [];
   const stderr: string[] = [];
   const child = spawn(process.execPath, ["src/server/local-api-server.ts"], {
@@ -301,6 +302,7 @@ async function checkWebBridgeSmoke(): Promise<DoctorCheck> {
       ...process.env,
       JARVIS_WEB_HOST: "127.0.0.1",
       JARVIS_WEB_PORT: String(port),
+      JARVIS_WEB_TOKEN: doctorToken,
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -314,6 +316,15 @@ async function checkWebBridgeSmoke(): Promise<DoctorCheck> {
     const indexHtml = await fetchTextWithRetry(`${origin}/index.html`);
     const stylesCss = await fetchTextWithRetry(`${origin}/styles.css`);
     const rendererJs = await fetchTextWithRetry(`${origin}/renderer.js`);
+    const deniedExternalManifestStatus = await fetchStatus(`${origin}/.well-known/arcigy-jarvis.json`, {
+      "x-forwarded-host": "doctor.example.ngrok-free.app",
+      "x-forwarded-proto": "https",
+    });
+    const allowedExternalManifest = await fetchJsonWithRetry(`${origin}/.well-known/arcigy-jarvis.json`, {
+      authorization: `Bearer ${doctorToken}`,
+      "x-forwarded-host": "doctor.example.ngrok-free.app",
+      "x-forwarded-proto": "https",
+    });
     const mcpBrief = await postJson(`${origin}/api/mcp/arcigy.get_cold_outreach_brief`, {
       periodLabel: "doctor period",
       contacted: 2,
@@ -333,7 +344,12 @@ async function checkWebBridgeSmoke(): Promise<DoctorCheck> {
       rendererJs.includes("arcigyApi") &&
       rendererJs.includes("webBridgePreflight");
     const mcpToolCallReady = typeof (mcpBrief as { result?: unknown }).result === "string" && String((mcpBrief as { result: string }).result).includes("doctor period");
-    const ready = mcpToolCount === expectedToolCount && manifestToolCount === expectedToolCount && uiAssetsReady && mcpToolCallReady;
+    const externalAuthReady =
+      deniedExternalManifestStatus === 401 &&
+      (allowedExternalManifest as { baseUrl?: unknown }).baseUrl === "https://doctor.example.ngrok-free.app" &&
+      Array.isArray((allowedExternalManifest as { tools?: unknown }).tools) &&
+      (allowedExternalManifest as { tools: unknown[] }).tools.length === expectedToolCount;
+    const ready = mcpToolCount === expectedToolCount && manifestToolCount === expectedToolCount && uiAssetsReady && mcpToolCallReady && externalAuthReady;
 
     return {
       key: "webBridgeSmoke",
@@ -348,6 +364,8 @@ async function checkWebBridgeSmoke(): Promise<DoctorCheck> {
         expectedToolCount,
         uiAssetsReady,
         mcpToolCallReady,
+        externalAuthReady,
+        deniedExternalManifestStatus,
       },
     };
   } catch (error) {
@@ -365,11 +383,11 @@ async function checkWebBridgeSmoke(): Promise<DoctorCheck> {
   }
 }
 
-async function fetchJsonWithRetry(url: string): Promise<unknown> {
+async function fetchJsonWithRetry(url: string, headers?: Record<string, string>): Promise<unknown> {
   let lastError: unknown;
   for (let attempt = 0; attempt < 30; attempt += 1) {
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, { headers });
       if (!response.ok) throw new Error(`${url} returned ${response.status}`);
       return await response.json();
     } catch (error) {
@@ -403,6 +421,11 @@ async function postJson(url: string, payload: unknown): Promise<unknown> {
   });
   if (!response.ok) throw new Error(`${url} returned ${response.status}`);
   return response.json();
+}
+
+async function fetchStatus(url: string, headers?: Record<string, string>): Promise<number> {
+  const response = await fetch(url, { headers });
+  return response.status;
 }
 
 function getFreePort(): Promise<number> {
