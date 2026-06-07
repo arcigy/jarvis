@@ -95,6 +95,8 @@ Run the local production smoke first:
 npm run doctor
 ```
 
+Doctor removes its own generated smoke artifacts after a successful run. Use `npm run doctor -- --keep-doctor-artifacts` when debugging generated outputs.
+
 Run the browser-ready Jarvis bridge:
 
 ```powershell

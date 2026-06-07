@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:net";
 import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -33,6 +33,8 @@ const skipEnvFile = args.has("--no-env-file");
 const skipContractGeneration = args.has("--skip-contract-generation");
 const skipWebBridge = args.has("--skip-web-bridge");
 const skipLocalDb = args.has("--skip-local-db");
+const keepDoctorArtifacts = args.has("--keep-doctor-artifacts");
+const doctorArtifacts: string[] = [];
 
 await main();
 
@@ -56,6 +58,10 @@ async function main() {
     failed: failed.length,
     checks,
   };
+
+  if (summary.ok && !keepDoctorArtifacts) {
+    cleanupDoctorArtifacts();
+  }
 
   if (jsonOutput) {
     process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
@@ -384,6 +390,7 @@ async function checkWebBridgeSmoke(): Promise<DoctorCheck> {
         deniedExternalManifestStatus,
         approvalGateReady,
         deniedContractStatus,
+        webContractOutputDir,
       },
     };
   } catch (error) {
@@ -495,7 +502,23 @@ function safeGeneratedPath(name: string): string {
   if (!target.startsWith(normalizedRoot)) {
     throw new Error(`Refusing to write outside generated directory: ${target}`);
   }
+  doctorArtifacts.push(target);
   return target;
+}
+
+function cleanupDoctorArtifacts() {
+  for (const artifact of doctorArtifacts) {
+    if (!isDoctorArtifact(artifact)) continue;
+    rmSync(artifact, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+  }
+}
+
+function isDoctorArtifact(artifact: string): boolean {
+  const generatedRoot = resolve(repoRoot, "generated");
+  const target = resolve(artifact);
+  const normalizedRoot = generatedRoot.endsWith(sep) ? generatedRoot : `${generatedRoot}${sep}`;
+  if (!target.startsWith(normalizedRoot)) return false;
+  return target.slice(normalizedRoot.length).startsWith("doctor-");
 }
 
 function trimOutput(value: string | null | undefined): string {

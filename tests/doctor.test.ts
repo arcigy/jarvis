@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import test from "node:test";
 
 test("Jarvis doctor reports local readiness without leaking secrets", () => {
@@ -25,8 +26,10 @@ test("Jarvis doctor reports local readiness without leaking secrets", () => {
   assert.equal(body.checks.find((check) => check.key === "requiredFiles")?.status, "ready");
   assert.equal(body.checks.find((check) => check.key === "mcpToolRegistry")?.status, "ready");
   assert.equal(body.checks.find((check) => check.key === "runtimeEnv")?.status, "warning");
-  assert.equal(body.checks.find((check) => check.key === "localDbSmoke")?.status, "ready");
-  assert.equal(body.checks.find((check) => check.key === "contractGeneration")?.status, "ready");
+  const localDb = body.checks.find((check) => check.key === "localDbSmoke");
+  const contractGeneration = body.checks.find((check) => check.key === "contractGeneration");
+  assert.equal(localDb?.status, "ready");
+  assert.equal(contractGeneration?.status, "ready");
   const webBridge = body.checks.find((check) => check.key === "webBridgeSmoke");
   assert.equal(webBridge?.status, "ready");
   const webBridgeDetails = webBridge?.details as {
@@ -37,6 +40,7 @@ test("Jarvis doctor reports local readiness without leaking secrets", () => {
     deniedExternalManifestStatus?: number;
     approvalGateReady?: boolean;
     deniedContractStatus?: number;
+    webContractOutputDir?: string;
   };
   assert.equal(webBridgeDetails?.expectedToolCount, 19);
   assert.equal(webBridgeDetails?.uiAssetsReady, true);
@@ -45,4 +49,7 @@ test("Jarvis doctor reports local readiness without leaking secrets", () => {
   assert.equal(webBridgeDetails?.deniedExternalManifestStatus, 401);
   assert.equal(webBridgeDetails?.approvalGateReady, true);
   assert.equal(webBridgeDetails?.deniedContractStatus, 409);
+  assert.equal(existsSync((localDb?.details as { dbPath: string }).dbPath), false);
+  assert.equal(existsSync((contractGeneration?.details as { outputDir: string }).outputDir), false);
+  assert.equal(existsSync(webBridgeDetails.webContractOutputDir ?? ""), false);
 });
