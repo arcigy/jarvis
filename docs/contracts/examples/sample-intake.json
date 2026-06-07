@@ -1,0 +1,55 @@
+{
+  "client": {
+    "businessName": "Test Klient s. r. o.",
+    "registeredAddress": "Testovacia 1, 811 01 Bratislava",
+    "companyId": "12345678",
+    "taxId": "SK1234567890",
+    "registration": "Obchodný register príslušného súdu, oddiel: Sro, vložka č. 12345/B",
+    "representativeName": "Meno Klienta",
+    "representativeRole": "konateľ",
+    "email": "klient@example.com",
+    "phone": "+421 900 000 000"
+  },
+  "contacts": {
+    "clientAuthorizedContact": "Meno Klienta, konateľ, klient@example.com, +421 900 000 000",
+    "arcigyAuthorizedContact": "Branislav Laubert, Co-Founder & CEO, branislav@arcigy.group, +421 951 268 376"
+  },
+  "project": {
+    "name": "Klientsky automatizačný portál",
+    "goal": "Sprístupniť klientovi individuálny portál na spracovanie leadov, interných úloh a automatizovaných výstupov.",
+    "applicationPurpose": "realizácii dohodnutých workflowov, správe klientskych dát a používaní individuálnych automatizačných modulov",
+    "includedUserAccounts": 2,
+    "feedbackRounds": 5,
+    "includedModules": [
+      {
+        "name": "Lead intake",
+        "purpose": "Zber a vyhodnotenie nových leadov",
+        "inputs": "email, meno, zdroj, stav",
+        "outputs": "interná notifikácia, záznam leadu",
+        "outOfScope": "platené reklamné kampane"
+      }
+    ],
+    "outputs": ["PDF report", "CSV export", "interná notifikácia"],
+    "aiFeatures": ["AI asistované vyplnenie formulárov", "AI sumarizácia komunikácie"],
+    "dataLimits": "podľa pravidiel primeraného používania",
+    "cooperationInputs": ["zoznam workflowov", "prístupové údaje do nástrojov", "ukážkové výstupy"],
+    "acceptanceCriteria": [
+      "Klient vie vytvoriť nový záznam",
+      "Klient vie spustiť dohodnutý automatizačný modul",
+      "Aplikácia vytvorí dohodnutý výstup"
+    ]
+  },
+  "pricing": {
+    "implementationFeeEur": 2000,
+    "depositPercent": 30,
+    "monthlyFeeEur": 200,
+    "initialTermMonths": 6,
+    "invoiceDueDays": 14
+  },
+  "dates": {
+    "frameworkAgreementDate": "[dátum]",
+    "projectAppendixDate": "[dátum]",
+    "plannedLaunchDate": "[dátum]"
+  },
+  "specialTerms": ["Bez osobitných výnimiek."]
+}

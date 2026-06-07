@@ -1,4 +1,4 @@
-import type { AutomationDefinition } from "./types.js";
+import type { AutomationDefinition } from "./types.ts";
 
 export const jarvisAutomations: AutomationDefinition[] = [
   {

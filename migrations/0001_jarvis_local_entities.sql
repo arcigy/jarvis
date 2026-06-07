@@ -25,6 +25,22 @@ CREATE INDEX IF NOT EXISTS idx_local_people_email ON local_people(primary_email)
 CREATE INDEX IF NOT EXISTS idx_local_email_activity_email ON local_email_activity(email);
 CREATE INDEX IF NOT EXISTS idx_local_email_activity_event_time ON local_email_activity(event_type, occurred_at);
 
+CREATE TABLE IF NOT EXISTS client_need_signals (
+  id TEXT PRIMARY KEY,
+  person_id TEXT REFERENCES local_people(id) ON DELETE CASCADE,
+  source TEXT NOT NULL,
+  signal_type TEXT NOT NULL,
+  summary TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'seen', 'resolved', 'ignored')),
+  confidence REAL NOT NULL DEFAULT 0.7,
+  data_json TEXT NOT NULL DEFAULT '{}',
+  occurred_at TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_client_need_signals_person_status ON client_need_signals(person_id, status);
+CREATE INDEX IF NOT EXISTS idx_client_need_signals_time ON client_need_signals(occurred_at);
+
 CREATE TABLE IF NOT EXISTS client_contract_records (
   id TEXT PRIMARY KEY,
   client_person_id TEXT REFERENCES local_people(id) ON DELETE SET NULL,

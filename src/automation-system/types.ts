@@ -47,3 +47,35 @@ export type ColdOutreachBrief = {
     positiveReplyRate: number;
   };
 };
+
+export type LocalPersonKind = "client" | "lead" | "contact";
+
+export type LocalPerson = {
+  id: string;
+  kind: LocalPersonKind;
+  primaryEmail: string;
+  displayName?: string;
+  companyName?: string;
+  status: "active" | "inactive" | string;
+  data?: Record<string, unknown>;
+};
+
+export type ClientNeedSignal = {
+  id: string;
+  personId: string;
+  source: string;
+  signalType: string;
+  summary: string;
+  status: "new" | "seen" | "resolved" | "ignored";
+  confidence: number;
+  occurredAt: string;
+  data?: Record<string, unknown>;
+};
+
+export type IdentityMatch = {
+  email: string;
+  person: LocalPerson | null;
+  confidence: number;
+  reason: string;
+  openNeedSignals: ClientNeedSignal[];
+};

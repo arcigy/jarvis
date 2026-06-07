@@ -36,6 +36,9 @@
       "properties": {
         "name": { "type": "string" },
         "goal": { "type": "string" },
+        "applicationPurpose": { "type": "string" },
+        "includedUserAccounts": { "type": "number", "default": 1 },
+        "feedbackRounds": { "type": "number", "default": 5 },
         "includedModules": {
           "type": "array",
           "items": {
@@ -52,6 +55,8 @@
         },
         "outputs": { "type": "array", "items": { "type": "string" } },
         "aiFeatures": { "type": "array", "items": { "type": "string" } },
+        "dataLimits": { "type": "string" },
+        "cooperationInputs": { "type": "array", "items": { "type": "string" } },
         "acceptanceCriteria": { "type": "array", "items": { "type": "string" } }
       }
     },
@@ -73,6 +78,10 @@
         "projectAppendixDate": { "type": "string" },
         "plannedLaunchDate": { "type": "string" }
       }
+    },
+    "specialTerms": {
+      "type": "array",
+      "items": { "type": "string" }
     }
   }
 }

@@ -9,6 +9,12 @@ MCP alebo dashboard vyplní `docs/contracts/contract-intake.schema.json`. Výstu
 
 Arcigy údaje ostávajú pevné. Klient, projekt, cena, moduly, výstupy a akceptačné kritériá sú formulárové hodnoty.
 
+Generovanie z vyplneného JSON formulára:
+
+```powershell
+python scripts\generate_contract_documents.py --input docs\contracts\examples\sample-intake.json --output-dir generated\contracts
+```
+
 ## Cold outreach prehľad
 
 Odpoveď MCP má byť krátka a akčná:
@@ -20,6 +26,8 @@ Implementácia sumarizácie je v `src/automation-system/cold-outreach-summary.ts
 ## Lokálni klienti a leads
 
 Email je primárny identifikátor v `local_people.primary_email`. Variabilné údaje sú v `data_json`, aby sa pre každú klientsku automatizáciu nevytvárali nové tabuľky.
+
+Logika párovania je v `src/automation-system/identity-matching.ts`. Otvorené potreby klienta sa ukladajú do `client_need_signals` a Jarvis odpoveď skladá cez `src/automation-system/jarvis-intents.ts`.
 
 ## Jarvis hlas
 

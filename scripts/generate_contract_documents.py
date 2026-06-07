@@ -1,0 +1,192 @@
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import tempfile
+import zipfile
+from pathlib import Path
+from typing import Any
+
+
+ROOT = Path(__file__).resolve().parents[1]
+TEMPLATE_DIR = ROOT / "docs" / "contracts" / "templates"
+DEFAULT_OUTPUT_DIR = ROOT / "generated" / "contracts"
+
+
+def money(value: float | int) -> str:
+    if float(value).is_integer():
+        return f"{int(value)} EUR"
+    return f"{value:.2f} EUR"
+
+
+def required(data: dict[str, Any], path: str) -> Any:
+    current: Any = data
+    for part in path.split("."):
+        if not isinstance(current, dict) or part not in current or current[part] in (None, ""):
+            raise ValueError(f"Missing required field: {path}")
+        current = current[part]
+    return current
+
+
+def join_items(items: list[Any] | None, fallback: str = "[●]") -> str:
+    if not items:
+        return fallback
+    if all(isinstance(item, str) for item in items):
+        return "; ".join(items)
+    return "; ".join(str(item) for item in items)
+
+
+def build_replacements(data: dict[str, Any]) -> dict[str, str]:
+    for field in [
+        "client.businessName",
+        "client.registeredAddress",
+        "client.companyId",
+        "client.representativeName",
+        "client.representativeRole",
+        "client.email",
+        "project.name",
+        "project.goal",
+        "pricing.implementationFeeEur",
+        "pricing.monthlyFeeEur",
+        "pricing.initialTermMonths",
+    ]:
+        required(data, field)
+
+    client = data["client"]
+    project = data["project"]
+    pricing = data["pricing"]
+    dates = data.get("dates", {})
+    contacts = data.get("contacts", {})
+
+    implementation_fee = float(pricing["implementationFeeEur"])
+    deposit_percent = float(pricing.get("depositPercent", 30))
+    deposit = round(implementation_fee * deposit_percent / 100, 2)
+    final_payment = round(implementation_fee - deposit, 2)
+    monthly = float(pricing["monthlyFeeEur"])
+    modules = project.get("includedModules", [])
+
+    client_block = "\n".join(
+        [
+            client["businessName"],
+            f"Sídlo: {client['registeredAddress']}",
+            f"IČO: {client['companyId']}",
+            f"DIČ/IČ DPH: {client.get('taxId', '[DIČ/IČ DPH Klienta]')}",
+            f"Zápis: {client.get('registration', '[register Klienta]')}",
+            f"E-mail: {client['email']}",
+            f"Zastúpený: {client['representativeName']}, {client['representativeRole']}",
+            "ďalej len ako „Klient“",
+        ]
+    )
+
+    first_module = modules[0] if modules else {}
+    module_count = len(modules) if modules else "[●]"
+    outputs = join_items(project.get("outputs"))
+    ai_features = join_items(project.get("aiFeatures"))
+    acceptance = join_items(project.get("acceptanceCriteria"), "podľa dohodnutého rozsahu")
+
+    return {
+        "[obchodné meno Klienta]": client["businessName"],
+        "Sídlo: [sídlo Klienta]": f"Sídlo: {client['registeredAddress']}",
+        "IČO: [IČO Klienta]": f"IČO: {client['companyId']}",
+        "DIČ/IČ DPH: [DIČ/IČ DPH Klienta]": f"DIČ/IČ DPH: {client.get('taxId', '[●]')}",
+        "Zápis: [register Klienta]": f"Zápis: {client.get('registration', '[●]')}",
+        "E-mail: [e-mail Klienta]": f"E-mail: {client['email']}",
+        "Zastúpený: [meno a funkcia zástupcu Klienta]": f"Zastúpený: {client['representativeName']}, {client['representativeRole']}",
+        "[meno zástupcu Klienta]": client["representativeName"],
+        "[meno a funkcia zástupcu Klienta]": f"{client['representativeName']}, {client['representativeRole']}",
+        "[meno, funkcia, e-mail a telefón oprávnenej osoby Klienta]": contacts.get(
+            "clientAuthorizedContact",
+            f"{client['representativeName']}, {client['representativeRole']}, {client['email']}, {client.get('phone', '[telefón]')}",
+        ),
+        "[názov projektu / pracovný názov Aplikácie]": project["name"],
+        "[dátum]": dates.get("projectAppendixDate") or dates.get("frameworkAgreementDate") or "[dátum]",
+        "[●] modulov": f"{module_count} modulov",
+        "[●], za predpokladu riadnej súčinnosti Klienta": f"{dates.get('plannedLaunchDate', '[dátum]')}, za predpokladu riadnej súčinnosti Klienta",
+        "2000 EUR": money(implementation_fee),
+        "600 EUR": money(deposit),
+        "1400 EUR": money(final_payment),
+        "200 EUR": money(monthly),
+        "6 mesiacov": f"{pricing['initialTermMonths']} mesiacov",
+        "2 používateľov": f"{project.get('includedUserAccounts', 1)} používateľov",
+        "5 kôl": f"{project.get('feedbackRounds', 5)} kôl",
+        "[rozsah]": ai_features,
+        "[obsah, dizajn, jazyk]": outputs,
+        "[formát / rozsah / frekvencia]": outputs,
+        "[spôsob výpočtu]": project.get("calculationRules", "[dohodnuté pravidlá]"),
+        "[názov modulu]": first_module.get("name", "[názov modulu]"),
+        "[opis nábytkovej štruktúry]": first_module.get("purpose", "[opis modulu]"),
+        "[hlavné parametre]": first_module.get("inputs", "[hlavné vstupy]"),
+        "[čo modul počíta / exportuje]": first_module.get("outputs", "[výstupy modulu]"),
+        "[čo nie je zahrnuté]": first_module.get("outOfScope", "[mimo rozsahu]"),
+        "[stav špecifikácie]": "podľa vyplneného formulára / schválenia Klientom",
+        "[akú nábytkovú štruktúru modul rieši]": first_module.get("purpose", "[účel modulu]"),
+        "[čo musí Klient zadať alebo spravovať]": first_module.get("inputs", "[vstupy od Klienta]"),
+        "[čo sa počíta a podľa akých pravidiel]": project.get("calculationRules", "[výpočtová alebo rozhodovacia logika]"),
+        "[cenová položka, export, 3D/2D, tabuľka atď.]": first_module.get("outputs", outputs),
+        "[meno / e-mail / áno-nie]": contacts.get("clientAuthorizedContact", client["email"]),
+        "[mená / e-maily]": contacts.get("clientAuthorizedContact", client["email"]),
+        "[forma / rozsah / frekvencia]": outputs,
+        "[žiadna / opis výnimky, ak je výslovne dohodnutá]": join_items(data.get("specialTerms"), "žiadna"),
+        "Meno a funkcia: [meno a funkcia zástupcu Klienta]": f"Meno a funkcia: {client['representativeName']}, {client['representativeRole']}",
+        client_block: client_block,
+        "[●]": "[doplniť podľa klienta]",
+    }
+
+
+def patch_docx(template: Path, target: Path, replacements: dict[str, str]) -> None:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        with zipfile.ZipFile(template, "r") as zin:
+            zin.extractall(tmp_path)
+
+        xml_files = list((tmp_path / "word").rglob("*.xml")) + list((tmp_path / "docProps").rglob("*.xml"))
+        for xml_path in xml_files:
+            text = xml_path.read_text(encoding="utf-8")
+            for old, new in replacements.items():
+                text = text.replace(old, new)
+            text = re.sub(r"\[[^\[\]]+Klienta[^\[\]]*\]", "[doplniť podľa klienta]", text)
+            xml_path.write_text(text, encoding="utf-8")
+
+        if target.exists():
+            target.unlink()
+        with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED) as zout:
+            for item in tmp_path.rglob("*"):
+                if item.is_file():
+                    zout.write(item, item.relative_to(tmp_path).as_posix())
+
+
+def generate_contract_documents(input_path: Path, output_dir: Path = DEFAULT_OUTPUT_DIR) -> list[Path]:
+    data = json.loads(input_path.read_text(encoding="utf-8"))
+    replacements = build_replacements(data)
+    slug = re.sub(r"[^a-zA-Z0-9_-]+", "-", data["client"]["businessName"]).strip("-").lower() or "klient"
+    targets = [
+        (
+            TEMPLATE_DIR / "ramcova-zmluva-univerzalna.docx",
+            output_dir / f"{slug}-ramcova-zmluva.docx",
+        ),
+        (
+            TEMPLATE_DIR / "projektova-priloha-univerzalna.docx",
+            output_dir / f"{slug}-projektova-priloha.docx",
+        ),
+    ]
+    created: list[Path] = []
+    for template, target in targets:
+        patch_docx(template, target, replacements)
+        created.append(target)
+    return created
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Generate Arcigy contract DOCX files from a JSON intake form.")
+    parser.add_argument("--input", required=True, type=Path)
+    parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
+    args = parser.parse_args()
+
+    for path in generate_contract_documents(args.input, args.output_dir):
+        print(path)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,4 +1,4 @@
-import type { ColdOutreachBrief, ColdOutreachMetrics } from "./types.js";
+import type { ColdOutreachBrief, ColdOutreachMetrics } from "./types.ts";
 
 function rate(part: number, total: number): number {
   if (total <= 0) return 0;
