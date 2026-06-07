@@ -294,8 +294,13 @@ function buildWebBridgeManifest(request: IncomingMessage) {
       mcpTools: `${origin}/api/mcp`,
       mcpToolCallPattern: `${mcpBaseUrl}/{toolName}`,
     },
+    approval: {
+      requiredPayload: { approval: { approved: true } },
+      appliesToToolsWithRequiresApproval: true,
+    },
     tools: listJarvisMcpTools().map((tool) => ({
       ...tool,
+      approval: tool.requiresApproval ? { required: true, field: "approval.approved" } : { required: false },
       method: "POST",
       url: `${mcpBaseUrl}/${tool.name}`,
     })),
@@ -316,6 +321,11 @@ function getForwardedValue(value: string | string[] | undefined): string | null 
 
 async function routeMcpTool(name: string, request: IncomingMessage, response: ServerResponse) {
   const payload = await readJson(request);
+  const approvalError = getApprovalError(name, payload);
+  if (approvalError) {
+    writeJson(response, 409, { error: approvalError });
+    return;
+  }
   if (name === "arcigy.generate_contract_documents") {
     if (!payload.inputJsonPath && !payload.intake) {
       writeJson(response, 400, { error: "Provide either inputJsonPath or inline intake payload." });
@@ -456,6 +466,14 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
     return;
   }
   writeJson(response, 404, { error: `Unsupported web MCP bridge tool: ${name}` });
+}
+
+function getApprovalError(name: string, payload: Record<string, unknown>): string | null {
+  const tool = listJarvisMcpTools().find((item) => item.name === name);
+  if (!tool?.requiresApproval) return null;
+  const approval = payload.approval as { approved?: unknown } | undefined;
+  if (approval?.approved === true || payload.approved === true) return null;
+  return `${name} requires explicit approval. Send {"approval":{"approved":true}} after user confirmation.`;
 }
 
 function runDbTool(command: string, payload: Record<string, unknown>) {

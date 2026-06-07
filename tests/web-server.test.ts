@@ -77,7 +77,25 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(voiceTool.result.shouldStartRecording, true);
 
     const contractOutputDir = makeRepoTempDir("jarvis-web-contract-");
+    const unapprovedContract = await fetch(`${baseUrl}/api/mcp/arcigy.generate_contract_documents`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        intake: JSON.parse(readFileSync("docs/contracts/examples/sample-intake.json", "utf-8")),
+        outputDir: contractOutputDir,
+      }),
+    });
+    assert.equal(unapprovedContract.status, 409);
+
+    const unapprovedSheetExport = await fetch(`${baseUrl}/api/mcp/arcigy.append_leads_to_google_sheet`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ rows: [["ACME", "https://example.com"]] }),
+    });
+    assert.equal(unapprovedSheetExport.status, 409);
+
     const contractTool = await postJson(`${baseUrl}/api/mcp/arcigy.generate_contract_documents`, {
+      approval: { approved: true },
       intake: JSON.parse(readFileSync("docs/contracts/examples/sample-intake.json", "utf-8")),
       outputDir: contractOutputDir,
     });
@@ -89,6 +107,7 @@ test("local web bridge serves UI and API health", async () => {
       body: JSON.stringify({
         intake: JSON.parse(readFileSync("docs/contracts/examples/sample-intake.json", "utf-8")),
         outputDir: join(tmpdir(), "outside-jarvis-contracts"),
+        approval: { approved: true },
       }),
     });
     assert.equal(rejectedPath.status, 400);

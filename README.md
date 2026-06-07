@@ -136,6 +136,7 @@ External agent setup flow:
 2. Run `npm run web:tunnel`.
 3. Open `https://<your-tunnel-host>/.well-known/arcigy-jarvis.json` with `Authorization: Bearer <JARVIS_WEB_TOKEN>`.
 4. Use the returned `tools[].url` values for web MCP-style calls. Each tool expects JSON in the POST body and returns `{ "result": ... }`.
+5. For manifest tools with `requiresApproval: true`, include `"approval": { "approved": true }` only after explicit user confirmation.
 
 API security:
 
