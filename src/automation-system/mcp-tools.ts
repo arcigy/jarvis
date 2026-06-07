@@ -5,7 +5,10 @@ import type { ClientNeedSignal, ColdOutreachMetrics, LocalPerson } from "./types
 export type JarvisMcpToolName =
   | "arcigy.generate_contract_documents"
   | "arcigy.get_cold_outreach_brief"
-  | "arcigy.identify_email";
+  | "arcigy.upsert_local_person"
+  | "arcigy.add_client_need_signal"
+  | "arcigy.identify_email"
+  | "arcigy.jarvis_voice_event";
 
 export type JarvisMcpTool = {
   name: JarvisMcpToolName;
@@ -36,6 +39,21 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.identify_email",
       description: "Podľa emailu nájde lokálneho klienta alebo lead a otvorené klientské požiadavky.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.upsert_local_person",
+      description: "Vytvorí alebo aktualizuje lokálneho klienta, lead alebo kontakt podľa emailu.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.add_client_need_signal",
+      description: "Uloží lokálny signál, že klient niečo chce alebo potrebuje.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.jarvis_voice_event",
+      description: "Spracuje transcript event pre Jarvis wake-word a vráti text na hlasovú odpoveď.",
       requiresApproval: false,
     },
   ];

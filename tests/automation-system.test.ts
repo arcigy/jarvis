@@ -1,4 +1,8 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 
 import { matchLocalIdentity } from "../src/automation-system/identity-matching.ts";
@@ -20,6 +24,9 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.generate_contract_documents",
     "arcigy.get_cold_outreach_brief",
     "arcigy.identify_email",
+    "arcigy.upsert_local_person",
+    "arcigy.add_client_need_signal",
+    "arcigy.jarvis_voice_event",
   ]);
 });
 
@@ -135,3 +142,64 @@ test("Jarvis voice flow wakes, answers, then returns idle", () => {
   assert.equal(response.shouldStopRecording, true);
   assert.match(response.speakText ?? "", /Za dnes sme napísali 10 ľuďom/);
 });
+
+test("local SQLite CLI persists people and need signals", () => {
+  const dir = mkdtempSync(join(tmpdir(), "jarvis-db-"));
+  const dbPath = join(dir, "jarvis.db");
+  const python = process.env.JARVIS_PYTHON || "python";
+
+  const person = runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "upsert-person",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify({
+      kind: "client",
+      primaryEmail: "ceo@acme.com",
+      displayName: "ACME CEO",
+      companyName: "ACME",
+    }),
+  ]);
+
+  assert.equal(person.primaryEmail, "ceo@acme.com");
+
+  runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "add-need-signal",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify({
+      personId: person.id,
+      summary: "chce nový report pre cold outreach",
+      confidence: 0.91,
+    }),
+  ]);
+
+  const match = runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "identify",
+    "--db",
+    dbPath,
+    "--email",
+    "ceo@acme.com",
+  ]);
+
+  assert.equal(match.reason, "exact_email_match");
+  assert.equal(match.openNeedSignals[0].summary, "chce nový report pre cold outreach");
+});
+
+function runPythonJson(python: string, args: string[]) {
+  const result = spawnSync(python, args, {
+    cwd: process.cwd(),
+    encoding: "utf-8",
+    env: {
+      ...process.env,
+      PYTHONIOENCODING: "utf-8",
+    },
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  return JSON.parse(result.stdout);
+}

@@ -8,7 +8,45 @@ This repo currently contains the scoped Arcigy/Jarvis automation additions reque
 - Cold outreach MCP briefing: `src/automation-system/cold-outreach-summary.ts`
 - Local client/lead identity matching schema: `migrations/0001_jarvis_local_entities.sql`
 - MCP tool facade: `src/automation-system/mcp-tools.ts`
+- MCP stdio server: `src/automation-system/mcp-server.ts`
 - Jarvis voice listener state: `src/automation-system/jarvis-voice.ts`
+
+## MCP server
+
+Run the local Arcigy/Jarvis MCP server:
+
+```powershell
+npm run mcp
+```
+
+Server tools:
+
+- `arcigy.generate_contract_documents`
+- `arcigy.get_cold_outreach_brief`
+- `arcigy.upsert_local_person`
+- `arcigy.add_client_need_signal`
+- `arcigy.identify_email`
+- `arcigy.jarvis_voice_event`
+
+Example MCP command config:
+
+```json
+{
+  "command": "npm",
+  "args": ["run", "mcp"],
+  "cwd": "C:\\Users\\laube\\Documents\\JARVIS"
+}
+```
+
+## Local clients/leads DB
+
+Initialize or use the SQLite DB:
+
+```powershell
+$env:PYTHONIOENCODING='utf-8'
+python scripts\jarvis_local_db.py init --db data\jarvis-local.db
+python scripts\jarvis_local_db.py identify --db data\jarvis-local.db --email klient@example.com
+```
 
 ## Contract templates
 
@@ -43,6 +81,7 @@ Generate client-ready DOCX files from a filled MCP/AI form:
 & 'C:\Users\laube\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe' --check src\automation-system\jarvis-intents.ts
 & 'C:\Users\laube\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' -m py_compile scripts\universalize_contract_templates.py
 & 'C:\Users\laube\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' -m py_compile scripts\generate_contract_documents.py
+& 'C:\Users\laube\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' -m py_compile scripts\jarvis_local_db.py
 npm run typecheck
 npm test
 ```
