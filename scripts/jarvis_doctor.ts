@@ -32,6 +32,7 @@ const strictEnv = args.has("--strict-env");
 const skipEnvFile = args.has("--no-env-file");
 const skipContractGeneration = args.has("--skip-contract-generation");
 const skipWebBridge = args.has("--skip-web-bridge");
+const skipLocalDb = args.has("--skip-local-db");
 
 await main();
 
@@ -42,6 +43,7 @@ async function main() {
   checks.push(checkRequiredFiles());
   checks.push(checkMcpToolRegistry());
   checks.push(checkRuntimeEnv());
+  if (!skipLocalDb) checks.push(checkLocalDbSmoke());
   if (!skipContractGeneration) checks.push(checkContractGeneration());
   if (!skipWebBridge) checks.push(await checkWebBridgeSmoke());
 
@@ -129,6 +131,92 @@ function checkRuntimeEnv(): DoctorCheck {
   };
 }
 
+function checkLocalDbSmoke(): DoctorCheck {
+  const dbPath = safeGeneratedPath(`doctor-local-db-${Date.now()}-${process.pid}.db`);
+  const python = process.env.JARVIS_PYTHON || "python";
+  const init = runPythonTool(python, ["scripts/jarvis_local_db.py", "init", "--db", dbPath]);
+  if (init.status !== 0) return failedPythonCheck("localDbSmoke", "Local DB init failed.", init);
+
+  const ingest = runPythonTool(python, [
+    "scripts/jarvis_local_db.py",
+    "ingest-message",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify({
+      fromEmail: "doctor-client@example.com",
+      displayName: "Doctor Client",
+      companyName: "Doctor Client s. r. o.",
+      subject: "Report request",
+      text: "Please prepare a new weekly cold outreach report.",
+      source: "doctor",
+    }),
+  ]);
+  if (ingest.status !== 0) return failedPythonCheck("localDbSmoke", "Local DB message ingest failed.", ingest);
+
+  const identify = runPythonTool(python, ["scripts/jarvis_local_db.py", "identify", "--db", dbPath, "--email", "doctor-client@example.com"]);
+  if (identify.status !== 0) return failedPythonCheck("localDbSmoke", "Local DB identity lookup failed.", identify);
+
+  const since = "2026-06-01T00:00:00Z";
+  const until = "2026-06-08T00:00:00Z";
+  const coldEvents = [
+    ["lead1@example.com", "sent"],
+    ["lead1@example.com", "opened"],
+    ["lead1@example.com", "replied"],
+    ["lead1@example.com", "positive_reply"],
+    ["lead1@example.com", "prepared_reply"],
+    ["lead2@example.com", "sent"],
+  ];
+  for (const [leadEmail, eventType] of coldEvents) {
+    const event = runPythonTool(python, [
+      "scripts/jarvis_local_db.py",
+      "add-cold-event",
+      "--db",
+      dbPath,
+      "--payload",
+      JSON.stringify({ leadEmail, eventType, occurredAt: "2026-06-03T12:00:00Z", campaignName: "Doctor" }),
+    ]);
+    if (event.status !== 0) return failedPythonCheck("localDbSmoke", `Local DB cold event failed: ${eventType}.`, event);
+  }
+
+  const brief = runPythonTool(python, [
+    "scripts/jarvis_local_db.py",
+    "cold-brief",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify({ since, until, periodLabel: "doctor period" }),
+  ]);
+  if (brief.status !== 0) return failedPythonCheck("localDbSmoke", "Local DB cold outreach brief failed.", brief);
+
+  const ingestBody = parseJson(ingest.stdout);
+  const identifyBody = parseJson(identify.stdout);
+  const briefBody = parseJson(brief.stdout);
+  const ready =
+    Boolean(ingestBody.jarvisAlert) &&
+    identifyBody.person?.primaryEmail === "doctor-client@example.com" &&
+    Array.isArray(identifyBody.openNeedSignals) &&
+    identifyBody.openNeedSignals.length === 1 &&
+    briefBody.metrics?.contacted === 2 &&
+    briefBody.metrics?.positiveReplies === 1 &&
+    briefBody.metrics?.pendingApprovalCount === 1;
+
+  return {
+    key: "localDbSmoke",
+    status: ready ? "ready" : "failed",
+    message: ready
+      ? "Local client memory, need signals, identity lookup, and cold outreach summary work."
+      : "Local DB smoke returned unexpected data.",
+    details: {
+      dbPath,
+      hasJarvisAlert: Boolean(ingestBody.jarvisAlert),
+      identityEmail: identifyBody.person?.primaryEmail,
+      openNeedSignals: identifyBody.openNeedSignals?.length ?? 0,
+      coldMetrics: briefBody.metrics,
+    },
+  };
+}
+
 function checkContractGeneration(): DoctorCheck {
   const outputDir = safeGeneratedPath(`doctor-contracts-${Date.now()}-${process.pid}`);
   mkdirSync(outputDir, { recursive: true });
@@ -180,6 +268,27 @@ function checkContractGeneration(): DoctorCheck {
         : "Sample contract generation manifest is incomplete.",
     details: { outputDir, generatedFiles: generatedFiles.length, missingFiles },
   };
+}
+
+function runPythonTool(python: string, args: string[]) {
+  return spawnSync(python, args, {
+    cwd: repoRoot,
+    encoding: "utf-8",
+    env: { ...process.env, PYTHONIOENCODING: "utf-8" },
+  });
+}
+
+function failedPythonCheck(key: string, message: string, result: ReturnType<typeof runPythonTool>): DoctorCheck {
+  return {
+    key,
+    status: "failed",
+    message,
+    details: { status: result.status, stderr: trimOutput(result.stderr), stdout: trimOutput(result.stdout) },
+  };
+}
+
+function parseJson(value: string): any {
+  return JSON.parse(value) as any;
 }
 
 async function checkWebBridgeSmoke(): Promise<DoctorCheck> {
