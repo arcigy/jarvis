@@ -38,6 +38,24 @@ Example MCP command config:
 }
 ```
 
+## Desktop app
+
+Run the local desktop shell:
+
+```powershell
+npm run desktop
+```
+
+The Electron shell opens a local Arcigy Jarvis console with:
+
+- wake word flow for `Jarvis`
+- microphone speech recognition when the Chromium runtime exposes `SpeechRecognition`
+- text transcript fallback
+- Slovak TTS via `speechSynthesis`
+- quick cold outreach response demo
+
+Tauri is the preferred target for a production desktop build, but this machine currently has no Rust/Cargo toolchain available. Electron is used here as the working desktop fallback.
+
 ## Local clients/leads DB
 
 Initialize or use the SQLite DB:

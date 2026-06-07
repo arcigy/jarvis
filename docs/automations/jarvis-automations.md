@@ -44,3 +44,5 @@ Desktop listener je definovaný ako vypnutá automatizácia, kým nebude pripoje
 Stavový modul je `src/automation-system/jarvis-voice.ts`. Desktop vrstva mu posiela transcript eventy a modul vracia, či má začať nahrávať, prestať nahrávať a aký text má prečítať cez TTS.
 
 MCP tool `arcigy.jarvis_voice_event` obslúži prechod z `idle` do `awake` po wake worde `Jarvis`.
+
+Lokálny desktop shell je v `src/desktop` a spustí sa cez `npm run desktop`. Používa Electron fallback, pretože v tomto prostredí nie je dostupný Rust/Cargo pre Tauri.

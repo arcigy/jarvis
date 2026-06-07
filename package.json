@@ -3,12 +3,14 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "desktop": "electron src/desktop/main.cjs",
     "mcp": "node src/automation-system/mcp-server.ts",
     "typecheck": "tsc --noEmit",
     "test": "node --test tests/*.test.ts"
   },
   "devDependencies": {
     "@types/node": "^25.9.2",
+    "electron": "^42.3.3",
     "typescript": "^5.8.3"
   },
   "dependencies": {

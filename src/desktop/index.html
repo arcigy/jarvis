@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="sk">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Arcigy Jarvis</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="mark">A</div>
+        <div>
+          <strong>Arcigy Jarvis</strong>
+          <span>Local automation hub</span>
+        </div>
+      </div>
+      <nav>
+        <button class="active">Jarvis</button>
+        <button>Cold outreach</button>
+        <button>Klienti & leads</button>
+        <button>Zmluvy</button>
+        <button>MCP</button>
+      </nav>
+    </aside>
+
+    <main>
+      <header>
+        <div>
+          <h1>Jarvis Console</h1>
+          <p>Wake word listener, local MCP tools, client identity, and contract generation.</p>
+        </div>
+        <div class="status" id="statusBadge">Idle</div>
+      </header>
+
+      <section class="grid">
+        <article class="panel listener">
+          <div class="panelHead">
+            <div>
+              <h2>Voice listener</h2>
+              <p>Say “Jarvis” after enabling microphone listening.</p>
+            </div>
+            <button id="listenButton">Enable</button>
+          </div>
+          <div class="orb" id="orb"></div>
+          <label>
+            Transcript
+            <textarea id="transcript" spellcheck="false" placeholder="Jarvis, čo sa dialo v cold outreach dnes?"></textarea>
+          </label>
+          <div class="actions">
+            <button id="simulateWake">Simulate wake</button>
+            <button id="submitTranscript">Send transcript</button>
+          </div>
+        </article>
+
+        <article class="panel">
+          <h2>Jarvis response</h2>
+          <div class="response" id="response">Čakám na wake word.</div>
+        </article>
+
+        <article class="panel">
+          <h2>Cold outreach demo</h2>
+          <dl>
+            <div><dt>Sent</dt><dd>128</dd></div>
+            <div><dt>Opened</dt><dd>61</dd></div>
+            <div><dt>Replies</dt><dd>14</dd></div>
+            <div><dt>Positive</dt><dd>5</dd></div>
+          </dl>
+          <button id="coldBrief">Ask Jarvis</button>
+        </article>
+
+        <article class="panel">
+          <h2>MCP tools</h2>
+          <ul>
+            <li>generate_contract_documents</li>
+            <li>get_cold_outreach_brief</li>
+            <li>upsert_local_person</li>
+            <li>add_client_need_signal</li>
+            <li>identify_email</li>
+            <li>jarvis_voice_event</li>
+          </ul>
+        </article>
+      </section>
+    </main>
+
+    <script src="./renderer.js"></script>
+  </body>
+</html>
