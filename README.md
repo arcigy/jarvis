@@ -7,7 +7,8 @@ This repo currently contains the scoped Arcigy/Jarvis automation additions reque
 - Contract generator: `src/automation-system/jarvis-automations.ts`
 - Cold outreach MCP briefing: `src/automation-system/cold-outreach-summary.ts`
 - Local client/lead identity matching schema: `migrations/0001_jarvis_local_entities.sql`
-- Jarvis voice listener definition: `src/automation-system/jarvis-automations.ts`
+- MCP tool facade: `src/automation-system/mcp-tools.ts`
+- Jarvis voice listener state: `src/automation-system/jarvis-voice.ts`
 
 ## Contract templates
 
@@ -42,6 +43,8 @@ Generate client-ready DOCX files from a filled MCP/AI form:
 & 'C:\Users\laube\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe' --check src\automation-system\jarvis-intents.ts
 & 'C:\Users\laube\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' -m py_compile scripts\universalize_contract_templates.py
 & 'C:\Users\laube\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' -m py_compile scripts\generate_contract_documents.py
+npm run typecheck
+npm test
 ```
 
 DOCX render QA requires LibreOffice/`soffice`.

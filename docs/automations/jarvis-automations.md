@@ -23,6 +23,8 @@ Odpoveď MCP má byť krátka a akčná:
 
 Implementácia sumarizácie je v `src/automation-system/cold-outreach-summary.ts`.
 
+MCP entrypoint je `src/automation-system/mcp-tools.ts`, tool `arcigy.get_cold_outreach_brief`.
+
 ## Lokálni klienti a leads
 
 Email je primárny identifikátor v `local_people.primary_email`. Variabilné údaje sú v `data_json`, aby sa pre každú klientsku automatizáciu nevytvárali nové tabuľky.
@@ -32,3 +34,5 @@ Logika párovania je v `src/automation-system/identity-matching.ts`. Otvorené p
 ## Jarvis hlas
 
 Desktop listener je definovaný ako vypnutá automatizácia, kým nebude pripojená desktopová vrstva. Wake word je `Jarvis`; po aktivácii má spustiť lokálny intent, použiť schválené MCP nástroje a odpovedať hlasom.
+
+Stavový modul je `src/automation-system/jarvis-voice.ts`. Desktop vrstva mu posiela transcript eventy a modul vracia, či má začať nahrávať, prestať nahrávať a aký text má prečítať cez TTS.
