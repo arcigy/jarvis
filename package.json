@@ -4,6 +4,8 @@
   "type": "module",
   "scripts": {
     "desktop": "electron src/desktop/main.cjs",
+    "web": "node src/server/local-api-server.ts",
+    "web:tunnel": "npx ngrok http 8765",
     "mcp": "node src/automation-system/mcp-server.ts",
     "typecheck": "tsc --noEmit",
     "test": "node --test tests/*.test.ts"

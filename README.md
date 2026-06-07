@@ -78,6 +78,27 @@ Live integrations are runtime-only:
 
 Tauri is the preferred target for a production desktop build, but this machine currently has no Rust/Cargo toolchain available. Electron is used here as the working desktop fallback.
 
+## Local web bridge
+
+Run the browser-ready Jarvis bridge:
+
+```powershell
+npm run web
+```
+
+It serves the same UI at `http://127.0.0.1:8765` and exposes local HTTP endpoints used by the browser fallback:
+
+- `GET /api/system-health`
+- `POST /api/jarvis/voice-event`
+- `POST /api/cold-outreach-brief`
+- `POST /api/generate-ai-reply`
+- `POST /api/generate-contracts`
+- `POST /api/mcp/arcigy.get_system_health`
+- `POST /api/mcp/arcigy.generate_ai_reply`
+- `POST /api/mcp/arcigy.get_cold_outreach_brief_from_db`
+
+For a temporary external URL, run `npm run web:tunnel` after configuring ngrok locally. Keep this local-first; do not expose it publicly without access controls.
+
 ## Local clients/leads DB
 
 Initialize or use the SQLite DB:

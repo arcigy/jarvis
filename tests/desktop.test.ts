@@ -16,11 +16,13 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /draftReply/);
   assert.match(renderer, /SpeechRecognition/);
   assert.match(renderer, /speechSynthesis/);
-  assert.match(renderer, /window\.arcigyDesktop\.jarvisVoiceEvent/);
-  assert.match(renderer, /window\.arcigyDesktop\.coldOutreachBrief/);
-  assert.match(renderer, /window\.arcigyDesktop\.generateContracts/);
-  assert.match(renderer, /window\.arcigyDesktop\.systemHealth/);
-  assert.match(renderer, /window\.arcigyDesktop\.generateAiReply/);
+  assert.match(renderer, /window\.arcigyDesktop/);
+  assert.match(renderer, /arcigyApi\.jarvisVoiceEvent/);
+  assert.match(renderer, /arcigyApi\.coldOutreachBrief/);
+  assert.match(renderer, /arcigyApi\.generateContracts/);
+  assert.match(renderer, /arcigyApi\.systemHealth/);
+  assert.match(renderer, /arcigyApi\.generateAiReply/);
+  assert.match(renderer, /\/api\/system-health/);
   assert.match(renderer, /sampleContractIntake/);
   assert.doesNotMatch(renderer, /demoColdOutreachMetrics/);
   assert.doesNotMatch(renderer, /Za dnes sme napísali/);

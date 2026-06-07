@@ -24,6 +24,13 @@ const elements = {
 };
 
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+const arcigyApi = window.arcigyDesktop ?? {
+  systemHealth: () => getJson("/api/system-health"),
+  coldOutreachBrief: (payload) => postJson("/api/cold-outreach-brief", payload),
+  jarvisVoiceEvent: (payload) => postJson("/api/jarvis/voice-event", payload),
+  generateAiReply: (payload) => postJson("/api/generate-ai-reply", payload),
+  generateContracts: (payload) => postJson("/api/generate-contracts", payload),
+};
 
 function setMode(mode) {
   state.mode = mode;
@@ -53,10 +60,27 @@ function renderHealth(health) {
 
 async function refreshHealth() {
   try {
-    renderHealth(await window.arcigyDesktop.systemHealth());
+    renderHealth(await arcigyApi.systemHealth());
   } catch (error) {
     elements.healthGrid.textContent = error instanceof Error ? error.message : String(error);
   }
+}
+
+async function getJson(url) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+  return response.json();
+}
+
+async function postJson(url, payload) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload ?? {}),
+  });
+  const value = await response.json();
+  if (!response.ok) throw new Error(value?.error || `Request failed: ${response.status}`);
+  return value;
 }
 
 function sampleContractIntake() {
@@ -113,7 +137,7 @@ async function handleTranscript(text) {
   const trimmed = text.trim();
   elements.transcript.value = trimmed;
 
-  const result = await window.arcigyDesktop.jarvisVoiceEvent({
+  const result = await arcigyApi.jarvisVoiceEvent({
     session: state.session,
     text: trimmed,
   });
@@ -173,12 +197,12 @@ elements.listenButton.addEventListener("click", () => {
 elements.simulateWake.addEventListener("click", () => void handleTranscript("Jarvis"));
 elements.submitTranscript.addEventListener("click", () => void handleTranscript(elements.transcript.value));
 elements.coldBrief.addEventListener("click", async () => {
-  speak(await window.arcigyDesktop.coldOutreachBrief({ text: "cold outreach za posledných 7 dní" }));
+  speak(await arcigyApi.coldOutreachBrief({ text: "cold outreach za posledných 7 dní" }));
 });
 elements.draftReply.addEventListener("click", async () => {
   try {
     elements.draftResult.textContent = "Drafting...";
-    const result = await window.arcigyDesktop.generateAiReply({
+    const result = await arcigyApi.generateAiReply({
       message: elements.clientMessage.value,
       context: "Client communication inside Arcigy Jarvis.",
     });
@@ -192,7 +216,7 @@ elements.generateContracts.addEventListener("click", async () => {
   try {
     elements.contractResult.textContent = "Generating...";
     const intake = JSON.parse(elements.contractIntake.value);
-    const result = await window.arcigyDesktop.generateContracts({ intake });
+    const result = await arcigyApi.generateContracts({ intake });
     elements.contractResult.textContent = [
       `Generated ${result.generatedFiles.length} files.`,
       `Manifest: ${result.manifestPath}`,
