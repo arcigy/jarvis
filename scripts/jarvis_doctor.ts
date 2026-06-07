@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { createServer } from "node:net";
 import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -30,32 +31,38 @@ const jsonOutput = args.has("--json");
 const strictEnv = args.has("--strict-env");
 const skipEnvFile = args.has("--no-env-file");
 const skipContractGeneration = args.has("--skip-contract-generation");
+const skipWebBridge = args.has("--skip-web-bridge");
 
-if (!skipEnvFile) loadLocalEnv(repoRoot);
+await main();
 
-const checks: DoctorCheck[] = [];
-checks.push(checkRequiredFiles());
-checks.push(checkMcpToolRegistry());
-checks.push(checkRuntimeEnv());
-if (!skipContractGeneration) checks.push(checkContractGeneration());
+async function main() {
+  if (!skipEnvFile) loadLocalEnv(repoRoot);
 
-const failed = checks.filter((check) => check.status === "failed");
-const warnings = checks.filter((check) => check.status === "warning");
-const summary: DoctorSummary = {
-  ok: failed.length === 0,
-  ready: checks.filter((check) => check.status === "ready").length,
-  warnings: warnings.length,
-  failed: failed.length,
-  checks,
-};
+  const checks: DoctorCheck[] = [];
+  checks.push(checkRequiredFiles());
+  checks.push(checkMcpToolRegistry());
+  checks.push(checkRuntimeEnv());
+  if (!skipContractGeneration) checks.push(checkContractGeneration());
+  if (!skipWebBridge) checks.push(await checkWebBridgeSmoke());
 
-if (jsonOutput) {
-  process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
-} else {
-  process.stdout.write(renderHumanSummary(summary));
+  const failed = checks.filter((check) => check.status === "failed");
+  const warnings = checks.filter((check) => check.status === "warning");
+  const summary: DoctorSummary = {
+    ok: failed.length === 0,
+    ready: checks.filter((check) => check.status === "ready").length,
+    warnings: warnings.length,
+    failed: failed.length,
+    checks,
+  };
+
+  if (jsonOutput) {
+    process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
+  } else {
+    process.stdout.write(renderHumanSummary(summary));
+  }
+
+  process.exitCode = summary.ok ? 0 : 1;
 }
-
-process.exitCode = summary.ok ? 0 : 1;
 
 function checkRequiredFiles(): DoctorCheck {
   const requiredFiles = [
@@ -85,8 +92,9 @@ function checkMcpToolRegistry(): DoctorCheck {
   const names = tools.map((tool) => tool.name);
   const duplicates = names.filter((name, index) => names.indexOf(name) !== index);
   const approvalTools = tools.filter((tool) => tool.requiresApproval).map((tool) => tool.name);
+  const approvalToolSet = new Set<string>(approvalTools);
   const requiredApprovalTools = ["arcigy.generate_contract_documents", "arcigy.append_leads_to_google_sheet"];
-  const missingApproval = requiredApprovalTools.filter((name) => !approvalTools.includes(name));
+  const missingApproval = requiredApprovalTools.filter((name) => !approvalToolSet.has(name));
   const failed = duplicates.length > 0 || missingApproval.length > 0 || tools.length < 19;
 
   return {
@@ -172,6 +180,107 @@ function checkContractGeneration(): DoctorCheck {
         : "Sample contract generation manifest is incomplete.",
     details: { outputDir, generatedFiles: generatedFiles.length, missingFiles },
   };
+}
+
+async function checkWebBridgeSmoke(): Promise<DoctorCheck> {
+  const port = await getFreePort();
+  const stdout: string[] = [];
+  const stderr: string[] = [];
+  const child = spawn(process.execPath, ["src/server/local-api-server.ts"], {
+    cwd: repoRoot,
+    env: {
+      ...process.env,
+      JARVIS_WEB_HOST: "127.0.0.1",
+      JARVIS_WEB_PORT: String(port),
+    },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  child.stdout.on("data", (chunk) => stdout.push(String(chunk)));
+  child.stderr.on("data", (chunk) => stderr.push(String(chunk)));
+
+  try {
+    const origin = `http://127.0.0.1:${port}`;
+    const preflight = await fetchJsonWithRetry(`${origin}/api/web-bridge-preflight`);
+    const manifest = await fetchJsonWithRetry(`${origin}/api/mcp`);
+    const expectedToolCount = listJarvisMcpTools().length;
+    const mcpToolCount = Number((preflight as { mcpToolCount?: unknown }).mcpToolCount);
+    const manifestToolCount = Array.isArray((manifest as { tools?: unknown }).tools) ? (manifest as { tools: unknown[] }).tools.length : 0;
+    const ready = mcpToolCount === expectedToolCount && manifestToolCount === expectedToolCount;
+
+    return {
+      key: "webBridgeSmoke",
+      status: ready ? "ready" : "failed",
+      message: ready
+        ? `Web bridge served preflight and MCP manifest with ${expectedToolCount} tool(s).`
+        : "Web bridge returned a tool count mismatch.",
+      details: {
+        origin,
+        mcpToolCount,
+        manifestToolCount,
+        expectedToolCount,
+      },
+    };
+  } catch (error) {
+    return {
+      key: "webBridgeSmoke",
+      status: "failed",
+      message: error instanceof Error ? error.message : String(error),
+      details: {
+        stdout: trimOutput(stdout.join("")),
+        stderr: trimOutput(stderr.join("")),
+      },
+    };
+  } finally {
+    await stopChild(child);
+  }
+}
+
+async function fetchJsonWithRetry(url: string): Promise<unknown> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`${url} returned ${response.status}`);
+      return await response.json();
+    } catch (error) {
+      lastError = error;
+      await delay(100);
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(`Timed out fetching ${url}`);
+}
+
+function getFreePort(): Promise<number> {
+  return new Promise((resolvePort, reject) => {
+    const server = createServer();
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      server.close(() => {
+        if (address && typeof address === "object") resolvePort(address.port);
+        else reject(new Error("Could not allocate a free local port."));
+      });
+    });
+  });
+}
+
+function stopChild(child: ChildProcess): Promise<void> {
+  return new Promise((resolveStop) => {
+    if (child.killed || child.exitCode !== null) {
+      resolveStop();
+      return;
+    }
+    child.once("exit", () => resolveStop());
+    child.kill();
+    setTimeout(() => {
+      if (child.exitCode === null) child.kill("SIGKILL");
+      resolveStop();
+    }, 1500).unref();
+  });
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolveDelay) => setTimeout(resolveDelay, ms));
 }
 
 function safeGeneratedPath(name: string): string {
