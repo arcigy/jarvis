@@ -7,6 +7,7 @@ const state = {
 };
 
 const elements = {
+  navButtons: [...document.querySelectorAll("nav button[data-target]")],
   statusBadge: document.querySelector("#statusBadge"),
   healthGrid: document.querySelector("#healthGrid"),
   listenButton: document.querySelector("#listenButton"),
@@ -91,6 +92,39 @@ function setMode(mode) {
   state.mode = mode;
   elements.statusBadge.textContent = mode === "idle" ? "Idle" : mode === "awake" ? "Awake" : "Listening";
   elements.orb.dataset.mode = mode;
+}
+
+function setupNavigation() {
+  const setActive = (targetId) => {
+    for (const button of elements.navButtons) {
+      button.classList.toggle("active", button.dataset.target === targetId);
+    }
+  };
+
+  for (const button of elements.navButtons) {
+    button.addEventListener("click", () => {
+      const targetId = button.dataset.target;
+      const target = targetId ? document.getElementById(targetId) : null;
+      if (!target) return;
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+      setActive(targetId);
+    });
+  }
+
+  if (!("IntersectionObserver" in window)) return;
+  const observer = new IntersectionObserver(
+    (entries) => {
+      const visible = entries
+        .filter((entry) => entry.isIntersecting)
+        .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+      if (visible?.target.id) setActive(visible.target.id);
+    },
+    { rootMargin: "-15% 0px -65% 0px", threshold: [0.2, 0.45, 0.7] }
+  );
+  for (const button of elements.navButtons) {
+    const target = button.dataset.target ? document.getElementById(button.dataset.target) : null;
+    if (target) observer.observe(target);
+  }
 }
 
 function speak(text) {
@@ -563,6 +597,7 @@ elements.generateContracts.addEventListener("click", async () => {
 });
 
 const initialContractIntake = sampleContractIntake();
+setupNavigation();
 fillContractForm(initialContractIntake);
 elements.contractIntake.value = JSON.stringify(initialContractIntake, null, 2);
 elements.contractBrief.value =
@@ -570,7 +605,7 @@ elements.contractBrief.value =
 elements.memoryEmail.value = "client@example.com";
 elements.memorySubject.value = "Onboarding automatizacia";
 elements.memoryMessage.value = "Potrebujem upravit onboarding automatizaciu do piatku.";
-elements.clientMessage.value = "Potrebujem upraviť onboarding automatizáciu do piatku.";
+elements.clientMessage.value = "Potrebujem upravit onboarding automatizaciu do piatku.";
 elements.gmailQuery.value = "newer_than:7d";
 elements.leadQuery.value = "automation agency Bratislava";
 void refreshHealth();

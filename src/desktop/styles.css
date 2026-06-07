@@ -3,6 +3,7 @@
   font-family: Inter, Segoe UI, Arial, sans-serif;
   background: #080b0d;
   color: #eef4f2;
+  scroll-behavior: smooth;
 }
 
 * {
@@ -23,9 +24,15 @@ body {
 }
 
 .sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
   border-right: 1px solid #26302f;
-  background: linear-gradient(180deg, #101615, #0b0f10);
+  background:
+    linear-gradient(180deg, rgb(67 217 196 / 8%), transparent 26%),
+    linear-gradient(180deg, #101615, #0b0f10);
   padding: 22px 18px;
+  overflow: auto;
 }
 
 .brand {
@@ -63,6 +70,20 @@ nav {
   gap: 8px;
 }
 
+nav button {
+  position: relative;
+  width: 100%;
+}
+
+nav button::before {
+  content: "";
+  position: absolute;
+  inset: 8px auto 8px 8px;
+  width: 3px;
+  border-radius: 999px;
+  background: transparent;
+}
+
 button {
   border: 1px solid #2c3937;
   background: #121a1a;
@@ -80,8 +101,21 @@ button.active {
   background: #142522;
 }
 
+nav button.active::before {
+  background: #43d9c4;
+  box-shadow: 0 0 18px rgb(67 217 196 / 70%);
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #43d9c4;
+  outline-offset: 2px;
+}
+
 main {
   padding: 26px;
+  width: min(100%, 1480px);
 }
 
 header {
@@ -171,11 +205,28 @@ h2 {
 }
 
 .panel {
+  position: relative;
+  overflow: hidden;
   border: 1px solid #26302f;
-  background: linear-gradient(180deg, rgb(18 26 26 / 94%), rgb(10 15 16 / 96%));
+  background:
+    linear-gradient(145deg, rgb(67 217 196 / 9%), transparent 32%),
+    linear-gradient(180deg, rgb(18 26 26 / 94%), rgb(10 15 16 / 96%));
   border-radius: 8px;
   padding: 18px;
   box-shadow: 0 18px 42px rgb(0 0 0 / 24%);
+  scroll-margin-top: 18px;
+}
+
+.panel::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgb(67 217 196 / 75%), transparent);
+}
+
+.panel:hover {
+  border-color: rgb(67 217 196 / 52%);
 }
 
 .panelHead {
@@ -210,6 +261,16 @@ h2 {
     conic-gradient(from 0deg, #43d9c4, #f0b84f, #68d391, #43d9c4);
   box-shadow: 0 0 42px rgb(67 217 196 / 35%);
   animation: pulse 3.8s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    scroll-behavior: auto;
+  }
+
+  .orb {
+    animation: none;
+  }
 }
 
 .orb::after {
@@ -262,11 +323,11 @@ input {
 }
 
 textarea:focus {
-  outline: 1px solid #43d9c4;
+  border-color: #43d9c4;
 }
 
 input:focus {
-  outline: 1px solid #43d9c4;
+  border-color: #43d9c4;
 }
 
 .actions {
@@ -331,14 +392,19 @@ ul {
   }
 
   .sidebar {
+    position: static;
+    height: auto;
     border-right: 0;
     border-bottom: 1px solid #26302f;
   }
 
-  nav,
   .statusGrid,
   .grid {
     grid-template-columns: 1fr;
+  }
+
+  nav {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .contractPanel,

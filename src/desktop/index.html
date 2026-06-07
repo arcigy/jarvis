@@ -16,12 +16,12 @@
         </div>
       </div>
       <nav>
-        <button class="active">Jarvis</button>
-        <button>Cold outreach</button>
-        <button>Klienti & leads</button>
-        <button>Zmluvy</button>
-        <button>Integrácie</button>
-        <button>MCP</button>
+        <button class="active" data-target="jarvisPanel">Jarvis</button>
+        <button data-target="coldPanel">Cold outreach</button>
+        <button data-target="clientPanel">Klienti & leads</button>
+        <button data-target="contractPanel">Zmluvy</button>
+        <button data-target="operationsPanel">Integracie</button>
+        <button data-target="mcpPanel">MCP</button>
       </nav>
     </aside>
 
@@ -37,7 +37,7 @@
       <section class="statusGrid" id="healthGrid" aria-label="Integration status"></section>
 
       <section class="grid">
-        <article class="panel listener">
+        <article class="panel listener" id="jarvisPanel">
           <div class="panelHead">
             <div>
               <h2>Voice listener</h2>
@@ -48,7 +48,7 @@
           <div class="orb" id="orb"></div>
           <label>
             Transcript
-            <textarea id="transcript" spellcheck="false" placeholder="Jarvis, čo sa dialo v cold outreach dnes?"></textarea>
+            <textarea id="transcript" spellcheck="false" placeholder="Jarvis, co sa dialo v cold outreach dnes?"></textarea>
           </label>
           <div class="actions">
             <button id="simulateWake">Simulate wake</button>
@@ -58,10 +58,10 @@
 
         <article class="panel">
           <h2>Jarvis response</h2>
-          <div class="response" id="response">Čakám na wake word.</div>
+          <div class="response" id="response">Cakam na wake word.</div>
         </article>
 
-        <article class="panel">
+        <article class="panel" id="coldPanel">
           <h2>Cold outreach live brief</h2>
           <dl>
             <div><dt>Source</dt><dd>SQLite</dd></div>
@@ -72,7 +72,7 @@
           <button id="coldBrief">Ask Jarvis</button>
         </article>
 
-        <article class="panel operationsPanel">
+        <article class="panel operationsPanel" id="operationsPanel">
           <div class="panelHead">
             <div>
               <h2>Operations sync</h2>
@@ -99,7 +99,7 @@
           <div class="response compact" id="smartleadResult">Ready for read-only Smartlead status.</div>
         </article>
 
-        <article class="panel clientMemoryPanel">
+        <article class="panel clientMemoryPanel" id="clientPanel">
           <div class="panelHead">
             <div>
               <h2>Client memory</h2>
@@ -127,7 +127,7 @@
           <div class="response compact" id="memoryResult">Ready to identify email or save a client need.</div>
         </article>
 
-        <article class="panel">
+        <article class="panel" id="leadPanel">
           <div class="panelHead">
             <div>
               <h2>Lead discovery</h2>
@@ -155,12 +155,12 @@
           </div>
           <label>
             Client message
-            <textarea id="clientMessage" spellcheck="false" placeholder="Potrebujem upraviť onboarding automatizáciu do piatku."></textarea>
+            <textarea id="clientMessage" spellcheck="false" placeholder="Potrebujem upravit onboarding automatizaciu do piatku."></textarea>
           </label>
           <div class="response compact" id="draftResult">Ready for Gemini.</div>
         </article>
 
-        <article class="panel">
+        <article class="panel" id="mcpPanel">
           <h2>MCP tools</h2>
           <ul>
             <li>generate_contract_documents</li>
@@ -181,7 +181,7 @@
           </ul>
         </article>
 
-        <article class="panel contractPanel">
+        <article class="panel contractPanel" id="contractPanel">
           <div class="panelHead">
             <div>
               <h2>Contract generator</h2>

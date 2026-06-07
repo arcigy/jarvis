@@ -10,6 +10,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
 
   assert.match(html, /Arcigy Jarvis/);
   assert.match(html, /Enable/);
+  assert.match(html, /data-target="jarvisPanel"/);
+  assert.match(html, /id="operationsPanel"/);
+  assert.match(html, /id="mcpPanel"/);
   assert.match(html, /Contract generator/);
   assert.match(html, /draftContractIntake/);
   assert.match(html, /contractBrief/);
@@ -36,6 +39,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /exportLeads/);
   assert.match(renderer, /SpeechRecognition/);
   assert.match(renderer, /speechSynthesis/);
+  assert.match(renderer, /setupNavigation/);
+  assert.match(renderer, /IntersectionObserver/);
+  assert.match(renderer, /scrollIntoView/);
   assert.match(renderer, /window\.arcigyDesktop/);
   assert.match(renderer, /arcigyApi\.jarvisVoiceEvent/);
   assert.match(renderer, /arcigyApi\.runDiagnostics/);
@@ -64,6 +70,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /fillContractForm/);
   assert.doesNotMatch(renderer, /demoColdOutreachMetrics/);
   assert.doesNotMatch(renderer, /Za dnes sme napísali/);
+  assert.doesNotMatch(html, /[\u0102\u00c4\u0139\u00e2]/);
   assert.doesNotMatch(main, /[\u0102\u00c4\u0139\u00e2]/);
   assert.match(main, /ipcMain\.handle\("jarvis:coldOutreachBrief"/);
   assert.match(main, /ipcMain\.handle\("jarvis:identifyEmail"/);
