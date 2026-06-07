@@ -51,6 +51,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /sampleContractIntake/);
   assert.doesNotMatch(renderer, /demoColdOutreachMetrics/);
   assert.doesNotMatch(renderer, /Za dnes sme napísali/);
+  assert.doesNotMatch(main, /[\u0102\u00c4\u0139\u00e2]/);
   assert.match(main, /ipcMain\.handle\("jarvis:coldOutreachBrief"/);
   assert.match(main, /ipcMain\.handle\("jarvis:identifyEmail"/);
   assert.match(main, /ipcMain\.handle\("jarvis:ingestClientMessage"/);

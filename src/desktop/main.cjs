@@ -207,13 +207,13 @@ async function generateAiReply(payload) {
   if (!message) throw new Error("Client message is required.");
   const model = payload?.model || "gemini-2.5-flash";
   const prompt = [
-    "Si Arcigy Jarvis. Priprav profesionĂˇlnu, vecnĂş a family-friendly odpoveÄŹ klientovi.",
-    "Nikdy nesÄľubuj odoslanie bez schvĂˇlenia pouĹľĂ­vateÄľom.",
+    "Si Arcigy Jarvis. Priprav profesionalnu, vecnu a family-friendly odpoved klientovi.",
+    "Nikdy neslubuj odoslanie bez schvalenia pouzivatelom.",
     payload?.clientName ? `Klient: ${payload.clientName}` : null,
     payload?.context ? `Kontext: ${payload.context}` : null,
-    "SprĂˇva klienta:",
+    "Sprava klienta:",
     message,
-    "Vytvor krĂˇtku odpoveÄŹ v slovenÄŤine a jednu vetu, ÄŤo mĂˇ pouĹľĂ­vateÄľ schvĂˇliĹĄ.",
+    "Vytvor kratku odpoved v slovencine a jednu vetu, co ma pouzivatel schvalit.",
   ]
     .filter(Boolean)
     .join("\n");
@@ -319,7 +319,7 @@ function resolveColdOutreachPeriod(text) {
   return {
     since: since.toISOString(),
     until,
-    periodLabel: "poslednĂ˝ch 7 dnĂ­",
+    periodLabel: "poslednych 7 dni",
   };
 }
 
@@ -335,36 +335,36 @@ function buildColdOutreachBrief(metrics) {
   };
   const openRate = input.contacted > 0 ? Math.round((input.opened / input.contacted) * 1000) / 10 : 0;
   const parts = [
-    `Za ${input.periodLabel} sme napĂ­sali ${skPeople(input.contacted)}.`,
-    `${openRate}% si email otvorilo, ${skReplies(input.replied)}, z toho ${input.positiveReplies} pozitĂ­vne.`,
+    `Za ${input.periodLabel} sme napisali ${skPeople(input.contacted)}.`,
+    `${openRate}% si email otvorilo, ${skReplies(input.replied)}, z toho ${input.positiveReplies} pozitivne.`,
   ];
 
   if (input.preparedPositiveReplyCount > 0) {
     parts.push(
-      `Pripravil som ti ${skPreparedReplies(input.preparedPositiveReplyCount)} na pozitĂ­vne reakcie a poĹˇlem ich aĹľ na tvoje potvrdenie.`
+      `Pripravil som ti ${skPreparedReplies(input.preparedPositiveReplyCount)} na pozitivne reakcie a poslem ich az na tvoje potvrdenie.`
     );
   }
   if (input.pendingApprovalCount > 0) {
-    parts.push(`ÄŚakĂˇ ${skPreparedReplies(input.pendingApprovalCount)} na schvĂˇlenie.`);
+    parts.push(`Caka ${skPreparedReplies(input.pendingApprovalCount)} na schvalenie.`);
   }
 
   return parts.join(" ");
 }
 
 function skPeople(count) {
-  if (count === 1) return "1 ÄŤloveku";
-  return `${count} ÄľuÄŹom`;
+  if (count === 1) return "1 cloveku";
+  return `${count} ludom`;
 }
 
 function skReplies(count) {
-  if (count === 1) return "1 ÄŤlovek odpĂ­sal";
-  return `${count} ÄľudĂ­ odpĂ­salo`;
+  if (count === 1) return "1 clovek odpisal";
+  return `${count} ludi odpisalo`;
 }
 
 function skPreparedReplies(count) {
-  if (count === 1) return "1 odpoveÄŹ";
+  if (count === 1) return "1 odpoved";
   if (count > 1 && count < 5) return `${count} odpovede`;
-  return `${count} odpovedĂ­`;
+  return `${count} odpovedi`;
 }
 
 function containsWakeWord(text, wakeWord = "jarvis") {
