@@ -18,7 +18,7 @@ This opens a local Electron desktop window. It is a working fallback shell until
 - The client memory panel identifies email addresses and ingests client requests into the local SQLite database.
 - The Gemini panel drafts client replies without sending them.
 - The operations panel syncs recent Gmail messages into the local SQLite memory and checks Smartlead campaign status.
-- The lead discovery panel runs read-only company discovery through Serper and Google Places.
+- The lead discovery panel runs company discovery through Serper and Google Places, then exports selected results to Google Sheets only after the user clicks `Export`.
 - The contract panel accepts inline intake JSON and generates local DOCX files through the main-process bridge.
 
 ## Security shape

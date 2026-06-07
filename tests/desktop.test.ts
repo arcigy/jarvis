@@ -26,6 +26,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /Lead discovery/);
   assert.match(html, /leadQuery/);
   assert.match(html, /discoverLeads/);
+  assert.match(html, /exportLeads/);
   assert.match(renderer, /SpeechRecognition/);
   assert.match(renderer, /speechSynthesis/);
   assert.match(renderer, /window\.arcigyDesktop/);
@@ -39,12 +40,14 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /arcigyApi\.syncGmailRecentMessages/);
   assert.match(renderer, /arcigyApi\.getSmartleadCampaignStatus/);
   assert.match(renderer, /arcigyApi\.discoverLeads/);
+  assert.match(renderer, /arcigyApi\.appendLeadsToGoogleSheet/);
   assert.match(renderer, /\/api\/system-health/);
   assert.match(renderer, /\/api\/identify-email/);
   assert.match(renderer, /\/api\/ingest-client-message/);
   assert.match(renderer, /\/api\/sync-gmail-recent-messages/);
   assert.match(renderer, /\/api\/smartlead-campaign-status/);
   assert.match(renderer, /\/api\/discover-leads/);
+  assert.match(renderer, /\/api\/append-leads-to-google-sheet/);
   assert.match(renderer, /sampleContractIntake/);
   assert.doesNotMatch(renderer, /demoColdOutreachMetrics/);
   assert.doesNotMatch(renderer, /Za dnes sme napísali/);
@@ -57,6 +60,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /ipcMain\.handle\("jarvis:syncGmailRecentMessages"/);
   assert.match(main, /ipcMain\.handle\("jarvis:getSmartleadCampaignStatus"/);
   assert.match(main, /ipcMain\.handle\("jarvis:discoverLeads"/);
+  assert.match(main, /ipcMain\.handle\("jarvis:appendLeadsToGoogleSheet"/);
   assert.match(main, /listRecentGmailMessageEvents/);
   assert.match(main, /getSmartleadCampaignStatus/);
   assert.match(main, /searchGooglePlacesLeads/);
@@ -77,5 +81,6 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(preload, /syncGmailRecentMessages/);
   assert.match(preload, /getSmartleadCampaignStatus/);
   assert.match(preload, /discoverLeads/);
+  assert.match(preload, /appendLeadsToGoogleSheet/);
   assert.match(preload, /generateContracts/);
 });

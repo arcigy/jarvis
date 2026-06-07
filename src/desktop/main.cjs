@@ -53,6 +53,7 @@ app.whenReady().then(() => {
   ipcMain.handle("jarvis:syncGmailRecentMessages", (_event, payload) => syncGmailRecentMessages(payload));
   ipcMain.handle("jarvis:getSmartleadCampaignStatus", (_event, payload) => getSmartleadCampaignStatus(payload));
   ipcMain.handle("jarvis:discoverLeads", (_event, payload) => discoverLeads(payload));
+  ipcMain.handle("jarvis:appendLeadsToGoogleSheet", (_event, payload) => appendLeadsToGoogleSheet(payload));
   ipcMain.handle("contracts:generate", (_event, payload) => generateContracts(payload));
   createWindow();
   createTray();
@@ -549,6 +550,39 @@ function getSerperApiKeys() {
   return [process.env.SERPER_API_KEY, process.env.SERPER_API_KEY_2]
     .map((value) => value?.trim())
     .filter((value, index, values) => value && value !== "dummy" && values.indexOf(value) === index);
+}
+
+async function appendLeadsToGoogleSheet(payload) {
+  const rows = Array.isArray(payload?.rows) ? payload.rows : [];
+  if (!rows.length) throw new Error("At least one lead row is required.");
+  const spreadsheetId = String(payload?.spreadsheetId || requireRuntimeEnv("GOOGLE_SHEET_ID"));
+  const range = String(payload?.range || "Leads!A1");
+  const accountEnvKey = String(payload?.accountEnvKey ?? "").trim();
+  const account = listConfiguredGmailAccounts().find((item) => !accountEnvKey || item.envKey === accountEnvKey);
+  if (!account) {
+    throw new Error(accountEnvKey ? `Google account not configured: ${accountEnvKey}` : "No configured Google OAuth account found.");
+  }
+  const accessToken = await refreshGoogleAccessToken(account.refreshToken);
+  const params = new URLSearchParams({
+    valueInputOption: "USER_ENTERED",
+    insertDataOption: "INSERT_ROWS",
+  });
+  const response = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(range)}:append?${params.toString()}`,
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        majorDimension: "ROWS",
+        values: rows,
+      }),
+    }
+  );
+  if (!response.ok) throw new Error(`Google Sheets append failed: ${response.status}`);
+  return response.json();
 }
 
 function generateContracts(payload) {

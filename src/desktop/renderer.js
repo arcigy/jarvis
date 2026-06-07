@@ -3,6 +3,7 @@ const state = {
   session: { state: "idle", wakeWord: "jarvis" },
   recognition: null,
   listening: false,
+  lastLeads: [],
 };
 
 const elements = {
@@ -32,6 +33,7 @@ const elements = {
   smartleadResult: document.querySelector("#smartleadResult"),
   leadQuery: document.querySelector("#leadQuery"),
   discoverLeads: document.querySelector("#discoverLeads"),
+  exportLeads: document.querySelector("#exportLeads"),
   leadResult: document.querySelector("#leadResult"),
   contractIntake: document.querySelector("#contractIntake"),
   generateContracts: document.querySelector("#generateContracts"),
@@ -50,6 +52,7 @@ const arcigyApi = window.arcigyDesktop ?? {
   syncGmailRecentMessages: (payload) => postJson("/api/sync-gmail-recent-messages", payload),
   getSmartleadCampaignStatus: (payload) => postJson("/api/smartlead-campaign-status", payload),
   discoverLeads: (payload) => postJson("/api/discover-leads", payload),
+  appendLeadsToGoogleSheet: (payload) => postJson("/api/append-leads-to-google-sheet", payload),
   generateContracts: (payload) => postJson("/api/generate-contracts", payload),
 };
 
@@ -119,6 +122,21 @@ function renderLeadDiscovery(result) {
         .join("\n")
     ),
   ].join("\n");
+}
+
+function leadsToSheetRows(leads) {
+  return [
+    ["Name", "Website", "Phone", "Address", "Source", "URL", "Exported At"],
+    ...leads.map((lead) => [
+      lead.name ?? "",
+      lead.website ?? "",
+      lead.phone ?? "",
+      lead.address ?? "",
+      lead.source ?? "",
+      lead.url ?? "",
+      new Date().toISOString(),
+    ]),
+  ];
 }
 
 function renderGmailSync(result) {
@@ -375,7 +393,25 @@ elements.discoverLeads.addEventListener("click", async () => {
       query: elements.leadQuery.value,
       maxResults: 8,
     });
+    state.lastLeads = result.leads ?? [];
     elements.leadResult.textContent = renderLeadDiscovery(result);
+  } catch (error) {
+    state.lastLeads = [];
+    elements.leadResult.textContent = error instanceof Error ? error.message : String(error);
+  }
+});
+elements.exportLeads.addEventListener("click", async () => {
+  try {
+    if (!state.lastLeads.length) {
+      elements.leadResult.textContent = "Search leads before exporting.";
+      return;
+    }
+    elements.leadResult.textContent = "Exporting leads to Google Sheets...";
+    const result = await arcigyApi.appendLeadsToGoogleSheet({
+      range: "Leads!A1",
+      rows: leadsToSheetRows(state.lastLeads),
+    });
+    elements.leadResult.textContent = `Exported ${state.lastLeads.length} leads to Google Sheets.\n${JSON.stringify(result, null, 2)}`;
   } catch (error) {
     elements.leadResult.textContent = error instanceof Error ? error.message : String(error);
   }

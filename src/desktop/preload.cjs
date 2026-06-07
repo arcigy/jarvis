@@ -12,5 +12,6 @@ contextBridge.exposeInMainWorld("arcigyDesktop", {
   syncGmailRecentMessages: (payload) => ipcRenderer.invoke("jarvis:syncGmailRecentMessages", payload),
   getSmartleadCampaignStatus: (payload) => ipcRenderer.invoke("jarvis:getSmartleadCampaignStatus", payload),
   discoverLeads: (payload) => ipcRenderer.invoke("jarvis:discoverLeads", payload),
+  appendLeadsToGoogleSheet: (payload) => ipcRenderer.invoke("jarvis:appendLeadsToGoogleSheet", payload),
   generateContracts: (payload) => ipcRenderer.invoke("contracts:generate", payload),
 });
