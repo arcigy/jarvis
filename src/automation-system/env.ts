@@ -53,13 +53,32 @@ export function requireEnv(env: RuntimeEnv, key: string): string {
 
 export function getIntegrationHealth(env: RuntimeEnv = process.env): IntegrationHealth[] {
   return integrations.map((integration) => {
-    const missing = integration.required.filter((key) => !getEnv(env, key));
+    const missing = integration.required.flatMap((key) => getRuntimeEnvIssue(env, key));
     return {
       key: integration.key,
       configured: missing.length === 0,
       missing,
     };
   });
+}
+
+function getRuntimeEnvIssue(env: RuntimeEnv, key: string): string[] {
+  const value = getEnv(env, key);
+  if (!value) return [key];
+  if ((key === "DATABASE_URL" || key === "REDIS_URL") && hasPlaceholderUrlCredential(value)) {
+    return [`${key} contains a placeholder credential`];
+  }
+  return [];
+}
+
+function hasPlaceholderUrlCredential(value: string): boolean {
+  try {
+    const url = new URL(value);
+    const credentials = [decodeURIComponent(url.username), decodeURIComponent(url.password)].map((item) => item.trim().toLowerCase());
+    return credentials.some((item) => ["password", "changeme", "change-me", "todo", "dummy"].includes(item));
+  } catch {
+    return false;
+  }
 }
 
 export function summarizeIntegrationHealth(env: RuntimeEnv = process.env): string {

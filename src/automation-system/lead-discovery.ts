@@ -46,7 +46,7 @@ export async function searchSerper(
 ): Promise<unknown> {
   const apiKeys = getSerperApiKeys(env);
   let lastError = "";
-  for (const apiKey of apiKeys) {
+  for (const [index, apiKey] of apiKeys.entries()) {
     const response = await fetchImpl("https://google.serper.dev/search", {
       method: "POST",
       headers: {
@@ -64,7 +64,9 @@ export async function searchSerper(
       return response.json();
     }
     const body = await response.text().catch(() => "");
-    lastError = body ? `Serper request failed: ${response.status} - ${body}` : `Serper request failed: ${response.status}`;
+    lastError = body
+      ? `Serper request failed after key ${index + 1}/${apiKeys.length}: ${response.status} - ${body}`
+      : `Serper request failed after key ${index + 1}/${apiKeys.length}: ${response.status}`;
     const retryable = response.status === 401 || response.status === 403 || response.status === 429 || /not enough credits/i.test(body);
     if (!retryable) {
       throw new Error(lastError);

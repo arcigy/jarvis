@@ -87,6 +87,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /getWebBridgePreflight/);
   assert.match(main, /tunnelCommand: "npm run web:tunnel"/);
   assert.match(main, /tunnelProvider: "ngrok"/);
+  assert.match(main, /getRuntimeEnvIssue/);
+  assert.match(main, /hasPlaceholderUrlCredential/);
   assert.match(main, /updateDiagnosticCheck/);
   assert.match(main, /parseServiceUrl/);
   assert.match(main, /pingRedis/);

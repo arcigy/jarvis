@@ -158,13 +158,32 @@ function getSystemHealth() {
     ["googleMaps", ["GOOGLE_MAPS_API_KEY"]],
     ["googleSheets", ["GOOGLE_SHEET_ID", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"]],
   ].map(([key, required]) => {
-    const missing = required.filter((name) => !presentEnv(name));
+    const missing = required.flatMap((name) => getRuntimeEnvIssue(name));
     return { key, configured: missing.length === 0, missing };
   });
   return {
     integrations,
     dbPath: defaultDbPath,
   };
+}
+
+function getRuntimeEnvIssue(name) {
+  const value = readEnv(name);
+  if (!value) return [name];
+  if ((name === "DATABASE_URL" || name === "REDIS_URL") && hasPlaceholderUrlCredential(value)) {
+    return [`${name} contains a placeholder credential`];
+  }
+  return [];
+}
+
+function hasPlaceholderUrlCredential(value) {
+  try {
+    const url = new URL(value);
+    const credentials = [decodeURIComponent(url.username), decodeURIComponent(url.password)].map((item) => item.trim().toLowerCase());
+    return credentials.some((item) => ["password", "changeme", "change-me", "todo", "dummy"].includes(item));
+  } catch {
+    return false;
+  }
 }
 
 async function runDiagnostics(payload) {

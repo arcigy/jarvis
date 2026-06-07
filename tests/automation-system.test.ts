@@ -172,6 +172,16 @@ test("runtime integration health reports missing secrets without throwing", () =
   assert.equal(health.find((item) => item.key === "smartlead")?.configured, true);
 });
 
+test("runtime integration health rejects placeholder URL credentials", () => {
+  const health = getIntegrationHealth({
+    DATABASE_URL: "postgres://postgres:PASSWORD@example.com:5432/db",
+    REDIS_URL: "redis://default:PASSWORD@example.com:6379",
+  });
+
+  assert.deepEqual(health.find((item) => item.key === "postgres")?.missing, ["DATABASE_URL contains a placeholder credential"]);
+  assert.deepEqual(health.find((item) => item.key === "redis")?.missing, ["REDIS_URL contains a placeholder credential"]);
+});
+
 test("Gemini reply helper calls generateContent and extracts text", async () => {
   const calls: Array<{ url: string; body: unknown }> = [];
   const fetchImpl = async (url: string | URL | Request, init?: RequestInit) => {
@@ -369,6 +379,32 @@ test("Serper search falls back to the secondary API key when credits are exhaust
 
   assert.deepEqual(seenKeys, ["spent-key", "fallback-key"]);
   assert.equal((result as { organic: unknown[] }).organic.length, 1);
+});
+
+test("Serper search reports exhausted fallback attempts without leaking keys", async () => {
+  const fetchImpl = async () =>
+    ({
+      ok: false,
+      status: 400,
+      text: async () => JSON.stringify({ message: "Not enough credits" }),
+    }) as Response;
+
+  await assert.rejects(
+    () =>
+      searchSerper(
+        { query: "automation agencies" },
+        { SERPER_API_KEY: "spent-key", SERPER_API_KEY_2: "fallback-key" },
+        fetchImpl as typeof fetch
+      ),
+    (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      assert.match(message, /key 2\/2/);
+      assert.match(message, /Not enough credits/);
+      assert.equal(message.includes("spent-key"), false);
+      assert.equal(message.includes("fallback-key"), false);
+      return true;
+    }
+  );
 });
 
 test("identity matching prefers exact email and returns open client needs", () => {

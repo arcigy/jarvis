@@ -103,7 +103,16 @@ async function checkPostgres(env: RuntimeEnv) {
 
 async function checkRedis(env: RuntimeEnv) {
   const target = parseServiceUrl(getEnv(env, "REDIS_URL"), "Redis");
-  await pingRedis(target);
+  try {
+    await pingRedis(target);
+  } catch (error) {
+    if (target.protocol === "redis:" && isConnectionResetLike(error)) {
+      const tlsTarget = { ...target, protocol: "rediss:" };
+      await pingRedis(tlsTarget);
+      return `Redis PING succeeded at ${target.host}:${target.port} using TLS fallback; update REDIS_URL to rediss:// for this provider.`;
+    }
+    throw error;
+  }
   return `Redis PING succeeded at ${target.host}:${target.port}.`;
 }
 
@@ -174,7 +183,10 @@ function openSocket(target: ServiceTarget, timeoutMs = 5000): Promise<void> {
 
 function pingRedis(target: ServiceTarget, timeoutMs = 5000): Promise<void> {
   return new Promise((resolve, reject) => {
-    const socket = target.protocol === "rediss:" ? connectTls({ host: target.host, port: target.port }) : connectNet({ host: target.host, port: target.port });
+    const socket =
+      target.protocol === "rediss:"
+        ? connectTls({ host: target.host, port: target.port, servername: target.host })
+        : connectNet({ host: target.host, port: target.port });
     const readyEvent = target.protocol === "rediss:" ? "secureConnect" : "connect";
     let buffer = "";
     const timeout = setTimeout(() => {
@@ -209,6 +221,11 @@ function pingRedis(target: ServiceTarget, timeoutMs = 5000): Promise<void> {
     });
     socket.once("error", (error) => finish(new Error(`Redis connection failed for ${target.host}:${target.port}: ${error.message}`)));
   });
+}
+
+function isConnectionResetLike(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /ECONNRESET|socket hang up|connection reset/i.test(message);
 }
 
 function encodeRedisCommand(parts: string[]): string {

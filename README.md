@@ -85,6 +85,8 @@ Live integrations are runtime-only:
 - lead discovery: `SERPER_API_KEY`, `GOOGLE_MAPS_API_KEY`
 - lead export: `GOOGLE_SHEET_ID` plus a Google OAuth refresh token with Sheets access
 
+Do not leave placeholder URL credentials such as `PASSWORD`, `changeme`, or `dummy` in `DATABASE_URL` or `REDIS_URL`; runtime health reports them as not configured. If `npm run doctor -- --live-integrations` reports Serper credits exhausted after key `2/2`, replace or top up at least one Serper key.
+
 Tauri is the preferred target for a production desktop build, but this machine currently has no Rust/Cargo toolchain available. Electron is used here as the working desktop fallback.
 
 ## Local web bridge
