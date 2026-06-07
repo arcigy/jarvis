@@ -14,6 +14,9 @@ const elements = {
   simulateWake: document.querySelector("#simulateWake"),
   submitTranscript: document.querySelector("#submitTranscript"),
   coldBrief: document.querySelector("#coldBrief"),
+  contractIntake: document.querySelector("#contractIntake"),
+  generateContracts: document.querySelector("#generateContracts"),
+  contractResult: document.querySelector("#contractResult"),
 };
 
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -43,6 +46,56 @@ function demoColdOutreachMetrics() {
     positiveReplies: 5,
     preparedPositiveReplyCount: 5,
     pendingApprovalCount: 5,
+  };
+}
+
+function sampleContractIntake() {
+  return {
+    client: {
+      businessName: "Test Klient s. r. o.",
+      registeredAddress: "Testovacia 1, 811 01 Bratislava",
+      companyId: "12345678",
+      taxId: "SK1234567890",
+      registration: "Obchodný register príslušného súdu, oddiel: Sro, vložka č. 12345/B",
+      representativeName: "Meno Klienta",
+      representativeRole: "konateľ",
+      email: "klient@example.com",
+      phone: "+421 900 000 000",
+    },
+    contacts: {
+      clientAuthorizedContact: "Meno Klienta, konateľ, klient@example.com, +421 900 000 000",
+      arcigyAuthorizedContact: "Branislav Laubert, Co-Founder & CEO, branislav@arcigy.group, +421 951 268 376",
+    },
+    project: {
+      name: "Klientsky automatizačný portál",
+      goal: "Sprístupniť klientovi individuálny portál na spracovanie leadov, interných úloh a automatizovaných výstupov.",
+      includedUserAccounts: 2,
+      feedbackRounds: 5,
+      includedModules: [
+        {
+          name: "Lead intake",
+          purpose: "Zber a vyhodnotenie nových leadov",
+          inputs: "email, meno, zdroj, stav",
+          outputs: "interná notifikácia, záznam leadu",
+          outOfScope: "platené reklamné kampane",
+        },
+      ],
+      outputs: ["PDF report", "CSV export", "interná notifikácia"],
+      aiFeatures: ["AI asistované vyplnenie formulárov", "AI sumarizácia komunikácie"],
+      acceptanceCriteria: ["Klient vie vytvoriť nový záznam", "Aplikácia vytvorí dohodnutý výstup"],
+    },
+    pricing: {
+      implementationFeeEur: 2000,
+      depositPercent: 30,
+      monthlyFeeEur: 200,
+      initialTermMonths: 6,
+      invoiceDueDays: 14,
+    },
+    dates: {
+      frameworkAgreementDate: "[dátum]",
+      projectAppendixDate: "[dátum]",
+      plannedLaunchDate: "[dátum]",
+    },
   };
 }
 
@@ -113,5 +166,20 @@ elements.submitTranscript.addEventListener("click", () => void handleTranscript(
 elements.coldBrief.addEventListener("click", async () => {
   speak(await window.arcigyDesktop.coldOutreachBrief(demoColdOutreachMetrics()));
 });
+elements.generateContracts.addEventListener("click", async () => {
+  try {
+    elements.contractResult.textContent = "Generating...";
+    const intake = JSON.parse(elements.contractIntake.value);
+    const result = await window.arcigyDesktop.generateContracts({ intake });
+    elements.contractResult.textContent = [
+      `Generated ${result.generatedFiles.length} files.`,
+      `Manifest: ${result.manifestPath}`,
+      ...result.generatedFiles,
+    ].join("\n");
+  } catch (error) {
+    elements.contractResult.textContent = error instanceof Error ? error.message : String(error);
+  }
+});
 
+elements.contractIntake.value = JSON.stringify(sampleContractIntake(), null, 2);
 setMode("idle");

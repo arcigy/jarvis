@@ -80,6 +80,21 @@
             <li>jarvis_voice_event</li>
           </ul>
         </article>
+
+        <article class="panel contractPanel">
+          <div class="panelHead">
+            <div>
+              <h2>Contract generator</h2>
+              <p>Paste or edit the same JSON intake used by MCP.</p>
+            </div>
+            <button id="generateContracts">Generate</button>
+          </div>
+          <label>
+            Intake JSON
+            <textarea id="contractIntake" spellcheck="false"></textarea>
+          </label>
+          <div class="response" id="contractResult">Ready to generate local DOCX files.</div>
+        </article>
       </section>
     </main>
 

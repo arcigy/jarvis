@@ -55,6 +55,7 @@ The Electron shell opens a local Arcigy Jarvis console with:
 - text transcript fallback
 - Slovak TTS via `speechSynthesis`
 - local Electron IPC bridge for Jarvis voice events and cold outreach briefs
+- local contract JSON intake form that generates DOCX files through the same generator as MCP
 - quick cold outreach response demo
 
 Tauri is the preferred target for a production desktop build, but this machine currently has no Rust/Cargo toolchain available. Electron is used here as the working desktop fallback.

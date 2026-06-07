@@ -127,6 +127,10 @@ h2 {
   grid-row: span 2;
 }
 
+.contractPanel {
+  grid-column: 1 / -1;
+}
+
 .orb {
   width: 138px;
   height: 138px;
@@ -166,6 +170,7 @@ textarea {
 }
 
 .response {
+  white-space: pre-wrap;
   margin-top: 14px;
   line-height: 1.55;
   color: #dbe5e9;

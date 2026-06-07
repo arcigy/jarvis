@@ -1,8 +1,11 @@
 const { app, BrowserWindow, ipcMain, shell, Tray, Menu, nativeImage } = require("electron");
+const { spawnSync } = require("node:child_process");
+const fs = require("node:fs");
 const path = require("node:path");
 
 let mainWindow;
 let tray;
+const repoRoot = path.resolve(__dirname, "..", "..");
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -41,6 +44,7 @@ app.whenReady().then(() => {
   ipcMain.handle("app:openPath", (_event, targetPath) => shell.openPath(targetPath));
   ipcMain.handle("jarvis:coldOutreachBrief", (_event, metrics) => buildColdOutreachBrief(metrics));
   ipcMain.handle("jarvis:voiceEvent", (_event, payload) => handleVoiceEvent(payload));
+  ipcMain.handle("contracts:generate", (_event, payload) => generateContracts(payload));
   createWindow();
   createTray();
 });
@@ -164,5 +168,52 @@ function defaultColdOutreachMetrics() {
     positiveReplies: 5,
     preparedPositiveReplyCount: 5,
     pendingApprovalCount: 5,
+  };
+}
+
+function generateContracts(payload) {
+  const outputDir = payload?.outputDir || path.join(repoRoot, "generated", "contracts");
+  const intake = typeof payload?.intake === "string" ? JSON.parse(payload.intake) : payload?.intake;
+  if (!intake || typeof intake !== "object") {
+    throw new Error("Contract intake JSON is required.");
+  }
+
+  const result = runPython([
+    "scripts/generate_contract_documents.py",
+    "--payload",
+    JSON.stringify(intake),
+    "--output-dir",
+    outputDir,
+  ]);
+  const manifestPath = path.join(outputDir, "generation-manifest.json");
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
+  return {
+    outputDir,
+    manifestPath,
+    generatedFiles: manifest.generatedFiles,
+    stdout: result.stdout,
+  };
+}
+
+function runPython(args) {
+  const python = process.env.JARVIS_PYTHON || "python";
+  const result = spawnSync(python, args, {
+    cwd: repoRoot,
+    encoding: "utf-8",
+    env: {
+      ...process.env,
+      PYTHONIOENCODING: "utf-8",
+    },
+  });
+
+  if (result.error) {
+    throw result.error;
+  }
+  if (result.status !== 0) {
+    throw new Error(result.stderr || `Python command failed with status ${result.status}`);
+  }
+  return {
+    stdout: result.stdout || "",
+    stderr: result.stderr || "",
   };
 }
