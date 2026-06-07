@@ -33,6 +33,10 @@ Server tools:
 - `arcigy.generate_ai_reply`
 - `arcigy.sync_gmail_recent_messages`
 - `arcigy.get_smartlead_campaign_status`
+- `arcigy.search_serper`
+- `arcigy.search_google_places`
+- `arcigy.discover_leads`
+- `arcigy.append_leads_to_google_sheet`
 - `arcigy.jarvis_voice_event`
 
 Example MCP command config:
@@ -75,6 +79,8 @@ Live integrations are runtime-only:
 - Gmail: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and the `GMAIL_REFRESH_TOKEN_*` values
 - Smartlead: `SMARTLEAD_API_KEY`
 - local app storage: `DATABASE_URL`, `REDIS_URL`, `data\jarvis-local.db`
+- lead discovery: `SERPER_API_KEY`, `GOOGLE_MAPS_API_KEY`
+- lead export: `GOOGLE_SHEET_ID` plus a Google OAuth refresh token with Sheets access
 
 Tauri is the preferred target for a production desktop build, but this machine currently has no Rust/Cargo toolchain available. Electron is used here as the working desktop fallback.
 
@@ -93,9 +99,17 @@ It serves the same UI at `http://127.0.0.1:8765` and exposes local HTTP endpoint
 - `POST /api/cold-outreach-brief`
 - `POST /api/generate-ai-reply`
 - `POST /api/generate-contracts`
+- `POST /api/discover-leads`
+- `POST /api/search-serper`
+- `POST /api/search-google-places`
+- `POST /api/append-leads-to-google-sheet`
 - `POST /api/mcp/arcigy.get_system_health`
 - `POST /api/mcp/arcigy.generate_ai_reply`
 - `POST /api/mcp/arcigy.get_cold_outreach_brief_from_db`
+- `POST /api/mcp/arcigy.search_serper`
+- `POST /api/mcp/arcigy.search_google_places`
+- `POST /api/mcp/arcigy.discover_leads`
+- `POST /api/mcp/arcigy.append_leads_to_google_sheet`
 
 For a temporary external URL, run `npm run web:tunnel` after configuring ngrok locally. Keep this local-first; do not expose it publicly without access controls.
 

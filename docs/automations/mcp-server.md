@@ -30,6 +30,10 @@ Claude, ChatGPT, or another MCP client can connect over stdio with:
 - `arcigy.generate_ai_reply`: uses Gemini to draft a client reply without sending it.
 - `arcigy.sync_gmail_recent_messages`: fetches Gmail messages and ingests client requests into SQLite.
 - `arcigy.get_smartlead_campaign_status`: reads Smartlead campaigns or campaign statistics.
+- `arcigy.search_serper`: read-only Serper web search for lead discovery.
+- `arcigy.search_google_places`: read-only Google Places Text Search for company discovery.
+- `arcigy.discover_leads`: combines Serper and Google Places into normalized lead candidates.
+- `arcigy.append_leads_to_google_sheet`: explicit Google Sheets append for prepared lead rows.
 - `arcigy.jarvis_voice_event`: wake-word state handling for the desktop voice layer.
 
 Use `JARVIS_PYTHON` if the MCP runtime needs a specific Python executable.

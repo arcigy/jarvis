@@ -8,6 +8,7 @@ import { getIntegrationHealth, loadLocalEnv, summarizeIntegrationHealth } from "
 import { buildClientReplyPrompt, generateGeminiText } from "./gemini.ts";
 import { listConfiguredGmailAccounts, listRecentGmailMessageEvents } from "./gmail.ts";
 import { handleJarvisVoiceEvent, type JarvisVoiceSession } from "./jarvis-voice.ts";
+import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "./lead-discovery.ts";
 import {
   buildContractGenerationCommand,
   getColdOutreachMcpAnswer,
@@ -428,6 +429,89 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async ({ campaignId }) => jsonResult(await getSmartleadCampaignStatus({ campaignId }))
+  );
+
+  server.registerTool(
+    "arcigy.search_serper",
+    {
+      title: "Search Serper",
+      description: "Search web results through Serper for lead discovery.",
+      inputSchema: {
+        query: z.string().min(1),
+        num: z.number().int().min(1).max(20).default(10),
+        gl: z.string().optional(),
+        hl: z.string().optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (input) => jsonResult(await searchSerper(input))
+  );
+
+  server.registerTool(
+    "arcigy.search_google_places",
+    {
+      title: "Search Google Places",
+      description: "Search businesses through Google Places Text Search.",
+      inputSchema: {
+        query: z.string().min(1),
+        maxResultCount: z.number().int().min(1).max(20).default(10),
+        languageCode: z.string().optional(),
+        regionCode: z.string().optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (input) => jsonResult(await searchGooglePlaces(input))
+  );
+
+  server.registerTool(
+    "arcigy.discover_leads",
+    {
+      title: "Discover leads",
+      description: "Combine Serper and Google Places into normalized lead candidates.",
+      inputSchema: {
+        query: z.string().min(1),
+        placesQuery: z.string().optional(),
+        maxResults: z.number().int().min(1).max(25).default(10),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (input) => jsonResult(await discoverLeads(input))
+  );
+
+  server.registerTool(
+    "arcigy.append_leads_to_google_sheet",
+    {
+      title: "Append leads to Google Sheet",
+      description: "Append prepared lead rows to a Google Sheet. This is an explicit write action.",
+      inputSchema: {
+        spreadsheetId: z.string().optional(),
+        range: z.string().default("Leads!A1"),
+        accountEnvKey: z.string().optional(),
+        rows: z.array(z.array(z.union([z.string(), z.number(), z.boolean(), z.null()]))).min(1),
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (input) => jsonResult(await appendRowsToGoogleSheet(input))
   );
 
   return server;

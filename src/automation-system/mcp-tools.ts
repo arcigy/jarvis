@@ -15,6 +15,10 @@ export type JarvisMcpToolName =
   | "arcigy.generate_ai_reply"
   | "arcigy.sync_gmail_recent_messages"
   | "arcigy.get_smartlead_campaign_status"
+  | "arcigy.search_serper"
+  | "arcigy.search_google_places"
+  | "arcigy.discover_leads"
+  | "arcigy.append_leads_to_google_sheet"
   | "arcigy.jarvis_voice_event";
 
 export type JarvisMcpTool = {
@@ -97,6 +101,26 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
       name: "arcigy.get_smartlead_campaign_status",
       description: "Načíta kampane alebo štatistiky kampane zo Smartlead API.",
       requiresApproval: false,
+    },
+    {
+      name: "arcigy.search_serper",
+      description: "Vyhľadá webové výsledky cez Serper pre lead discovery.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.search_google_places",
+      description: "Vyhľadá firmy cez Google Places Text Search.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.discover_leads",
+      description: "Skombinuje Serper a Google Places do normalizovaného zoznamu leadov.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.append_leads_to_google_sheet",
+      description: "Zapíše pripravené lead rows do Google Sheetu po explicitnom volaní.",
+      requiresApproval: true,
     },
   ];
 }

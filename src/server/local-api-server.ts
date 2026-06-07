@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { getIntegrationHealth, loadLocalEnv } from "../automation-system/env.ts";
 import { buildClientReplyPrompt, generateGeminiText } from "../automation-system/gemini.ts";
 import { handleJarvisVoiceEvent, type JarvisVoiceSession } from "../automation-system/jarvis-voice.ts";
+import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "../automation-system/lead-discovery.ts";
 
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
 const desktopRoot = join(repoRoot, "src", "desktop");
@@ -120,6 +121,65 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
     return;
   }
 
+  if (request.method === "POST" && url.pathname === "/api/discover-leads") {
+    const payload = await readJson(request);
+    writeJson(
+      response,
+      200,
+      await discoverLeads({
+        query: String(payload.query ?? ""),
+        placesQuery: optionalString(payload.placesQuery),
+        maxResults: typeof payload.maxResults === "number" ? payload.maxResults : undefined,
+      })
+    );
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/search-serper") {
+    const payload = await readJson(request);
+    writeJson(
+      response,
+      200,
+      await searchSerper({
+        query: String(payload.query ?? ""),
+        num: typeof payload.num === "number" ? payload.num : undefined,
+        gl: optionalString(payload.gl),
+        hl: optionalString(payload.hl),
+      })
+    );
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/search-google-places") {
+    const payload = await readJson(request);
+    writeJson(
+      response,
+      200,
+      await searchGooglePlaces({
+        query: String(payload.query ?? ""),
+        maxResultCount: typeof payload.maxResultCount === "number" ? payload.maxResultCount : undefined,
+        languageCode: optionalString(payload.languageCode),
+        regionCode: optionalString(payload.regionCode),
+      })
+    );
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/append-leads-to-google-sheet") {
+    const payload = await readJson(request);
+    writeJson(
+      response,
+      200,
+      await appendRowsToGoogleSheet({
+        spreadsheetId: optionalString(payload.spreadsheetId),
+        range: optionalString(payload.range),
+        accountEnvKey: optionalString(payload.accountEnvKey),
+        rows: (payload.rows ?? []) as Array<Array<string | number | boolean | null>>,
+      })
+    );
+    return;
+  }
+
   if (request.method === "POST" && url.pathname.startsWith("/api/mcp/")) {
     await routeMcpTool(url.pathname.replace("/api/mcp/", ""), request, response);
     return;
@@ -186,6 +246,49 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
       JSON.stringify(payload),
     ]);
     writeJson(response, 200, { result: JSON.parse(result.stdout) });
+    return;
+  }
+  if (name === "arcigy.discover_leads") {
+    writeJson(response, 200, {
+      result: await discoverLeads({
+        query: String(payload.query ?? ""),
+        placesQuery: optionalString(payload.placesQuery),
+        maxResults: typeof payload.maxResults === "number" ? payload.maxResults : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.search_serper") {
+    writeJson(response, 200, {
+      result: await searchSerper({
+        query: String(payload.query ?? ""),
+        num: typeof payload.num === "number" ? payload.num : undefined,
+        gl: optionalString(payload.gl),
+        hl: optionalString(payload.hl),
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.search_google_places") {
+    writeJson(response, 200, {
+      result: await searchGooglePlaces({
+        query: String(payload.query ?? ""),
+        maxResultCount: typeof payload.maxResultCount === "number" ? payload.maxResultCount : undefined,
+        languageCode: optionalString(payload.languageCode),
+        regionCode: optionalString(payload.regionCode),
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.append_leads_to_google_sheet") {
+    writeJson(response, 200, {
+      result: await appendRowsToGoogleSheet({
+        spreadsheetId: optionalString(payload.spreadsheetId),
+        range: optionalString(payload.range),
+        accountEnvKey: optionalString(payload.accountEnvKey),
+        rows: (payload.rows ?? []) as Array<Array<string | number | boolean | null>>,
+      }),
+    });
     return;
   }
   writeJson(response, 404, { error: `Unsupported web MCP bridge tool: ${name}` });

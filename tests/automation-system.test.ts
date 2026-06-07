@@ -9,6 +9,7 @@ import { matchLocalIdentity } from "../src/automation-system/identity-matching.t
 import { getIntegrationHealth } from "../src/automation-system/env.ts";
 import { buildClientReplyPrompt, generateGeminiText } from "../src/automation-system/gemini.ts";
 import { listRecentGmailMessageEvents, parseFromHeader } from "../src/automation-system/gmail.ts";
+import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "../src/automation-system/lead-discovery.ts";
 import {
   buildContractGenerationCommand,
   getColdOutreachMcpAnswer,
@@ -38,6 +39,10 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.generate_ai_reply",
     "arcigy.sync_gmail_recent_messages",
     "arcigy.get_smartlead_campaign_status",
+    "arcigy.search_serper",
+    "arcigy.search_google_places",
+    "arcigy.discover_leads",
+    "arcigy.append_leads_to_google_sheet",
   ]);
 });
 
@@ -204,6 +209,78 @@ test("Smartlead helper fetches campaign statistics", async () => {
   assert.equal(status.campaignId, "123");
   assert.match(seenUrls[0], /campaigns\/123\/statistics/);
   assert.match(seenUrls[0], /api_key=/);
+});
+
+test("lead discovery helpers call Serper, Google Places, and Google Sheets", async () => {
+  const calls: string[] = [];
+  const fetchImpl = async (url: string | URL | Request) => {
+    const target = String(url);
+    calls.push(target);
+    if (target.includes("oauth2.googleapis.com")) return responseJson({ access_token: "access-token" });
+    if (target.includes("google.serper.dev")) {
+      return responseJson({ organic: [{ title: "ACME", link: "https://acme.example" }] });
+    }
+    if (target.includes("places.googleapis.com")) {
+      return responseJson({
+        places: [
+          {
+            displayName: { text: "ACME Office" },
+            formattedAddress: "Bratislava",
+            websiteUri: "https://office.example",
+          },
+        ],
+      });
+    }
+    if (target.includes("sheets.googleapis.com")) return responseJson({ updates: { updatedRows: 1 } });
+    throw new Error(`Unexpected URL: ${target}`);
+  };
+
+  await searchSerper({ query: "automation agencies" }, { SERPER_API_KEY: "serper-key" }, fetchImpl as typeof fetch);
+  await searchGooglePlaces({ query: "automation agency Bratislava" }, { GOOGLE_MAPS_API_KEY: "maps-key" }, fetchImpl as typeof fetch);
+  const discovered = await discoverLeads(
+    { query: "automation agencies", maxResults: 5 },
+    { SERPER_API_KEY: "serper-key", GOOGLE_MAPS_API_KEY: "maps-key" },
+    fetchImpl as typeof fetch
+  );
+  const append = await appendRowsToGoogleSheet(
+    { rows: [["ACME", "https://acme.example"]] },
+    {
+      GOOGLE_SHEET_ID: "sheet-id",
+      GOOGLE_CLIENT_ID: "client",
+      GOOGLE_CLIENT_SECRET: "secret",
+      GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP: "refresh",
+    },
+    fetchImpl as typeof fetch
+  );
+
+  assert.equal(discovered.leads.length, 2);
+  assert.deepEqual(append, { updates: { updatedRows: 1 } });
+  assert.ok(calls.some((url) => url.includes("values/Leads!A1:append")));
+});
+
+test("Serper search falls back to the secondary API key when credits are exhausted", async () => {
+  const seenKeys: string[] = [];
+  const fetchImpl = async (_url: string | URL | Request, init?: RequestInit) => {
+    const headers = init?.headers as Record<string, string>;
+    seenKeys.push(headers["x-api-key"]);
+    if (seenKeys.length === 1) {
+      return {
+        ok: false,
+        status: 400,
+        text: async () => JSON.stringify({ message: "Not enough credits" }),
+      } as Response;
+    }
+    return responseJson({ organic: [{ title: "Fallback result", link: "https://fallback.example" }] });
+  };
+
+  const result = await searchSerper(
+    { query: "automation agencies" },
+    { SERPER_API_KEY: "spent-key", SERPER_API_KEY_2: "fallback-key" },
+    fetchImpl as typeof fetch
+  );
+
+  assert.deepEqual(seenKeys, ["spent-key", "fallback-key"]);
+  assert.equal((result as { organic: unknown[] }).organic.length, 1);
 });
 
 test("identity matching prefers exact email and returns open client needs", () => {

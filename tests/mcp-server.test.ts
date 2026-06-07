@@ -28,6 +28,10 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(names.includes("arcigy.generate_ai_reply"));
   assert.ok(names.includes("arcigy.sync_gmail_recent_messages"));
   assert.ok(names.includes("arcigy.get_smartlead_campaign_status"));
+  assert.ok(names.includes("arcigy.search_serper"));
+  assert.ok(names.includes("arcigy.search_google_places"));
+  assert.ok(names.includes("arcigy.discover_leads"));
+  assert.ok(names.includes("arcigy.append_leads_to_google_sheet"));
 
   const result = await client.callTool({
     name: "arcigy.get_cold_outreach_brief",
