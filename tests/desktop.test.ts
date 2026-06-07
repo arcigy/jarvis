@@ -14,6 +14,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /contractIntake/);
   assert.match(html, /healthGrid/);
   assert.match(html, /draftReply/);
+  assert.match(html, /Lead discovery/);
+  assert.match(html, /leadQuery/);
+  assert.match(html, /discoverLeads/);
   assert.match(renderer, /SpeechRecognition/);
   assert.match(renderer, /speechSynthesis/);
   assert.match(renderer, /window\.arcigyDesktop/);
@@ -22,7 +25,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /arcigyApi\.generateContracts/);
   assert.match(renderer, /arcigyApi\.systemHealth/);
   assert.match(renderer, /arcigyApi\.generateAiReply/);
+  assert.match(renderer, /arcigyApi\.discoverLeads/);
   assert.match(renderer, /\/api\/system-health/);
+  assert.match(renderer, /\/api\/discover-leads/);
   assert.match(renderer, /sampleContractIntake/);
   assert.doesNotMatch(renderer, /demoColdOutreachMetrics/);
   assert.doesNotMatch(renderer, /Za dnes sme napísali/);
@@ -30,6 +35,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /ipcMain\.handle\("jarvis:voiceEvent"/);
   assert.match(main, /ipcMain\.handle\("jarvis:systemHealth"/);
   assert.match(main, /ipcMain\.handle\("jarvis:generateAiReply"/);
+  assert.match(main, /ipcMain\.handle\("jarvis:discoverLeads"/);
+  assert.match(main, /searchGooglePlacesLeads/);
+  assert.match(main, /getSerperApiKeys/);
   assert.match(main, /ipcMain\.handle\("contracts:generate"/);
   assert.match(main, /jarvis_local_db\.py/);
   assert.match(main, /cold-brief/);
@@ -41,5 +49,6 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(preload, /coldOutreachBrief/);
   assert.match(preload, /systemHealth/);
   assert.match(preload, /generateAiReply/);
+  assert.match(preload, /discoverLeads/);
   assert.match(preload, /generateContracts/);
 });

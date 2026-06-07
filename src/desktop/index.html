@@ -75,6 +75,21 @@
         <article class="panel">
           <div class="panelHead">
             <div>
+              <h2>Lead discovery</h2>
+              <p>Search live company candidates through configured discovery APIs.</p>
+            </div>
+            <button id="discoverLeads">Search</button>
+          </div>
+          <label>
+            Search query
+            <textarea id="leadQuery" spellcheck="false" placeholder="automation agency Bratislava"></textarea>
+          </label>
+          <div class="response compact leadResult" id="leadResult">Ready for read-only lead discovery.</div>
+        </article>
+
+        <article class="panel">
+          <div class="panelHead">
+            <div>
               <h2>Gemini reply draft</h2>
               <p>Prepare a client answer without sending it.</p>
             </div>
@@ -94,6 +109,10 @@
             <li>get_cold_outreach_brief</li>
             <li>sync_gmail_recent_messages</li>
             <li>get_smartlead_campaign_status</li>
+            <li>search_serper</li>
+            <li>search_google_places</li>
+            <li>discover_leads</li>
+            <li>append_leads_to_google_sheet</li>
             <li>generate_ai_reply</li>
             <li>get_system_health</li>
             <li>upsert_local_person</li>

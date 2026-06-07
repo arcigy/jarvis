@@ -48,6 +48,7 @@ app.whenReady().then(() => {
   ipcMain.handle("jarvis:voiceEvent", (_event, payload) => handleVoiceEvent(payload));
   ipcMain.handle("jarvis:systemHealth", () => getSystemHealth());
   ipcMain.handle("jarvis:generateAiReply", (_event, payload) => generateAiReply(payload));
+  ipcMain.handle("jarvis:discoverLeads", (_event, payload) => discoverLeads(payload));
   ipcMain.handle("contracts:generate", (_event, payload) => generateContracts(payload));
   createWindow();
   createTray();
@@ -123,6 +124,8 @@ function getSystemHealth() {
     ["postgres", ["DATABASE_URL"]],
     ["redis", ["REDIS_URL"]],
     ["serper", ["SERPER_API_KEY"]],
+    ["googleMaps", ["GOOGLE_MAPS_API_KEY"]],
+    ["googleSheets", ["GOOGLE_SHEET_ID", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"]],
   ].map(([key, required]) => {
     const missing = required.filter((name) => !presentEnv(name));
     return { key, configured: missing.length === 0, missing };
@@ -273,6 +276,102 @@ function normalizeTranscript(text) {
     .toLowerCase()
     .replace(/[^\p{Letter}\p{Number}\s]/gu, " ")
     .trim();
+}
+
+async function discoverLeads(payload) {
+  const query = String(payload?.query ?? "").trim();
+  if (!query) throw new Error("Lead search query is required.");
+  const maxResults = Math.max(1, Math.min(Number(payload?.maxResults ?? 10), 25));
+  const [serper, places] = await Promise.allSettled([
+    getSerperApiKeys().length ? searchSerperLeads(query, maxResults) : null,
+    presentEnv("GOOGLE_MAPS_API_KEY") ? searchGooglePlacesLeads(String(payload?.placesQuery ?? query), Math.min(maxResults, 20)) : null,
+  ]);
+  const leads = [
+    ...normalizeSerperLeads(serper.status === "fulfilled" ? serper.value : null),
+    ...normalizePlacesLeads(places.status === "fulfilled" ? places.value : null),
+  ];
+  return {
+    leads: dedupeLeads(leads).slice(0, maxResults),
+    sources: [
+      serper.status === "fulfilled" && serper.value ? "serper" : null,
+      places.status === "fulfilled" && places.value ? "google_places" : null,
+    ].filter(Boolean),
+  };
+}
+
+async function searchSerperLeads(query, maxResults) {
+  let lastError = "";
+  for (const apiKey of getSerperApiKeys()) {
+    const response = await fetch("https://google.serper.dev/search", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": apiKey,
+      },
+      body: JSON.stringify({ q: query, num: maxResults, gl: "sk", hl: "sk" }),
+    });
+    if (response.ok) return response.json();
+    const body = await response.text().catch(() => "");
+    lastError = body ? `Serper request failed: ${response.status} - ${body}` : `Serper request failed: ${response.status}`;
+    if (!/not enough credits/i.test(body) && ![401, 403, 429].includes(response.status)) throw new Error(lastError);
+  }
+  throw new Error(lastError || "Serper request failed.");
+}
+
+async function searchGooglePlacesLeads(query, maxResults) {
+  const apiKey = requireRuntimeEnv("GOOGLE_MAPS_API_KEY");
+  const response = await fetch("https://places.googleapis.com/v1/places:searchText", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-goog-api-key": apiKey,
+      "x-goog-fieldmask":
+        "places.id,places.displayName,places.formattedAddress,places.websiteUri,places.nationalPhoneNumber,places.googleMapsUri",
+    },
+    body: JSON.stringify({ textQuery: query, maxResultCount: maxResults, languageCode: "sk", regionCode: "SK" }),
+  });
+  if (!response.ok) throw new Error(`Google Places request failed: ${response.status}`);
+  return response.json();
+}
+
+function normalizeSerperLeads(value) {
+  return (value?.organic ?? [])
+    .map((item) => ({
+      name: String(item.title ?? "").trim(),
+      website: typeof item.link === "string" ? item.link : undefined,
+      source: "serper",
+      url: typeof item.link === "string" ? item.link : undefined,
+    }))
+    .filter((lead) => lead.name);
+}
+
+function normalizePlacesLeads(value) {
+  return (value?.places ?? [])
+    .map((place) => ({
+      name: String(place.displayName?.text ?? "").trim(),
+      website: typeof place.websiteUri === "string" ? place.websiteUri : undefined,
+      source: "google_places",
+      url: typeof place.googleMapsUri === "string" ? place.googleMapsUri : undefined,
+      address: typeof place.formattedAddress === "string" ? place.formattedAddress : undefined,
+      phone: typeof place.nationalPhoneNumber === "string" ? place.nationalPhoneNumber : undefined,
+    }))
+    .filter((lead) => lead.name);
+}
+
+function dedupeLeads(leads) {
+  const seen = new Set();
+  return leads.filter((lead) => {
+    const key = String(lead.website || lead.name).toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function getSerperApiKeys() {
+  return [process.env.SERPER_API_KEY, process.env.SERPER_API_KEY_2]
+    .map((value) => value?.trim())
+    .filter((value, index, values) => value && value !== "dummy" && values.indexOf(value) === index);
 }
 
 function generateContracts(payload) {

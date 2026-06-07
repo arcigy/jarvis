@@ -18,6 +18,9 @@ const elements = {
   clientMessage: document.querySelector("#clientMessage"),
   draftReply: document.querySelector("#draftReply"),
   draftResult: document.querySelector("#draftResult"),
+  leadQuery: document.querySelector("#leadQuery"),
+  discoverLeads: document.querySelector("#discoverLeads"),
+  leadResult: document.querySelector("#leadResult"),
   contractIntake: document.querySelector("#contractIntake"),
   generateContracts: document.querySelector("#generateContracts"),
   contractResult: document.querySelector("#contractResult"),
@@ -30,6 +33,7 @@ const arcigyApi = window.arcigyDesktop ?? {
   coldOutreachBrief: (payload) => postJson("/api/cold-outreach-brief", payload),
   jarvisVoiceEvent: (payload) => postJson("/api/jarvis/voice-event", payload),
   generateAiReply: (payload) => postJson("/api/generate-ai-reply", payload),
+  discoverLeads: (payload) => postJson("/api/discover-leads", payload),
   generateContracts: (payload) => postJson("/api/generate-contracts", payload),
 };
 
@@ -76,6 +80,29 @@ async function refreshHealth() {
   } catch (error) {
     elements.healthGrid.textContent = error instanceof Error ? error.message : String(error);
   }
+}
+
+function renderLeadDiscovery(result) {
+  const leads = result.leads ?? [];
+  const sources = (result.sources ?? []).join(", ") || "none";
+  if (!leads.length) {
+    return `No leads found. Sources checked: ${sources}.`;
+  }
+  return [
+    `Found ${leads.length} leads. Sources: ${sources}.`,
+    "",
+    ...leads.map((lead, index) =>
+      [
+        `${index + 1}. ${lead.name}`,
+        lead.website ? `   Website: ${lead.website}` : null,
+        lead.phone ? `   Phone: ${lead.phone}` : null,
+        lead.address ? `   Address: ${lead.address}` : null,
+        lead.source ? `   Source: ${lead.source}` : null,
+      ]
+        .filter(Boolean)
+        .join("\n")
+    ),
+  ].join("\n");
 }
 
 async function getJson(url) {
@@ -228,6 +255,18 @@ elements.draftReply.addEventListener("click", async () => {
     elements.draftResult.textContent = error instanceof Error ? error.message : String(error);
   }
 });
+elements.discoverLeads.addEventListener("click", async () => {
+  try {
+    elements.leadResult.textContent = "Searching...";
+    const result = await arcigyApi.discoverLeads({
+      query: elements.leadQuery.value,
+      maxResults: 8,
+    });
+    elements.leadResult.textContent = renderLeadDiscovery(result);
+  } catch (error) {
+    elements.leadResult.textContent = error instanceof Error ? error.message : String(error);
+  }
+});
 elements.generateContracts.addEventListener("click", async () => {
   try {
     elements.contractResult.textContent = "Generating...";
@@ -245,5 +284,6 @@ elements.generateContracts.addEventListener("click", async () => {
 
 elements.contractIntake.value = JSON.stringify(sampleContractIntake(), null, 2);
 elements.clientMessage.value = "Potrebujem upraviť onboarding automatizáciu do piatku.";
+elements.leadQuery.value = "automation agency Bratislava";
 void refreshHealth();
 setMode("idle");

@@ -15,6 +15,8 @@ This opens a local Electron desktop window. It is a working fallback shell until
 - Jarvis answers through `speechSynthesis` in Slovak.
 - If speech recognition is not available, use the transcript text box and `Send transcript`.
 - The renderer calls the local Electron preload bridge for Jarvis voice events and cold outreach briefs.
+- The Gemini panel drafts client replies without sending them.
+- The lead discovery panel runs read-only company discovery through Serper and Google Places.
 - The contract panel accepts inline intake JSON and generates local DOCX files through the main-process bridge.
 
 ## Security shape

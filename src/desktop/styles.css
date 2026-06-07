@@ -266,6 +266,10 @@ textarea:focus {
   overflow: auto;
 }
 
+.leadResult {
+  font-size: 13px;
+}
+
 dl {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
