@@ -37,18 +37,6 @@ function speak(text) {
   }
 }
 
-function demoColdOutreachMetrics() {
-  return {
-    periodLabel: "dnes",
-    contacted: 128,
-    opened: 61,
-    replied: 14,
-    positiveReplies: 5,
-    preparedPositiveReplyCount: 5,
-    pendingApprovalCount: 5,
-  };
-}
-
 function sampleContractIntake() {
   return {
     client: {
@@ -106,7 +94,6 @@ async function handleTranscript(text) {
   const result = await window.arcigyDesktop.jarvisVoiceEvent({
     session: state.session,
     text: trimmed,
-    metrics: demoColdOutreachMetrics(),
   });
 
   state.session = result.session;
@@ -164,7 +151,7 @@ elements.listenButton.addEventListener("click", () => {
 elements.simulateWake.addEventListener("click", () => void handleTranscript("Jarvis"));
 elements.submitTranscript.addEventListener("click", () => void handleTranscript(elements.transcript.value));
 elements.coldBrief.addEventListener("click", async () => {
-  speak(await window.arcigyDesktop.coldOutreachBrief(demoColdOutreachMetrics()));
+  speak(await window.arcigyDesktop.coldOutreachBrief({ text: "cold outreach za posledných 7 dní" }));
 });
 elements.generateContracts.addEventListener("click", async () => {
   try {

@@ -6,6 +6,7 @@ const path = require("node:path");
 let mainWindow;
 let tray;
 const repoRoot = path.resolve(__dirname, "..", "..");
+const defaultDbPath = path.join(repoRoot, "data", "jarvis-local.db");
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -42,7 +43,7 @@ function createTray() {
 app.whenReady().then(() => {
   ipcMain.handle("app:version", () => app.getVersion());
   ipcMain.handle("app:openPath", (_event, targetPath) => shell.openPath(targetPath));
-  ipcMain.handle("jarvis:coldOutreachBrief", (_event, metrics) => buildColdOutreachBrief(metrics));
+  ipcMain.handle("jarvis:coldOutreachBrief", (_event, payload) => getColdOutreachBrief(payload));
   ipcMain.handle("jarvis:voiceEvent", (_event, payload) => handleVoiceEvent(payload));
   ipcMain.handle("contracts:generate", (_event, payload) => generateContracts(payload));
   createWindow();
@@ -83,7 +84,7 @@ function handleVoiceEvent(payload) {
   }
 
   if (text.toLowerCase().includes("cold")) {
-    const response = buildColdOutreachBrief(payload?.metrics ?? defaultColdOutreachMetrics());
+    const response = getColdOutreachBrief({ text, dbPath: payload?.dbPath });
     return {
       session: {
         ...session,
@@ -111,6 +112,53 @@ function handleVoiceEvent(payload) {
   };
 }
 
+function getColdOutreachBrief(payload) {
+  if (payload?.metrics) {
+    return buildColdOutreachBrief(payload.metrics);
+  }
+  if (typeof payload?.contacted !== "undefined") {
+    return buildColdOutreachBrief(payload);
+  }
+
+  const period = resolveColdOutreachPeriod(String(payload?.text ?? payload?.periodLabel ?? ""));
+  const result = runPython([
+    "scripts/jarvis_local_db.py",
+    "cold-brief",
+    "--db",
+    payload?.dbPath || defaultDbPath,
+    "--payload",
+    JSON.stringify({
+      since: payload?.since || period.since,
+      until: payload?.until || period.until,
+      periodLabel: payload?.periodLabel || period.periodLabel,
+    }),
+  ]);
+  const parsed = JSON.parse(result.stdout);
+  return parsed.summary;
+}
+
+function resolveColdOutreachPeriod(text) {
+  const lowered = normalizeTranscript(text);
+  const now = new Date();
+  const until = now.toISOString();
+
+  if (lowered.includes("dnes") || lowered.includes("today")) {
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    return {
+      since: start.toISOString(),
+      until,
+      periodLabel: "dnes",
+    };
+  }
+
+  const since = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  return {
+    since: since.toISOString(),
+    until,
+    periodLabel: "posledných 7 dní",
+  };
+}
+
 function buildColdOutreachBrief(metrics) {
   const input = {
     periodLabel: metrics?.periodLabel ?? "dnes",
@@ -123,8 +171,8 @@ function buildColdOutreachBrief(metrics) {
   };
   const openRate = input.contacted > 0 ? Math.round((input.opened / input.contacted) * 1000) / 10 : 0;
   const parts = [
-    `Za ${input.periodLabel} sme napísali ${input.contacted} ľuďom.`,
-    `${openRate}% si email otvorilo, ${input.replied} ľudí odpísalo, z toho ${input.positiveReplies} pozitívne.`,
+    `Za ${input.periodLabel} sme napísali ${skPeople(input.contacted)}.`,
+    `${openRate}% si email otvorilo, ${skReplies(input.replied)}, z toho ${input.positiveReplies} pozitívne.`,
   ];
 
   if (input.preparedPositiveReplyCount > 0) {
@@ -133,10 +181,20 @@ function buildColdOutreachBrief(metrics) {
     );
   }
   if (input.pendingApprovalCount > 0) {
-    parts.push(`Čaká ${input.pendingApprovalCount} odpovedí na schválenie.`);
+    parts.push(`Čaká ${skPreparedReplies(input.pendingApprovalCount)} na schválenie.`);
   }
 
   return parts.join(" ");
+}
+
+function skPeople(count) {
+  if (count === 1) return "1 človeku";
+  return `${count} ľuďom`;
+}
+
+function skReplies(count) {
+  if (count === 1) return "1 človek odpísal";
+  return `${count} ľudí odpísalo`;
 }
 
 function skPreparedReplies(count) {
@@ -157,18 +215,6 @@ function normalizeTranscript(text) {
     .toLowerCase()
     .replace(/[^\p{Letter}\p{Number}\s]/gu, " ")
     .trim();
-}
-
-function defaultColdOutreachMetrics() {
-  return {
-    periodLabel: "dnes",
-    contacted: 128,
-    opened: 61,
-    replied: 14,
-    positiveReplies: 5,
-    preparedPositiveReplyCount: 5,
-    pendingApprovalCount: 5,
-  };
 }
 
 function generateContracts(payload) {

@@ -56,6 +56,7 @@ The Electron shell opens a local Arcigy Jarvis console with:
 - text transcript fallback
 - Slovak TTS via `speechSynthesis`
 - local Electron IPC bridge for Jarvis voice events and cold outreach briefs
+- voice cold outreach answers backed by `data\jarvis-local.db`
 - local contract JSON intake form that generates DOCX files through the same generator as MCP
 - quick cold outreach response demo
 

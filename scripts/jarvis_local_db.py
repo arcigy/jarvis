@@ -384,14 +384,26 @@ def build_cold_outreach_summary(metrics: dict[str, Any]) -> str:
     pending = int(metrics["pendingApprovalCount"])
     open_rate = round((opened / contacted) * 100, 1) if contacted else 0
     parts = [
-        f"Za {metrics['periodLabel']} sme napísali {contacted} ľuďom.",
-        f"{open_rate}% si email otvorilo, {replied} ľudí odpísalo, z toho {positive} pozitívne.",
+        f"Za {metrics['periodLabel']} sme napísali {people_label(contacted)}.",
+        f"{open_rate}% si email otvorilo, {reply_label(replied)}, z toho {positive} pozitívne.",
     ]
     if prepared:
         parts.append(f"Pripravil som ti {prepared_reply_label(prepared)} na pozitívne reakcie a pošlem ich až na tvoje potvrdenie.")
     if pending:
-        parts.append(f"Čaká {pending} odpovedí na schválenie.")
+        parts.append(f"Čaká {prepared_reply_label(pending)} na schválenie.")
     return " ".join(parts)
+
+
+def people_label(count: int) -> str:
+    if count == 1:
+        return "1 človeku"
+    return f"{count} ľuďom"
+
+
+def reply_label(count: int) -> str:
+    if count == 1:
+        return "1 človek odpísal"
+    return f"{count} ľudí odpísalo"
 
 
 def prepared_reply_label(count: int) -> str:
