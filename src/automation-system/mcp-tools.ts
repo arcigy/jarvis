@@ -11,6 +11,10 @@ export type JarvisMcpToolName =
   | "arcigy.add_client_need_signal"
   | "arcigy.ingest_client_message"
   | "arcigy.identify_email"
+  | "arcigy.get_system_health"
+  | "arcigy.generate_ai_reply"
+  | "arcigy.sync_gmail_recent_messages"
+  | "arcigy.get_smartlead_campaign_status"
   | "arcigy.jarvis_voice_event";
 
 export type JarvisMcpTool = {
@@ -72,6 +76,26 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.jarvis_voice_event",
       description: "Spracuje transcript event pre Jarvis wake-word a vráti text na hlasovú odpoveď.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.get_system_health",
+      description: "Skontroluje, ktoré produkčné integrácie majú runtime konfiguráciu bez odhalenia secretov.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.generate_ai_reply",
+      description: "Použije Gemini na prípravu návrhu odpovede klientovi bez odoslania.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.sync_gmail_recent_messages",
+      description: "Načíta posledné Gmail správy a uloží klientské potreby do lokálnej databázy.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.get_smartlead_campaign_status",
+      description: "Načíta kampane alebo štatistiky kampane zo Smartlead API.",
       requiresApproval: false,
     },
   ];

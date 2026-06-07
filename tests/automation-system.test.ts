@@ -6,12 +6,16 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { matchLocalIdentity } from "../src/automation-system/identity-matching.ts";
+import { getIntegrationHealth } from "../src/automation-system/env.ts";
+import { buildClientReplyPrompt, generateGeminiText } from "../src/automation-system/gemini.ts";
+import { listRecentGmailMessageEvents, parseFromHeader } from "../src/automation-system/gmail.ts";
 import {
   buildContractGenerationCommand,
   getColdOutreachMcpAnswer,
   identifyEmailMcpAnswer,
   listJarvisMcpTools,
 } from "../src/automation-system/mcp-tools.ts";
+import { getSmartleadCampaignStatus } from "../src/automation-system/smartlead.ts";
 import {
   containsWakeWord,
   createJarvisVoiceSession,
@@ -30,6 +34,10 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.add_client_need_signal",
     "arcigy.ingest_client_message",
     "arcigy.jarvis_voice_event",
+    "arcigy.get_system_health",
+    "arcigy.generate_ai_reply",
+    "arcigy.sync_gmail_recent_messages",
+    "arcigy.get_smartlead_campaign_status",
   ]);
 });
 
@@ -118,6 +126,84 @@ test("cold outreach answer uses the requested Slovak style", () => {
   assert.match(answer, /51% si email otvorilo/);
   assert.match(answer, /12 ľudí odpísalo, z toho 4 pozitívne/);
   assert.match(answer, /pošlem ich až na tvoje potvrdenie/);
+});
+
+test("runtime integration health reports missing secrets without throwing", () => {
+  const health = getIntegrationHealth({
+    GEMINI_API_KEY: "dummy",
+    SMARTLEAD_API_KEY: "smartlead-key",
+  });
+  assert.equal(health.find((item) => item.key === "gemini")?.configured, false);
+  assert.equal(health.find((item) => item.key === "smartlead")?.configured, true);
+});
+
+test("Gemini reply helper calls generateContent and extracts text", async () => {
+  const calls: Array<{ url: string; body: unknown }> = [];
+  const fetchImpl = async (url: string | URL | Request, init?: RequestInit) => {
+    calls.push({ url: String(url), body: JSON.parse(String(init?.body)) });
+    return responseJson({
+      candidates: [{ content: { parts: [{ text: "Návrh odpovede" }] } }],
+    });
+  };
+
+  const result = await generateGeminiText(
+    buildClientReplyPrompt({ clientName: "ACME", message: "Potrebujem nový report." }),
+    { GEMINI_API_KEY: "gemini-key" },
+    fetchImpl as typeof fetch
+  );
+
+  assert.equal(result.model, "gemini-2.5-flash");
+  assert.equal(result.text, "Návrh odpovede");
+  assert.match(calls[0].url, /generateContent/);
+});
+
+test("Gmail helper refreshes OAuth token and normalizes message events", async () => {
+  const fetchImpl = async (url: string | URL | Request) => {
+    const target = String(url);
+    if (target.includes("oauth2.googleapis.com")) return responseJson({ access_token: "access-token" });
+    if (target.includes("/messages?")) return responseJson({ messages: [{ id: "m1", threadId: "t1" }] });
+    return responseJson({
+      id: "m1",
+      threadId: "t1",
+      snippet: "Prosím, pošli report.",
+      internalDate: "1780860000000",
+      payload: {
+        headers: [
+          { name: "From", value: "Client <client@example.com>" },
+          { name: "Subject", value: "Report" },
+        ],
+      },
+    });
+  };
+
+  const events = await listRecentGmailMessageEvents(
+    { envKey: "GMAIL_REFRESH_TOKEN_TEST", label: "test", refreshToken: "refresh" },
+    { query: "newer_than:1d", maxResults: 1 },
+    { GOOGLE_CLIENT_ID: "client", GOOGLE_CLIENT_SECRET: "secret" },
+    fetchImpl as typeof fetch
+  );
+
+  assert.equal(parseFromHeader("Client <client@example.com>").email, "client@example.com");
+  assert.equal(events[0].fromEmail, "client@example.com");
+  assert.equal(events[0].subject, "Report");
+});
+
+test("Smartlead helper fetches campaign statistics", async () => {
+  const seenUrls: string[] = [];
+  const fetchImpl = async (url: string | URL | Request) => {
+    seenUrls.push(String(url));
+    return responseJson({ sent_count: 10 });
+  };
+
+  const status = await getSmartleadCampaignStatus(
+    { campaignId: "123" },
+    { SMARTLEAD_API_KEY: "smartlead-key" },
+    fetchImpl as typeof fetch
+  );
+
+  assert.equal(status.campaignId, "123");
+  assert.match(seenUrls[0], /campaigns\/123\/statistics/);
+  assert.match(seenUrls[0], /api_key=/);
 });
 
 test("identity matching prefers exact email and returns open client needs", () => {
@@ -344,4 +430,12 @@ function runPythonJson(python: string, args: string[]) {
 
   assert.equal(result.status, 0, result.stderr);
   return JSON.parse(result.stdout);
+}
+
+function responseJson(value: unknown): Response {
+  return {
+    ok: true,
+    status: 200,
+    json: async () => value,
+  } as Response;
 }

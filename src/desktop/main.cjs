@@ -7,6 +7,7 @@ let mainWindow;
 let tray;
 const repoRoot = path.resolve(__dirname, "..", "..");
 const defaultDbPath = path.join(repoRoot, "data", "jarvis-local.db");
+loadLocalEnv();
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -45,6 +46,8 @@ app.whenReady().then(() => {
   ipcMain.handle("app:openPath", (_event, targetPath) => shell.openPath(targetPath));
   ipcMain.handle("jarvis:coldOutreachBrief", (_event, payload) => getColdOutreachBrief(payload));
   ipcMain.handle("jarvis:voiceEvent", (_event, payload) => handleVoiceEvent(payload));
+  ipcMain.handle("jarvis:systemHealth", () => getSystemHealth());
+  ipcMain.handle("jarvis:generateAiReply", (_event, payload) => generateAiReply(payload));
   ipcMain.handle("contracts:generate", (_event, payload) => generateContracts(payload));
   createWindow();
   createTray();
@@ -110,6 +113,61 @@ function handleVoiceEvent(payload) {
     shouldStopRecording: true,
     speakText: fallback,
   };
+}
+
+function getSystemHealth() {
+  const integrations = [
+    ["gemini", ["GEMINI_API_KEY"]],
+    ["gmail", ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP"]],
+    ["smartlead", ["SMARTLEAD_API_KEY"]],
+    ["postgres", ["DATABASE_URL"]],
+    ["redis", ["REDIS_URL"]],
+    ["serper", ["SERPER_API_KEY"]],
+  ].map(([key, required]) => {
+    const missing = required.filter((name) => !presentEnv(name));
+    return { key, configured: missing.length === 0, missing };
+  });
+  return {
+    integrations,
+    dbPath: defaultDbPath,
+  };
+}
+
+async function generateAiReply(payload) {
+  const apiKey = requireRuntimeEnv("GEMINI_API_KEY");
+  const message = String(payload?.message ?? "").trim();
+  if (!message) throw new Error("Client message is required.");
+  const model = payload?.model || "gemini-2.5-flash";
+  const prompt = [
+    "Si Arcigy Jarvis. Priprav profesionálnu, vecnú a family-friendly odpoveď klientovi.",
+    "Nikdy nesľubuj odoslanie bez schválenia používateľom.",
+    payload?.clientName ? `Klient: ${payload.clientName}` : null,
+    payload?.context ? `Kontext: ${payload.context}` : null,
+    "Správa klienta:",
+    message,
+    "Vytvor krátku odpoveď v slovenčine a jednu vetu, čo má používateľ schváliť.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.35 },
+      }),
+    }
+  );
+  if (!response.ok) {
+    throw new Error(`Gemini request failed: ${response.status}`);
+  }
+  const data = await response.json();
+  const text = data?.candidates?.[0]?.content?.parts?.map((part) => part.text || "").join("").trim();
+  if (!text) throw new Error("Gemini returned an empty response.");
+  return { model, text };
 }
 
 function getColdOutreachBrief(payload) {
@@ -262,4 +320,35 @@ function runPython(args) {
     stdout: result.stdout || "",
     stderr: result.stderr || "",
   };
+}
+
+function loadLocalEnv() {
+  for (const filename of [".env.local", ".env"]) {
+    const envPath = path.join(repoRoot, filename);
+    if (!fs.existsSync(envPath)) continue;
+    const lines = fs.readFileSync(envPath, "utf-8").split(/\r?\n/);
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const index = trimmed.indexOf("=");
+      if (index === -1) continue;
+      const key = trimmed.slice(0, index).trim();
+      const value = trimmed.slice(index + 1).trim().replace(/^["']|["']$/g, "");
+      if (key && typeof process.env[key] === "undefined") {
+        process.env[key] = value;
+      }
+    }
+  }
+}
+
+function presentEnv(key) {
+  const value = process.env[key]?.trim();
+  return Boolean(value && value !== "dummy");
+}
+
+function requireRuntimeEnv(key) {
+  if (!presentEnv(key)) {
+    throw new Error(`Missing runtime environment variable: ${key}`);
+  }
+  return process.env[key];
 }

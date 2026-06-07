@@ -4,15 +4,20 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
+import { getIntegrationHealth, loadLocalEnv, summarizeIntegrationHealth } from "./env.ts";
+import { buildClientReplyPrompt, generateGeminiText } from "./gemini.ts";
+import { listConfiguredGmailAccounts, listRecentGmailMessageEvents } from "./gmail.ts";
 import { handleJarvisVoiceEvent, type JarvisVoiceSession } from "./jarvis-voice.ts";
 import {
   buildContractGenerationCommand,
   getColdOutreachMcpAnswer,
   identifyEmailMcpAnswer,
 } from "./mcp-tools.ts";
+import { getSmartleadCampaignStatus } from "./smartlead.ts";
 import type { ClientNeedSignal, LocalPerson } from "./types.ts";
 
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
+loadLocalEnv(repoRoot);
 
 export function createJarvisMcpServer(): McpServer {
   const server = new McpServer({
@@ -315,6 +320,116 @@ export function createJarvisMcpServer(): McpServer {
     }
   );
 
+  server.registerTool(
+    "arcigy.get_system_health",
+    {
+      title: "System health",
+      description: "Return configured/missing production integrations without exposing secrets.",
+      inputSchema: {
+        format: z.enum(["json", "text"]).default("json"),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async ({ format }) => {
+      if (format === "text") return textResult(summarizeIntegrationHealth());
+      return jsonResult({ integrations: getIntegrationHealth() });
+    }
+  );
+
+  server.registerTool(
+    "arcigy.generate_ai_reply",
+    {
+      title: "Generate AI reply",
+      description: "Use Gemini to draft a client reply. This only prepares text; it never sends the email.",
+      inputSchema: {
+        clientName: z.string().optional(),
+        message: z.string().min(1),
+        context: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        tone: z.enum(["direct", "warm", "executive"]).default("executive"),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (input) => jsonResult(await generateGeminiText(buildClientReplyPrompt(input)))
+  );
+
+  server.registerTool(
+    "arcigy.sync_gmail_recent_messages",
+    {
+      title: "Sync Gmail recent messages",
+      description: "Fetch recent Gmail messages and optionally ingest them into the local Jarvis DB.",
+      inputSchema: {
+        dbPath: z.string().optional(),
+        accountEnvKey: z.string().optional(),
+        query: z.string().default("newer_than:7d"),
+        maxResults: z.number().int().min(1).max(25).default(10),
+        dryRun: z.boolean().default(false),
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async ({ dbPath, accountEnvKey, query, maxResults, dryRun }) => {
+      const accounts = listConfiguredGmailAccounts().filter((account) => !accountEnvKey || account.envKey === accountEnvKey);
+      if (!accounts.length) {
+        throw new Error(accountEnvKey ? `Configured Gmail account not found: ${accountEnvKey}` : "No configured Gmail accounts found.");
+      }
+
+      const synced = [];
+      for (const account of accounts) {
+        const events = await listRecentGmailMessageEvents(account, { query, maxResults });
+        const ingested = [];
+        if (!dryRun) {
+          for (const event of events) {
+            ingested.push(runDbCommand("ingest-message", event, dbPath));
+          }
+        }
+        synced.push({
+          account: account.label,
+          fetched: events.length,
+          ingested: ingested.length,
+          preview: events.slice(0, 3).map((event) => ({
+            fromEmail: event.fromEmail,
+            subject: event.subject,
+            text: event.text,
+          })),
+        });
+      }
+      return jsonResult({ dryRun, synced });
+    }
+  );
+
+  server.registerTool(
+    "arcigy.get_smartlead_campaign_status",
+    {
+      title: "Smartlead campaign status",
+      description: "Fetch Smartlead campaigns or one campaign's statistics.",
+      inputSchema: {
+        campaignId: z.string().optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async ({ campaignId }) => jsonResult(await getSmartleadCampaignStatus({ campaignId }))
+  );
+
   return server;
 }
 
@@ -351,12 +466,20 @@ function jsonDbTool(
   payload: Record<string, unknown>,
   dbPath?: string
 ) {
+  return jsonResult(runDbCommand(command, payload, dbPath));
+}
+
+function runDbCommand(
+  command: "upsert-person" | "add-need-signal" | "add-cold-event" | "cold-brief" | "ingest-message",
+  payload: Record<string, unknown>,
+  dbPath?: string
+) {
   const args = ["scripts/jarvis_local_db.py", command, "--payload", JSON.stringify(payload)];
   if (dbPath) {
     args.push("--db", dbPath);
   }
   const result = runPython(args);
-  return jsonResult(JSON.parse(result.stdout));
+  return JSON.parse(result.stdout);
 }
 
 function textResult(text: string) {

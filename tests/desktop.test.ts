@@ -8,20 +8,26 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   const main = readFileSync("src/desktop/main.cjs", "utf-8");
   const preload = readFileSync("src/desktop/preload.cjs", "utf-8");
 
-  assert.match(html, /Jarvis Console/);
+  assert.match(html, /Arcigy Jarvis/);
   assert.match(html, /Enable/);
   assert.match(html, /Contract generator/);
   assert.match(html, /contractIntake/);
+  assert.match(html, /healthGrid/);
+  assert.match(html, /draftReply/);
   assert.match(renderer, /SpeechRecognition/);
   assert.match(renderer, /speechSynthesis/);
   assert.match(renderer, /window\.arcigyDesktop\.jarvisVoiceEvent/);
   assert.match(renderer, /window\.arcigyDesktop\.coldOutreachBrief/);
   assert.match(renderer, /window\.arcigyDesktop\.generateContracts/);
+  assert.match(renderer, /window\.arcigyDesktop\.systemHealth/);
+  assert.match(renderer, /window\.arcigyDesktop\.generateAiReply/);
   assert.match(renderer, /sampleContractIntake/);
   assert.doesNotMatch(renderer, /demoColdOutreachMetrics/);
   assert.doesNotMatch(renderer, /Za dnes sme napísali/);
   assert.match(main, /ipcMain\.handle\("jarvis:coldOutreachBrief"/);
   assert.match(main, /ipcMain\.handle\("jarvis:voiceEvent"/);
+  assert.match(main, /ipcMain\.handle\("jarvis:systemHealth"/);
+  assert.match(main, /ipcMain\.handle\("jarvis:generateAiReply"/);
   assert.match(main, /ipcMain\.handle\("contracts:generate"/);
   assert.match(main, /jarvis_local_db\.py/);
   assert.match(main, /cold-brief/);
@@ -31,5 +37,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(preload, /contextBridge\.exposeInMainWorld/);
   assert.match(preload, /jarvisVoiceEvent/);
   assert.match(preload, /coldOutreachBrief/);
+  assert.match(preload, /systemHealth/);
+  assert.match(preload, /generateAiReply/);
   assert.match(preload, /generateContracts/);
 });

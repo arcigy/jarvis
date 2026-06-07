@@ -7,6 +7,7 @@ const state = {
 
 const elements = {
   statusBadge: document.querySelector("#statusBadge"),
+  healthGrid: document.querySelector("#healthGrid"),
   listenButton: document.querySelector("#listenButton"),
   transcript: document.querySelector("#transcript"),
   response: document.querySelector("#response"),
@@ -14,6 +15,9 @@ const elements = {
   simulateWake: document.querySelector("#simulateWake"),
   submitTranscript: document.querySelector("#submitTranscript"),
   coldBrief: document.querySelector("#coldBrief"),
+  clientMessage: document.querySelector("#clientMessage"),
+  draftReply: document.querySelector("#draftReply"),
+  draftResult: document.querySelector("#draftResult"),
   contractIntake: document.querySelector("#contractIntake"),
   generateContracts: document.querySelector("#generateContracts"),
   contractResult: document.querySelector("#contractResult"),
@@ -34,6 +38,24 @@ function speak(text) {
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = "sk-SK";
     window.speechSynthesis.speak(utterance);
+  }
+}
+
+function renderHealth(health) {
+  elements.healthGrid.innerHTML = "";
+  for (const item of health.integrations ?? []) {
+    const node = document.createElement("div");
+    node.className = `health ${item.configured ? "ready" : "missing"}`;
+    node.innerHTML = `<strong>${item.key}</strong><span>${item.configured ? "ready" : `missing ${item.missing.length}`}</span>`;
+    elements.healthGrid.appendChild(node);
+  }
+}
+
+async function refreshHealth() {
+  try {
+    renderHealth(await window.arcigyDesktop.systemHealth());
+  } catch (error) {
+    elements.healthGrid.textContent = error instanceof Error ? error.message : String(error);
   }
 }
 
@@ -153,6 +175,19 @@ elements.submitTranscript.addEventListener("click", () => void handleTranscript(
 elements.coldBrief.addEventListener("click", async () => {
   speak(await window.arcigyDesktop.coldOutreachBrief({ text: "cold outreach za posledných 7 dní" }));
 });
+elements.draftReply.addEventListener("click", async () => {
+  try {
+    elements.draftResult.textContent = "Drafting...";
+    const result = await window.arcigyDesktop.generateAiReply({
+      message: elements.clientMessage.value,
+      context: "Client communication inside Arcigy Jarvis.",
+    });
+    elements.draftResult.textContent = result.text;
+    speak(result.text);
+  } catch (error) {
+    elements.draftResult.textContent = error instanceof Error ? error.message : String(error);
+  }
+});
 elements.generateContracts.addEventListener("click", async () => {
   try {
     elements.contractResult.textContent = "Generating...";
@@ -169,4 +204,6 @@ elements.generateContracts.addEventListener("click", async () => {
 });
 
 elements.contractIntake.value = JSON.stringify(sampleContractIntake(), null, 2);
+elements.clientMessage.value = "Potrebujem upraviť onboarding automatizáciu do piatku.";
+void refreshHealth();
 setMode("idle");

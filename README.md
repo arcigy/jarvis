@@ -29,6 +29,10 @@ Server tools:
 - `arcigy.add_client_need_signal`
 - `arcigy.ingest_client_message`
 - `arcigy.identify_email`
+- `arcigy.get_system_health`
+- `arcigy.generate_ai_reply`
+- `arcigy.sync_gmail_recent_messages`
+- `arcigy.get_smartlead_campaign_status`
 - `arcigy.jarvis_voice_event`
 
 Example MCP command config:
@@ -57,8 +61,20 @@ The Electron shell opens a local Arcigy Jarvis console with:
 - Slovak TTS via `speechSynthesis`
 - local Electron IPC bridge for Jarvis voice events and cold outreach briefs
 - voice cold outreach answers backed by `data\jarvis-local.db`
+- runtime integration health for Gemini, Gmail, Smartlead, Postgres, Redis, Serper
+- Gemini draft replies that are prepared locally and not sent automatically
 - local contract JSON intake form that generates DOCX files through the same generator as MCP
-- quick cold outreach response demo
+
+## Runtime secrets
+
+Copy `.env.example` to `.env.local` and fill runtime values there. `.env.local`, local DBs, generated contracts, and `node_modules` are ignored by git. Do not commit real API keys.
+
+Live integrations are runtime-only:
+
+- Gemini: `GEMINI_API_KEY`
+- Gmail: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and the `GMAIL_REFRESH_TOKEN_*` values
+- Smartlead: `SMARTLEAD_API_KEY`
+- local app storage: `DATABASE_URL`, `REDIS_URL`, `data\jarvis-local.db`
 
 Tauri is the preferred target for a production desktop build, but this machine currently has no Rust/Cargo toolchain available. Electron is used here as the working desktop fallback.
 

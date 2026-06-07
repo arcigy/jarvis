@@ -12,7 +12,7 @@
         <div class="mark">A</div>
         <div>
           <strong>Arcigy Jarvis</strong>
-          <span>Local automation hub</span>
+          <span>Production command center</span>
         </div>
       </div>
       <nav>
@@ -20,6 +20,7 @@
         <button>Cold outreach</button>
         <button>Klienti & leads</button>
         <button>Zmluvy</button>
+        <button>Integrácie</button>
         <button>MCP</button>
       </nav>
     </aside>
@@ -27,11 +28,13 @@
     <main>
       <header>
         <div>
-          <h1>Jarvis Console</h1>
-          <p>Wake word listener, local MCP tools, client identity, and contract generation.</p>
+          <h1>Arcigy Jarvis</h1>
+          <p>Voice command center for contracts, outreach, client memory, Gemini drafts, and MCP operations.</p>
         </div>
         <div class="status" id="statusBadge">Idle</div>
       </header>
+
+      <section class="statusGrid" id="healthGrid" aria-label="Integration status"></section>
 
       <section class="grid">
         <article class="panel listener">
@@ -59,14 +62,29 @@
         </article>
 
         <article class="panel">
-          <h2>Cold outreach demo</h2>
+          <h2>Cold outreach live brief</h2>
           <dl>
-            <div><dt>Sent</dt><dd>128</dd></div>
-            <div><dt>Opened</dt><dd>61</dd></div>
-            <div><dt>Replies</dt><dd>14</dd></div>
-            <div><dt>Positive</dt><dd>5</dd></div>
+            <div><dt>Source</dt><dd>SQLite</dd></div>
+            <div><dt>Period</dt><dd>7d</dd></div>
+            <div><dt>Mode</dt><dd>Local</dd></div>
+            <div><dt>Approval</dt><dd>Manual</dd></div>
           </dl>
           <button id="coldBrief">Ask Jarvis</button>
+        </article>
+
+        <article class="panel">
+          <div class="panelHead">
+            <div>
+              <h2>Gemini reply draft</h2>
+              <p>Prepare a client answer without sending it.</p>
+            </div>
+            <button id="draftReply">Draft</button>
+          </div>
+          <label>
+            Client message
+            <textarea id="clientMessage" spellcheck="false" placeholder="Potrebujem upraviť onboarding automatizáciu do piatku."></textarea>
+          </label>
+          <div class="response compact" id="draftResult">Ready for Gemini.</div>
         </article>
 
         <article class="panel">
@@ -74,6 +92,10 @@
           <ul>
             <li>generate_contract_documents</li>
             <li>get_cold_outreach_brief</li>
+            <li>sync_gmail_recent_messages</li>
+            <li>get_smartlead_campaign_status</li>
+            <li>generate_ai_reply</li>
+            <li>get_system_health</li>
             <li>upsert_local_person</li>
             <li>add_client_need_signal</li>
             <li>ingest_client_message</li>

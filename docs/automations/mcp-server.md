@@ -26,6 +26,12 @@ Claude, ChatGPT, or another MCP client can connect over stdio with:
 - `arcigy.add_client_need_signal`: stores that a client needs something.
 - `arcigy.ingest_client_message`: stores a received email/message, identifies the sender, and returns a Jarvis alert when the message contains a request.
 - `arcigy.identify_email`: exact email/domain identity lookup with open need signals.
+- `arcigy.get_system_health`: checks runtime configuration without exposing secrets.
+- `arcigy.generate_ai_reply`: uses Gemini to draft a client reply without sending it.
+- `arcigy.sync_gmail_recent_messages`: fetches Gmail messages and ingests client requests into SQLite.
+- `arcigy.get_smartlead_campaign_status`: reads Smartlead campaigns or campaign statistics.
 - `arcigy.jarvis_voice_event`: wake-word state handling for the desktop voice layer.
 
 Use `JARVIS_PYTHON` if the MCP runtime needs a specific Python executable.
+
+Store live keys in `.env.local`, not in committed files.
