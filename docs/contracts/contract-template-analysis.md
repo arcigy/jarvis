@@ -4,6 +4,7 @@ Spracované vstupy:
 
 - `PRÍLOHA Č. 1 PROJEKTOVÁ PRÍLOHA.docx`
 - `RÁMCOVÁ ZMLUVA O POSKYTOVANÍ WEBOVEJ APLIKÁCIE.docx`
+- doplnková univerzálna príloha vytvorená pre budúce prílohy
 
 Odstránené alebo zovšeobecnené klientské údaje:
 
@@ -26,3 +27,5 @@ Ponechané pevné údaje:
 - Branislav Laubert ako zástupca poskytovateľa
 
 Poznámka: výsledné DOCX sú univerzálne šablóny, nie právne posúdenie.
+
+Budúce prílohy sa generujú cez `additionalAttachments[]` v `contract-intake.schema.json`.

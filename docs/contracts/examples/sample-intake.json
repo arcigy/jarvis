@@ -52,4 +52,17 @@
     "plannedLaunchDate": "[dátum]"
   },
   "specialTerms": ["Bez osobitných výnimiek."]
+  ,
+  "additionalAttachments": [
+    {
+      "templatePath": "docs/contracts/templates/doplnkova-priloha-univerzalna.docx",
+      "outputName": "doplnkova-priloha-servisne-pravidla.docx",
+      "title": "Doplnková príloha - servisné pravidlá",
+      "description": "Príloha určuje doplnkové pravidlá pre servis, podporu a prevádzkovú súčinnosť.",
+      "items": [
+        "Podpora sa rieši cez dohodnutý komunikačný kanál.",
+        "Zmenové požiadavky mimo rozsahu sa nacenia samostatne."
+      ]
+    }
+  ]
 }

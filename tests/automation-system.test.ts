@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -44,6 +44,37 @@ test("contract generation command points to the JSON form generator", () => {
 
 test("contract generation rejects non-json input", () => {
   assert.throws(() => buildContractGenerationCommand("contract.docx"), /JSON/);
+});
+
+test("contract generator creates core documents, extra attachments, and manifest", () => {
+  const dir = mkdtempSync(join(tmpdir(), "jarvis-contracts-"));
+  const python = process.env.JARVIS_PYTHON || "python";
+  const result = spawnSync(
+    python,
+    [
+      "scripts/generate_contract_documents.py",
+      "--input",
+      "docs/contracts/examples/sample-intake.json",
+      "--output-dir",
+      dir,
+    ],
+    {
+      cwd: process.cwd(),
+      encoding: "utf-8",
+      env: {
+        ...process.env,
+        PYTHONIOENCODING: "utf-8",
+      },
+    }
+  );
+
+  assert.equal(result.status, 0, result.stderr);
+  const manifestPath = join(dir, "generation-manifest.json");
+  assert.equal(existsSync(manifestPath), true);
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
+  assert.equal(manifest.client, "Test Klient s. r. o.");
+  assert.equal(manifest.generatedFiles.length, 3);
+  assert.ok(manifest.generatedFiles.some((path: string) => path.endsWith("doplnkova-priloha-servisne-pravidla.docx")));
 });
 
 test("cold outreach answer uses the requested Slovak style", () => {

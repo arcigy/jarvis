@@ -73,6 +73,7 @@ Universal Arcigy templates are in:
 
 - `docs/contracts/templates/ramcova-zmluva-univerzalna.docx`
 - `docs/contracts/templates/projektova-priloha-univerzalna.docx`
+- `docs/contracts/templates/doplnkova-priloha-univerzalna.docx`
 
 The MCP/client form schema is:
 
@@ -90,6 +91,8 @@ Generate client-ready DOCX files from a filled MCP/AI form:
 ```powershell
 & 'C:\Users\laube\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' scripts\generate_contract_documents.py --input docs\contracts\examples\sample-intake.json --output-dir generated\contracts
 ```
+
+The JSON form can include `additionalAttachments[]` with a DOCX template path and output name. The generator writes all generated files plus `generation-manifest.json`.
 
 ## Verification
 

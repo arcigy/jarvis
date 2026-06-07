@@ -82,6 +82,20 @@
     "specialTerms": {
       "type": "array",
       "items": { "type": "string" }
+    },
+    "additionalAttachments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["templatePath", "outputName"],
+        "properties": {
+          "templatePath": { "type": "string" },
+          "outputName": { "type": "string" },
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "items": { "type": "array", "items": { "type": "string" } }
+        }
+      }
     }
   }
 }

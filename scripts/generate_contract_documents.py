@@ -12,6 +12,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE_DIR = ROOT / "docs" / "contracts" / "templates"
 DEFAULT_OUTPUT_DIR = ROOT / "generated" / "contracts"
+MANIFEST_NAME = "generation-manifest.json"
 
 
 def money(value: float | int) -> str:
@@ -75,7 +76,7 @@ def build_replacements(data: dict[str, Any]) -> dict[str, str]:
             f"Zápis: {client.get('registration', '[register Klienta]')}",
             f"E-mail: {client['email']}",
             f"Zastúpený: {client['representativeName']}, {client['representativeRole']}",
-            "ďalej len ako „Klient“",
+            'ďalej len ako "Klient"',
         ]
     )
 
@@ -84,6 +85,7 @@ def build_replacements(data: dict[str, Any]) -> dict[str, str]:
     outputs = join_items(project.get("outputs"))
     ai_features = join_items(project.get("aiFeatures"))
     acceptance = join_items(project.get("acceptanceCriteria"), "podľa dohodnutého rozsahu")
+    attachment = data.get("_currentAttachment") or {}
 
     return {
         "[obchodné meno Klienta]": client["businessName"],
@@ -129,6 +131,10 @@ def build_replacements(data: dict[str, Any]) -> dict[str, str]:
         "[forma / rozsah / frekvencia]": outputs,
         "[žiadna / opis výnimky, ak je výslovne dohodnutá]": join_items(data.get("specialTerms"), "žiadna"),
         "Meno a funkcia: [meno a funkcia zástupcu Klienta]": f"Meno a funkcia: {client['representativeName']}, {client['representativeRole']}",
+        "[názov doplnkovej prílohy]": attachment.get("title", "[názov doplnkovej prílohy]"),
+        "[opis doplnkovej prílohy]": attachment.get("description", "[opis doplnkovej prílohy]"),
+        "[položky doplnkovej prílohy]": join_items(attachment.get("items"), "[položky doplnkovej prílohy]"),
+        "[akceptačné kritériá]": acceptance,
         client_block: client_block,
         "[●]": "[doplniť podľa klienta]",
     }
@@ -159,7 +165,6 @@ def patch_docx(template: Path, target: Path, replacements: dict[str, str]) -> No
 
 def generate_contract_documents(input_path: Path, output_dir: Path = DEFAULT_OUTPUT_DIR) -> list[Path]:
     data = json.loads(input_path.read_text(encoding="utf-8"))
-    replacements = build_replacements(data)
     slug = re.sub(r"[^a-zA-Z0-9_-]+", "-", data["client"]["businessName"]).strip("-").lower() or "klient"
     targets = [
         (
@@ -173,9 +178,53 @@ def generate_contract_documents(input_path: Path, output_dir: Path = DEFAULT_OUT
     ]
     created: list[Path] = []
     for template, target in targets:
-        patch_docx(template, target, replacements)
+        patch_docx(template, target, build_replacements(data))
         created.append(target)
+
+    for attachment in data.get("additionalAttachments", []):
+        template = resolve_template_path(required(attachment, "templatePath"))
+        output_name = safe_docx_name(required(attachment, "outputName"))
+        attachment_data = {**data, "_currentAttachment": attachment}
+        target = output_dir / f"{slug}-{output_name}"
+        patch_docx(template, target, build_replacements(attachment_data))
+        created.append(target)
+
+    write_manifest(input_path, output_dir, created, data)
     return created
+
+
+def resolve_template_path(raw_path: str) -> Path:
+    path = Path(raw_path)
+    if not path.is_absolute():
+        path = ROOT / path
+    resolved = path.resolve()
+    template_root = TEMPLATE_DIR.resolve()
+    if template_root not in resolved.parents and resolved != template_root:
+        raise ValueError(f"Attachment template must be under {TEMPLATE_DIR}: {raw_path}")
+    if resolved.suffix.lower() != ".docx":
+        raise ValueError(f"Attachment template must be a DOCX file: {raw_path}")
+    if not resolved.exists():
+        raise FileNotFoundError(f"Attachment template does not exist: {raw_path}")
+    return resolved
+
+
+def safe_docx_name(raw_name: str) -> str:
+    name = re.sub(r"[^a-zA-Z0-9_.-]+", "-", raw_name.strip()).strip("-")
+    if not name:
+        raise ValueError("Attachment outputName cannot be empty")
+    if not name.lower().endswith(".docx"):
+        name = f"{name}.docx"
+    return name
+
+
+def write_manifest(input_path: Path, output_dir: Path, created: list[Path], data: dict[str, Any]) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    manifest = {
+        "input": str(input_path),
+        "client": data["client"]["businessName"],
+        "generatedFiles": [str(path) for path in created],
+    }
+    (output_dir / MANIFEST_NAME).write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def main() -> None:
@@ -186,6 +235,7 @@ def main() -> None:
 
     for path in generate_contract_documents(args.input, args.output_dir):
         print(path)
+    print(args.output_dir / MANIFEST_NAME)
 
 
 if __name__ == "__main__":

@@ -15,6 +15,8 @@ Generovanie z vyplneného JSON formulára:
 python scripts\generate_contract_documents.py --input docs\contracts\examples\sample-intake.json --output-dir generated\contracts
 ```
 
+Ďalšie prílohy sa pridávajú cez `additionalAttachments[]` v JSON formulári. Každá položka určí `templatePath`, `outputName`, voliteľný `title`, `description` a `items`. Generátor vytvorí aj `generation-manifest.json`.
+
 ## Cold outreach prehľad
 
 Odpoveď MCP má byť krátka a akčná:
