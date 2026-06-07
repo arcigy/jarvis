@@ -47,6 +47,7 @@ app.whenReady().then(() => {
   ipcMain.handle("jarvis:coldOutreachBrief", (_event, payload) => getColdOutreachBrief(payload));
   ipcMain.handle("jarvis:voiceEvent", (_event, payload) => handleVoiceEvent(payload));
   ipcMain.handle("jarvis:systemHealth", () => getSystemHealth());
+  ipcMain.handle("jarvis:runDiagnostics", (_event, payload) => runDiagnostics(payload));
   ipcMain.handle("jarvis:identifyEmail", (_event, payload) => identifyEmail(payload));
   ipcMain.handle("jarvis:ingestClientMessage", (_event, payload) => ingestClientMessage(payload));
   ipcMain.handle("jarvis:generateAiReply", (_event, payload) => generateAiReply(payload));
@@ -160,6 +161,80 @@ function getSystemHealth() {
     integrations,
     dbPath: defaultDbPath,
   };
+}
+
+async function runDiagnostics(payload) {
+  const live = payload?.live === true;
+  const checks = getSystemHealth().integrations.map((item) => ({
+    key: item.key,
+    status: item.configured ? "ready" : "missing",
+    message: item.configured ? "Configured." : `Missing: ${item.missing.join(", ")}`,
+  }));
+  checks.push({
+    key: "sqlite",
+    status: fs.existsSync(payload?.dbPath || defaultDbPath) ? "ready" : "ready",
+    message: fs.existsSync(payload?.dbPath || defaultDbPath) ? "Local DB exists." : "Local DB can be created on demand.",
+  });
+
+  if (live) {
+    await Promise.all([
+      updateDiagnosticCheck(checks, "gemini", async () => {
+        const result = await generateAiReply({ message: "Return OK.", context: "Diagnostics check." });
+        return `Gemini responded with ${result.text.length} characters.`;
+      }),
+      updateDiagnosticCheck(checks, "gmail", async () => {
+        const accounts = listConfiguredGmailAccounts();
+        if (!accounts.length) throw new Error("No configured Gmail accounts found.");
+        await Promise.all(accounts.map((account) => refreshGoogleAccessToken(account.refreshToken)));
+        return `OAuth refresh succeeded for ${accounts.length} Gmail account(s).`;
+      }),
+      updateDiagnosticCheck(checks, "smartlead", async () => {
+        const result = await getSmartleadCampaignStatus({});
+        return `Smartlead returned ${result.campaigns?.length ?? 0} campaign(s).`;
+      }),
+      updateDiagnosticCheck(checks, "googleMaps", async () => {
+        await searchGooglePlacesLeads("Arcigy", 1);
+        return "Google Places Text Search responded.";
+      }),
+      updateDiagnosticCheck(checks, "serper", async () => {
+        await searchSerperLeads("Arcigy", 1);
+        return "Serper responded.";
+      }),
+      updateDiagnosticCheck(checks, "googleSheets", async () => {
+        await checkGoogleSheetsAccess();
+        return "Google Sheets metadata request responded.";
+      }),
+    ]);
+  }
+
+  return {
+    live,
+    checkedAt: new Date().toISOString(),
+    checks,
+  };
+}
+
+async function updateDiagnosticCheck(checks, key, run) {
+  const check = checks.find((item) => item.key === key);
+  if (!check || check.status === "missing") return;
+  try {
+    check.message = await run();
+    check.status = "ready";
+  } catch (error) {
+    check.status = "failed";
+    check.message = error instanceof Error ? error.message : String(error);
+  }
+}
+
+async function checkGoogleSheetsAccess() {
+  const spreadsheetId = requireRuntimeEnv("GOOGLE_SHEET_ID");
+  const account = listConfiguredGmailAccounts()[0];
+  if (!account) throw new Error("No configured Google OAuth account found.");
+  const accessToken = await refreshGoogleAccessToken(account.refreshToken);
+  const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}?fields=spreadsheetId`, {
+    headers: { authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) throw new Error(`Google Sheets metadata request failed: ${response.status}`);
 }
 
 function summarizeHealthForVoice(health) {

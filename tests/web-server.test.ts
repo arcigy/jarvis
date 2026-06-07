@@ -23,6 +23,16 @@ test("local web bridge serves UI and API health", async () => {
     const body = (await health.json()) as { integrations: Array<{ key: string }> };
     assert.ok(body.integrations.some((item) => item.key === "gemini"));
 
+    const diagnostics = await fetch(`${baseUrl}/api/run-diagnostics`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ live: false }),
+    });
+    assert.equal(diagnostics.status, 200);
+    const diagnosticsBody = (await diagnostics.json()) as { live: boolean; checks: Array<{ key: string }> };
+    assert.equal(diagnosticsBody.live, false);
+    assert.ok(diagnosticsBody.checks.some((item) => item.key === "sqlite"));
+
     const voice = await fetch(`${baseUrl}/api/jarvis/voice-event`, {
       method: "POST",
       headers: { "content-type": "application/json" },

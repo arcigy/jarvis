@@ -16,6 +16,7 @@ This opens a local Electron desktop window. It is a working fallback shell until
 - After wake, Jarvis can answer voice commands for cold outreach, integrations health, email identity, lead discovery, and Gemini reply drafts.
 - If speech recognition is not available, use the transcript text box and `Send transcript`.
 - The renderer calls the local Electron preload bridge for Jarvis voice events and cold outreach briefs.
+- The diagnostics action checks configured integrations and can run live read-only API probes.
 - The client memory panel identifies email addresses and ingests client requests into the local SQLite database.
 - The Gemini panel drafts client replies without sending them.
 - The operations panel syncs recent Gmail messages into the local SQLite memory and checks Smartlead campaign status.

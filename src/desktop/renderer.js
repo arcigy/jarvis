@@ -25,6 +25,8 @@ const elements = {
   clientMessage: document.querySelector("#clientMessage"),
   draftReply: document.querySelector("#draftReply"),
   draftResult: document.querySelector("#draftResult"),
+  runDiagnostics: document.querySelector("#runDiagnostics"),
+  diagnosticsResult: document.querySelector("#diagnosticsResult"),
   gmailQuery: document.querySelector("#gmailQuery"),
   syncGmail: document.querySelector("#syncGmail"),
   gmailResult: document.querySelector("#gmailResult"),
@@ -46,6 +48,7 @@ const arcigyApi = window.arcigyDesktop ?? {
   systemHealth: () => getJson("/api/system-health"),
   coldOutreachBrief: (payload) => postJson("/api/cold-outreach-brief", payload),
   jarvisVoiceEvent: (payload) => postJson("/api/jarvis/voice-event", payload),
+  runDiagnostics: (payload) => postJson("/api/run-diagnostics", payload),
   identifyEmail: (payload) => postJson("/api/identify-email", payload),
   ingestClientMessage: (payload) => postJson("/api/ingest-client-message", payload),
   generateAiReply: (payload) => postJson("/api/generate-ai-reply", payload),
@@ -151,6 +154,15 @@ function renderGmailSync(result) {
       ].join("\n")
     )
     .join("\n\n");
+}
+
+function renderDiagnostics(result) {
+  const checks = result.checks ?? [];
+  return [
+    `${result.live ? "Live" : "Configured"} diagnostics at ${result.checkedAt ?? "now"}`,
+    "",
+    ...checks.map((check) => `${check.status.toUpperCase()} ${check.key}: ${check.message}`),
+  ].join("\n");
 }
 
 function renderIdentity(result) {
@@ -360,6 +372,15 @@ elements.draftReply.addEventListener("click", async () => {
     speak(result.text);
   } catch (error) {
     elements.draftResult.textContent = error instanceof Error ? error.message : String(error);
+  }
+});
+elements.runDiagnostics.addEventListener("click", async () => {
+  try {
+    elements.diagnosticsResult.textContent = "Running live diagnostics...";
+    const result = await arcigyApi.runDiagnostics({ live: true });
+    elements.diagnosticsResult.textContent = renderDiagnostics(result);
+  } catch (error) {
+    elements.diagnosticsResult.textContent = error instanceof Error ? error.message : String(error);
   }
 });
 elements.syncGmail.addEventListener("click", async () => {

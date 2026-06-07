@@ -95,6 +95,7 @@ npm run web
 It serves the same UI at `http://127.0.0.1:8765` and exposes local HTTP endpoints used by the browser fallback:
 
 - `GET /api/system-health`
+- `POST /api/run-diagnostics`
 - `POST /api/jarvis/voice-event`
 - `POST /api/cold-outreach-brief`
 - `POST /api/identify-email`

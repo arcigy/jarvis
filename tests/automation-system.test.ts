@@ -6,6 +6,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { matchLocalIdentity } from "../src/automation-system/identity-matching.ts";
+import { runIntegrationDiagnostics } from "../src/automation-system/diagnostics.ts";
 import { getIntegrationHealth } from "../src/automation-system/env.ts";
 import { buildClientReplyPrompt, generateGeminiText } from "../src/automation-system/gemini.ts";
 import { listRecentGmailMessageEvents, parseFromHeader } from "../src/automation-system/gmail.ts";
@@ -256,6 +257,48 @@ test("lead discovery helpers call Serper, Google Places, and Google Sheets", asy
   assert.equal(discovered.leads.length, 2);
   assert.deepEqual(append, { updates: { updatedRows: 1 } });
   assert.ok(calls.some((url) => url.includes("values/Leads!A1:append")));
+});
+
+test("integration diagnostics run live read-only checks with mocked providers", async () => {
+  const calls: string[] = [];
+  const fetchImpl = async (url: string | URL | Request) => {
+    const target = String(url);
+    calls.push(target);
+    if (target.includes("generativelanguage.googleapis.com")) {
+      return responseJson({ candidates: [{ content: { parts: [{ text: "OK" }] } }] });
+    }
+    if (target.includes("oauth2.googleapis.com")) return responseJson({ access_token: "access-token" });
+    if (target.includes("server.smartlead.ai")) return responseJson([{ id: 1, name: "Campaign" }]);
+    if (target.includes("places.googleapis.com")) return responseJson({ places: [] });
+    if (target.includes("google.serper.dev")) return responseJson({ organic: [] });
+    if (target.includes("sheets.googleapis.com")) return responseJson({ spreadsheetId: "sheet-id" });
+    throw new Error(`Unexpected URL: ${target}`);
+  };
+
+  const result = await runIntegrationDiagnostics(
+    { live: true, dbPath: "missing.db" },
+    {
+      GEMINI_API_KEY: "gemini",
+      GOOGLE_CLIENT_ID: "client",
+      GOOGLE_CLIENT_SECRET: "secret",
+      GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP: "refresh",
+      GMAIL_REFRESH_TOKEN_BRANISLAV_L_ARCIGY_GROUP: "refresh-2",
+      GMAIL_REFRESH_TOKEN_ANDREJ_ARCIGY_GROUP: "refresh-3",
+      GMAIL_REFRESH_TOKEN_ANDREJ_R_ARCIGY_GROUP: "refresh-4",
+      SMARTLEAD_API_KEY: "smartlead",
+      DATABASE_URL: "postgres://example",
+      REDIS_URL: "redis://example",
+      GOOGLE_SHEET_ID: "sheet-id",
+      GOOGLE_MAPS_API_KEY: "maps",
+      SERPER_API_KEY: "serper",
+    },
+    fetchImpl as typeof fetch
+  );
+
+  assert.equal(result.live, true);
+  assert.equal(result.checks.find((check) => check.key === "gemini")?.status, "ready");
+  assert.equal(result.checks.find((check) => check.key === "serper")?.status, "ready");
+  assert.ok(calls.some((url) => url.includes("sheets.googleapis.com")));
 });
 
 test("Serper search falls back to the secondary API key when credits are exhausted", async () => {

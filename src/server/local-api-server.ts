@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { runIntegrationDiagnostics } from "../automation-system/diagnostics.ts";
 import { getIntegrationHealth, loadLocalEnv } from "../automation-system/env.ts";
 import { buildClientReplyPrompt, generateGeminiText } from "../automation-system/gemini.ts";
 import { listConfiguredGmailAccounts, listRecentGmailMessageEvents } from "../automation-system/gmail.ts";
@@ -50,6 +51,12 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
       dbPath: defaultDbPath,
       mode: "web",
     });
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/run-diagnostics") {
+    const payload = await readJson(request);
+    writeJson(response, 200, await runIntegrationDiagnostics({ live: payload.live === true, dbPath: optionalString(payload.dbPath) ?? defaultDbPath }));
     return;
   }
 

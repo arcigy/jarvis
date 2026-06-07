@@ -14,6 +14,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /contractIntake/);
   assert.match(html, /healthGrid/);
   assert.match(html, /draftReply/);
+  assert.match(html, /runDiagnostics/);
+  assert.match(html, /diagnosticsResult/);
   assert.match(html, /Client memory/);
   assert.match(html, /memoryEmail/);
   assert.match(html, /identifyEmail/);
@@ -31,6 +33,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /speechSynthesis/);
   assert.match(renderer, /window\.arcigyDesktop/);
   assert.match(renderer, /arcigyApi\.jarvisVoiceEvent/);
+  assert.match(renderer, /arcigyApi\.runDiagnostics/);
   assert.match(renderer, /arcigyApi\.coldOutreachBrief/);
   assert.match(renderer, /arcigyApi\.identifyEmail/);
   assert.match(renderer, /arcigyApi\.ingestClientMessage/);
@@ -42,6 +45,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /arcigyApi\.discoverLeads/);
   assert.match(renderer, /arcigyApi\.appendLeadsToGoogleSheet/);
   assert.match(renderer, /\/api\/system-health/);
+  assert.match(renderer, /\/api\/run-diagnostics/);
   assert.match(renderer, /\/api\/identify-email/);
   assert.match(renderer, /\/api\/ingest-client-message/);
   assert.match(renderer, /\/api\/sync-gmail-recent-messages/);
@@ -56,6 +60,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /ipcMain\.handle\("jarvis:identifyEmail"/);
   assert.match(main, /ipcMain\.handle\("jarvis:ingestClientMessage"/);
   assert.match(main, /ipcMain\.handle\("jarvis:voiceEvent"/);
+  assert.match(main, /ipcMain\.handle\("jarvis:runDiagnostics"/);
+  assert.match(main, /updateDiagnosticCheck/);
   assert.match(main, /summarizeHealthForVoice/);
   assert.match(main, /summarizeIdentityForVoice/);
   assert.match(main, /summarizeLeadsForVoice/);
@@ -78,6 +84,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /nodeIntegration: false/);
   assert.match(preload, /contextBridge\.exposeInMainWorld/);
   assert.match(preload, /jarvisVoiceEvent/);
+  assert.match(preload, /runDiagnostics/);
   assert.match(preload, /coldOutreachBrief/);
   assert.match(preload, /identifyEmail/);
   assert.match(preload, /ingestClientMessage/);
