@@ -32,3 +32,32 @@ test("local web bridge serves UI and API health", async () => {
     await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   }
 });
+
+test("local web bridge requires bearer auth on external hosts", async () => {
+  const previousToken = process.env.JARVIS_WEB_TOKEN;
+  process.env.JARVIS_WEB_TOKEN = "test-token";
+  const server = createLocalApiServer();
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  const baseUrl = `http://127.0.0.1:${address.port}`;
+
+  try {
+    const denied = await fetch(`${baseUrl}/api/system-health`, {
+      headers: { "x-forwarded-host": "jarvis.example.ngrok-free.app" },
+    });
+    assert.equal(denied.status, 401);
+
+    const allowed = await fetch(`${baseUrl}/api/system-health`, {
+      headers: {
+        "x-forwarded-host": "jarvis.example.ngrok-free.app",
+        authorization: "Bearer test-token",
+      },
+    });
+    assert.equal(allowed.status, 200);
+  } finally {
+    if (previousToken === undefined) delete process.env.JARVIS_WEB_TOKEN;
+    else process.env.JARVIS_WEB_TOKEN = previousToken;
+    await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});

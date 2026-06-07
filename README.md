@@ -99,6 +99,14 @@ It serves the same UI at `http://127.0.0.1:8765` and exposes local HTTP endpoint
 
 For a temporary external URL, run `npm run web:tunnel` after configuring ngrok locally. Keep this local-first; do not expose it publicly without access controls.
 
+API security:
+
+- Localhost requests are allowed by default for desktop/local use.
+- External hosts, including ngrok domains, require `Authorization: Bearer <JARVIS_WEB_TOKEN>`.
+- If `JARVIS_WEB_TOKEN` is not set, `API_SECRET_KEY` is used unless it is `dummy`.
+- Open the web UI with `?token=<token>` once; the browser stores it in localStorage and removes it from the URL.
+- Set `JARVIS_WEB_REQUIRE_AUTH=true` to require the token even on localhost.
+
 ## Local clients/leads DB
 
 Initialize or use the SQLite DB:

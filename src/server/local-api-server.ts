@@ -34,6 +34,13 @@ export function createLocalApiServer() {
 async function routeRequest(request: IncomingMessage, response: ServerResponse) {
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
 
+  if (url.pathname.startsWith("/api/") && !isApiAuthorized(request)) {
+    writeJson(response, 401, {
+      error: "Jarvis web API is locked. Provide a bearer token using JARVIS_WEB_TOKEN or API_SECRET_KEY.",
+    });
+    return;
+  }
+
   if (request.method === "GET" && url.pathname === "/api/system-health") {
     writeJson(response, 200, {
       integrations: getIntegrationHealth(),
@@ -124,6 +131,37 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
   }
 
   writeJson(response, 404, { error: "Not found" });
+}
+
+function isApiAuthorized(request: IncomingMessage): boolean {
+  const token = getWebToken();
+  if (!token) return isLocalRequest(request);
+  if (isLocalRequest(request) && process.env.JARVIS_WEB_REQUIRE_AUTH !== "true") return true;
+  return getBearerToken(request) === token;
+}
+
+function isLocalRequest(request: IncomingMessage): boolean {
+  const host = getRequestHost(request);
+  return host === "127.0.0.1" || host === "localhost" || host === "::1";
+}
+
+function getRequestHost(request: IncomingMessage): string {
+  const forwarded = request.headers["x-forwarded-host"];
+  const raw = Array.isArray(forwarded) ? forwarded[0] : forwarded || request.headers.host || "";
+  return String(raw).split(":")[0].toLowerCase();
+}
+
+function getWebToken(): string | null {
+  const value = (process.env.JARVIS_WEB_TOKEN || process.env.API_SECRET_KEY || "").trim();
+  if (!value || value === "dummy") return null;
+  return value;
+}
+
+function getBearerToken(request: IncomingMessage): string | null {
+  const header = request.headers.authorization;
+  if (!header) return null;
+  const match = /^Bearer\s+(.+)$/i.exec(Array.isArray(header) ? header[0] : header);
+  return match?.[1]?.trim() || null;
 }
 
 async function routeMcpTool(name: string, request: IncomingMessage, response: ServerResponse) {

@@ -24,6 +24,7 @@ const elements = {
 };
 
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+const webToken = resolveWebToken();
 const arcigyApi = window.arcigyDesktop ?? {
   systemHealth: () => getJson("/api/system-health"),
   coldOutreachBrief: (payload) => postJson("/api/cold-outreach-brief", payload),
@@ -31,6 +32,17 @@ const arcigyApi = window.arcigyDesktop ?? {
   generateAiReply: (payload) => postJson("/api/generate-ai-reply", payload),
   generateContracts: (payload) => postJson("/api/generate-contracts", payload),
 };
+
+function resolveWebToken() {
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get("token");
+  if (token) {
+    window.localStorage.setItem("arcigyJarvisToken", token);
+    window.history.replaceState({}, document.title, window.location.pathname);
+    return token;
+  }
+  return window.localStorage.getItem("arcigyJarvisToken");
+}
 
 function setMode(mode) {
   state.mode = mode;
@@ -67,7 +79,7 @@ async function refreshHealth() {
 }
 
 async function getJson(url) {
-  const response = await fetch(url);
+  const response = await fetch(url, { headers: authHeaders() });
   if (!response.ok) throw new Error(`Request failed: ${response.status}`);
   return response.json();
 }
@@ -75,12 +87,16 @@ async function getJson(url) {
 async function postJson(url, payload) {
   const response = await fetch(url, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...authHeaders() },
     body: JSON.stringify(payload ?? {}),
   });
   const value = await response.json();
   if (!response.ok) throw new Error(value?.error || `Request failed: ${response.status}`);
   return value;
+}
+
+function authHeaders() {
+  return webToken ? { authorization: `Bearer ${webToken}` } : {};
 }
 
 function sampleContractIntake() {
