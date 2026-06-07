@@ -17,6 +17,7 @@ import { getSmartleadCampaignStatus } from "../automation-system/smartlead.ts";
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
 const desktopRoot = join(repoRoot, "src", "desktop");
 const defaultDbPath = join(repoRoot, "data", "jarvis-local.db");
+const defaultMaxJsonBytes = 1_000_000;
 
 loadLocalEnv(repoRoot);
 
@@ -602,11 +603,26 @@ function contentType(filePath: string): string {
 
 async function readJson(request: IncomingMessage): Promise<Record<string, unknown>> {
   const chunks: Buffer[] = [];
+  const maxBytes = getMaxJsonBytes();
+  let size = 0;
+  const contentLength = Number(request.headers["content-length"] ?? 0);
+  if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+    throw httpError(413, `JSON body exceeds ${maxBytes} bytes.`);
+  }
   for await (const chunk of request) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    size += buffer.length;
+    if (size > maxBytes) {
+      throw httpError(413, `JSON body exceeds ${maxBytes} bytes.`);
+    }
+    chunks.push(buffer);
   }
   if (!chunks.length) return {};
-  return JSON.parse(Buffer.concat(chunks).toString("utf-8")) as Record<string, unknown>;
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString("utf-8")) as Record<string, unknown>;
+  } catch {
+    throw httpError(400, "Request body must be valid JSON.");
+  }
 }
 
 function writeJson(response: ServerResponse, statusCode: number, value: unknown) {
@@ -624,6 +640,11 @@ function getErrorStatus(error: unknown): number {
 
 function httpError(statusCode: number, message: string): Error {
   return Object.assign(new Error(message), { statusCode });
+}
+
+function getMaxJsonBytes(): number {
+  const value = Number(process.env.JARVIS_MAX_JSON_BYTES ?? defaultMaxJsonBytes);
+  return Number.isFinite(value) && value > 0 ? value : defaultMaxJsonBytes;
 }
 
 async function handleWebVoiceEvent(payload: Record<string, unknown>) {

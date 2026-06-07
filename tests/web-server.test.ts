@@ -233,3 +233,37 @@ test("local web bridge requires bearer auth on external hosts", async () => {
     await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   }
 });
+
+test("local web bridge rejects malformed or oversized JSON bodies", async () => {
+  const previousLimit = process.env.JARVIS_MAX_JSON_BYTES;
+  process.env.JARVIS_MAX_JSON_BYTES = "64";
+  const server = createLocalApiServer();
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  const baseUrl = `http://127.0.0.1:${address.port}`;
+
+  try {
+    const malformed = await fetch(`${baseUrl}/api/run-diagnostics`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{not-json",
+    });
+    assert.equal(malformed.status, 400);
+    const malformedBody = (await malformed.json()) as { error: string };
+    assert.match(malformedBody.error, /valid JSON/);
+
+    const oversized = await fetch(`${baseUrl}/api/run-diagnostics`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text: "x".repeat(200) }),
+    });
+    assert.equal(oversized.status, 413);
+    const oversizedBody = (await oversized.json()) as { error: string };
+    assert.match(oversizedBody.error, /exceeds/);
+  } finally {
+    if (previousLimit === undefined) delete process.env.JARVIS_MAX_JSON_BYTES;
+    else process.env.JARVIS_MAX_JSON_BYTES = previousLimit;
+    await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
