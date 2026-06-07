@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -34,6 +34,54 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(manifest.auth.requiredForExternalHosts, true);
     assert.match(manifest.endpoints.mcpToolCallPattern, /\/api\/mcp\/\{toolName\}$/);
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.draft_contract_intake" && tool.method === "POST"));
+
+    const mcpBrief = await postJson(`${baseUrl}/api/mcp/arcigy.get_cold_outreach_brief`, {
+      periodLabel: "dnes",
+      contacted: 3,
+      opened: 2,
+      replied: 1,
+      positiveReplies: 1,
+      preparedPositiveReplyCount: 1,
+      pendingApprovalCount: 1,
+    });
+    assert.match(String(mcpBrief.result), /Za dnes/);
+
+    const mcpDbPath = join(mkdtempSync(join(tmpdir(), "jarvis-web-mcp-")), "memory.db");
+    const upsert = await postJson(`${baseUrl}/api/mcp/arcigy.upsert_local_person`, {
+      dbPath: mcpDbPath,
+      kind: "client",
+      primaryEmail: "founder@example.com",
+      displayName: "Founder",
+    });
+    assert.equal(upsert.result.primaryEmail, "founder@example.com");
+
+    const need = await postJson(`${baseUrl}/api/mcp/arcigy.add_client_need_signal`, {
+      dbPath: mcpDbPath,
+      personId: upsert.result.id,
+      summary: "chce novy reporting",
+    });
+    assert.equal(need.result.personId, upsert.result.id);
+
+    const coldEvent = await postJson(`${baseUrl}/api/mcp/arcigy.add_cold_outreach_event`, {
+      dbPath: mcpDbPath,
+      leadEmail: "lead@example.com",
+      eventType: "sent",
+      occurredAt: "2026-06-08T10:00:00Z",
+    });
+    assert.equal(coldEvent.result.leadEmail, "lead@example.com");
+
+    const voiceTool = await postJson(`${baseUrl}/api/mcp/arcigy.jarvis_voice_event`, {
+      text: "Jarvis",
+      session: { state: "idle", wakeWord: "jarvis" },
+    });
+    assert.equal(voiceTool.result.shouldStartRecording, true);
+
+    const contractOutputDir = mkdtempSync(join(tmpdir(), "jarvis-web-contract-"));
+    const contractTool = await postJson(`${baseUrl}/api/mcp/arcigy.generate_contract_documents`, {
+      intake: JSON.parse(readFileSync("docs/contracts/examples/sample-intake.json", "utf-8")),
+      outputDir: contractOutputDir,
+    });
+    assert.match(String(contractTool.result), /generation-manifest\.json/);
 
     const diagnostics = await fetch(`${baseUrl}/api/run-diagnostics`, {
       method: "POST",
@@ -92,6 +140,18 @@ test("local web bridge serves UI and API health", async () => {
     await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   }
 });
+
+async function postJson(url: string, payload: unknown) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (response.status !== 200) {
+    assert.fail(await response.text());
+  }
+  return (await response.json()) as { result: any };
+}
 
 test("local web bridge requires bearer auth on external hosts", async () => {
   const previousToken = process.env.JARVIS_WEB_TOKEN;

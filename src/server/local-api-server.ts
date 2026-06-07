@@ -11,7 +11,7 @@ import { buildClientReplyPrompt, generateGeminiText } from "../automation-system
 import { listConfiguredGmailAccounts, listRecentGmailMessageEvents } from "../automation-system/gmail.ts";
 import { containsWakeWord, type JarvisVoiceSession } from "../automation-system/jarvis-voice.ts";
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "../automation-system/lead-discovery.ts";
-import { listJarvisMcpTools } from "../automation-system/mcp-tools.ts";
+import { buildContractGenerationCommand, getColdOutreachMcpAnswer, listJarvisMcpTools } from "../automation-system/mcp-tools.ts";
 import { getSmartleadCampaignStatus } from "../automation-system/smartlead.ts";
 
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
@@ -316,6 +316,49 @@ function getForwardedValue(value: string | string[] | undefined): string | null 
 
 async function routeMcpTool(name: string, request: IncomingMessage, response: ServerResponse) {
   const payload = await readJson(request);
+  if (name === "arcigy.generate_contract_documents") {
+    if (!payload.inputJsonPath && !payload.intake) {
+      writeJson(response, 400, { error: "Provide either inputJsonPath or inline intake payload." });
+      return;
+    }
+    const outputDir = String(payload.outputDir ?? join(repoRoot, "generated", "contracts"));
+    const args = payload.inputJsonPath
+      ? buildContractGenerationCommand(String(payload.inputJsonPath), outputDir).args
+      : ["scripts/generate_contract_documents.py", "--payload", JSON.stringify(payload.intake), "--output-dir", outputDir];
+    const result = runPython(args);
+    writeJson(response, 200, { result: result.stdout.trim() || "Contract documents generated." });
+    return;
+  }
+  if (name === "arcigy.get_cold_outreach_brief") {
+    writeJson(response, 200, {
+      result: getColdOutreachMcpAnswer({
+        periodLabel: String(payload.periodLabel ?? ""),
+        contacted: Number(payload.contacted ?? 0),
+        opened: Number(payload.opened ?? 0),
+        replied: Number(payload.replied ?? 0),
+        positiveReplies: Number(payload.positiveReplies ?? 0),
+        preparedPositiveReplyCount: Number(payload.preparedPositiveReplyCount ?? 0),
+        pendingApprovalCount: Number(payload.pendingApprovalCount ?? 0),
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.add_cold_outreach_event") {
+    writeJson(response, 200, { result: runDbTool("add-cold-event", payload) });
+    return;
+  }
+  if (name === "arcigy.upsert_local_person") {
+    writeJson(response, 200, { result: runDbTool("upsert-person", payload) });
+    return;
+  }
+  if (name === "arcigy.add_client_need_signal") {
+    writeJson(response, 200, { result: runDbTool("add-need-signal", payload) });
+    return;
+  }
+  if (name === "arcigy.jarvis_voice_event") {
+    writeJson(response, 200, { result: await handleWebVoiceEvent(payload) });
+    return;
+  }
   if (name === "arcigy.get_system_health") {
     writeJson(response, 200, { result: { integrations: getIntegrationHealth() } });
     return;
@@ -413,6 +456,19 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
     return;
   }
   writeJson(response, 404, { error: `Unsupported web MCP bridge tool: ${name}` });
+}
+
+function runDbTool(command: string, payload: Record<string, unknown>) {
+  const { dbPath, ...body } = payload;
+  const result = runPython([
+    "scripts/jarvis_local_db.py",
+    command,
+    "--db",
+    String(dbPath ?? defaultDbPath),
+    "--payload",
+    JSON.stringify(body),
+  ]);
+  return JSON.parse(result.stdout);
 }
 
 async function syncGmailRecentMessages(payload: Record<string, unknown>) {
