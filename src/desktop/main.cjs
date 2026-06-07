@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, Tray, Menu, nativeImage } = require("electron");
+﻿const { app, BrowserWindow, ipcMain, shell, Tray, Menu, nativeImage } = require("electron");
 const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -70,9 +70,10 @@ app.on("window-all-closed", (event) => {
   mainWindow?.hide();
 });
 
-function handleVoiceEvent(payload) {
+async function handleVoiceEvent(payload) {
   const session = payload?.session ?? { state: "idle", wakeWord: "jarvis" };
   const text = String(payload?.text ?? "").trim();
+  const lowered = normalizeTranscript(text);
 
   if (session.state === "idle") {
     if (!containsWakeWord(text, session.wakeWord)) {
@@ -88,39 +89,59 @@ function handleVoiceEvent(payload) {
       session: { ...session, state: "awake", lastTranscript: text },
       shouldStartRecording: true,
       shouldStopRecording: false,
-      speakText: "Áno, počúvam.",
+      speakText: "Ano, pocuvam.",
     };
   }
 
-  if (text.toLowerCase().includes("cold")) {
-    const response = getColdOutreachBrief({ text, dbPath: payload?.dbPath });
-    return {
-      session: {
-        ...session,
-        state: "idle",
-        lastTranscript: text,
-        lastResponse: response,
-      },
-      shouldStartRecording: false,
-      shouldStopRecording: true,
-      speakText: response,
-    };
+  if (lowered.includes("cold") || lowered.includes("outreach")) {
+    return voiceDone(session, text, getColdOutreachBrief({ text, dbPath: payload?.dbPath }));
   }
 
-  const fallback = "Rozumiem. Tento príkaz pošlem lokálnemu MCP nástroju po doplnení konkrétneho intentu.";
+  if (lowered.includes("integracie") || lowered.includes("system") || lowered.includes("health")) {
+    return voiceDone(session, text, summarizeHealthForVoice(getSystemHealth()));
+  }
+
+  if (lowered.includes("identifikuj") || lowered.includes("kto je") || lowered.includes("email")) {
+    const email = extractEmail(text);
+    const response = email
+      ? summarizeIdentityForVoice(identifyEmail({ email, dbPath: payload?.dbPath }))
+      : "Povedz mi email, ktory mam vyhladat v lokalnej pamati.";
+    return voiceDone(session, text, response);
+  }
+
+  if (lowered.includes("lead") || lowered.includes("najdi") || lowered.includes("vyhladaj")) {
+    const query = cleanVoiceQuery(text, ["jarvis", "lead", "leady", "leadov", "najdi", "vyhladaj", "hladaj"]);
+    const result = await discoverLeads({ query: query || "automation agency Bratislava", maxResults: 3 });
+    return voiceDone(session, text, summarizeLeadsForVoice(result));
+  }
+
+  if (lowered.includes("odpoved") || lowered.includes("draft") || lowered.includes("gemini")) {
+    const message = cleanVoiceQuery(text, ["jarvis", "odpoved", "odpovedz", "draft", "gemini", "navrhni"]);
+    if (!message) return voiceDone(session, text, "Povedz mi spravu klienta, na ktoru mam pripravit odpoved.");
+    const response = await generateAiReply({ message, context: "Voice command inside Arcigy Jarvis." });
+    return voiceDone(session, text, response.text);
+  }
+
+  return voiceDone(
+    session,
+    text,
+    "Rozumiem. Viem hlasom skontrolovat cold outreach, integracie, identifikovat email, vyhladat leady alebo pripravit Gemini odpoved."
+  );
+}
+
+function voiceDone(session, transcript, response) {
   return {
     session: {
       ...session,
       state: "idle",
-      lastTranscript: text,
-      lastResponse: fallback,
+      lastTranscript: transcript,
+      lastResponse: response,
     },
     shouldStartRecording: false,
     shouldStopRecording: true,
-    speakText: fallback,
+    speakText: response,
   };
 }
-
 function getSystemHealth() {
   const integrations = [
     ["gemini", ["GEMINI_API_KEY"]],
@@ -141,19 +162,58 @@ function getSystemHealth() {
   };
 }
 
+function summarizeHealthForVoice(health) {
+  const ready = health.integrations.filter((item) => item.configured).map((item) => item.key);
+  const missing = health.integrations.filter((item) => !item.configured).map((item) => item.key);
+  return [
+    ready.length ? `Ready integracie: ${ready.join(", ")}.` : "Ziadne integracie nie su ready.",
+    missing.length ? `Chybaju: ${missing.join(", ")}.` : "Nic nechyba.",
+  ].join(" ");
+}
+
+function summarizeIdentityForVoice(result) {
+  if (!result.person) return `Email ${result.email} zatial nepoznam v lokalnej pamati.`;
+  const name = result.person.displayName || result.person.companyName || result.person.primaryEmail;
+  const needs = result.openNeedSignals || [];
+  const needText = needs.length ? `Ma ${needs.length} otvorenych poziadaviek. Najnovsia: ${needs[0].summary}` : "Nema otvorene poziadavky.";
+  return `${result.email} je ${name}, typ ${result.person.kind}. ${needText}`;
+}
+
+function summarizeLeadsForVoice(result) {
+  const leads = result.leads || [];
+  if (!leads.length) return "Nenasiel som ziadne leady pre tento dotaz.";
+  const names = leads.slice(0, 3).map((lead) => lead.name).join(", ");
+  const sources = (result.sources || []).join(", ") || "ziadny zdroj";
+  return `Nasiel som ${leads.length} leadov cez ${sources}. Top vysledky: ${names}.`;
+}
+
+function extractEmail(text) {
+  return String(text).match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0]?.toLowerCase() || null;
+}
+
+function cleanVoiceQuery(text, removeWords) {
+  const remove = new Set(removeWords.map((word) => normalizeTranscript(word)));
+  return String(text)
+    .split(/\s+/)
+    .filter((word) => !remove.has(normalizeTranscript(word)))
+    .join(" ")
+    .replace(/[,:;.]+$/g, "")
+    .trim();
+}
+
 async function generateAiReply(payload) {
   const apiKey = requireRuntimeEnv("GEMINI_API_KEY");
   const message = String(payload?.message ?? "").trim();
   if (!message) throw new Error("Client message is required.");
   const model = payload?.model || "gemini-2.5-flash";
   const prompt = [
-    "Si Arcigy Jarvis. Priprav profesionálnu, vecnú a family-friendly odpoveď klientovi.",
-    "Nikdy nesľubuj odoslanie bez schválenia používateľom.",
+    "Si Arcigy Jarvis. Priprav profesionĂˇlnu, vecnĂş a family-friendly odpoveÄŹ klientovi.",
+    "Nikdy nesÄľubuj odoslanie bez schvĂˇlenia pouĹľĂ­vateÄľom.",
     payload?.clientName ? `Klient: ${payload.clientName}` : null,
     payload?.context ? `Kontext: ${payload.context}` : null,
-    "Správa klienta:",
+    "SprĂˇva klienta:",
     message,
-    "Vytvor krátku odpoveď v slovenčine a jednu vetu, čo má používateľ schváliť.",
+    "Vytvor krĂˇtku odpoveÄŹ v slovenÄŤine a jednu vetu, ÄŤo mĂˇ pouĹľĂ­vateÄľ schvĂˇliĹĄ.",
   ]
     .filter(Boolean)
     .join("\n");
@@ -259,7 +319,7 @@ function resolveColdOutreachPeriod(text) {
   return {
     since: since.toISOString(),
     until,
-    periodLabel: "posledných 7 dní",
+    periodLabel: "poslednĂ˝ch 7 dnĂ­",
   };
 }
 
@@ -275,36 +335,36 @@ function buildColdOutreachBrief(metrics) {
   };
   const openRate = input.contacted > 0 ? Math.round((input.opened / input.contacted) * 1000) / 10 : 0;
   const parts = [
-    `Za ${input.periodLabel} sme napísali ${skPeople(input.contacted)}.`,
-    `${openRate}% si email otvorilo, ${skReplies(input.replied)}, z toho ${input.positiveReplies} pozitívne.`,
+    `Za ${input.periodLabel} sme napĂ­sali ${skPeople(input.contacted)}.`,
+    `${openRate}% si email otvorilo, ${skReplies(input.replied)}, z toho ${input.positiveReplies} pozitĂ­vne.`,
   ];
 
   if (input.preparedPositiveReplyCount > 0) {
     parts.push(
-      `Pripravil som ti ${skPreparedReplies(input.preparedPositiveReplyCount)} na pozitívne reakcie a pošlem ich až na tvoje potvrdenie.`
+      `Pripravil som ti ${skPreparedReplies(input.preparedPositiveReplyCount)} na pozitĂ­vne reakcie a poĹˇlem ich aĹľ na tvoje potvrdenie.`
     );
   }
   if (input.pendingApprovalCount > 0) {
-    parts.push(`Čaká ${skPreparedReplies(input.pendingApprovalCount)} na schválenie.`);
+    parts.push(`ÄŚakĂˇ ${skPreparedReplies(input.pendingApprovalCount)} na schvĂˇlenie.`);
   }
 
   return parts.join(" ");
 }
 
 function skPeople(count) {
-  if (count === 1) return "1 človeku";
-  return `${count} ľuďom`;
+  if (count === 1) return "1 ÄŤloveku";
+  return `${count} ÄľuÄŹom`;
 }
 
 function skReplies(count) {
-  if (count === 1) return "1 človek odpísal";
-  return `${count} ľudí odpísalo`;
+  if (count === 1) return "1 ÄŤlovek odpĂ­sal";
+  return `${count} ÄľudĂ­ odpĂ­salo`;
 }
 
 function skPreparedReplies(count) {
-  if (count === 1) return "1 odpoveď";
+  if (count === 1) return "1 odpoveÄŹ";
   if (count > 1 && count < 5) return `${count} odpovede`;
-  return `${count} odpovedí`;
+  return `${count} odpovedĂ­`;
 }
 
 function containsWakeWord(text, wakeWord = "jarvis") {

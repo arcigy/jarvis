@@ -32,6 +32,16 @@ test("local web bridge serves UI and API health", async () => {
     const voiceBody = (await voice.json()) as { shouldStartRecording: boolean };
     assert.equal(voiceBody.shouldStartRecording, true);
 
+    const voiceHealth = await fetch(`${baseUrl}/api/jarvis/voice-event`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text: "integracie", session: { state: "awake", wakeWord: "jarvis" } }),
+    });
+    assert.equal(voiceHealth.status, 200);
+    const voiceHealthBody = (await voiceHealth.json()) as { shouldStopRecording: boolean; speakText?: string };
+    assert.equal(voiceHealthBody.shouldStopRecording, true);
+    assert.match(voiceHealthBody.speakText ?? "", /integracie/i);
+
     const dbPath = join(mkdtempSync(join(tmpdir(), "jarvis-web-")), "memory.db");
     const ingested = await fetch(`${baseUrl}/api/ingest-client-message`, {
       method: "POST",

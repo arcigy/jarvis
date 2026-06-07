@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { getIntegrationHealth, loadLocalEnv } from "../automation-system/env.ts";
 import { buildClientReplyPrompt, generateGeminiText } from "../automation-system/gemini.ts";
 import { listConfiguredGmailAccounts, listRecentGmailMessageEvents } from "../automation-system/gmail.ts";
-import { handleJarvisVoiceEvent, type JarvisVoiceSession } from "../automation-system/jarvis-voice.ts";
+import { containsWakeWord, type JarvisVoiceSession } from "../automation-system/jarvis-voice.ts";
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "../automation-system/lead-discovery.ts";
 import { getSmartleadCampaignStatus } from "../automation-system/smartlead.ts";
 
@@ -55,11 +55,7 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
 
   if (request.method === "POST" && url.pathname === "/api/jarvis/voice-event") {
     const payload = await readJson(request);
-    const result = handleJarvisVoiceEvent((payload.session ?? { state: "idle", wakeWord: "jarvis" }) as JarvisVoiceSession, {
-      type: "transcript",
-      text: String(payload.text ?? ""),
-    });
-    writeJson(response, 200, result);
+    writeJson(response, 200, await handleWebVoiceEvent(payload));
     return;
   }
 
@@ -462,6 +458,130 @@ function writeJson(response: ServerResponse, statusCode: number, value: unknown)
     "cache-control": "no-store",
   });
   response.end(JSON.stringify(value));
+}
+
+async function handleWebVoiceEvent(payload: Record<string, unknown>) {
+  const session = (payload.session ?? { state: "idle", wakeWord: "jarvis" }) as JarvisVoiceSession;
+  const text = String(payload.text ?? "").trim();
+  const lowered = normalizeTranscript(text);
+
+  if (session.state === "idle") {
+    if (!containsWakeWord(text, session.wakeWord)) {
+      return {
+        session: { ...session, lastTranscript: text },
+        shouldStartRecording: false,
+        shouldStopRecording: false,
+        speakText: null,
+      };
+    }
+    return {
+      session: { ...session, state: "awake", lastTranscript: text },
+      shouldStartRecording: true,
+      shouldStopRecording: false,
+      speakText: "Ano, pocuvam.",
+    };
+  }
+
+  if (lowered.includes("cold") || lowered.includes("outreach")) {
+    const period = resolveColdOutreachPeriod(text);
+    const result = runPython([
+      "scripts/jarvis_local_db.py",
+      "cold-brief",
+      "--db",
+      String(payload.dbPath ?? defaultDbPath),
+      "--payload",
+      JSON.stringify({
+        since: period.since,
+        until: period.until,
+        periodLabel: period.periodLabel,
+      }),
+    ]);
+    return voiceDone(session, text, JSON.parse(result.stdout).summary);
+  }
+
+  if (lowered.includes("integracie") || lowered.includes("system") || lowered.includes("health")) {
+    return voiceDone(session, text, summarizeHealthForVoice({ integrations: getIntegrationHealth() }));
+  }
+
+  if (lowered.includes("identifikuj") || lowered.includes("kto je") || lowered.includes("email")) {
+    const email = extractEmail(text);
+    const response = email
+      ? summarizeIdentityForVoice(identifyEmail({ email, dbPath: payload.dbPath }))
+      : "Povedz mi email, ktory mam vyhladat v lokalnej pamati.";
+    return voiceDone(session, text, response);
+  }
+
+  if (lowered.includes("lead") || lowered.includes("najdi") || lowered.includes("vyhladaj")) {
+    const query = cleanVoiceQuery(text, ["jarvis", "lead", "leady", "leadov", "najdi", "vyhladaj", "hladaj"]);
+    const result = await discoverLeads({ query: query || "automation agency Bratislava", maxResults: 3 });
+    return voiceDone(session, text, summarizeLeadsForVoice(result));
+  }
+
+  if (lowered.includes("odpoved") || lowered.includes("draft") || lowered.includes("gemini")) {
+    const message = cleanVoiceQuery(text, ["jarvis", "odpoved", "odpovedz", "draft", "gemini", "navrhni"]);
+    if (!message) return voiceDone(session, text, "Povedz mi spravu klienta, na ktoru mam pripravit odpoved.");
+    const result = await generateGeminiText(buildClientReplyPrompt({ message, context: "Voice command inside Arcigy Jarvis." }));
+    return voiceDone(session, text, result.text);
+  }
+
+  return voiceDone(
+    session,
+    text,
+    "Rozumiem. Viem hlasom skontrolovat cold outreach, integracie, identifikovat email, vyhladat leady alebo pripravit Gemini odpoved."
+  );
+}
+
+function voiceDone(session: JarvisVoiceSession, transcript: string, response: string) {
+  return {
+    session: {
+      ...session,
+      state: "idle",
+      lastTranscript: transcript,
+      lastResponse: response,
+    },
+    shouldStartRecording: false,
+    shouldStopRecording: true,
+    speakText: response,
+  };
+}
+
+function summarizeHealthForVoice(health: { integrations: Array<{ key: string; configured: boolean }> }) {
+  const ready = health.integrations.filter((item) => item.configured).map((item) => item.key);
+  const missing = health.integrations.filter((item) => !item.configured).map((item) => item.key);
+  return [
+    ready.length ? `Ready integracie: ${ready.join(", ")}.` : "Ziadne integracie nie su ready.",
+    missing.length ? `Chybaju: ${missing.join(", ")}.` : "Nic nechyba.",
+  ].join(" ");
+}
+
+function summarizeIdentityForVoice(result: { email: string; person?: { displayName?: string; companyName?: string; primaryEmail: string; kind: string } | null; openNeedSignals?: Array<{ summary: string }> }) {
+  if (!result.person) return `Email ${result.email} zatial nepoznam v lokalnej pamati.`;
+  const name = result.person.displayName || result.person.companyName || result.person.primaryEmail;
+  const needs = result.openNeedSignals || [];
+  const needText = needs.length ? `Ma ${needs.length} otvorenych poziadaviek. Najnovsia: ${needs[0].summary}` : "Nema otvorene poziadavky.";
+  return `${result.email} je ${name}, typ ${result.person.kind}. ${needText}`;
+}
+
+function summarizeLeadsForVoice(result: { leads: Array<{ name: string }>; sources: string[] }) {
+  const leads = result.leads || [];
+  if (!leads.length) return "Nenasiel som ziadne leady pre tento dotaz.";
+  const names = leads.slice(0, 3).map((lead) => lead.name).join(", ");
+  const sources = (result.sources || []).join(", ") || "ziadny zdroj";
+  return `Nasiel som ${leads.length} leadov cez ${sources}. Top vysledky: ${names}.`;
+}
+
+function extractEmail(text: string) {
+  return String(text).match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0]?.toLowerCase() || null;
+}
+
+function cleanVoiceQuery(text: string, removeWords: string[]) {
+  const remove = new Set(removeWords.map((word) => normalizeTranscript(word)));
+  return String(text)
+    .split(/\s+/)
+    .filter((word) => !remove.has(normalizeTranscript(word)))
+    .join(" ")
+    .replace(/[,:;.]+$/g, "")
+    .trim();
 }
 
 function resolveColdOutreachPeriod(text: string) {

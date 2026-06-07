@@ -13,6 +13,7 @@ This opens a local Electron desktop window. It is a working fallback shell until
 - Click `Enable` to start microphone recognition when `SpeechRecognition` is available.
 - Say `Jarvis` to wake the assistant.
 - Jarvis answers through `speechSynthesis` in Slovak.
+- After wake, Jarvis can answer voice commands for cold outreach, integrations health, email identity, lead discovery, and Gemini reply drafts.
 - If speech recognition is not available, use the transcript text box and `Send transcript`.
 - The renderer calls the local Electron preload bridge for Jarvis voice events and cold outreach briefs.
 - The client memory panel identifies email addresses and ingests client requests into the local SQLite database.
