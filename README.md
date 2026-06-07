@@ -30,6 +30,7 @@ Server tools:
 - `arcigy.ingest_client_message`
 - `arcigy.identify_email`
 - `arcigy.get_system_health`
+- `arcigy.run_integration_diagnostics`
 - `arcigy.generate_ai_reply`
 - `arcigy.sync_gmail_recent_messages`
 - `arcigy.get_smartlead_campaign_status`
@@ -109,6 +110,7 @@ It serves the same UI at `http://127.0.0.1:8765` and exposes local HTTP endpoint
 - `POST /api/search-google-places`
 - `POST /api/append-leads-to-google-sheet`
 - `POST /api/mcp/arcigy.get_system_health`
+- `POST /api/mcp/arcigy.run_integration_diagnostics`
 - `POST /api/mcp/arcigy.generate_ai_reply`
 - `POST /api/mcp/arcigy.get_cold_outreach_brief_from_db`
 - `POST /api/mcp/arcigy.identify_email`

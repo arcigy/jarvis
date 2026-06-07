@@ -25,6 +25,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(names.includes("arcigy.ingest_client_message"));
   assert.ok(names.includes("arcigy.jarvis_voice_event"));
   assert.ok(names.includes("arcigy.get_system_health"));
+  assert.ok(names.includes("arcigy.run_integration_diagnostics"));
   assert.ok(names.includes("arcigy.generate_ai_reply"));
   assert.ok(names.includes("arcigy.sync_gmail_recent_messages"));
   assert.ok(names.includes("arcigy.get_smartlead_campaign_status"));
@@ -56,6 +57,14 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   });
   const health = getStructuredResult(healthResult) as { integrations: Array<{ key: string; configured: boolean }> };
   assert.ok(health.integrations.some((item) => item.key === "gemini"));
+
+  const diagnosticsResult = await client.callTool({
+    name: "arcigy.run_integration_diagnostics",
+    arguments: { live: false },
+  });
+  const diagnostics = getStructuredResult(diagnosticsResult) as { live: boolean; checks: Array<{ key: string }> };
+  assert.equal(diagnostics.live, false);
+  assert.ok(diagnostics.checks.some((item) => item.key === "sqlite"));
 
   await client.close();
   await server.close();

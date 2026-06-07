@@ -4,6 +4,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
+import { runIntegrationDiagnostics } from "./diagnostics.ts";
 import { getIntegrationHealth, loadLocalEnv, summarizeIntegrationHealth } from "./env.ts";
 import { buildClientReplyPrompt, generateGeminiText } from "./gemini.ts";
 import { listConfiguredGmailAccounts, listRecentGmailMessageEvents } from "./gmail.ts";
@@ -340,6 +341,25 @@ export function createJarvisMcpServer(): McpServer {
       if (format === "text") return textResult(summarizeIntegrationHealth());
       return jsonResult({ integrations: getIntegrationHealth() });
     }
+  );
+
+  server.registerTool(
+    "arcigy.run_integration_diagnostics",
+    {
+      title: "Run integration diagnostics",
+      description: "Run configuration checks or explicit live read-only probes for production integrations.",
+      inputSchema: {
+        live: z.boolean().default(false),
+        dbPath: z.string().optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async ({ live, dbPath }) => jsonResult(await runIntegrationDiagnostics({ live, dbPath }))
   );
 
   server.registerTool(

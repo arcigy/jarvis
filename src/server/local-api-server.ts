@@ -259,6 +259,12 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
     writeJson(response, 200, { result: { integrations: getIntegrationHealth() } });
     return;
   }
+  if (name === "arcigy.run_integration_diagnostics") {
+    writeJson(response, 200, {
+      result: await runIntegrationDiagnostics({ live: payload.live === true, dbPath: optionalString(payload.dbPath) ?? defaultDbPath }),
+    });
+    return;
+  }
   if (name === "arcigy.generate_ai_reply") {
     writeJson(response, 200, {
       result: await generateGeminiText(buildClientReplyPrompt({ message: String(payload.message ?? ""), context: optionalString(payload.context) })),

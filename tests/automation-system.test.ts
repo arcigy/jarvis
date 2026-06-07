@@ -37,6 +37,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.ingest_client_message",
     "arcigy.jarvis_voice_event",
     "arcigy.get_system_health",
+    "arcigy.run_integration_diagnostics",
     "arcigy.generate_ai_reply",
     "arcigy.sync_gmail_recent_messages",
     "arcigy.get_smartlead_campaign_status",
