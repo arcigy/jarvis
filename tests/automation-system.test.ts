@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createServer, type Socket } from "node:net";
 import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -303,30 +304,46 @@ test("integration diagnostics run live read-only checks with mocked providers", 
     throw new Error(`Unexpected URL: ${target}`);
   };
 
-  const result = await runIntegrationDiagnostics(
-    { live: true, dbPath: "missing.db" },
-    {
-      GEMINI_API_KEY: "gemini",
-      GOOGLE_CLIENT_ID: "client",
-      GOOGLE_CLIENT_SECRET: "secret",
-      GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP: "refresh",
-      GMAIL_REFRESH_TOKEN_BRANISLAV_L_ARCIGY_GROUP: "refresh-2",
-      GMAIL_REFRESH_TOKEN_ANDREJ_ARCIGY_GROUP: "refresh-3",
-      GMAIL_REFRESH_TOKEN_ANDREJ_R_ARCIGY_GROUP: "refresh-4",
-      SMARTLEAD_API_KEY: "smartlead",
-      DATABASE_URL: "postgres://example",
-      REDIS_URL: "redis://example",
-      GOOGLE_SHEET_ID: "sheet-id",
-      GOOGLE_MAPS_API_KEY: "maps",
-      SERPER_API_KEY: "serper",
-    },
-    fetchImpl as typeof fetch
-  );
+  const postgres = await startTcpServer();
+  const redis = await startTcpServer((socket) => {
+    socket.on("data", (chunk: Buffer) => {
+      const text = chunk.toString("utf-8");
+      if (text.includes("AUTH")) socket.write("+OK\r\n");
+      if (text.includes("PING")) socket.write("+PONG\r\n");
+    });
+  });
 
-  assert.equal(result.live, true);
-  assert.equal(result.checks.find((check) => check.key === "gemini")?.status, "ready");
-  assert.equal(result.checks.find((check) => check.key === "serper")?.status, "ready");
-  assert.ok(calls.some((url) => url.includes("sheets.googleapis.com")));
+  try {
+    const result = await runIntegrationDiagnostics(
+      { live: true, dbPath: "missing.db" },
+      {
+        GEMINI_API_KEY: "gemini",
+        GOOGLE_CLIENT_ID: "client",
+        GOOGLE_CLIENT_SECRET: "secret",
+        GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP: "refresh",
+        GMAIL_REFRESH_TOKEN_BRANISLAV_L_ARCIGY_GROUP: "refresh-2",
+        GMAIL_REFRESH_TOKEN_ANDREJ_ARCIGY_GROUP: "refresh-3",
+        GMAIL_REFRESH_TOKEN_ANDREJ_R_ARCIGY_GROUP: "refresh-4",
+        SMARTLEAD_API_KEY: "smartlead",
+        DATABASE_URL: `postgres://user:pass@127.0.0.1:${postgres.port}/db`,
+        REDIS_URL: `redis://default:secret@127.0.0.1:${redis.port}`,
+        GOOGLE_SHEET_ID: "sheet-id",
+        GOOGLE_MAPS_API_KEY: "maps",
+        SERPER_API_KEY: "serper",
+      },
+      fetchImpl as typeof fetch
+    );
+
+    assert.equal(result.live, true);
+    assert.equal(result.checks.find((check) => check.key === "gemini")?.status, "ready");
+    assert.equal(result.checks.find((check) => check.key === "postgres")?.status, "ready");
+    assert.equal(result.checks.find((check) => check.key === "redis")?.status, "ready");
+    assert.equal(result.checks.find((check) => check.key === "serper")?.status, "ready");
+    assert.ok(calls.some((url) => url.includes("sheets.googleapis.com")));
+  } finally {
+    await postgres.close();
+    await redis.close();
+  }
 });
 
 test("Serper search falls back to the secondary API key when credits are exhausted", async () => {
@@ -586,4 +603,15 @@ function responseJson(value: unknown): Response {
     status: 200,
     json: async () => value,
   } as Response;
+}
+
+async function startTcpServer(onConnection?: (socket: Socket) => void) {
+  const server = onConnection ? createServer(onConnection) : createServer();
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  return {
+    port: address.port,
+    close: () => new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve()))),
+  };
 }

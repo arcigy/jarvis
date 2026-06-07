@@ -1,4 +1,6 @@
 import { existsSync } from "node:fs";
+import { connect as connectNet } from "node:net";
+import { connect as connectTls } from "node:tls";
 
 import { getEnv, getIntegrationHealth, type RuntimeEnv } from "./env.ts";
 import { generateGeminiText, type FetchLike } from "./gemini.ts";
@@ -49,6 +51,8 @@ export async function runIntegrationDiagnostics(
       updateLiveCheck(checks, "gemini", () => checkGemini(env, fetchImpl)),
       updateLiveCheck(checks, "gmail", () => checkGmail(env, fetchImpl)),
       updateLiveCheck(checks, "smartlead", () => checkSmartlead(env, fetchImpl)),
+      updateLiveCheck(checks, "postgres", () => checkPostgres(env)),
+      updateLiveCheck(checks, "redis", () => checkRedis(env)),
       updateLiveCheck(checks, "googleMaps", () => checkGoogleMaps(env, fetchImpl)),
       updateLiveCheck(checks, "serper", () => checkSerper(env, fetchImpl)),
       updateLiveCheck(checks, "googleSheets", () => checkGoogleSheets(env, fetchImpl)),
@@ -91,6 +95,18 @@ async function checkSmartlead(env: RuntimeEnv, fetchImpl: FetchLike) {
   return `Smartlead returned ${result.campaigns?.length ?? 0} campaign(s).`;
 }
 
+async function checkPostgres(env: RuntimeEnv) {
+  const target = parseServiceUrl(getEnv(env, "DATABASE_URL"), "Postgres");
+  await openSocket(target);
+  return `Postgres TCP connection opened to ${target.host}:${target.port}.`;
+}
+
+async function checkRedis(env: RuntimeEnv) {
+  const target = parseServiceUrl(getEnv(env, "REDIS_URL"), "Redis");
+  await pingRedis(target);
+  return `Redis PING succeeded at ${target.host}:${target.port}.`;
+}
+
 async function checkGoogleMaps(env: RuntimeEnv, fetchImpl: FetchLike) {
   await searchGooglePlaces({ query: "Arcigy", maxResultCount: 1 }, env, fetchImpl);
   return "Google Places Text Search responded.";
@@ -112,4 +128,89 @@ async function checkGoogleSheets(env: RuntimeEnv, fetchImpl: FetchLike) {
   });
   if (!response.ok) throw new Error(`Google Sheets metadata request failed: ${response.status}`);
   return "Google Sheets metadata request responded.";
+}
+
+type ServiceTarget = {
+  protocol: string;
+  host: string;
+  port: number;
+  username: string;
+  password: string;
+};
+
+function parseServiceUrl(value: string | null, label: string): ServiceTarget {
+  if (!value) throw new Error(`Missing ${label} URL.`);
+  const url = new URL(value);
+  const defaultPort = url.protocol === "rediss:" ? 6380 : url.protocol.startsWith("redis") ? 6379 : 5432;
+  if (!url.hostname) throw new Error(`${label} URL is missing hostname.`);
+  return {
+    protocol: url.protocol,
+    host: url.hostname,
+    port: Number(url.port || defaultPort),
+    username: decodeURIComponent(url.username || ""),
+    password: decodeURIComponent(url.password || ""),
+  };
+}
+
+function openSocket(target: ServiceTarget, timeoutMs = 5000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const socket = target.protocol === "rediss:" ? connectTls({ host: target.host, port: target.port }) : connectNet({ host: target.host, port: target.port });
+    const readyEvent = target.protocol === "rediss:" ? "secureConnect" : "connect";
+    const timeout = setTimeout(() => {
+      socket.destroy();
+      reject(new Error(`TCP connection timed out for ${target.host}:${target.port}.`));
+    }, timeoutMs);
+    socket.once(readyEvent, () => {
+      clearTimeout(timeout);
+      socket.end();
+      resolve();
+    });
+    socket.once("error", (error) => {
+      clearTimeout(timeout);
+      reject(new Error(`TCP connection failed for ${target.host}:${target.port}: ${error.message}`));
+    });
+  });
+}
+
+function pingRedis(target: ServiceTarget, timeoutMs = 5000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const socket = target.protocol === "rediss:" ? connectTls({ host: target.host, port: target.port }) : connectNet({ host: target.host, port: target.port });
+    const readyEvent = target.protocol === "rediss:" ? "secureConnect" : "connect";
+    let buffer = "";
+    const timeout = setTimeout(() => {
+      socket.destroy();
+      reject(new Error(`Redis PING timed out for ${target.host}:${target.port}.`));
+    }, timeoutMs);
+    const finish = (error?: Error) => {
+      clearTimeout(timeout);
+      socket.destroy();
+      error ? reject(error) : resolve();
+    };
+    const sendPing = () => socket.write(encodeRedisCommand(["PING"]));
+    const authenticate = () => {
+      if (!target.password) {
+        sendPing();
+      } else if (target.username) {
+        socket.write(encodeRedisCommand(["AUTH", target.username, target.password]));
+      } else {
+        socket.write(encodeRedisCommand(["AUTH", target.password]));
+      }
+    };
+    socket.once(readyEvent, authenticate);
+    socket.on("data", (chunk) => {
+      buffer += chunk.toString("utf-8");
+      if (buffer.startsWith("-")) {
+        finish(new Error(`Redis returned an error at ${target.host}:${target.port}.`));
+      } else if (buffer.includes("+PONG")) {
+        finish();
+      } else if (buffer.includes("+OK")) {
+        sendPing();
+      }
+    });
+    socket.once("error", (error) => finish(new Error(`Redis connection failed for ${target.host}:${target.port}: ${error.message}`)));
+  });
+}
+
+function encodeRedisCommand(parts: string[]): string {
+  return `*${parts.length}\r\n${parts.map((part) => `$${Buffer.byteLength(part)}\r\n${part}\r\n`).join("")}`;
 }
