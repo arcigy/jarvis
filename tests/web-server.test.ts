@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -46,7 +46,7 @@ test("local web bridge serves UI and API health", async () => {
     });
     assert.match(String(mcpBrief.result), /Za dnes/);
 
-    const mcpDbPath = join(mkdtempSync(join(tmpdir(), "jarvis-web-mcp-")), "memory.db");
+    const mcpDbPath = join(makeRepoTempDir("jarvis-web-mcp-"), "memory.db");
     const upsert = await postJson(`${baseUrl}/api/mcp/arcigy.upsert_local_person`, {
       dbPath: mcpDbPath,
       kind: "client",
@@ -76,12 +76,22 @@ test("local web bridge serves UI and API health", async () => {
     });
     assert.equal(voiceTool.result.shouldStartRecording, true);
 
-    const contractOutputDir = mkdtempSync(join(tmpdir(), "jarvis-web-contract-"));
+    const contractOutputDir = makeRepoTempDir("jarvis-web-contract-");
     const contractTool = await postJson(`${baseUrl}/api/mcp/arcigy.generate_contract_documents`, {
       intake: JSON.parse(readFileSync("docs/contracts/examples/sample-intake.json", "utf-8")),
       outputDir: contractOutputDir,
     });
     assert.match(String(contractTool.result), /generation-manifest\.json/);
+
+    const rejectedPath = await fetch(`${baseUrl}/api/mcp/arcigy.generate_contract_documents`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        intake: JSON.parse(readFileSync("docs/contracts/examples/sample-intake.json", "utf-8")),
+        outputDir: join(tmpdir(), "outside-jarvis-contracts"),
+      }),
+    });
+    assert.equal(rejectedPath.status, 400);
 
     const diagnostics = await fetch(`${baseUrl}/api/run-diagnostics`, {
       method: "POST",
@@ -112,7 +122,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(voiceHealthBody.shouldStopRecording, true);
     assert.match(voiceHealthBody.speakText ?? "", /integracie/i);
 
-    const dbPath = join(mkdtempSync(join(tmpdir(), "jarvis-web-")), "memory.db");
+    const dbPath = join(makeRepoTempDir("jarvis-web-"), "memory.db");
     const ingested = await fetch(`${baseUrl}/api/ingest-client-message`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -151,6 +161,12 @@ async function postJson(url: string, payload: unknown) {
     assert.fail(await response.text());
   }
   return (await response.json()) as { result: any };
+}
+
+function makeRepoTempDir(prefix: string) {
+  const base = join(process.cwd(), "generated", "test-runs");
+  mkdirSync(base, { recursive: true });
+  return mkdtempSync(join(base, prefix));
 }
 
 test("local web bridge requires bearer auth on external hosts", async () => {

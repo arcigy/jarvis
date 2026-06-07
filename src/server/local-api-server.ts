@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { existsSync, readFileSync } from "node:fs";
-import { extname, join, normalize, resolve } from "node:path";
+import { extname, join, normalize, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { draftContractIntake } from "../automation-system/contract-intake-draft.ts";
@@ -30,7 +30,7 @@ export function createLocalApiServer() {
     try {
       await routeRequest(request, response);
     } catch (error) {
-      writeJson(response, 500, {
+      writeJson(response, getErrorStatus(error), {
         error: error instanceof Error ? error.message : String(error),
       });
     }
@@ -63,7 +63,7 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
 
   if (request.method === "POST" && url.pathname === "/api/run-diagnostics") {
     const payload = await readJson(request);
-    writeJson(response, 200, await runIntegrationDiagnostics({ live: payload.live === true, dbPath: optionalString(payload.dbPath) ?? defaultDbPath }));
+    writeJson(response, 200, await runIntegrationDiagnostics({ live: payload.live === true, dbPath: resolveRepoPath(payload.dbPath, defaultDbPath, "dbPath") }));
     return;
   }
 
@@ -80,7 +80,7 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
       "scripts/jarvis_local_db.py",
       "cold-brief",
       "--db",
-      String(payload.dbPath ?? defaultDbPath),
+      resolveRepoPath(payload.dbPath, defaultDbPath, "dbPath"),
       "--payload",
       JSON.stringify({
         since: payload.since ?? period.since,
@@ -121,7 +121,7 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
 
   if (request.method === "POST" && url.pathname === "/api/generate-contracts") {
     const payload = await readJson(request);
-    const outputDir = String(payload.outputDir ?? join(repoRoot, "generated", "contracts"));
+    const outputDir = resolveRepoPath(payload.outputDir, join(repoRoot, "generated", "contracts"), "outputDir");
     const intake = typeof payload.intake === "string" ? JSON.parse(payload.intake) : payload.intake;
     if (!intake || typeof intake !== "object") {
       writeJson(response, 400, { error: "Contract intake JSON is required." });
@@ -321,10 +321,10 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
       writeJson(response, 400, { error: "Provide either inputJsonPath or inline intake payload." });
       return;
     }
-    const outputDir = String(payload.outputDir ?? join(repoRoot, "generated", "contracts"));
+    const safeOutputDir = resolveRepoPath(payload.outputDir, join(repoRoot, "generated", "contracts"), "outputDir");
     const args = payload.inputJsonPath
-      ? buildContractGenerationCommand(String(payload.inputJsonPath), outputDir).args
-      : ["scripts/generate_contract_documents.py", "--payload", JSON.stringify(payload.intake), "--output-dir", outputDir];
+      ? buildContractGenerationCommand(resolveRepoPath(payload.inputJsonPath, "", "inputJsonPath"), safeOutputDir).args
+      : ["scripts/generate_contract_documents.py", "--payload", JSON.stringify(payload.intake), "--output-dir", safeOutputDir];
     const result = runPython(args);
     writeJson(response, 200, { result: result.stdout.trim() || "Contract documents generated." });
     return;
@@ -365,7 +365,7 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
   }
   if (name === "arcigy.run_integration_diagnostics") {
     writeJson(response, 200, {
-      result: await runIntegrationDiagnostics({ live: payload.live === true, dbPath: optionalString(payload.dbPath) ?? defaultDbPath }),
+      result: await runIntegrationDiagnostics({ live: payload.live === true, dbPath: resolveRepoPath(payload.dbPath, defaultDbPath, "dbPath") }),
     });
     return;
   }
@@ -389,7 +389,7 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
       "scripts/jarvis_local_db.py",
       "cold-brief",
       "--db",
-      String(payload.dbPath ?? defaultDbPath),
+      resolveRepoPath(payload.dbPath, defaultDbPath, "dbPath"),
       "--payload",
       JSON.stringify(payload),
     ]);
@@ -464,7 +464,7 @@ function runDbTool(command: string, payload: Record<string, unknown>) {
     "scripts/jarvis_local_db.py",
     command,
     "--db",
-    String(dbPath ?? defaultDbPath),
+    resolveRepoPath(dbPath, defaultDbPath, "dbPath"),
     "--payload",
     JSON.stringify(body),
   ]);
@@ -476,7 +476,7 @@ async function syncGmailRecentMessages(payload: Record<string, unknown>) {
   const query = optionalString(payload.query) ?? "newer_than:7d";
   const maxResults = typeof payload.maxResults === "number" ? Math.max(1, Math.min(payload.maxResults, 25)) : 10;
   const dryRun = payload.dryRun === true;
-  const dbPath = String(payload.dbPath ?? defaultDbPath);
+  const dbPath = resolveRepoPath(payload.dbPath, defaultDbPath, "dbPath");
   const accounts = listConfiguredGmailAccounts().filter((account) => !accountEnvKey || account.envKey === accountEnvKey);
   if (!accounts.length) {
     throw new Error(accountEnvKey ? `Configured Gmail account not found: ${accountEnvKey}` : "No configured Gmail accounts found.");
@@ -525,7 +525,7 @@ function identifyEmail(payload: Record<string, unknown>) {
       "scripts/jarvis_local_db.py",
       "identify",
       "--db",
-      String(payload.dbPath ?? defaultDbPath),
+      resolveRepoPath(payload.dbPath, defaultDbPath, "dbPath"),
       "--email",
       email,
     ]).stdout
@@ -542,7 +542,7 @@ function ingestClientMessage(payload: Record<string, unknown>) {
       "scripts/jarvis_local_db.py",
       "ingest-message",
       "--db",
-      String(payload.dbPath ?? defaultDbPath),
+      resolveRepoPath(payload.dbPath, defaultDbPath, "dbPath"),
       "--payload",
       JSON.stringify({
         fromEmail: email,
@@ -599,6 +599,15 @@ function writeJson(response: ServerResponse, statusCode: number, value: unknown)
   response.end(JSON.stringify(value));
 }
 
+function getErrorStatus(error: unknown): number {
+  const statusCode = (error as { statusCode?: unknown })?.statusCode;
+  return typeof statusCode === "number" && statusCode >= 400 && statusCode < 600 ? statusCode : 500;
+}
+
+function httpError(statusCode: number, message: string): Error {
+  return Object.assign(new Error(message), { statusCode });
+}
+
 async function handleWebVoiceEvent(payload: Record<string, unknown>) {
   const session = (payload.session ?? { state: "idle", wakeWord: "jarvis" }) as JarvisVoiceSession;
   const text = String(payload.text ?? "").trim();
@@ -627,7 +636,7 @@ async function handleWebVoiceEvent(payload: Record<string, unknown>) {
       "scripts/jarvis_local_db.py",
       "cold-brief",
       "--db",
-      String(payload.dbPath ?? defaultDbPath),
+      resolveRepoPath(payload.dbPath, defaultDbPath, "dbPath"),
       "--payload",
       JSON.stringify({
         since: period.since,
@@ -645,7 +654,7 @@ async function handleWebVoiceEvent(payload: Record<string, unknown>) {
   if (lowered.includes("identifikuj") || lowered.includes("kto je") || lowered.includes("email")) {
     const email = extractEmail(text);
     const response = email
-      ? summarizeIdentityForVoice(identifyEmail({ email, dbPath: payload.dbPath }))
+      ? summarizeIdentityForVoice(identifyEmail({ email, dbPath: resolveRepoPath(payload.dbPath, defaultDbPath, "dbPath") }))
       : "Povedz mi email, ktory mam vyhladat v lokalnej pamati.";
     return voiceDone(session, text, response);
   }
@@ -758,6 +767,19 @@ function runPython(args: string[]): { stdout: string; stderr: string } {
 
 function optionalString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+function resolveRepoPath(value: unknown, fallback: string, label: string): string {
+  const candidate = optionalString(value) ?? fallback;
+  if (!candidate) throw httpError(400, `${label} is required.`);
+  const resolved = resolve(repoRoot, candidate);
+  const root = resolve(repoRoot);
+  const normalizedResolved = process.platform === "win32" ? resolved.toLowerCase() : resolved;
+  const normalizedRoot = process.platform === "win32" ? root.toLowerCase() : root;
+  if (normalizedResolved !== normalizedRoot && !normalizedResolved.startsWith(`${normalizedRoot}${sep}`)) {
+    throw httpError(400, `${label} must stay inside the Jarvis repository.`);
+  }
+  return resolved;
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
