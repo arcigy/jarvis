@@ -101,7 +101,7 @@ Generate client-ready DOCX files from a filled MCP/AI form:
 & 'C:\Users\laube\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' scripts\generate_contract_documents.py --input docs\contracts\examples\sample-intake.json --output-dir generated\contracts
 ```
 
-The JSON form can include `additionalAttachments[]` with a DOCX template path and output name. The generator writes all generated files plus `generation-manifest.json`.
+MCP can pass the same form directly as inline `intake` JSON to `arcigy.generate_contract_documents`; creating a temporary JSON file first is optional. The JSON form can include `additionalAttachments[]` with a DOCX template path and output name. The generator writes all generated files plus `generation-manifest.json`.
 
 ## Verification
 

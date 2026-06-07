@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -90,6 +90,33 @@ test("Jarvis MCP server persists and identifies local people through SQLite tool
 
   assert.equal(match.reason, "exact_email_match");
   assert.equal(match.openNeedSignals[0].summary, "chce pripraviť novú automatizáciu");
+
+  await client.close();
+  await server.close();
+});
+
+test("Jarvis MCP server generates contracts from inline intake payload", async () => {
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  const server = createJarvisMcpServer();
+  const client = new Client({ name: "test-client", version: "0.1.0" });
+  const outputDir = mkdtempSync(join(tmpdir(), "jarvis-mcp-contracts-"));
+  const intake = JSON.parse(readFileSync("docs/contracts/examples/sample-intake.json", "utf-8"));
+
+  await server.connect(serverTransport);
+  await client.connect(clientTransport);
+
+  const result = await client.callTool({
+    name: "arcigy.generate_contract_documents",
+    arguments: {
+      intake,
+      outputDir,
+    },
+  });
+
+  const content = result.content as Array<{ type: string; text?: string }>;
+  const text = content[0]?.type === "text" ? content[0].text ?? "" : "";
+  assert.match(text, /generation-manifest\.json/);
+  assert.equal(existsSync(join(outputDir, "generation-manifest.json")), true);
 
   await client.close();
   await server.close();

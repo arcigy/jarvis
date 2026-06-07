@@ -164,7 +164,18 @@ def patch_docx(template: Path, target: Path, replacements: dict[str, str]) -> No
 
 
 def generate_contract_documents(input_path: Path, output_dir: Path = DEFAULT_OUTPUT_DIR) -> list[Path]:
-    data = json.loads(input_path.read_text(encoding="utf-8"))
+    return generate_contract_documents_from_data(
+        json.loads(input_path.read_text(encoding="utf-8")),
+        output_dir,
+        input_label=str(input_path),
+    )
+
+
+def generate_contract_documents_from_data(
+    data: dict[str, Any],
+    output_dir: Path = DEFAULT_OUTPUT_DIR,
+    input_label: str = "inline-payload",
+) -> list[Path]:
     slug = re.sub(r"[^a-zA-Z0-9_-]+", "-", data["client"]["businessName"]).strip("-").lower() or "klient"
     targets = [
         (
@@ -189,7 +200,7 @@ def generate_contract_documents(input_path: Path, output_dir: Path = DEFAULT_OUT
         patch_docx(template, target, build_replacements(attachment_data))
         created.append(target)
 
-    write_manifest(input_path, output_dir, created, data)
+    write_manifest(input_label, output_dir, created, data)
     return created
 
 
@@ -217,23 +228,37 @@ def safe_docx_name(raw_name: str) -> str:
     return name
 
 
-def write_manifest(input_path: Path, output_dir: Path, created: list[Path], data: dict[str, Any]) -> None:
+def write_manifest(input_label: str, output_dir: Path, created: list[Path], data: dict[str, Any]) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     manifest = {
-        "input": str(input_path),
+        "input": input_label,
         "client": data["client"]["businessName"],
         "generatedFiles": [str(path) for path in created],
     }
     (output_dir / MANIFEST_NAME).write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def load_payload(raw: str) -> dict[str, Any]:
+    path = Path(raw)
+    if path.exists():
+        return json.loads(path.read_text(encoding="utf-8"))
+    return json.loads(raw)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate Arcigy contract DOCX files from a JSON intake form.")
-    parser.add_argument("--input", required=True, type=Path)
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--input", type=Path)
+    source.add_argument("--payload")
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     args = parser.parse_args()
 
-    for path in generate_contract_documents(args.input, args.output_dir):
+    if args.input:
+        created = generate_contract_documents(args.input, args.output_dir)
+    else:
+        created = generate_contract_documents_from_data(load_payload(args.payload), args.output_dir)
+
+    for path in created:
         print(path)
     print(args.output_dir / MANIFEST_NAME)
 

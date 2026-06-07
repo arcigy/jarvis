@@ -18,7 +18,7 @@ Claude, ChatGPT, or another MCP client can connect over stdio with:
 
 ## Tools
 
-- `arcigy.generate_contract_documents`: JSON intake form -> framework agreement + project appendix DOCX.
+- `arcigy.generate_contract_documents`: JSON intake form -> framework agreement + project appendix DOCX. Accepts either `inputJsonPath` or inline `intake`.
 - `arcigy.get_cold_outreach_brief`: Slovak cold outreach summary.
 - `arcigy.add_cold_outreach_event`: stores local cold outreach activity.
 - `arcigy.get_cold_outreach_brief_from_db`: computes Slovak cold outreach summary from SQLite events.

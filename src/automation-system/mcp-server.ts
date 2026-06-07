@@ -26,7 +26,8 @@ export function createJarvisMcpServer(): McpServer {
       title: "Generate Arcigy contracts",
       description: "Generate framework agreement and project appendix DOCX files from a filled JSON intake form.",
       inputSchema: {
-        inputJsonPath: z.string().min(1),
+        inputJsonPath: z.string().min(1).optional(),
+        intake: z.record(z.string(), z.unknown()).optional(),
         outputDir: z.string().min(1).optional(),
       },
       annotations: {
@@ -36,9 +37,21 @@ export function createJarvisMcpServer(): McpServer {
         openWorldHint: false,
       },
     },
-    async ({ inputJsonPath, outputDir }) => {
-      const command = buildContractGenerationCommand(inputJsonPath, outputDir);
-      const result = runPython(command.args);
+    async ({ inputJsonPath, intake, outputDir }) => {
+      if (!inputJsonPath && !intake) {
+        throw new Error("Provide either inputJsonPath or inline intake payload.");
+      }
+
+      const args = inputJsonPath
+        ? buildContractGenerationCommand(inputJsonPath, outputDir).args
+        : [
+            "scripts/generate_contract_documents.py",
+            "--payload",
+            JSON.stringify(intake),
+            "--output-dir",
+            outputDir ?? "generated/contracts",
+          ];
+      const result = runPython(args);
       return textResult(result.stdout.trim() || "Contract documents generated.");
     }
   );

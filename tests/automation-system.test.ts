@@ -79,6 +79,29 @@ test("contract generator creates core documents, extra attachments, and manifest
   assert.ok(manifest.generatedFiles.some((path: string) => path.endsWith("doplnkova-priloha-servisne-pravidla.docx")));
 });
 
+test("contract generator accepts inline JSON payload", () => {
+  const dir = mkdtempSync(join(tmpdir(), "jarvis-contract-payload-"));
+  const python = process.env.JARVIS_PYTHON || "python";
+  const payload = readFileSync("docs/contracts/examples/sample-intake.json", "utf-8");
+  const result = spawnSync(
+    python,
+    ["scripts/generate_contract_documents.py", "--payload", payload, "--output-dir", dir],
+    {
+      cwd: process.cwd(),
+      encoding: "utf-8",
+      env: {
+        ...process.env,
+        PYTHONIOENCODING: "utf-8",
+      },
+    }
+  );
+
+  assert.equal(result.status, 0, result.stderr);
+  const manifest = JSON.parse(readFileSync(join(dir, "generation-manifest.json"), "utf-8"));
+  assert.equal(manifest.input, "inline-payload");
+  assert.equal(manifest.generatedFiles.length, 3);
+});
+
 test("cold outreach answer uses the requested Slovak style", () => {
   const answer = getColdOutreachMcpAnswer({
     periodLabel: "posledných 7 dní",
