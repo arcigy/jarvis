@@ -261,10 +261,11 @@ function listWebMcpTools() {
     { name: "arcigy.get_cold_outreach_brief", requiresApproval: false },
     { name: "arcigy.get_cold_outreach_brief_from_db", requiresApproval: false },
     { name: "arcigy.add_cold_outreach_event", requiresApproval: false },
+    { name: "arcigy.identify_email", requiresApproval: false },
     { name: "arcigy.upsert_local_person", requiresApproval: false },
     { name: "arcigy.add_client_need_signal", requiresApproval: false },
     { name: "arcigy.ingest_client_message", requiresApproval: false },
-    { name: "arcigy.identify_email", requiresApproval: false },
+    { name: "arcigy.jarvis_voice_event", requiresApproval: false },
     { name: "arcigy.get_system_health", requiresApproval: false },
     { name: "arcigy.run_integration_diagnostics", requiresApproval: false },
     { name: "arcigy.generate_ai_reply", requiresApproval: false },
@@ -274,7 +275,6 @@ function listWebMcpTools() {
     { name: "arcigy.search_google_places", requiresApproval: false },
     { name: "arcigy.discover_leads", requiresApproval: false },
     { name: "arcigy.append_leads_to_google_sheet", requiresApproval: true },
-    { name: "arcigy.jarvis_voice_event", requiresApproval: false },
   ];
 }
 

@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
+import { listJarvisMcpTools } from "../src/automation-system/mcp-tools.ts";
+
 test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () => {
   const html = readFileSync("src/desktop/index.html", "utf-8");
   const renderer = readFileSync("src/desktop/renderer.js", "utf-8");
@@ -126,4 +128,19 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(preload, /appendLeadsToGoogleSheet/);
   assert.match(preload, /generateContracts/);
   assert.match(preload, /draftContractIntake/);
+});
+
+test("desktop web bridge preflight stays in parity with MCP tool registry", () => {
+  const main = readFileSync("src/desktop/main.cjs", "utf-8");
+  const desktopTools = [...main.matchAll(/\{\s*name: "([^"]+)", requiresApproval: (true|false)\s*\}/g)].map((match) => ({
+    name: match[1],
+    requiresApproval: match[2] === "true",
+  }));
+
+  const registryTools = listJarvisMcpTools().map((tool) => ({
+    name: tool.name,
+    requiresApproval: tool.requiresApproval,
+  }));
+
+  assert.deepEqual(desktopTools, registryTools);
 });
