@@ -11,6 +11,7 @@ import { buildClientReplyPrompt, generateGeminiText } from "../automation-system
 import { listConfiguredGmailAccounts, listRecentGmailMessageEvents } from "../automation-system/gmail.ts";
 import { containsWakeWord, type JarvisVoiceSession } from "../automation-system/jarvis-voice.ts";
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "../automation-system/lead-discovery.ts";
+import { listJarvisMcpTools } from "../automation-system/mcp-tools.ts";
 import { getSmartleadCampaignStatus } from "../automation-system/smartlead.ts";
 
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
@@ -39,10 +40,15 @@ export function createLocalApiServer() {
 async function routeRequest(request: IncomingMessage, response: ServerResponse) {
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
 
-  if (url.pathname.startsWith("/api/") && !isApiAuthorized(request)) {
+  if ((url.pathname.startsWith("/api/") || url.pathname === "/.well-known/arcigy-jarvis.json") && !isApiAuthorized(request)) {
     writeJson(response, 401, {
       error: "Jarvis web API is locked. Provide a bearer token using JARVIS_WEB_TOKEN or API_SECRET_KEY.",
     });
+    return;
+  }
+
+  if (request.method === "GET" && (url.pathname === "/api/mcp" || url.pathname === "/.well-known/arcigy-jarvis.json")) {
+    writeJson(response, 200, buildWebBridgeManifest(request));
     return;
   }
 
@@ -265,6 +271,47 @@ function getBearerToken(request: IncomingMessage): string | null {
   if (!header) return null;
   const match = /^Bearer\s+(.+)$/i.exec(Array.isArray(header) ? header[0] : header);
   return match?.[1]?.trim() || null;
+}
+
+function buildWebBridgeManifest(request: IncomingMessage) {
+  const origin = getRequestOrigin(request);
+  const mcpBaseUrl = `${origin}/api/mcp`;
+  return {
+    name: "Arcigy Jarvis local web bridge",
+    version: "0.1.0",
+    mode: "local-web-bridge",
+    baseUrl: origin,
+    auth: {
+      type: "bearer",
+      requiredForExternalHosts: true,
+      header: "Authorization: Bearer <JARVIS_WEB_TOKEN>",
+      localhostBypass: process.env.JARVIS_WEB_REQUIRE_AUTH !== "true",
+    },
+    endpoints: {
+      ui: `${origin}/index.html`,
+      systemHealth: `${origin}/api/system-health`,
+      diagnostics: `${origin}/api/run-diagnostics`,
+      mcpTools: `${origin}/api/mcp`,
+      mcpToolCallPattern: `${mcpBaseUrl}/{toolName}`,
+    },
+    tools: listJarvisMcpTools().map((tool) => ({
+      ...tool,
+      method: "POST",
+      url: `${mcpBaseUrl}/${tool.name}`,
+    })),
+  };
+}
+
+function getRequestOrigin(request: IncomingMessage): string {
+  const proto = getForwardedValue(request.headers["x-forwarded-proto"]) || (isLocalRequest(request) ? "http" : "https");
+  const host = getForwardedValue(request.headers["x-forwarded-host"]) || request.headers.host || "127.0.0.1";
+  return `${proto}://${host}`;
+}
+
+function getForwardedValue(value: string | string[] | undefined): string | null {
+  if (!value) return null;
+  const raw = Array.isArray(value) ? value[0] : value;
+  return raw.split(",")[0].trim() || null;
 }
 
 async function routeMcpTool(name: string, request: IncomingMessage, response: ServerResponse) {

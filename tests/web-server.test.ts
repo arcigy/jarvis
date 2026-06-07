@@ -23,6 +23,18 @@ test("local web bridge serves UI and API health", async () => {
     const body = (await health.json()) as { integrations: Array<{ key: string }> };
     assert.ok(body.integrations.some((item) => item.key === "gemini"));
 
+    const manifestResponse = await fetch(`${baseUrl}/api/mcp`);
+    assert.equal(manifestResponse.status, 200);
+    const manifest = (await manifestResponse.json()) as {
+      auth: { type: string; requiredForExternalHosts: boolean };
+      endpoints: { mcpToolCallPattern: string };
+      tools: Array<{ name: string; method: string; url: string }>;
+    };
+    assert.equal(manifest.auth.type, "bearer");
+    assert.equal(manifest.auth.requiredForExternalHosts, true);
+    assert.match(manifest.endpoints.mcpToolCallPattern, /\/api\/mcp\/\{toolName\}$/);
+    assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.draft_contract_intake" && tool.method === "POST"));
+
     const diagnostics = await fetch(`${baseUrl}/api/run-diagnostics`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -103,6 +115,23 @@ test("local web bridge requires bearer auth on external hosts", async () => {
       },
     });
     assert.equal(allowed.status, 200);
+
+    const deniedManifest = await fetch(`${baseUrl}/.well-known/arcigy-jarvis.json`, {
+      headers: { "x-forwarded-host": "jarvis.example.ngrok-free.app" },
+    });
+    assert.equal(deniedManifest.status, 401);
+
+    const allowedManifest = await fetch(`${baseUrl}/.well-known/arcigy-jarvis.json`, {
+      headers: {
+        "x-forwarded-host": "jarvis.example.ngrok-free.app",
+        "x-forwarded-proto": "https",
+        authorization: "Bearer test-token",
+      },
+    });
+    assert.equal(allowedManifest.status, 200);
+    const manifest = (await allowedManifest.json()) as { baseUrl: string; endpoints: { mcpTools: string } };
+    assert.equal(manifest.baseUrl, "https://jarvis.example.ngrok-free.app");
+    assert.equal(manifest.endpoints.mcpTools, "https://jarvis.example.ngrok-free.app/api/mcp");
   } finally {
     if (previousToken === undefined) delete process.env.JARVIS_WEB_TOKEN;
     else process.env.JARVIS_WEB_TOKEN = previousToken;

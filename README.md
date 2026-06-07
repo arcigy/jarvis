@@ -96,6 +96,8 @@ npm run web
 
 It serves the same UI at `http://127.0.0.1:8765` and exposes local HTTP endpoints used by the browser fallback:
 
+- `GET /api/mcp`
+- `GET /.well-known/arcigy-jarvis.json`
 - `GET /api/system-health`
 - `POST /api/run-diagnostics`
 - `POST /api/jarvis/voice-event`
@@ -126,6 +128,13 @@ It serves the same UI at `http://127.0.0.1:8765` and exposes local HTTP endpoint
 - `POST /api/mcp/arcigy.append_leads_to_google_sheet`
 
 For a temporary external URL, run `npm run web:tunnel` after configuring ngrok locally. Keep this local-first; do not expose it publicly without access controls.
+
+External agent setup flow:
+
+1. Run `npm run web`.
+2. Run `npm run web:tunnel`.
+3. Open `https://<your-tunnel-host>/.well-known/arcigy-jarvis.json` with `Authorization: Bearer <JARVIS_WEB_TOKEN>`.
+4. Use the returned `tools[].url` values for web MCP-style calls. Each tool expects JSON in the POST body and returns `{ "result": ... }`.
 
 API security:
 

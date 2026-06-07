@@ -16,6 +16,13 @@ Claude, ChatGPT, or another MCP client can connect over stdio with:
 }
 ```
 
+For browser or remote-agent use, run `npm run web` and expose it with `npm run web:tunnel`. The web bridge publishes its protected manifest at:
+
+- `GET /api/mcp`
+- `GET /.well-known/arcigy-jarvis.json`
+
+External hosts require `Authorization: Bearer <JARVIS_WEB_TOKEN>`. The manifest returns concrete `tools[].url` values for POST calls.
+
 ## Tools
 
 - `arcigy.generate_contract_documents`: JSON intake form -> framework agreement + project appendix DOCX. Accepts either `inputJsonPath` or inline `intake`.
