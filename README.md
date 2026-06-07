@@ -95,6 +95,14 @@ Run the local production smoke first:
 npm run doctor
 ```
 
+Default doctor is a local/read-only smoke: required files, MCP registry, runtime env presence, local DB, contract generation, and the web bridge. It does not call live Gemini, Gmail, Smartlead, Google, Serper, Postgres, or Redis APIs.
+
+Run explicit live read-only probes only when you want to test configured providers and accept provider/network quota use:
+
+```powershell
+npm run doctor -- --live-integrations
+```
+
 Doctor removes its own generated smoke artifacts after a successful run. Use `npm run doctor -- --keep-doctor-artifacts` when debugging generated outputs.
 
 Run the browser-ready Jarvis bridge:

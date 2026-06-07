@@ -6,6 +6,7 @@ import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { getIntegrationHealth, loadLocalEnv } from "../src/automation-system/env.ts";
+import { runIntegrationDiagnostics } from "../src/automation-system/diagnostics.ts";
 import { listJarvisMcpTools } from "../src/automation-system/mcp-tools.ts";
 
 type CheckStatus = "ready" | "warning" | "failed";
@@ -34,6 +35,7 @@ const skipContractGeneration = args.has("--skip-contract-generation");
 const skipWebBridge = args.has("--skip-web-bridge");
 const skipLocalDb = args.has("--skip-local-db");
 const keepDoctorArtifacts = args.has("--keep-doctor-artifacts");
+const liveIntegrations = args.has("--live-integrations");
 const doctorArtifacts: string[] = [];
 
 await main();
@@ -48,6 +50,7 @@ async function main() {
   if (!skipLocalDb) checks.push(checkLocalDbSmoke());
   if (!skipContractGeneration) checks.push(checkContractGeneration());
   if (!skipWebBridge) checks.push(await checkWebBridgeSmoke());
+  if (liveIntegrations) checks.push(await checkLiveIntegrationDiagnostics());
 
   const failed = checks.filter((check) => check.status === "failed");
   const warnings = checks.filter((check) => check.status === "warning");
@@ -133,6 +136,26 @@ function checkRuntimeEnv(): DoctorCheck {
     details: {
       configured: health.filter((item) => item.configured).map((item) => item.key),
       missing,
+    },
+  };
+}
+
+async function checkLiveIntegrationDiagnostics(): Promise<DoctorCheck> {
+  const dbPath = safeGeneratedPath(`doctor-live-diagnostics-${Date.now()}-${process.pid}.db`);
+  const diagnostics = await runIntegrationDiagnostics({ live: true, dbPath });
+  const notReady = diagnostics.checks.filter((check) => check.status !== "ready");
+  return {
+    key: "liveIntegrationDiagnostics",
+    status: notReady.length ? "failed" : "ready",
+    message: notReady.length
+      ? `${notReady.length} live integration check(s) are not ready.`
+      : `${diagnostics.checks.length} live integration check(s) passed.`,
+    details: {
+      live: diagnostics.live,
+      checkedAt: diagnostics.checkedAt,
+      dbPath,
+      notReady,
+      ready: diagnostics.checks.filter((check) => check.status === "ready").map((check) => check.key),
     },
   };
 }

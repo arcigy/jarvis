@@ -26,6 +26,7 @@ test("Jarvis doctor reports local readiness without leaking secrets", () => {
   assert.equal(body.checks.find((check) => check.key === "requiredFiles")?.status, "ready");
   assert.equal(body.checks.find((check) => check.key === "mcpToolRegistry")?.status, "ready");
   assert.equal(body.checks.find((check) => check.key === "runtimeEnv")?.status, "warning");
+  assert.equal(body.checks.some((check) => check.key === "liveIntegrationDiagnostics"), false);
   const localDb = body.checks.find((check) => check.key === "localDbSmoke");
   const contractGeneration = body.checks.find((check) => check.key === "contractGeneration");
   assert.equal(localDb?.status, "ready");
