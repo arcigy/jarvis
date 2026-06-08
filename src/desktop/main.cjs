@@ -113,8 +113,46 @@ async function handleVoiceEvent(payload) {
     return voiceDone(session, text, (await getOperatorBriefing({ ...payload, text })).speechText);
   }
 
+  if (isProductionReadinessVoiceCommand(lowered)) {
+    const report = await getProductionReadiness({ ...payload, live: payload?.live === true || lowered.includes("live") });
+    return voiceDone(session, text, summarizeReadinessForVoice(report));
+  }
+
+  if (isRemoteMcpVoiceCommand(lowered)) {
+    const pack = await getRemoteMcpPack({ ...payload, includeReadiness: true, live: false });
+    return voiceDone(session, text, summarizeRemoteMcpForVoice(pack));
+  }
+
+  if (isContractVoiceCommand(lowered)) {
+    const brief = cleanVoiceQuery(text, ["jarvis", "zmluva", "zmluvy", "contract", "kontrakt", "formular", "formulár", "intake", "navrhni", "draft"]);
+    if (lowered.includes("vygeneruj") || lowered.includes("generuj")) {
+      return voiceDone(session, text, "Zmluvy vygenerujem az po vyplnenom intake a explicitnom schvaleni payloadu. Hlasom mozem pripravit draft intake.");
+    }
+    if (brief.length >= 24 && (lowered.includes("intake") || lowered.includes("formular") || lowered.includes("formulár") || lowered.includes("navrh") || lowered.includes("draft"))) {
+      const intake = await draftContractIntake({ brief });
+      return voiceDone(session, text, summarizeContractDraftForVoice(intake));
+    }
+    return voiceDone(session, text, "Zmluvny modul je pripraveny. Povedz klienta, projekt, cenu a rozsah; pripravim intake a finalne DOCX az po tvojom schvaleni.");
+  }
+
   if (lowered.includes("cold") || lowered.includes("outreach")) {
     return voiceDone(session, text, await getColdOutreachBrief({ text, dbPath: payload?.dbPath, live: payload?.live !== false }));
+  }
+
+  if (isClientNeedsVoiceCommand(lowered)) {
+    const result = getClientNeedAlerts({ dbPath: payload?.dbPath, status: "new", limit: 10 });
+    return voiceDone(session, text, summarizeClientNeeds(Number(result.count || 0), Array.isArray(result.alerts) ? result.alerts : []));
+  }
+
+  if (isGmailVoiceCommand(lowered)) {
+    const result = await syncGmailRecentMessages({
+      dbPath: payload?.dbPath,
+      accountEnvKey: payload?.accountEnvKey,
+      query: payload?.gmailQuery || defaultGmailBriefingQuery,
+      maxResults: Number(payload?.gmailMaxResults || 5),
+      dryRun: true,
+    });
+    return voiceDone(session, text, summarizeGmailPreviewForVoice(result));
   }
 
   if (lowered.includes("integracie") || lowered.includes("system") || lowered.includes("health")) {
@@ -145,7 +183,7 @@ async function handleVoiceEvent(payload) {
   return voiceDone(
     session,
     text,
-    "Rozumiem. Viem hlasom pripravit briefing, skontrolovat cold outreach, integracie, identifikovat email, vyhladat leady alebo pripravit Gemini odpoved."
+    "Rozumiem. Viem hlasom pripravit briefing, skontrolovat produkciu, remote MCP, zmluvy, cold outreach, Gmail, klientske poziadavky, integracie, email, leady alebo Gemini odpoved."
   );
 }
 
@@ -1116,6 +1154,81 @@ function summarizeHealthForVoice(health) {
     ready.length ? `Ready integracie: ${ready.join(", ")}.` : "Ziadne integracie nie su ready.",
     missing.length ? `Chybaju: ${missing.join(", ")}.` : "Nic nechyba.",
   ].join(" ");
+}
+
+function summarizeReadinessForVoice(report) {
+  const queue = Array.isArray(report.attentionQueue) ? report.attentionQueue : [];
+  const launch = Array.isArray(report.launchChecklist) ? report.launchChecklist : [];
+  const topQueue = queue.slice(0, 3).map((item) => `${item.key}: ${item.title}`).join("; ");
+  const checklistReady = launch.filter((item) => item.status === "ready").length;
+  const nextAction = Array.isArray(report.nextActions) && report.nextActions.length ? `Najblizsi krok: ${report.nextActions[0]}` : "Najblizsi krok: ziadny urgentny.";
+  return [
+    `Production readiness je ${report.status}.`,
+    report.summary,
+    launch.length ? `Launch checklist: ${checklistReady}/${launch.length} ready.` : null,
+    topQueue ? `Attention queue: ${topQueue}.` : "Attention queue je prazdna.",
+    nextAction,
+  ].filter(Boolean).join(" ");
+}
+
+function summarizeRemoteMcpForVoice(pack) {
+  const tools = pack.tools || {};
+  const approvalRequired = Array.isArray(tools.approvalRequired) ? tools.approvalRequired : [];
+  const localWrites = Array.isArray(tools.localStateWrite) ? tools.localStateWrite : [];
+  const quickStarts = Array.isArray(pack.quickStartCalls) ? pack.quickStartCalls.length : 0;
+  const readiness = pack.readiness?.status ? `Readiness: ${pack.readiness.status}.` : "";
+  return [
+    `Remote MCP pack je pripraveny pre ${tools.count || 0} toolov.`,
+    readiness,
+    `Approval locky: ${approvalRequired.length}. Lokalnych zapisov: ${localWrites.length}. Quick-start volani: ${quickStarts}.`,
+    `Manifest: ${pack.manifestUrl}. Smoke test: ${pack.smokeTestUrl}.`,
+    "Token nevraciam; pouziva sa iba bearer placeholder.",
+  ].filter(Boolean).join(" ");
+}
+
+function summarizeContractDraftForVoice(intake) {
+  const client = intake?.client || {};
+  const project = intake?.project || {};
+  const pricing = intake?.pricing || {};
+  const clientName = client.businessName || client.name || "klient nie je doplneny";
+  const projectName = project.name || project.goal || "projekt nie je doplneny";
+  const fee = pricing.implementationFeeEur ?? pricing.implementationFee ?? pricing.monthlyFee ?? null;
+  return [
+    `Pripravil som draft intake pre ${clientName}.`,
+    `Projekt: ${projectName}.`,
+    fee !== null ? `Cena v intake: ${fee} EUR.` : "Cena este nie je jasna.",
+    "DOCX zmluvu a prilohy vygenerujem az po tvojej kontrole a explicitnom schvaleni.",
+  ].join(" ");
+}
+
+function summarizeGmailPreviewForVoice(result) {
+  const synced = Array.isArray(result.synced) ? result.synced : [];
+  const fetched = synced.reduce((sum, item) => sum + Number(item.fetched || 0), 0);
+  const preview = synced.flatMap((item) => item.preview || []).slice(0, 3);
+  const previewText = preview.length
+    ? `Top preview: ${preview.map((item) => `${item.fromEmail}: ${item.subject || "bez predmetu"}`).join("; ")}.`
+    : "Preview nenasiel ziadne spravy.";
+  return `Gmail preview bez lokalneho zapisu skontroloval ${synced.length} account(s) a nasiel ${fetched} sprav. ${previewText}`;
+}
+
+function isProductionReadinessVoiceCommand(text) {
+  return ["production", "produkcia", "readiness", "launch", "checklist", "nasadenie"].some((term) => text.includes(term));
+}
+
+function isRemoteMcpVoiceCommand(text) {
+  return ["remote mcp", "mcp", "tunel", "tunnel", "handoff", "claude", "chatgpt"].some((term) => text.includes(term));
+}
+
+function isContractVoiceCommand(text) {
+  return ["zmluva", "zmluvy", "contract", "kontrakt", "priloha", "docx", "intake"].some((term) => text.includes(term));
+}
+
+function isClientNeedsVoiceCommand(text) {
+  return ["klientske poziadavky", "poziadavky klientov", "co chce klient", "co chcu klienti", "client need"].some((term) => text.includes(term));
+}
+
+function isGmailVoiceCommand(text) {
+  return ["gmail", "inbox", "posta", "mail sync"].some((term) => text.includes(term));
 }
 
 function summarizeIdentityForVoice(result) {

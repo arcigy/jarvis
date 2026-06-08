@@ -26,6 +26,7 @@ import {
   createJarvisVoiceSession,
   handleJarvisVoiceEvent,
 } from "../src/automation-system/jarvis-voice.ts";
+import { resolveJarvisIntentFromTranscript } from "../src/automation-system/jarvis-intents.ts";
 import { buildProductionReadinessReport } from "../src/automation-system/production-readiness.ts";
 import { buildOperatorBriefing } from "../src/automation-system/operator-briefing.ts";
 import { buildRemoteMcpConnectionPack } from "../src/automation-system/remote-mcp-pack.ts";
@@ -1131,6 +1132,27 @@ test("Jarvis voice flow wakes, answers, then returns idle", () => {
   assert.equal(response.session.state, "idle");
   assert.equal(response.shouldStopRecording, true);
   assert.match(response.speakText ?? "", /Za dnes sme napísali 10 ľuďom/);
+});
+
+test("Jarvis voice resolves production, remote MCP, contracts, Gmail, and client memory prompts", () => {
+  assert.equal(resolveJarvisIntentFromTranscript("Jarvis skontroluj production readiness")?.kind, "voice_capability");
+  assert.equal(resolveJarvisIntentFromTranscript("Jarvis priprav remote MCP handoff pre Claude")?.kind, "voice_capability");
+  assert.equal(resolveJarvisIntentFromTranscript("Jarvis priprav zmluvny intake")?.kind, "voice_capability");
+  assert.equal(resolveJarvisIntentFromTranscript("Jarvis skontroluj Gmail inbox")?.kind, "voice_capability");
+  assert.equal(resolveJarvisIntentFromTranscript("Jarvis ake su klientske poziadavky?")?.kind, "voice_capability");
+
+  const wake = handleJarvisVoiceEvent(createJarvisVoiceSession(), {
+    type: "transcript",
+    text: "Jarvis",
+  });
+  const response = handleJarvisVoiceEvent(wake.session, {
+    type: "transcript",
+    text: "priprav remote MCP handoff pre ChatGPT",
+  });
+
+  assert.equal(response.session.state, "idle");
+  assert.match(response.speakText ?? "", /remote MCP handoff/);
+  assert.match(response.speakText ?? "", /bearer auth placeholder/);
 });
 
 test("local SQLite CLI persists people and need signals", () => {

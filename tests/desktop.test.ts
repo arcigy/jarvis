@@ -305,6 +305,18 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /Redis PING succeeded/);
   assert.match(main, /Postgres TCP connection opened/);
   assert.match(main, /summarizeHealthForVoice/);
+  assert.match(main, /isProductionReadinessVoiceCommand/);
+  assert.match(main, /isRemoteMcpVoiceCommand/);
+  assert.match(main, /isContractVoiceCommand/);
+  assert.match(main, /isClientNeedsVoiceCommand/);
+  assert.match(main, /isGmailVoiceCommand/);
+  assert.match(main, /summarizeReadinessForVoice/);
+  assert.match(main, /summarizeRemoteMcpForVoice/);
+  assert.match(main, /summarizeContractDraftForVoice/);
+  assert.match(main, /summarizeGmailPreviewForVoice/);
+  assert.match(main, /Zmluvy vygenerujem az po vyplnenom intake/);
+  assert.match(main, /Gmail preview bez lokalneho zapisu/);
+  assert.match(main, /Token nevraciam/);
   assert.match(main, /summarizeIdentityForVoice/);
   assert.match(main, /summarizeLeadsForVoice/);
   assert.match(main, /getOperatorBriefing/);

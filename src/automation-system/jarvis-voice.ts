@@ -1,4 +1,4 @@
-import { answerJarvisIntent, type JarvisIntent } from "./jarvis-intents.ts";
+import { answerJarvisIntent, resolveJarvisIntentFromTranscript, type JarvisIntent } from "./jarvis-intents.ts";
 
 export type JarvisVoiceState = "idle" | "awake" | "processing";
 
@@ -74,7 +74,8 @@ export function handleJarvisVoiceEvent(
     };
   }
 
-  if (!event.intent) {
+  const intent = event.intent ?? resolveJarvisIntentFromTranscript(transcript);
+  if (!intent) {
     return {
       session: { ...session, state: "awake", lastTranscript: transcript },
       shouldStartRecording: true,
@@ -83,7 +84,7 @@ export function handleJarvisVoiceEvent(
     };
   }
 
-  const response = answerJarvisIntent(event.intent);
+  const response = answerJarvisIntent(intent);
   return {
     session: {
       ...session,
