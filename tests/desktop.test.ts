@@ -78,6 +78,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /Operations sync/);
   assert.match(html, /gmailQuery/);
   assert.match(html, /in:inbox newer_than:7d/);
+  assert.match(html, /previewGmail/);
   assert.match(html, /syncGmail/);
   assert.match(html, /smartleadCampaignId/);
   assert.match(html, /checkSmartlead/);
@@ -124,6 +125,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /arcigyApi\.systemHealth/);
   assert.match(renderer, /arcigyApi\.generateAiReply/);
   assert.match(renderer, /arcigyApi\.syncGmailRecentMessages/);
+  assert.match(renderer, /Previewing Gmail without writing local records/);
+  assert.match(renderer, /dryRun: true/);
+  assert.match(renderer, /Preview only: wrote 0 local records/);
   assert.match(renderer, /in:inbox newer_than:7d/);
   assert.match(renderer, /arcigyApi\.getSmartleadCampaignStatus/);
   assert.match(renderer, /arcigyApi\.getSmartleadOutreachBrief/);

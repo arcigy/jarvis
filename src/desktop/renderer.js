@@ -57,6 +57,7 @@ const elements = {
   runDiagnostics: document.querySelector("#runDiagnostics"),
   diagnosticsResult: document.querySelector("#diagnosticsResult"),
   gmailQuery: document.querySelector("#gmailQuery"),
+  previewGmail: document.querySelector("#previewGmail"),
   syncGmail: document.querySelector("#syncGmail"),
   gmailResult: document.querySelector("#gmailResult"),
   smartleadCampaignId: document.querySelector("#smartleadCampaignId"),
@@ -347,9 +348,11 @@ function leadsToSheetRows(leads) {
 function renderGmailSync(result) {
   const synced = result.synced ?? [];
   if (!synced.length) return "No Gmail accounts were synced.";
+  const modeLine = result.dryRun ? "Preview only: wrote 0 local records." : "Local memory sync wrote new records and skipped duplicates.";
   return synced
     .map((item) =>
       [
+        modeLine,
         `${item.account}: fetched ${item.fetched}, created ${item.created ?? item.ingested}, skipped ${item.duplicates ?? 0} duplicates`,
         ...(item.alerts ?? []).map((alert) => `Alert: ${alert}`),
         ...(item.preview ?? []).map((event) => `Preview: ${event.fromEmail} - ${event.subject ?? "no subject"}`),
@@ -963,6 +966,19 @@ elements.runDiagnostics.addEventListener("click", async () => {
     elements.diagnosticsResult.textContent = renderDiagnostics(result);
   } catch (error) {
     elements.diagnosticsResult.textContent = error instanceof Error ? error.message : String(error);
+  }
+});
+elements.previewGmail.addEventListener("click", async () => {
+  try {
+    elements.gmailResult.textContent = "Previewing Gmail without writing local records...";
+    const result = await arcigyApi.syncGmailRecentMessages({
+      query: elements.gmailQuery.value,
+      maxResults: 5,
+      dryRun: true,
+    });
+    elements.gmailResult.textContent = renderGmailSync(result);
+  } catch (error) {
+    elements.gmailResult.textContent = error instanceof Error ? error.message : String(error);
   }
 });
 elements.syncGmail.addEventListener("click", async () => {
