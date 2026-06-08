@@ -119,6 +119,10 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /arcigyApi\.webBridgePreflight/);
   assert.match(renderer, /arcigyApi\.remoteMcpPack/);
   assert.match(renderer, /arcigyApi\.remoteMcpSmoke/);
+  assert.match(renderer, /function redactSensitiveText/);
+  assert.match(renderer, /function safeUiErrorText/);
+  assert.match(renderer, /return redactSensitiveText\(error instanceof Error \? error\.message : String\(error\)\)/);
+  assert.doesNotMatch(renderer, /textContent = error instanceof Error \? error\.message : String\(error\)/);
   assert.match(renderer, /renderBridgeCockpit/);
   assert.match(renderer, /renderRemoteMcpPack/);
   assert.match(renderer, /renderMcpToolList/);

@@ -163,6 +163,21 @@ function resolveWebToken() {
   return window.localStorage.getItem("arcigyJarvisToken");
 }
 
+function redactSensitiveText(value) {
+  return String(value ?? "")
+    .replace(/(postgres(?:ql)?|redis):\/\/([^:\s/@]+):([^@\s]+)@/gi, "$1://$2:[redacted]@")
+    .replace(/Bearer\s+[A-Za-z0-9._~+/=-]{16,}/gi, "Bearer [redacted]")
+    .replace(/AIza[0-9A-Za-z_-]{20,}/g, "[redacted-google-api-key]")
+    .replace(/GOCSPX-[0-9A-Za-z_-]{10,}/g, "[redacted-google-client-secret]")
+    .replace(/1\/\/[0-9A-Za-z_-]{20,}/g, "[redacted-google-refresh-token]")
+    .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_[A-Za-z0-9_-]{8,}\b/gi, "[redacted-provider-key]")
+    .replace(/\b[0-9a-f]{32,}\b/gi, "[redacted-hex-secret]");
+}
+
+function safeUiErrorText(error) {
+  return redactSensitiveText(error instanceof Error ? error.message : String(error));
+}
+
 function setMode(mode) {
   state.mode = mode;
   elements.statusBadge.textContent = mode === "idle" ? "Idle" : mode === "awake" ? "Awake" : "Listening";
@@ -391,11 +406,11 @@ async function refreshOperatorBriefing({ speakResult = false, loadingText = null
 function startOperatorBriefingWatch() {
   if (state.operatorBriefingTimer) window.clearInterval(state.operatorBriefingTimer);
   void refreshOperatorBriefing().catch((error) => {
-    elements.response.textContent = error instanceof Error ? error.message : String(error);
+    elements.response.textContent = safeUiErrorText(error);
   });
   state.operatorBriefingTimer = window.setInterval(() => {
     void refreshOperatorBriefing().catch((error) => {
-      elements.commandTimeline.textContent = error instanceof Error ? error.message : String(error);
+      elements.commandTimeline.textContent = safeUiErrorText(error);
     });
   }, state.operatorBriefingPollMs);
 }
@@ -411,8 +426,8 @@ async function refreshHealth() {
       renderCommandDeck(health, null);
     }
   } catch (error) {
-    elements.healthGrid.textContent = error instanceof Error ? error.message : String(error);
-    elements.commandTimeline.textContent = error instanceof Error ? error.message : String(error);
+    elements.healthGrid.textContent = safeUiErrorText(error);
+    elements.commandTimeline.textContent = safeUiErrorText(error);
   }
 }
 
@@ -623,7 +638,7 @@ async function maybeSyncGmailForClientAlerts({ force = false } = {}) {
     const alerts = synced.reduce((sum, item) => sum + (item.alerts ?? []).length, 0);
     state.lastClientAlertGmailSyncSummary = `Gmail auto-sync checked ${synced.length} account(s), fetched ${fetched}, created ${created}, skipped ${duplicates} duplicate(s), raised ${alerts} alert(s).`;
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = safeUiErrorText(error);
     state.lastClientAlertGmailSyncSummary = `Gmail auto-sync unavailable: ${message}`;
   }
 }
@@ -635,12 +650,12 @@ function startClientNeedWatch() {
   setCortexSignal(elements.cortexMemory, "Gmail watch", "ready");
   if (state.clientAlertPollTimer) window.clearInterval(state.clientAlertPollTimer);
   void refreshClientNeedAlerts({ announceNew: false }).catch((error) => {
-    elements.clientAlertWatchStatus.textContent = error instanceof Error ? error.message : String(error);
+    elements.clientAlertWatchStatus.textContent = safeUiErrorText(error);
   });
   state.clientAlertPollTimer = window.setInterval(() => {
     if (!state.clientAlertWatchEnabled) return;
     void refreshClientNeedAlerts({ announceNew: true }).catch((error) => {
-      elements.clientAlertWatchStatus.textContent = error instanceof Error ? error.message : String(error);
+      elements.clientAlertWatchStatus.textContent = safeUiErrorText(error);
     });
   }, state.clientAlertPollMs);
 }
@@ -852,11 +867,11 @@ async function writeClipboardText(text) {
 function startWebBridgeWatch() {
   if (state.webBridgeTimer) window.clearInterval(state.webBridgeTimer);
   void refreshWebBridge().catch((error) => {
-    elements.webBridgeResult.textContent = error instanceof Error ? error.message : String(error);
+    elements.webBridgeResult.textContent = safeUiErrorText(error);
   });
   state.webBridgeTimer = window.setInterval(() => {
     void refreshWebBridge().catch((error) => {
-      elements.webBridgeResult.textContent = error instanceof Error ? error.message : String(error);
+      elements.webBridgeResult.textContent = safeUiErrorText(error);
     });
   }, state.webBridgePollMs);
 }
@@ -1077,7 +1092,7 @@ elements.preparedReplies.addEventListener("click", async () => {
     if (result.count > 0 && result.summary) speak(result.summary);
   } catch (error) {
     state.lastPreparedReplies = [];
-    elements.preparedReplyResult.textContent = error instanceof Error ? error.message : String(error);
+    elements.preparedReplyResult.textContent = safeUiErrorText(error);
   }
 });
 elements.approvePreparedReply.addEventListener("click", async () => {
@@ -1102,7 +1117,7 @@ elements.approvePreparedReply.addEventListener("click", async () => {
     const refreshed = await arcigyApi.getPreparedOutreachReplies({ status: "pending", limit: 10 });
     state.lastPreparedReplies = refreshed.replies ?? [];
   } catch (error) {
-    elements.preparedReplyResult.textContent = error instanceof Error ? error.message : String(error);
+    elements.preparedReplyResult.textContent = safeUiErrorText(error);
   }
 });
 elements.identifyEmail.addEventListener("click", async () => {
@@ -1111,7 +1126,7 @@ elements.identifyEmail.addEventListener("click", async () => {
     const result = await arcigyApi.identifyEmail({ email: elements.memoryEmail.value });
     elements.memoryResult.textContent = renderIdentity(result);
   } catch (error) {
-    elements.memoryResult.textContent = error instanceof Error ? error.message : String(error);
+    elements.memoryResult.textContent = safeUiErrorText(error);
   }
 });
 elements.ingestClientMessage.addEventListener("click", async () => {
@@ -1126,7 +1141,7 @@ elements.ingestClientMessage.addEventListener("click", async () => {
     if (result.jarvisAlert) speak(result.jarvisAlert);
     await refreshClientNeedAlerts({ announceNew: false });
   } catch (error) {
-    elements.memoryResult.textContent = error instanceof Error ? error.message : String(error);
+    elements.memoryResult.textContent = safeUiErrorText(error);
   }
 });
 elements.clientNeedAlerts.addEventListener("click", async () => {
@@ -1135,7 +1150,7 @@ elements.clientNeedAlerts.addEventListener("click", async () => {
     const result = await refreshClientNeedAlerts({ announceNew: false, loadingText: "Loading client alerts..." });
     if (result.count > 0 && result.summary) speak(result.summary);
   } catch (error) {
-    elements.clientAlertsResult.textContent = error instanceof Error ? error.message : String(error);
+    elements.clientAlertsResult.textContent = safeUiErrorText(error);
   }
 });
 elements.toggleClientNeedWatch.addEventListener("click", () => {
@@ -1152,7 +1167,7 @@ elements.draftReply.addEventListener("click", async () => {
     elements.draftResult.textContent = result.text;
     speak(result.text);
   } catch (error) {
-    elements.draftResult.textContent = error instanceof Error ? error.message : String(error);
+    elements.draftResult.textContent = safeUiErrorText(error);
   }
 });
 elements.runDiagnostics.addEventListener("click", async () => {
@@ -1161,7 +1176,7 @@ elements.runDiagnostics.addEventListener("click", async () => {
     const result = await arcigyApi.runDiagnostics({ live: true });
     elements.diagnosticsResult.textContent = renderDiagnostics(result);
   } catch (error) {
-    elements.diagnosticsResult.textContent = error instanceof Error ? error.message : String(error);
+    elements.diagnosticsResult.textContent = safeUiErrorText(error);
   }
 });
 elements.auditEvents.addEventListener("click", async () => {
@@ -1170,7 +1185,7 @@ elements.auditEvents.addEventListener("click", async () => {
     const result = await arcigyApi.getAuditEvents({ limit: 20 });
     elements.auditResult.textContent = renderAuditEvents(result);
   } catch (error) {
-    elements.auditResult.textContent = error instanceof Error ? error.message : String(error);
+    elements.auditResult.textContent = safeUiErrorText(error);
   }
 });
 elements.previewGmail.addEventListener("click", async () => {
@@ -1183,7 +1198,7 @@ elements.previewGmail.addEventListener("click", async () => {
     });
     elements.gmailResult.textContent = renderGmailSync(result);
   } catch (error) {
-    elements.gmailResult.textContent = error instanceof Error ? error.message : String(error);
+    elements.gmailResult.textContent = safeUiErrorText(error);
   }
 });
 elements.syncGmail.addEventListener("click", async () => {
@@ -1196,7 +1211,7 @@ elements.syncGmail.addEventListener("click", async () => {
     });
     elements.gmailResult.textContent = renderGmailSync(result);
   } catch (error) {
-    elements.gmailResult.textContent = error instanceof Error ? error.message : String(error);
+    elements.gmailResult.textContent = safeUiErrorText(error);
   }
 });
 elements.checkSmartlead.addEventListener("click", async () => {
@@ -1207,7 +1222,7 @@ elements.checkSmartlead.addEventListener("click", async () => {
     });
     elements.smartleadResult.textContent = renderSmartleadStatus(result);
   } catch (error) {
-    elements.smartleadResult.textContent = error instanceof Error ? error.message : String(error);
+    elements.smartleadResult.textContent = safeUiErrorText(error);
   }
 });
 elements.smartleadBrief.addEventListener("click", async () => {
@@ -1222,21 +1237,21 @@ elements.smartleadBrief.addEventListener("click", async () => {
     elements.smartleadResult.textContent = renderSmartleadBrief(result);
     speak(result.summary);
   } catch (error) {
-    elements.smartleadResult.textContent = error instanceof Error ? error.message : String(error);
+    elements.smartleadResult.textContent = safeUiErrorText(error);
   }
 });
 elements.checkWebBridge.addEventListener("click", async () => {
   try {
     await refreshWebBridge({ loadingText: "Checking web bridge..." });
   } catch (error) {
-    elements.webBridgeResult.textContent = error instanceof Error ? error.message : String(error);
+    elements.webBridgeResult.textContent = safeUiErrorText(error);
   }
 });
 elements.copyRemotePack.addEventListener("click", async () => {
   try {
     await copyRemotePack();
   } catch (error) {
-    elements.remoteAgentPrompt.textContent = error instanceof Error ? error.message : String(error);
+    elements.remoteAgentPrompt.textContent = safeUiErrorText(error);
   }
 });
 elements.runRemoteSmoke.addEventListener("click", async () => {
@@ -1245,7 +1260,7 @@ elements.runRemoteSmoke.addEventListener("click", async () => {
     const report = await arcigyApi.remoteMcpSmoke({ baseUrl: state.lastRemoteMcpPack?.baseUrl });
     renderRemoteMcpSmoke(report);
   } catch (error) {
-    elements.remoteSmokeResult.textContent = error instanceof Error ? error.message : String(error);
+    elements.remoteSmokeResult.textContent = safeUiErrorText(error);
   }
 });
 elements.readinessReport.addEventListener("click", async () => {
@@ -1255,14 +1270,14 @@ elements.readinessReport.addEventListener("click", async () => {
     elements.commandTimeline.textContent = report.summary;
     elements.response.textContent = renderReadinessReport(report);
   } catch (error) {
-    elements.commandTimeline.textContent = error instanceof Error ? error.message : String(error);
+    elements.commandTimeline.textContent = safeUiErrorText(error);
   }
 });
 elements.operatorBriefing.addEventListener("click", async () => {
   try {
     await refreshOperatorBriefing({ speakResult: true, loadingText: "Building live operator briefing...", live: true });
   } catch (error) {
-    elements.commandTimeline.textContent = error instanceof Error ? error.message : String(error);
+    elements.commandTimeline.textContent = safeUiErrorText(error);
   }
 });
 elements.discoverLeads.addEventListener("click", async () => {
@@ -1276,7 +1291,7 @@ elements.discoverLeads.addEventListener("click", async () => {
     elements.leadResult.textContent = renderLeadDiscovery(result);
   } catch (error) {
     state.lastLeads = [];
-    elements.leadResult.textContent = error instanceof Error ? error.message : String(error);
+    elements.leadResult.textContent = safeUiErrorText(error);
   }
 });
 elements.exportLeads.addEventListener("click", async () => {
@@ -1298,7 +1313,7 @@ elements.exportLeads.addEventListener("click", async () => {
     });
     elements.leadResult.textContent = `Exported ${state.lastLeads.length} leads to Google Sheets.\n${JSON.stringify(result, null, 2)}`;
   } catch (error) {
-    elements.leadResult.textContent = error instanceof Error ? error.message : String(error);
+    elements.leadResult.textContent = safeUiErrorText(error);
   }
 });
 elements.draftContractIntake.addEventListener("click", async () => {
@@ -1313,7 +1328,7 @@ elements.draftContractIntake.addEventListener("click", async () => {
     elements.contractIntake.value = JSON.stringify(intake, null, 2);
     elements.contractResult.textContent = "AI contract intake draft applied. Review it before generating DOCX files.";
   } catch (error) {
-    elements.contractResult.textContent = error instanceof Error ? error.message : String(error);
+    elements.contractResult.textContent = safeUiErrorText(error);
   }
 });
 elements.applyContractForm.addEventListener("click", () => {
@@ -1322,7 +1337,7 @@ elements.applyContractForm.addEventListener("click", () => {
     elements.contractIntake.value = JSON.stringify(intake, null, 2);
     elements.contractResult.textContent = "Contract form applied to intake JSON.";
   } catch (error) {
-    elements.contractResult.textContent = error instanceof Error ? error.message : String(error);
+    elements.contractResult.textContent = safeUiErrorText(error);
   }
 });
 elements.generateContracts.addEventListener("click", async () => {
@@ -1343,7 +1358,7 @@ elements.generateContracts.addEventListener("click", async () => {
       ...result.generatedFiles,
     ].join("\n");
   } catch (error) {
-    elements.contractResult.textContent = error instanceof Error ? error.message : String(error);
+    elements.contractResult.textContent = safeUiErrorText(error);
   }
 });
 
