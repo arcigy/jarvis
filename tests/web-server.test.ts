@@ -495,6 +495,17 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(approvalQueueBody.count, 1);
     assert.equal(approvalQueueBody.items[0].approvalTool, "arcigy.update_client_need_status");
 
+    const memorySnapshot = await fetch(`${baseUrl}/api/local-memory-snapshot`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ dbPath, limit: 5 }),
+    });
+    assert.equal(memorySnapshot.status, 200);
+    const memorySnapshotBody = (await memorySnapshot.json()) as { redacted: boolean; counts: { people: number; openClientNeeds: number } };
+    assert.equal(memorySnapshotBody.redacted, true);
+    assert.equal(memorySnapshotBody.counts.people, 1);
+    assert.equal(memorySnapshotBody.counts.openClientNeeds, 1);
+
     const voiceApprovalQueue = await fetch(`${baseUrl}/api/jarvis/voice-event`, {
       method: "POST",
       headers: { "content-type": "application/json" },

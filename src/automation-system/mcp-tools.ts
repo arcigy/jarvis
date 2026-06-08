@@ -19,6 +19,7 @@ export type JarvisMcpToolName =
   | "arcigy.get_client_need_alerts"
   | "arcigy.update_client_need_status"
   | "arcigy.get_audit_events"
+  | "arcigy.get_local_memory_snapshot"
   | "arcigy.identify_email"
   | "arcigy.get_system_health"
   | "arcigy.run_integration_diagnostics"
@@ -146,6 +147,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.get_audit_events",
       description: "Vrati lokalny audit trail Jarvis operacii, approval-gated akcii a citlivych workflow krokov.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.get_local_memory_snapshot",
+      description: "Vrati secret-safe snapshot lokalnej klientovej pamate, email aktivit, klientskych poziadaviek a audit eventov.",
       requiresApproval: false,
     },
     {

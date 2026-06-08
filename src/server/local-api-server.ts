@@ -171,6 +171,12 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
     return;
   }
 
+  if (request.method === "POST" && url.pathname === "/api/local-memory-snapshot") {
+    const payload = await readJson(request);
+    writeJson(response, 200, runDbTool("local-memory-snapshot", payload));
+    return;
+  }
+
   if (request.method === "POST" && url.pathname === "/api/generate-ai-reply") {
     const payload = await readJson(request);
     const result = await generateGeminiText(buildClientReplyPrompt(toClientReplyDraftInput(payload)));
@@ -524,6 +530,10 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
   }
   if (name === "arcigy.get_audit_events") {
     writeJson(response, 200, { result: runDbTool("list-audit-events", payload) });
+    return;
+  }
+  if (name === "arcigy.get_local_memory_snapshot") {
+    writeJson(response, 200, { result: runDbTool("local-memory-snapshot", payload) });
     return;
   }
   if (name === "arcigy.jarvis_voice_event") {

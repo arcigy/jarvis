@@ -425,6 +425,59 @@ def list_approval_queue(db_path: Path, payload: dict[str, Any]) -> dict[str, Any
     }
 
 
+def local_memory_snapshot(db_path: Path, payload: dict[str, Any]) -> dict[str, Any]:
+    init_db(db_path)
+    limit = max(1, min(int(payload.get("limit", 10)), 50))
+    conn = connect(db_path)
+    counts = {
+        "people": conn.execute("select count(*) as count from local_people").fetchone()["count"],
+        "emailActivities": conn.execute("select count(*) as count from local_email_activity").fetchone()["count"],
+        "clientNeedSignals": conn.execute("select count(*) as count from client_need_signals").fetchone()["count"],
+        "openClientNeeds": conn.execute("select count(*) as count from client_need_signals where status = 'new'").fetchone()["count"],
+        "coldOutreachEvents": conn.execute("select count(*) as count from cold_outreach_events").fetchone()["count"],
+        "auditEvents": conn.execute("select count(*) as count from jarvis_automation_events").fetchone()["count"],
+    }
+    people = [
+        row_to_person(row)
+        for row in conn.execute(
+            "select * from local_people order by updated_at desc, created_at desc limit ?",
+            (limit,),
+        )
+    ]
+    email_activities = [
+        row_to_email_activity(row)
+        for row in conn.execute(
+            "select * from local_email_activity order by occurred_at desc limit ?",
+            (limit,),
+        )
+    ]
+    need_signals = [
+        row_to_need_signal(row)
+        for row in conn.execute(
+            "select * from client_need_signals order by occurred_at desc limit ?",
+            (limit,),
+        )
+    ]
+    audit_events = [
+        row_to_audit_event(row)
+        for row in conn.execute(
+            "select * from jarvis_automation_events order by created_at desc limit ?",
+            (limit,),
+        )
+    ]
+    snapshot = {
+        "mode": "local-memory-snapshot",
+        "redacted": True,
+        "counts": counts,
+        "people": people,
+        "recentEmailActivities": email_activities,
+        "recentClientNeedSignals": need_signals,
+        "recentAuditEvents": audit_events,
+        "summary": build_local_memory_snapshot_summary(counts),
+    }
+    return redact_secrets(snapshot)
+
+
 def approve_prepared_reply(db_path: Path, payload: dict[str, Any]) -> dict[str, Any]:
     init_db(db_path)
     prepared_id = required(payload, "preparedEventId")
@@ -844,6 +897,17 @@ def build_approval_queue_summary(items: list[dict[str, Any]]) -> str:
     return f"Jarvis: Na tvoje potvrdenie caka {len(items)} veci: {', '.join(parts)}. Najblizsie: {first['title']}."
 
 
+def build_local_memory_snapshot_summary(counts: dict[str, Any]) -> str:
+    return (
+        "Jarvis local memory snapshot: "
+        f"{counts['people']} people, "
+        f"{counts['emailActivities']} email activities, "
+        f"{counts['openClientNeeds']} open client needs, "
+        f"{counts['coldOutreachEvents']} cold outreach events, "
+        f"{counts['auditEvents']} audit events. Secrets are redacted."
+    )
+
+
 def build_prepared_reply_status_summary(lead_email: str, status: str) -> str:
     if status == "sent":
         return f"Jarvis: Odpoved pre {lead_email} uz bola odoslana."
@@ -1123,6 +1187,7 @@ def main() -> None:
             "list-open-needs",
             "update-need-status",
             "list-approval-queue",
+            "local-memory-snapshot",
             "add-audit-event",
             "list-audit-events",
         ],
@@ -1157,6 +1222,8 @@ def main() -> None:
             result = update_need_status(args.db, load_payload(args.payload))
         elif args.command == "list-approval-queue":
             result = list_approval_queue(args.db, load_payload(args.payload))
+        elif args.command == "local-memory-snapshot":
+            result = local_memory_snapshot(args.db, load_payload(args.payload))
         elif args.command == "add-audit-event":
             result = add_audit_event(args.db, load_payload(args.payload))
         elif args.command == "list-audit-events":

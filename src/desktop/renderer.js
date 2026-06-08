@@ -89,6 +89,7 @@ const elements = {
   diagnosticsGrid: document.querySelector("#diagnosticsGrid"),
   diagnosticsResult: document.querySelector("#diagnosticsResult"),
   auditEvents: document.querySelector("#auditEvents"),
+  localMemorySnapshot: document.querySelector("#localMemorySnapshot"),
   auditResult: document.querySelector("#auditResult"),
   gmailQuery: document.querySelector("#gmailQuery"),
   previewGmail: document.querySelector("#previewGmail"),
@@ -173,6 +174,7 @@ const arcigyApi = window.arcigyDesktop ?? {
   getClientNeedAlerts: (payload) => postJson("/api/client-need-alerts", payload),
   updateClientNeedStatus: (payload) => postJson("/api/update-client-need-status", payload),
   getAuditEvents: (payload) => postJson("/api/audit-events", payload),
+  getLocalMemorySnapshot: (payload) => postJson("/api/local-memory-snapshot", payload),
   generateAiReply: (payload) => postJson("/api/generate-ai-reply", payload),
   webBridgePreflight: () => getJson("/api/web-bridge-preflight"),
   remoteMcpPack: (payload) =>
@@ -716,6 +718,31 @@ function renderAuditEvents(result) {
         `   Approval: ${event.requiresApproval ? event.approvedAt ?? "required" : "not required"}`,
       ].join("\n")
     ),
+  ].join("\n");
+}
+
+function renderLocalMemorySnapshot(result) {
+  const counts = result.counts ?? {};
+  const people = result.people ?? [];
+  const needs = result.recentClientNeedSignals ?? [];
+  const audit = result.recentAuditEvents ?? [];
+  return [
+    result.summary ?? "Local memory snapshot loaded.",
+    "",
+    `People: ${counts.people ?? 0}`,
+    `Email activities: ${counts.emailActivities ?? 0}`,
+    `Open client needs: ${counts.openClientNeeds ?? 0}`,
+    `Cold outreach events: ${counts.coldOutreachEvents ?? 0}`,
+    `Audit events: ${counts.auditEvents ?? 0}`,
+    "",
+    "Recent people:",
+    ...(people.length ? people.slice(0, 5).map((person) => `- ${person.primaryEmail} (${person.kind})`) : ["- none"]),
+    "",
+    "Recent client needs:",
+    ...(needs.length ? needs.slice(0, 5).map((need) => `- ${need.status}: ${need.summary}`) : ["- none"]),
+    "",
+    "Recent audit:",
+    ...(audit.length ? audit.slice(0, 5).map((event) => `- ${event.automationKey} / ${event.status}`) : ["- none"]),
   ].join("\n");
 }
 
@@ -1656,6 +1683,15 @@ elements.auditEvents.addEventListener("click", async () => {
     elements.auditResult.textContent = "Loading audit trail...";
     const result = await arcigyApi.getAuditEvents({ limit: 20 });
     elements.auditResult.textContent = renderAuditEvents(result);
+  } catch (error) {
+    elements.auditResult.textContent = safeUiErrorText(error);
+  }
+});
+elements.localMemorySnapshot.addEventListener("click", async () => {
+  try {
+    elements.auditResult.textContent = "Loading redacted local memory snapshot...";
+    const result = await arcigyApi.getLocalMemorySnapshot({ limit: 10 });
+    elements.auditResult.textContent = renderLocalMemorySnapshot(result);
   } catch (error) {
     elements.auditResult.textContent = safeUiErrorText(error);
   }

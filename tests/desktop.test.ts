@@ -106,6 +106,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /diagnosticsGrid/);
   assert.match(html, /diagnosticsResult/);
   assert.match(html, /auditEvents/);
+  assert.match(html, /localMemorySnapshot/);
   assert.match(html, /auditResult/);
   assert.match(html, /Client memory/);
   assert.match(html, /memoryEmail/);
@@ -360,6 +361,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /\/api\/client-need-alerts/);
   assert.match(renderer, /\/api\/update-client-need-status/);
   assert.match(renderer, /\/api\/audit-events/);
+  assert.match(renderer, /\/api\/local-memory-snapshot/);
   assert.match(renderer, /\/api\/sync-gmail-recent-messages/);
   assert.match(renderer, /\/api\/smartlead-campaign-status/);
   assert.match(renderer, /\/api\/smartlead-outreach-brief/);
@@ -514,6 +516,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /pack-client-memory-quick-start/);
   assert.match(main, /pack-audit-quick-start/);
   assert.match(main, /List operator approval queue/);
+  assert.match(main, /Get redacted local memory snapshot/);
   assert.match(main, /Draft contract intake JSON without writing files/);
   assert.match(main, /hasUsableContractQuickStart/);
   assert.match(main, /hasDraftContractIntakeQuickStart/);
@@ -676,6 +679,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(preload, /getClientNeedAlerts/);
   assert.match(preload, /updateClientNeedStatus/);
   assert.match(preload, /getAuditEvents/);
+  assert.match(preload, /getLocalMemorySnapshot/);
   assert.match(preload, /systemHealth/);
   assert.match(preload, /generateAiReply/);
   assert.match(preload, /syncGmailRecentMessages/);

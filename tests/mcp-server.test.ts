@@ -39,6 +39,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(names.includes("arcigy.ingest_client_message"));
   assert.ok(names.includes("arcigy.get_client_need_alerts"));
   assert.ok(names.includes("arcigy.get_audit_events"));
+  assert.ok(names.includes("arcigy.get_local_memory_snapshot"));
   assert.ok(names.includes("arcigy.jarvis_voice_event"));
   assert.ok(names.includes("arcigy.get_system_health"));
   assert.ok(names.includes("arcigy.run_integration_diagnostics"));
@@ -293,6 +294,15 @@ test("Jarvis MCP server persists and identifies local people through SQLite tool
   const queueBody = getStructuredResult(queue) as { count: number; items: Array<{ approvalTool: string }> };
   assert.equal(queueBody.count, 1);
   assert.equal(queueBody.items[0].approvalTool, "arcigy.update_client_need_status");
+
+  const snapshot = await client.callTool({
+    name: "arcigy.get_local_memory_snapshot",
+    arguments: { dbPath, limit: 5 },
+  });
+  const snapshotBody = getStructuredResult(snapshot) as { redacted: boolean; counts: { people: number; clientNeedSignals: number } };
+  assert.equal(snapshotBody.redacted, true);
+  assert.equal(snapshotBody.counts.people, 1);
+  assert.equal(snapshotBody.counts.clientNeedSignals, 1);
 
   assertToolError(
     await client.callTool({

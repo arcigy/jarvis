@@ -308,6 +308,14 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Get redacted local memory snapshot",
+      tool: "arcigy.get_local_memory_snapshot",
+      method: "POST",
+      url: toolUrl("arcigy.get_local_memory_snapshot"),
+      body: { limit: 10 },
+      approvalRequired: false,
+    },
+    {
       label: "Get Smartlead outreach brief",
       tool: "arcigy.get_smartlead_outreach_brief",
       method: "POST",

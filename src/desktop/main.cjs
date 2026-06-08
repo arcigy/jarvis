@@ -140,6 +140,7 @@ app.whenReady().then(() => {
   ipcMain.handle("jarvis:getClientNeedAlerts", (_event, payload) => getClientNeedAlerts(payload));
   ipcMain.handle("jarvis:updateClientNeedStatus", (_event, payload) => updateClientNeedStatus(payload));
   ipcMain.handle("jarvis:getAuditEvents", (_event, payload) => getAuditEvents(payload));
+  ipcMain.handle("jarvis:getLocalMemorySnapshot", (_event, payload) => getLocalMemorySnapshot(payload));
   ipcMain.handle("jarvis:generateAiReply", (_event, payload) => generateAiReply(payload));
   ipcMain.handle("jarvis:syncGmailRecentMessages", (_event, payload) => syncGmailRecentMessages(payload));
   ipcMain.handle("jarvis:getSmartleadCampaignStatus", (_event, payload) => getSmartleadCampaignStatus(payload));
@@ -887,6 +888,14 @@ function buildRemoteMcpQuickStartCalls(baseUrl) {
       approvalRequired: false,
     },
     {
+      label: "Get redacted local memory snapshot",
+      tool: "arcigy.get_local_memory_snapshot",
+      method: "POST",
+      url: toolUrl("arcigy.get_local_memory_snapshot"),
+      body: { limit: 10 },
+      approvalRequired: false,
+    },
+    {
       label: "Get Smartlead outreach brief",
       tool: "arcigy.get_smartlead_outreach_brief",
       method: "POST",
@@ -1388,6 +1397,7 @@ function listWebMcpTools() {
     { name: "arcigy.get_client_need_alerts", requiresApproval: false },
     { name: "arcigy.update_client_need_status", requiresApproval: true },
     { name: "arcigy.get_audit_events", requiresApproval: false },
+    { name: "arcigy.get_local_memory_snapshot", requiresApproval: false },
     { name: "arcigy.jarvis_voice_event", requiresApproval: false },
     { name: "arcigy.get_system_health", requiresApproval: false },
     { name: "arcigy.run_integration_diagnostics", requiresApproval: false },
@@ -3001,6 +3011,20 @@ function getAuditEvents(payload = {}) {
       automationKey: payload?.automationKey,
       status: payload?.status,
       limit: payload?.limit || 20,
+    }),
+  ]);
+  return JSON.parse(result.stdout);
+}
+
+function getLocalMemorySnapshot(payload = {}) {
+  const result = runPython([
+    "scripts/jarvis_local_db.py",
+    "local-memory-snapshot",
+    "--db",
+    payload?.dbPath || defaultDbPath,
+    "--payload",
+    JSON.stringify({
+      limit: payload?.limit || 10,
     }),
   ]);
   return JSON.parse(result.stdout);

@@ -53,6 +53,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.get_client_need_alerts",
     "arcigy.update_client_need_status",
     "arcigy.get_audit_events",
+    "arcigy.get_local_memory_snapshot",
     "arcigy.jarvis_voice_event",
     "arcigy.get_system_health",
     "arcigy.run_integration_diagnostics",
@@ -2520,6 +2521,57 @@ test("local SQLite CLI redacts secrets from local data payloads", () => {
   assert.match(output, /\[redacted-google-api-key\]/);
   assert.match(output, /\[redacted-provider-key\]/);
   assert.match(output, /postgresql:\/\/postgres:\[redacted\]@example\.com:5432\/db/);
+});
+
+test("local SQLite CLI exports a redacted local memory snapshot", () => {
+  const dir = mkdtempSync(join(tmpdir(), "jarvis-memory-snapshot-db-"));
+  const dbPath = join(dir, "jarvis.db");
+  const python = process.env.JARVIS_PYTHON || "python";
+  const googleKey = "AI" + "za" + "S" + "y" + "C".repeat(32);
+
+  runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "upsert-person",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify({
+      primaryEmail: "snapshot@example.com",
+      kind: "client",
+      data: { googleKey },
+    }),
+  ]);
+  runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "ingest-message",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify({
+      fromEmail: "snapshot@example.com",
+      source: "gmail",
+      subject: "Snapshot",
+      text: `Potrebujem pomoc s ${googleKey}`,
+      externalId: "snapshot-message-1",
+    }),
+  ]);
+
+  const snapshot = runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "local-memory-snapshot",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify({ limit: 5 }),
+  ]);
+  const output = JSON.stringify(snapshot);
+
+  assert.equal(snapshot.mode, "local-memory-snapshot");
+  assert.equal(snapshot.redacted, true);
+  assert.equal(snapshot.counts.people, 1);
+  assert.equal(snapshot.counts.emailActivities, 1);
+  assert.equal(output.includes(googleKey), false);
+  assert.match(output, /\[redacted-google-api-key\]/);
 });
 
 function runPythonJson(python: string, args: string[]) {

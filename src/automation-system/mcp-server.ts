@@ -512,6 +512,25 @@ export function createJarvisMcpServer(): McpServer {
   );
 
   server.registerTool(
+    "arcigy.get_local_memory_snapshot",
+    {
+      title: "Get local memory snapshot",
+      description: "Return a secret-safe read-only snapshot of local people, email activity, client needs, and audit events.",
+      inputSchema: {
+        dbPath: z.string().optional(),
+        limit: z.number().int().min(1).max(50).default(10),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async ({ dbPath, ...payload }) => jsonDbTool("local-memory-snapshot", payload, dbPath)
+  );
+
+  server.registerTool(
     "arcigy.jarvis_voice_event",
     {
       title: "Jarvis voice event",
@@ -990,7 +1009,8 @@ function jsonDbTool(
     | "list-open-needs"
     | "update-need-status"
     | "add-audit-event"
-    | "list-audit-events",
+    | "list-audit-events"
+    | "local-memory-snapshot",
   payload: Record<string, unknown>,
   dbPath?: string
 ) {
@@ -1011,7 +1031,8 @@ function runDbCommand(
     | "list-open-needs"
     | "update-need-status"
     | "add-audit-event"
-    | "list-audit-events",
+    | "list-audit-events"
+    | "local-memory-snapshot",
   payload: Record<string, unknown>,
   dbPath?: string
 ) {
