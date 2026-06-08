@@ -27,13 +27,13 @@ export const gmailRefreshTokenEnv = [
   "GMAIL_REFRESH_TOKEN_ANDREJ_R_ARCIGY_GROUP",
 ] as const;
 
-const integrations: Array<{ key: IntegrationKey; required: string[]; requiredForProduction?: boolean }> = [
+const integrations: Array<{ key: IntegrationKey; required: string[]; requiredAnyOf?: readonly string[]; requiredForProduction?: boolean }> = [
   { key: "gemini", required: ["GEMINI_API_KEY"] },
   { key: "gmail", required: ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", ...gmailRefreshTokenEnv] },
   { key: "smartlead", required: ["SMARTLEAD_API_KEY"] },
   { key: "postgres", required: ["DATABASE_URL"] },
   { key: "redis", required: ["REDIS_URL"], requiredForProduction: false },
-  { key: "googleSheets", required: ["GOOGLE_SHEET_ID", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"] },
+  { key: "googleSheets", required: ["GOOGLE_SHEET_ID", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"], requiredAnyOf: gmailRefreshTokenEnv },
   { key: "googleMaps", required: ["GOOGLE_MAPS_API_KEY"] },
   { key: "serper", required: ["SERPER_API_KEY"], requiredForProduction: false },
 ];
@@ -54,7 +54,10 @@ export function requireEnv(env: RuntimeEnv, key: string): string {
 
 export function getIntegrationHealth(env: RuntimeEnv = process.env): IntegrationHealth[] {
   return integrations.map((integration) => {
-    const missing = integration.required.flatMap((key) => getRuntimeEnvIssue(env, key));
+    const missing = [
+      ...integration.required.flatMap((key) => getRuntimeEnvIssue(env, key)),
+      ...getAnyOfRuntimeEnvIssue(env, integration.requiredAnyOf),
+    ];
     return {
       key: integration.key,
       configured: missing.length === 0,
@@ -62,6 +65,11 @@ export function getIntegrationHealth(env: RuntimeEnv = process.env): Integration
       requiredForProduction: integration.requiredForProduction !== false,
     };
   });
+}
+
+function getAnyOfRuntimeEnvIssue(env: RuntimeEnv, keys: readonly string[] | undefined): string[] {
+  if (!keys?.length) return [];
+  return keys.some((key) => getEnv(env, key)) ? [] : [`one of ${keys.join(", ")}`];
 }
 
 function getRuntimeEnvIssue(env: RuntimeEnv, key: string): string[] {

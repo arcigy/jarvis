@@ -531,6 +531,24 @@ test("runtime integration health rejects placeholder URL credentials", () => {
   assert.equal(health.find((item) => item.key === "redis")?.requiredForProduction, false);
 });
 
+test("runtime integration health requires Google OAuth account for Sheets", () => {
+  const withoutAccount = getIntegrationHealth({
+    GOOGLE_SHEET_ID: "sheet",
+    GOOGLE_CLIENT_ID: "client",
+    GOOGLE_CLIENT_SECRET: "secret",
+  });
+  const withAccount = getIntegrationHealth({
+    GOOGLE_SHEET_ID: "sheet",
+    GOOGLE_CLIENT_ID: "client",
+    GOOGLE_CLIENT_SECRET: "secret",
+    GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP: "refresh",
+  });
+
+  assert.equal(withoutAccount.find((item) => item.key === "googleSheets")?.configured, false);
+  assert.match(withoutAccount.find((item) => item.key === "googleSheets")?.missing.join(" ") ?? "", /one of GMAIL_REFRESH_TOKEN_/);
+  assert.equal(withAccount.find((item) => item.key === "googleSheets")?.configured, true);
+});
+
 test("Gemini reply helper calls generateContent and extracts text", async () => {
   const calls: Array<{ url: string; body: unknown }> = [];
   const fetchImpl = async (url: string | URL | Request, init?: RequestInit) => {
