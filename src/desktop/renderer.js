@@ -461,8 +461,9 @@ function renderOperatorBriefing(briefing) {
 
 function renderOperatorBriefingCards(briefing) {
   const sections = briefing.sections ?? {};
+  const readiness = sections.readiness ?? briefing.summary;
   const cards = [
-    { key: "readiness", label: "Readiness", value: sections.readiness ?? briefing.summary, state: briefing.status === "blocked" ? "blocked" : "ready" },
+    { key: "readiness", label: "Readiness", value: readiness, state: readinessCardState(readiness) },
     { key: "coldOutreach", label: "Outreach", value: sections.coldOutreach, state: textHasAttention(sections.coldOutreach) ? "attention" : "ready" },
     { key: "clientNeeds", label: "Client needs", value: sections.clientNeeds, state: textHasAttention(sections.clientNeeds) ? "attention" : "ready" },
     { key: "preparedReplies", label: "Approvals", value: sections.preparedReplies, state: textHasAttention(sections.preparedReplies) ? "attention" : "ready" },
@@ -482,8 +483,15 @@ function renderOperatorBriefingCards(briefing) {
   }
 }
 
+function readinessCardState(value) {
+  const status = String(value ?? "").match(/^Readiness:\s*([a-z]+)/i)?.[1]?.toLowerCase();
+  if (status === "blocked") return "blocked";
+  if (status === "attention") return "attention";
+  return textHasAttention(value) ? "attention" : "ready";
+}
+
 function textHasAttention(value) {
-  return /([1-9]\d*\s*(open|reply|positive|alert|need|request|approval|blok|warning|attention|odpoved|pozitiv|poziadav))/i.test(String(value ?? ""));
+  return /([1-9]\d*\s*(open|reply|positive|alert|need|request|approval|blok|warning|attention|odpoved|pozitiv|poziadav|otvoren|caka|čaká|schval|schváľ|schvalenie|schválenie))/i.test(String(value ?? ""));
 }
 
 function trackReadinessNoticeFromBriefing(briefing) {

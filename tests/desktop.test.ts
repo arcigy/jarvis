@@ -291,7 +291,10 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /function renderOperatorBriefingCards/);
   assert.match(renderer, /elements\.briefingGrid\.replaceChildren\(\)/);
   assert.match(renderer, /elements\.briefingGrid\.appendChild\(node\)/);
+  assert.match(renderer, /function readinessCardState/);
+  assert.match(renderer, /status === "attention"/);
   assert.match(renderer, /function textHasAttention/);
+  assert.match(renderer, /otvoren\|caka\|čaká/);
   assert.match(renderer, /Loading operator briefing/);
   assert.match(renderer, /sections\.liveSync/);
   assert.match(renderer, /sections\.readinessAttention/);
