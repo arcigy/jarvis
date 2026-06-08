@@ -625,6 +625,7 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async ({ dbPath, accountEnvKey, query, maxResults, dryRun }) => {
+      const safeDbPath = resolveOptionalRepoPath(dbPath, "dbPath");
       const accounts = listConfiguredGmailAccounts().filter((account) => !accountEnvKey || account.envKey === accountEnvKey);
       if (!accounts.length) {
         throw new Error(accountEnvKey ? `Configured Gmail account not found: ${accountEnvKey}` : "No configured Gmail accounts found.");
@@ -636,7 +637,7 @@ export function createJarvisMcpServer(): McpServer {
         const ingested = [];
         if (!dryRun) {
           for (const event of events) {
-            ingested.push(runDbCommand("ingest-message", event, dbPath));
+            ingested.push(runDbCommand("ingest-message", event, safeDbPath));
           }
         }
         const createdItems = ingested.filter((item) => item.status === "created");

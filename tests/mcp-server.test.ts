@@ -143,6 +143,13 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
     }),
     /dbPath must stay inside the Jarvis repository/
   );
+  assertToolError(
+    await client.callTool({
+      name: "arcigy.sync_gmail_recent_messages",
+      arguments: { dryRun: true, dbPath: join(tmpdir(), "outside-jarvis-gmail.sqlite") },
+    }),
+    /dbPath must stay inside the Jarvis repository/
+  );
 
   assertToolError(
     await client.callTool({
