@@ -701,6 +701,7 @@ function buildRemoteMcpHandoffRunbook(baseUrl) {
 
 const localStateWriteTools = new Set([
   "arcigy.add_cold_outreach_event",
+  "arcigy.prepare_positive_outreach_reply",
   "arcigy.upsert_local_person",
   "arcigy.add_client_need_signal",
   "arcigy.ingest_client_message",
@@ -765,6 +766,20 @@ function buildRemoteMcpQuickStartCalls(baseUrl) {
       method: "POST",
       url: toolUrl("arcigy.generate_ai_reply"),
       body: { message: "Client message here", context: "Arcigy Jarvis remote handoff.", language: "sk", tone: "executive" },
+      approvalRequired: false,
+    },
+    {
+      label: "Prepare a positive outreach reply for approval",
+      tool: "arcigy.prepare_positive_outreach_reply",
+      method: "POST",
+      url: toolUrl("arcigy.prepare_positive_outreach_reply"),
+      body: {
+        leadEmail: "lead@example.com",
+        positiveSignal: "Lead odpovedal pozitivne a chce kratky call.",
+        context: "Remote handoff demo. This stores a local prepared_reply draft only.",
+        language: "sk",
+        tone: "executive",
+      },
       approvalRequired: false,
     },
     {
@@ -1217,6 +1232,7 @@ function listWebMcpTools() {
     { name: "arcigy.get_cold_outreach_brief", requiresApproval: false },
     { name: "arcigy.get_cold_outreach_brief_from_db", requiresApproval: false },
     { name: "arcigy.add_cold_outreach_event", requiresApproval: false },
+    { name: "arcigy.prepare_positive_outreach_reply", requiresApproval: false },
     { name: "arcigy.get_prepared_outreach_replies", requiresApproval: false },
     { name: "arcigy.approve_prepared_outreach_reply", requiresApproval: true },
     { name: "arcigy.identify_email", requiresApproval: false },

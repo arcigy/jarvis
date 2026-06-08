@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
+import { listJarvisMcpTools } from "../src/automation-system/mcp-tools.ts";
 
 test("Jarvis doctor reports local readiness without leaking secrets", () => {
   const doctorSource = readFileSync("scripts/jarvis_doctor.ts", "utf-8");
@@ -51,7 +52,7 @@ test("Jarvis doctor reports local readiness without leaking secrets", () => {
     deniedContractStatus?: number;
     webContractOutputDir?: string;
   };
-  assert.equal(webBridgeDetails?.expectedToolCount, 28);
+  assert.equal(webBridgeDetails?.expectedToolCount, listJarvisMcpTools().length);
   assert.equal(webBridgeDetails?.uiAssetsReady, true);
   assert.equal(webBridgeDetails?.commandDeckReady, true);
   assert.equal(webBridgeDetails?.mcpToolCallReady, true);

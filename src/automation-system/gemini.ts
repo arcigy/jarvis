@@ -24,6 +24,16 @@ export type ClientReplyDraftInput = {
   tone?: "direct" | "warm" | "executive";
 };
 
+export type PositiveOutreachReplyDraftInput = {
+  leadEmail: string;
+  leadName?: string;
+  companyName?: string;
+  positiveSignal: string;
+  context?: string;
+  language?: "sk" | "en";
+  tone?: "direct" | "warm" | "executive";
+};
+
 export async function generateGeminiText(
   input: GeminiTextInput,
   env: RuntimeEnv = process.env,
@@ -145,5 +155,33 @@ export function buildClientReplyPrompt(input: ClientReplyDraftInput): GeminiText
     ]
       .filter(Boolean)
       .join("\n"),
+  };
+}
+
+export function buildPositiveOutreachReplyPrompt(input: PositiveOutreachReplyDraftInput): GeminiTextInput {
+  const language = input.language ?? "sk";
+  const tone = input.tone ?? "executive";
+  return {
+    systemInstruction:
+      "Si Arcigy Jarvis. Pripravuj profesionalne, vecne a family-friendly odpovede na pozitivne cold outreach reakcie. Nikdy neslubuj odoslanie bez schvalenia pouzivatelom. Ak vstup obsahuje citlive udaje alebo secrety, nereprodukuj ich.",
+    prompt: [
+      `Lead email: ${safeAiPromptPart(input.leadEmail)}.`,
+      input.leadName ? `Meno leadu: ${safeAiPromptPart(input.leadName)}.` : null,
+      input.companyName ? `Firma: ${safeAiPromptPart(input.companyName)}.` : null,
+      `Jazyk odpovede: ${language}.`,
+      `Ton: ${tone}.`,
+      input.context ? `Kontext kampane: ${safeAiPromptPart(input.context)}` : null,
+      "Pozitivny signal od leadu:",
+      safeAiPromptPart(input.positiveSignal),
+      [
+        "Vytvor kratky navrh odpovede pre pozitivny lead.",
+        "Ciel: posunut lead na jasny dalsi krok, idealne kratky call alebo doplnenie detailov.",
+        "Neodosielaj nic, iba priprav draft.",
+        "Vrat iba samotny emailovy text bez markdownu, bez podpisu so secretmi a bez tvrdenia, ze sprava uz bola odoslana.",
+      ].join(" "),
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    temperature: 0.3,
   };
 }

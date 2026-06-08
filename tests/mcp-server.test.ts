@@ -7,6 +7,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 
 import { createJarvisMcpServer } from "../src/automation-system/mcp-server.ts";
+import { listJarvisMcpTools } from "../src/automation-system/mcp-tools.ts";
 
 test("Jarvis MCP server lists and calls automation tools", async () => {
   const source = readFileSync("src/automation-system/mcp-server.ts", "utf-8");
@@ -30,6 +31,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(names.includes("arcigy.get_cold_outreach_brief_from_db"));
   assert.ok(names.includes("arcigy.add_cold_outreach_event"));
   assert.ok(names.includes("arcigy.get_prepared_outreach_replies"));
+  assert.ok(names.includes("arcigy.prepare_positive_outreach_reply"));
   assert.ok(names.includes("arcigy.approve_prepared_outreach_reply"));
   assert.ok(names.includes("arcigy.identify_email"));
   assert.ok(names.includes("arcigy.ingest_client_message"));
@@ -105,7 +107,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
     launchChecklist: Array<{ id: string; status: string }>;
   };
   assert.ok(["ready", "attention", "blocked"].includes(readiness.status));
-  assert.equal(readiness.mcp.toolCount, 28);
+  assert.equal(readiness.mcp.toolCount, listJarvisMcpTools().length);
   assert.ok(Array.isArray(readiness.nextActions));
   assert.ok(Array.isArray(readiness.fixGuide));
   assert.ok(Array.isArray(readiness.attentionQueue));
@@ -140,9 +142,10 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.equal(pack.limits.pathPolicy, "repo-only");
   assert.equal(pack.limits.maxJsonBytes > 0, true);
   assert.equal(pack.limits.writesRequireExplicitToolCall, true);
-  assert.equal(pack.tools.count, 28);
+  assert.equal(pack.tools.count, listJarvisMcpTools().length);
   assert.ok(pack.tools.approvalRequired.includes("arcigy.generate_contract_documents"));
   assert.ok(pack.tools.localStateWrite.includes("arcigy.sync_gmail_recent_messages"));
+  assert.ok(pack.tools.localStateWrite.includes("arcigy.prepare_positive_outreach_reply"));
   assert.ok(pack.tools.localStateWrite.includes("arcigy.ingest_client_message"));
   assert.equal(pack.tools.readOnlyOrDraft.includes("arcigy.sync_gmail_recent_messages"), false);
   assert.equal(pack.tools.readOnlyOrDraft.includes("arcigy.upsert_local_person"), false);
@@ -401,6 +404,60 @@ test("Jarvis MCP server ingests client messages and returns a need alert", async
 
   await client.close();
   await server.close();
+});
+
+test("Jarvis MCP server prepares positive outreach replies with Gemini", async () => {
+  const previousGeminiKey = process.env.GEMINI_API_KEY;
+  const originalFetch = globalThis.fetch.bind(globalThis);
+  process.env.GEMINI_API_KEY = "gemini";
+  globalThis.fetch = async (input: string | URL | Request) => {
+    const target = String(input);
+    if (target.includes("generativelanguage.googleapis.com")) {
+      return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "Dakujem za pozitivnu reakciu, navrhujem kratky call." }] } }] }), {
+        headers: { "content-type": "application/json" },
+      });
+    }
+    return originalFetch(input);
+  };
+
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  const server = createJarvisMcpServer();
+  const client = new Client({ name: "test-client", version: "0.1.0" });
+  const dbPath = join(makeRepoTempDir("jarvis-mcp-positive-"), "jarvis.db");
+
+  await server.connect(serverTransport);
+  await client.connect(clientTransport);
+
+  try {
+    const prepared = await client.callTool({
+      name: "arcigy.prepare_positive_outreach_reply",
+      arguments: {
+        dbPath,
+        leadEmail: "lead@example.com",
+        positiveSignal: "Lead chce demo a pyta sa na termin.",
+        context: "Cold outreach pre Arcigy automatizacie.",
+      },
+    });
+    const preparedBody = getStructuredResult(prepared) as { status: string; replyText: string; preparedReply: { eventType: string } };
+    assert.equal(preparedBody.status, "prepared");
+    assert.equal(preparedBody.replyText, "Dakujem za pozitivnu reakciu, navrhujem kratky call.");
+    assert.equal(preparedBody.preparedReply.eventType, "prepared_reply");
+
+    const pending = await client.callTool({
+      name: "arcigy.get_prepared_outreach_replies",
+      arguments: { dbPath, status: "pending", limit: 5 },
+    });
+    const pendingBody = getStructuredResult(pending) as { count: number; replies: Array<{ replyText: string; positiveSignal: string }> };
+    assert.equal(pendingBody.count, 1);
+    assert.equal(pendingBody.replies[0].replyText, "Dakujem za pozitivnu reakciu, navrhujem kratky call.");
+    assert.equal(pendingBody.replies[0].positiveSignal, "Lead chce demo a pyta sa na termin.");
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (previousGeminiKey === undefined) delete process.env.GEMINI_API_KEY;
+    else process.env.GEMINI_API_KEY = previousGeminiKey;
+    await client.close();
+    await server.close();
+  }
 });
 
 test("Jarvis MCP server summarizes cold outreach from local SQLite events", async () => {

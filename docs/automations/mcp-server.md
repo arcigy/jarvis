@@ -61,6 +61,7 @@ The desktop MCP panel now runs an automatic preflight watch every two minutes. I
 - `/api/cold-outreach-brief` with `live=true` prefers live Smartlead statistics and falls back to local SQLite.
 - `arcigy.add_cold_outreach_event`: stores local cold outreach activity.
 - `arcigy.get_cold_outreach_brief_from_db`: computes Slovak cold outreach summary from SQLite events.
+- `arcigy.prepare_positive_outreach_reply`: uses Gemini to draft a reply for a positive cold outreach lead and stores it as a local `prepared_reply` waiting for approval.
 - `arcigy.get_prepared_outreach_replies`: returns prepared cold outreach replies waiting for approval.
 - `arcigy.approve_prepared_outreach_reply`: marks one prepared outreach reply as approved after explicit confirmation.
 - `arcigy.upsert_local_person`: local client/lead/contact upsert into SQLite.

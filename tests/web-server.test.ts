@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 import { createLocalApiServer } from "../src/server/local-api-server.ts";
+import { listJarvisMcpTools } from "../src/automation-system/mcp-tools.ts";
 
 test("local web bridge serves UI and API health", async () => {
   const source = readFileSync("src/server/local-api-server.ts", "utf-8");
@@ -76,12 +77,14 @@ test("local web bridge serves UI and API health", async () => {
     assert.match(manifest.endpoints.mcpToolCallPattern, /\/api\/mcp\/\{toolName\}$/);
     assert.ok(manifest.toolPolicy.approvalRequired.includes("arcigy.generate_contract_documents"));
     assert.ok(manifest.toolPolicy.localStateWrite.includes("arcigy.sync_gmail_recent_messages"));
+    assert.ok(manifest.toolPolicy.localStateWrite.includes("arcigy.prepare_positive_outreach_reply"));
     assert.equal(manifest.toolPolicy.readOnlyOrDraft.includes("arcigy.ingest_client_message"), false);
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.draft_contract_intake" && tool.method === "POST"));
     assert.ok(manifest.tools.every((tool) => tool.method === "POST" && tool.url.endsWith(`/api/mcp/${tool.name}`)));
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.generate_contract_documents" && tool.approval.required === true && tool.approval.field === "approval.approved"));
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.get_smartlead_outreach_brief" && tool.method === "POST"));
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.sync_gmail_recent_messages" && tool.localStateWrite === true && tool.readOnlyOrDraft === false));
+    assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.prepare_positive_outreach_reply" && tool.localStateWrite === true && tool.readOnlyOrDraft === false));
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.generate_ai_reply" && tool.localStateWrite === false && tool.readOnlyOrDraft === true));
 
     const mcpBrief = await postJson(`${baseUrl}/api/mcp/arcigy.get_cold_outreach_brief`, {
@@ -325,14 +328,14 @@ test("local web bridge serves UI and API health", async () => {
       launchChecklist: Array<{ id: string; status: string }>;
     };
     assert.ok(["ready", "attention", "blocked"].includes(readinessBody.status));
-    assert.equal(readinessBody.mcp.toolCount, 28);
+    assert.equal(readinessBody.mcp.toolCount, listJarvisMcpTools().length);
     assert.ok(Array.isArray(readinessBody.nextActions));
     assert.ok(Array.isArray(readinessBody.fixGuide));
     assert.ok(Array.isArray(readinessBody.attentionQueue));
     assert.ok(readinessBody.launchChecklist.some((item) => item.id === "approval-locks" && item.status === "ready"));
 
     const mcpReadiness = await postJson(`${baseUrl}/api/mcp/arcigy.get_production_readiness`, { live: false });
-    assert.equal(mcpReadiness.result.mcp.toolCount, 28);
+    assert.equal(mcpReadiness.result.mcp.toolCount, listJarvisMcpTools().length);
     assert.ok(Array.isArray(mcpReadiness.result.fixGuide));
     assert.ok(Array.isArray(mcpReadiness.result.attentionQueue));
     assert.ok(mcpReadiness.result.launchChecklist.some((item: { id: string }) => item.id === "mcp-registry"));
@@ -362,7 +365,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(remotePackBody.limits.pathPolicy, "repo-only");
     assert.equal(remotePackBody.limits.maxJsonBytes > 0, true);
     assert.equal(remotePackBody.limits.writesRequireExplicitToolCall, true);
-    assert.equal(remotePackBody.tools.count, 28);
+    assert.equal(remotePackBody.tools.count, listJarvisMcpTools().length);
     assert.match(remotePackBody.handoff.connectionPackUrl, /\/api\/remote-mcp-pack\?includeReadiness=true&live=true$/);
     assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "connection-pack" && item.url.includes("includeReadiness=true")));
     assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "connection-pack" && item.expected.includes("repo-only limits")));
@@ -380,9 +383,11 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_audit_events" && call.body.limit === 20));
     assert.ok(remotePackBody.tools.approvalRequired.includes("arcigy.append_leads_to_google_sheet"));
     assert.ok(remotePackBody.tools.localStateWrite.includes("arcigy.sync_gmail_recent_messages"));
+    assert.ok(remotePackBody.tools.localStateWrite.includes("arcigy.prepare_positive_outreach_reply"));
     assert.equal(remotePackBody.tools.readOnlyOrDraft.includes("arcigy.ingest_client_message"), false);
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.run_remote_mcp_smoke" && call.approvalRequired === false));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_outreach_brief" && !("campaignId" in call.body)));
+    assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.prepare_positive_outreach_reply" && call.body.leadEmail === "lead@example.com"));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.sync_gmail_recent_messages" && call.body.dryRun === true));
     assert.ok(
       remotePackBody.quickStartCalls.some(
@@ -400,13 +405,13 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(remotePackBody.tunnel.secureCommand, "npm run web:tunnel:secure");
 
     const mcpRemotePack = await postJson(`${baseUrl}/api/mcp/arcigy.get_remote_mcp_pack`, { includeReadiness: false });
-    assert.equal(mcpRemotePack.result.tools.count, 28);
+    assert.equal(mcpRemotePack.result.tools.count, listJarvisMcpTools().length);
 
     const smoke = await fetch(`${baseUrl}/api/remote-mcp-smoke`);
     assert.equal(smoke.status, 200);
     const smokeBody = (await smoke.json()) as { status: string; expectedToolCount: number; checks: Array<{ key: string; status: string }> };
     assert.equal(smokeBody.status, "ready");
-    assert.equal(smokeBody.expectedToolCount, 28);
+    assert.equal(smokeBody.expectedToolCount, listJarvisMcpTools().length);
     assert.ok(smokeBody.checks.some((check) => check.key === "approval-gate" && check.status === "ready"));
     assert.ok(smokeBody.checks.some((check) => check.key === "manifest-local-write-policy" && check.status === "ready"));
     assert.ok(smokeBody.checks.some((check) => check.key === "pack-local-write-policy" && check.status === "ready"));
@@ -416,7 +421,7 @@ test("local web bridge serves UI and API health", async () => {
 
     const mcpSmoke = await postJson(`${baseUrl}/api/mcp/arcigy.run_remote_mcp_smoke`, {});
     assert.equal(mcpSmoke.result.status, "ready");
-    assert.equal(mcpSmoke.result.expectedToolCount, 28);
+    assert.equal(mcpSmoke.result.expectedToolCount, listJarvisMcpTools().length);
 
     const voice = await fetch(`${baseUrl}/api/jarvis/voice-event`, {
       method: "POST",
@@ -691,6 +696,64 @@ test("local web bridge MCP AI reply preserves prompt options", async () => {
     assert.match(requestText, /Jazyk odpovede: en/);
     assert.match(requestText, /Ton: warm/);
     assert.match(requestText, /Kontext: Renewal conversation/);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (previousGeminiKey === undefined) delete process.env.GEMINI_API_KEY;
+    else process.env.GEMINI_API_KEY = previousGeminiKey;
+    await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
+test("local web bridge prepares positive outreach replies with Gemini and stores approval draft", async () => {
+  const previousGeminiKey = process.env.GEMINI_API_KEY;
+  const originalFetch = globalThis.fetch.bind(globalThis);
+  const geminiBodies: unknown[] = [];
+  process.env.GEMINI_API_KEY = "gemini";
+  globalThis.fetch = async (input: string | URL | Request, init?: RequestInit) => {
+    const target = String(input);
+    if (target.includes("generativelanguage.googleapis.com")) {
+      geminiBodies.push(JSON.parse(String(init?.body)));
+      return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "Dakujem za reakciu, navrhujem kratky 15-min call." }] } }] }), {
+        headers: { "content-type": "application/json" },
+      });
+    }
+    return originalFetch(input, init);
+  };
+
+  const server = createLocalApiServer();
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  const baseUrl = `http://127.0.0.1:${address.port}`;
+  const testRunDir = join(process.cwd(), "generated", "test-runs");
+  mkdirSync(testRunDir, { recursive: true });
+  const dbPath = join(mkdtempSync(join(testRunDir, "jarvis-positive-web-")), "jarvis.db");
+
+  try {
+    const prepared = await postJson(`${baseUrl}/api/mcp/arcigy.prepare_positive_outreach_reply`, {
+      dbPath,
+      leadEmail: "lead@example.com",
+      leadName: "Demo Lead",
+      positiveSignal: "Lead chce demo a navrhol call.",
+      context: "Cold outreach kampan pre automatizacie.",
+      subject: "Re: automatizacie",
+    });
+
+    assert.equal(prepared.result.status, "prepared");
+    assert.equal(prepared.result.replyText, "Dakujem za reakciu, navrhujem kratky 15-min call.");
+    assert.equal(prepared.result.preparedReply.eventType, "prepared_reply");
+    const requestText = JSON.stringify(geminiBodies[0]);
+    assert.match(requestText, /Lead email: lead@example\.com/);
+    assert.match(requestText, /Lead chce demo/);
+
+    const pending = await postJson(`${baseUrl}/api/mcp/arcigy.get_prepared_outreach_replies`, {
+      dbPath,
+      status: "pending",
+      limit: 5,
+    });
+    assert.equal(pending.result.count, 1);
+    assert.equal(pending.result.replies[0].replyText, "Dakujem za reakciu, navrhujem kratky 15-min call.");
+    assert.equal(pending.result.replies[0].positiveSignal, "Lead chce demo a navrhol call.");
   } finally {
     globalThis.fetch = originalFetch;
     if (previousGeminiKey === undefined) delete process.env.GEMINI_API_KEY;

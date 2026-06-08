@@ -8,7 +8,7 @@ import { redactSensitiveText } from "../automation-system/ai-safety.ts";
 import { draftContractIntake } from "../automation-system/contract-intake-draft.ts";
 import { runIntegrationDiagnostics } from "../automation-system/diagnostics.ts";
 import { getIntegrationHealth, loadLocalEnv } from "../automation-system/env.ts";
-import { buildClientReplyPrompt, generateGeminiText } from "../automation-system/gemini.ts";
+import { buildClientReplyPrompt, buildPositiveOutreachReplyPrompt, generateGeminiText } from "../automation-system/gemini.ts";
 import { defaultGmailBriefingQuery, defaultGmailSyncQuery, listConfiguredGmailAccounts, listRecentGmailMessageEvents } from "../automation-system/gmail.ts";
 import { containsWakeWord, type JarvisVoiceSession } from "../automation-system/jarvis-voice.ts";
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "../automation-system/lead-discovery.ts";
@@ -469,6 +469,10 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
     writeJson(response, 200, { result: runDbTool("list-prepared-replies", payload) });
     return;
   }
+  if (name === "arcigy.prepare_positive_outreach_reply") {
+    writeJson(response, 200, { result: await preparePositiveOutreachReply(payload) });
+    return;
+  }
   if (name === "arcigy.approve_prepared_outreach_reply") {
     writeJson(response, 200, { result: runDbTool("approve-prepared-reply", payload) });
     return;
@@ -791,6 +795,54 @@ function getClientNeedAlerts(payload: Record<string, unknown>) {
       }),
     ]).stdout
   );
+}
+
+async function preparePositiveOutreachReply(payload: Record<string, unknown>) {
+  const leadEmail = String(payload.leadEmail ?? "").trim();
+  const positiveSignal = String(payload.positiveSignal ?? "").trim();
+  if (!leadEmail) throw httpError(400, "Lead email is required.");
+  if (!positiveSignal) throw httpError(400, "Positive signal is required.");
+  const draft = await generateGeminiText(
+    buildPositiveOutreachReplyPrompt({
+      leadEmail,
+      leadName: optionalString(payload.leadName),
+      companyName: optionalString(payload.companyName),
+      positiveSignal,
+      context: optionalString(payload.context),
+      language: payload.language === "en" ? "en" : "sk",
+      tone: payload.tone === "direct" || payload.tone === "warm" ? payload.tone : "executive",
+    })
+  );
+  const event = runDbTool("add-cold-event", {
+    dbPath: payload.dbPath,
+    leadEmail,
+    campaignId: optionalString(payload.campaignId),
+    campaignName: optionalString(payload.campaignName),
+    eventType: "prepared_reply",
+    occurredAt: optionalString(payload.occurredAt),
+    data: {
+      subject: optionalString(payload.subject),
+      replyText: draft.text,
+      positiveSignal,
+      leadName: optionalString(payload.leadName),
+      companyName: optionalString(payload.companyName),
+      context: optionalString(payload.context),
+      language: payload.language === "en" ? "en" : "sk",
+      tone: payload.tone === "direct" || payload.tone === "warm" ? payload.tone : "executive",
+      model: draft.model,
+      attempts: draft.attempts,
+      generatedBy: "gemini",
+      requiresApprovalBeforeSend: true,
+    },
+  });
+  return {
+    status: "prepared",
+    preparedReply: event,
+    replyText: draft.text,
+    model: draft.model,
+    attempts: draft.attempts,
+    summary: `Jarvis: Pripravil som odpoved pre ${leadEmail}. Poslem ju az po tvojom schvaleni cez arcigy.approve_prepared_outreach_reply.`,
+  };
 }
 
 async function getOperatorBriefing(payload: Record<string, unknown>) {

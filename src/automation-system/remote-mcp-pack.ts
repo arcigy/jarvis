@@ -287,6 +287,20 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Prepare a positive outreach reply for approval",
+      tool: "arcigy.prepare_positive_outreach_reply",
+      method: "POST",
+      url: toolUrl("arcigy.prepare_positive_outreach_reply"),
+      body: {
+        leadEmail: "lead@example.com",
+        positiveSignal: "Lead odpovedal pozitivne a chce kratky call.",
+        context: "Remote handoff demo. This stores a local prepared_reply draft only.",
+        language: "sk",
+        tone: "executive",
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Draft contract intake JSON without writing files",
       tool: "arcigy.draft_contract_intake",
       method: "POST",

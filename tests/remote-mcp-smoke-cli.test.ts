@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import { createLocalApiServer } from "../src/server/local-api-server.ts";
+import { listJarvisMcpTools } from "../src/automation-system/mcp-tools.ts";
 
 test("remote MCP smoke CLI help and package script are wired", () => {
   const packageJson = JSON.parse(readFileSync("package.json", "utf-8")) as { scripts: Record<string, string> };
@@ -48,7 +49,7 @@ test("remote MCP smoke CLI verifies a local bridge without leaking token", async
     assert.equal(result.stdout.includes(token), false);
     const body = JSON.parse(result.stdout) as { status: string; expectedToolCount: number; tokenValueReturned: boolean; checks: Array<{ key: string; status: string }> };
     assert.equal(body.status, "ready");
-    assert.equal(body.expectedToolCount, 28);
+    assert.equal(body.expectedToolCount, listJarvisMcpTools().length);
     assert.equal(body.tokenValueReturned, false);
     assert.ok(body.checks.some((check) => check.key === "manifest-local-write-policy" && check.status === "ready"));
     assert.ok(body.checks.some((check) => check.key === "pack-local-write-policy" && check.status === "ready"));

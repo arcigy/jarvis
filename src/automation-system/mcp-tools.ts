@@ -8,6 +8,7 @@ export type JarvisMcpToolName =
   | "arcigy.get_cold_outreach_brief"
   | "arcigy.get_cold_outreach_brief_from_db"
   | "arcigy.add_cold_outreach_event"
+  | "arcigy.prepare_positive_outreach_reply"
   | "arcigy.get_prepared_outreach_replies"
   | "arcigy.approve_prepared_outreach_reply"
   | "arcigy.upsert_local_person"
@@ -41,6 +42,7 @@ export type JarvisMcpTool = {
 
 export const localStateWriteToolNames = new Set<JarvisMcpToolName>([
   "arcigy.add_cold_outreach_event",
+  "arcigy.prepare_positive_outreach_reply",
   "arcigy.upsert_local_person",
   "arcigy.add_client_need_signal",
   "arcigy.ingest_client_message",
@@ -80,6 +82,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.add_cold_outreach_event",
       description: "Ulozi lokalny cold outreach event, napriklad sent, opened, replied alebo positive_reply.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.prepare_positive_outreach_reply",
+      description: "Pouzije Gemini na pripravu odpovede pozitivnemu leadu a ulozi ju ako prepared_reply cakajuci na schvalenie.",
       requiresApproval: false,
     },
     {

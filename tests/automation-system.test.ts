@@ -41,6 +41,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.get_cold_outreach_brief",
     "arcigy.get_cold_outreach_brief_from_db",
     "arcigy.add_cold_outreach_event",
+    "arcigy.prepare_positive_outreach_reply",
     "arcigy.get_prepared_outreach_replies",
     "arcigy.approve_prepared_outreach_reply",
     "arcigy.identify_email",
@@ -67,6 +68,7 @@ test("MCP tools expose the requested automation surface", () => {
   ]);
   assert.ok(localStateWriteToolNames.has("arcigy.sync_gmail_recent_messages"));
   assert.ok(localStateWriteToolNames.has("arcigy.ingest_client_message"));
+  assert.ok(localStateWriteToolNames.has("arcigy.prepare_positive_outreach_reply"));
   assert.equal(localStateWriteToolNames.has("arcigy.generate_contract_documents"), false);
   for (const tool of listJarvisMcpTools()) {
     assert.equal(tool.description.length > 20, true);
@@ -83,7 +85,7 @@ test("production readiness report returns blockers and next actions without secr
   });
 
   assert.equal(report.status, "blocked");
-  assert.equal(report.mcp.toolCount, 28);
+  assert.equal(report.mcp.toolCount, listJarvisMcpTools().length);
   assert.ok(report.blockers.some((blocker) => blocker.key === "redis" && blocker.severity === "warning"));
   assert.ok(report.nextActions.some((action) => action.includes("REDIS_URL")));
   assert.ok(report.fixGuide.some((step) => step.id === "redis-real-password" && step.envKeys.includes("REDIS_URL")));

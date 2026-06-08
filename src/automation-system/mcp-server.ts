@@ -9,7 +9,7 @@ import { redactSensitiveText } from "./ai-safety.ts";
 import { draftContractIntake } from "./contract-intake-draft.ts";
 import { runIntegrationDiagnostics } from "./diagnostics.ts";
 import { getIntegrationHealth, loadLocalEnv, summarizeIntegrationHealth } from "./env.ts";
-import { buildClientReplyPrompt, generateGeminiText } from "./gemini.ts";
+import { buildClientReplyPrompt, buildPositiveOutreachReplyPrompt, generateGeminiText } from "./gemini.ts";
 import { defaultGmailBriefingQuery, defaultGmailSyncQuery, listConfiguredGmailAccounts, listRecentGmailMessageEvents } from "./gmail.ts";
 import { handleJarvisVoiceEvent, type JarvisVoiceSession } from "./jarvis-voice.ts";
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "./lead-discovery.ts";
@@ -164,6 +164,35 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async ({ dbPath, ...payload }) => jsonDbTool("list-prepared-replies", payload, dbPath)
+  );
+
+  server.registerTool(
+    "arcigy.prepare_positive_outreach_reply",
+    {
+      title: "Prepare positive outreach reply",
+      description: "Use Gemini to draft a reply for a positive cold outreach lead and store it for approval.",
+      inputSchema: {
+        dbPath: z.string().optional(),
+        leadEmail: z.string().email(),
+        leadName: z.string().optional(),
+        companyName: z.string().optional(),
+        campaignId: z.string().optional(),
+        campaignName: z.string().optional(),
+        positiveSignal: z.string().min(1),
+        context: z.string().optional(),
+        subject: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        tone: z.enum(["direct", "warm", "executive"]).default("executive"),
+        occurredAt: z.string().optional(),
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async ({ dbPath, ...payload }) => jsonResult(await preparePositiveOutreachReply(payload, dbPath))
   );
 
   server.registerTool(
@@ -913,6 +942,58 @@ function runDbCommand(
   }
   const result = runPython(args);
   return JSON.parse(result.stdout);
+}
+
+async function preparePositiveOutreachReply(
+  payload: {
+    leadEmail: string;
+    leadName?: string;
+    companyName?: string;
+    campaignId?: string;
+    campaignName?: string;
+    positiveSignal: string;
+    context?: string;
+    subject?: string;
+    language?: "sk" | "en";
+    tone?: "direct" | "warm" | "executive";
+    occurredAt?: string;
+  },
+  dbPath?: string
+) {
+  const draft = await generateGeminiText(buildPositiveOutreachReplyPrompt(payload));
+  const event = runDbCommand(
+    "add-cold-event",
+    {
+      leadEmail: payload.leadEmail,
+      campaignId: payload.campaignId,
+      campaignName: payload.campaignName,
+      eventType: "prepared_reply",
+      occurredAt: payload.occurredAt,
+      data: {
+        subject: payload.subject,
+        replyText: draft.text,
+        positiveSignal: payload.positiveSignal,
+        leadName: payload.leadName,
+        companyName: payload.companyName,
+        context: payload.context,
+        language: payload.language ?? "sk",
+        tone: payload.tone ?? "executive",
+        model: draft.model,
+        attempts: draft.attempts,
+        generatedBy: "gemini",
+        requiresApprovalBeforeSend: true,
+      },
+    },
+    dbPath
+  );
+  return {
+    status: "prepared",
+    preparedReply: event,
+    replyText: draft.text,
+    model: draft.model,
+    attempts: draft.attempts,
+    summary: `Jarvis: Pripravil som odpoved pre ${payload.leadEmail}. Poslem ju az po tvojom schvaleni cez arcigy.approve_prepared_outreach_reply.`,
+  };
 }
 
 function requireExplicitApproval(name: string, payload: { approval?: { approved?: boolean } }) {
