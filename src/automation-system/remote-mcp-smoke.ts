@@ -54,9 +54,9 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
   checks.push(check(manifest.body?.auth?.header === "Authorization: Bearer <JARVIS_WEB_TOKEN>", "auth-placeholder", "Manifest returns auth placeholder, not the token value."));
   checks.push(
     check(
-      hasLocalWritePolicy(manifest.body?.toolPolicy),
+      hasExactToolPolicy(manifest.body?.toolPolicy),
       "manifest-local-write-policy",
-      "Manifest identifies local write tools separately from read-only/draft tools."
+      "Manifest exposes exact approval, local-write, and read-only/draft tool policy."
     )
   );
 
@@ -65,9 +65,9 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
   checks.push(check(pack.body?.auth?.tokenValueReturned === false, "pack-secret-policy", "Connection pack confirms tokenValueReturned=false."));
   checks.push(
     check(
-      hasLocalWritePolicy(pack.body?.tools),
+      hasExactToolPolicy(pack.body?.tools),
       "pack-local-write-policy",
-      "Connection pack identifies local write tools separately from read-only/draft tools."
+      "Connection pack exposes exact approval, local-write, and read-only/draft tool policy."
     )
   );
   checks.push(
@@ -197,12 +197,17 @@ function check(ok: boolean, key: string, message: string): RemoteMcpSmokeCheck {
   };
 }
 
-function hasLocalWritePolicy(value: unknown): boolean {
+function hasExactToolPolicy(value: unknown): boolean {
   if (!value || typeof value !== "object") return false;
-  const policy = value as { localStateWrite?: unknown; readOnlyOrDraft?: unknown };
-  const localStateWrite = Array.isArray(policy.localStateWrite) ? policy.localStateWrite : [];
-  const readOnlyOrDraft = Array.isArray(policy.readOnlyOrDraft) ? policy.readOnlyOrDraft : [];
-  return localStateWrite.includes("arcigy.sync_gmail_recent_messages") && !readOnlyOrDraft.includes("arcigy.sync_gmail_recent_messages");
+  const policy = value as { approvalRequired?: unknown; localStateWrite?: unknown; readOnlyOrDraft?: unknown };
+  return (
+    Array.isArray(policy.approvalRequired) &&
+    Array.isArray(policy.localStateWrite) &&
+    Array.isArray(policy.readOnlyOrDraft) &&
+    sameStringArray(policy.approvalRequired, approvalRequiredToolNames()) &&
+    sameStringArray(policy.localStateWrite, localStateWriteToolNamesList()) &&
+    sameStringArray(policy.readOnlyOrDraft, readOnlyOrDraftToolNames())
+  );
 }
 
 function hasExactManifestRegistry(value: unknown): boolean {
@@ -249,6 +254,20 @@ function hasExactPackRegistry(value: unknown): boolean {
 
 function expectedToolNames(): string[] {
   return listJarvisMcpTools().map((tool) => tool.name);
+}
+
+function approvalRequiredToolNames(): string[] {
+  return listJarvisMcpTools().filter((tool) => tool.requiresApproval).map((tool) => tool.name);
+}
+
+function localStateWriteToolNamesList(): string[] {
+  const localWritePolicy = new Set<string>(localStateWriteToolNames);
+  return listJarvisMcpTools().filter((tool) => localWritePolicy.has(tool.name)).map((tool) => tool.name);
+}
+
+function readOnlyOrDraftToolNames(): string[] {
+  const localWritePolicy = new Set<string>(localStateWriteToolNames);
+  return listJarvisMcpTools().filter((tool) => !tool.requiresApproval && !localWritePolicy.has(tool.name)).map((tool) => tool.name);
 }
 
 function sameStringArray(actual: unknown[], expected: string[]): boolean {

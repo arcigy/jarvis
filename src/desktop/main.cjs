@@ -878,9 +878,9 @@ async function runRemoteMcpSmoke(payload = {}) {
   checks.push(smokeCheck(manifest.body?.auth?.header === "Authorization: Bearer <JARVIS_WEB_TOKEN>", "auth-placeholder", "Manifest returns auth placeholder, not the token value."));
   checks.push(
     smokeCheck(
-      hasLocalWritePolicy(manifest.body?.toolPolicy),
+      hasExactToolPolicy(manifest.body?.toolPolicy),
       "manifest-local-write-policy",
-      "Manifest identifies local write tools separately from read-only/draft tools."
+      "Manifest exposes exact approval, local-write, and read-only/draft tool policy."
     )
   );
   const pack = await fetchJson(`${baseUrl}/api/remote-mcp-pack?includeReadiness=false`, token);
@@ -888,9 +888,9 @@ async function runRemoteMcpSmoke(payload = {}) {
   checks.push(smokeCheck(pack.body?.auth?.tokenValueReturned === false, "pack-secret-policy", "Connection pack confirms tokenValueReturned=false."));
   checks.push(
     smokeCheck(
-      hasLocalWritePolicy(pack.body?.tools),
+      hasExactToolPolicy(pack.body?.tools),
       "pack-local-write-policy",
-      "Connection pack identifies local write tools separately from read-only/draft tools."
+      "Connection pack exposes exact approval, local-write, and read-only/draft tool policy."
     )
   );
   checks.push(
@@ -1012,11 +1012,16 @@ async function checkApprovalGates(baseUrl, token, topLevelApproved) {
   return { ok: true, bodies };
 }
 
-function hasLocalWritePolicy(value) {
+function hasExactToolPolicy(value) {
   if (!value || typeof value !== "object") return false;
-  const localStateWrite = Array.isArray(value.localStateWrite) ? value.localStateWrite : [];
-  const readOnlyOrDraft = Array.isArray(value.readOnlyOrDraft) ? value.readOnlyOrDraft : [];
-  return localStateWrite.includes("arcigy.sync_gmail_recent_messages") && !readOnlyOrDraft.includes("arcigy.sync_gmail_recent_messages");
+  return (
+    Array.isArray(value.approvalRequired) &&
+    Array.isArray(value.localStateWrite) &&
+    Array.isArray(value.readOnlyOrDraft) &&
+    sameStringArray(value.approvalRequired, approvalRequiredToolNames()) &&
+    sameStringArray(value.localStateWrite, localStateWriteToolNamesList()) &&
+    sameStringArray(value.readOnlyOrDraft, readOnlyOrDraftToolNames())
+  );
 }
 
 function hasExactManifestRegistry(value) {
@@ -1053,6 +1058,18 @@ function hasExactPackRegistry(value) {
 
 function expectedToolNames() {
   return listWebMcpTools().map((tool) => tool.name);
+}
+
+function approvalRequiredToolNames() {
+  return listWebMcpTools().filter((tool) => tool.requiresApproval).map((tool) => tool.name);
+}
+
+function localStateWriteToolNamesList() {
+  return listWebMcpTools().filter((tool) => localStateWriteTools.has(tool.name)).map((tool) => tool.name);
+}
+
+function readOnlyOrDraftToolNames() {
+  return listWebMcpTools().filter((tool) => !tool.requiresApproval && !localStateWriteTools.has(tool.name)).map((tool) => tool.name);
 }
 
 function sameStringArray(actual, expected) {

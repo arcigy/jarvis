@@ -427,6 +427,56 @@ test("remote MCP smoke requires valid manifest tool metadata", async () => {
   assert.ok(report.checks.some((check) => check.key === "manifest-tool-registry" && check.status === "ready"));
 });
 
+test("remote MCP smoke requires exact manifest and pack tool policies", async () => {
+  const expectedNames = listJarvisMcpTools().map((tool) => tool.name);
+  const fetchImpl = async (target: string | URL) => {
+    const url = String(target);
+    if (url.endsWith("/.well-known/arcigy-jarvis.json")) {
+      return responseJson({
+        tools: remoteSmokeManifestToolsFixture(),
+        auth: { header: "Authorization: Bearer <JARVIS_WEB_TOKEN>" },
+        toolPolicy: {
+          localStateWrite: ["arcigy.sync_gmail_recent_messages"],
+          readOnlyOrDraft: ["arcigy.generate_ai_reply"],
+        },
+      });
+    }
+    if (url.includes("/api/remote-mcp-pack")) {
+      return responseJson({
+        auth: { tokenValueReturned: false },
+        agentCompatibility: remoteAgentCompatibilityFixture(),
+        handoff: {
+          connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
+          requiredProof: [{ key: "manifest" }, { key: "connection-pack" }, { key: "remote-smoke" }],
+          agentFirstSteps: ["Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
+        },
+        tools: {
+          names: expectedNames,
+          approvalRequired: ["arcigy.generate_contract_documents"],
+          localStateWrite: ["arcigy.sync_gmail_recent_messages"],
+          readOnlyOrDraft: ["arcigy.generate_ai_reply"],
+        },
+        quickStartCalls: remoteSmokeQuickStartFixture(),
+      });
+    }
+    if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
+    if (
+      url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
+      url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
+    ) {
+      return responseJson({ error: "approval required" }, 409);
+    }
+    return responseJson({ error: "unexpected URL" }, 404);
+  };
+
+  const report = await runRemoteMcpSmoke({ baseUrl: "https://jarvis.example", fetchImpl: fetchImpl as typeof fetch });
+
+  assert.equal(report.status, "blocked");
+  assert.ok(report.checks.some((check) => check.key === "manifest-local-write-policy" && check.status === "blocked"));
+  assert.ok(report.checks.some((check) => check.key === "pack-local-write-policy" && check.status === "blocked"));
+});
+
 test("remote MCP smoke requires the handoff proof runbook", async () => {
   const tools = remoteSmokeManifestToolsFixture();
   const fetchImpl = async (target: string | URL) => {
