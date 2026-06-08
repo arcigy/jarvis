@@ -137,6 +137,7 @@ app.whenReady().then(() => {
   ipcMain.handle("jarvis:identifyEmail", (_event, payload) => identifyEmail(payload));
   ipcMain.handle("jarvis:ingestClientMessage", (_event, payload) => ingestClientMessage(payload));
   ipcMain.handle("jarvis:getClientNeedAlerts", (_event, payload) => getClientNeedAlerts(payload));
+  ipcMain.handle("jarvis:updateClientNeedStatus", (_event, payload) => updateClientNeedStatus(payload));
   ipcMain.handle("jarvis:getAuditEvents", (_event, payload) => getAuditEvents(payload));
   ipcMain.handle("jarvis:generateAiReply", (_event, payload) => generateAiReply(payload));
   ipcMain.handle("jarvis:syncGmailRecentMessages", (_event, payload) => syncGmailRecentMessages(payload));
@@ -732,7 +733,7 @@ async function getRemoteMcpPack(payload = {}) {
       "Run the smokeTestUrl before handoff and require ready checks for pack-limits, approval-gate, approval-shape-gate, and secret-redaction.",
       "Call MCP tools with POST JSON to mcpToolCallPattern.",
       "Use the bearer auth header placeholder; the real token must be supplied by the operator and is never returned by this pack.",
-      "Treat generate_contract_documents, approve_prepared_outreach_reply, send_approved_outreach_reply, and append_leads_to_google_sheet as approval-gated actions.",
+      "Treat generate_contract_documents, approve_prepared_outreach_reply, send_approved_outreach_reply, update_client_need_status, and append_leads_to_google_sheet as approval-gated actions.",
       "Treat localStateWrite tools as local memory writes. Prefer dryRun: true for sync_gmail_recent_messages before ingesting messages.",
       "Use get_operator_briefing for a Jarvis-style daily status before making recommendations.",
     ],
@@ -815,6 +816,7 @@ const localStateWriteTools = new Set([
   "arcigy.upsert_local_person",
   "arcigy.add_client_need_signal",
   "arcigy.ingest_client_message",
+  "arcigy.update_client_need_status",
   "arcigy.sync_gmail_recent_messages",
 ]);
 
@@ -853,6 +855,14 @@ function buildRemoteMcpQuickStartCalls(baseUrl) {
       url: toolUrl("arcigy.get_client_need_alerts"),
       body: { status: "new", limit: 10 },
       approvalRequired: false,
+    },
+    {
+      label: "Resolve a client need alert after approval",
+      tool: "arcigy.update_client_need_status",
+      method: "POST",
+      url: toolUrl("arcigy.update_client_need_status"),
+      body: { needSignalId: "client_need_signal_id", status: "resolved", approval: { approved: true } },
+      approvalRequired: true,
     },
     {
       label: "Review recent Jarvis audit events",
@@ -1146,6 +1156,7 @@ async function checkApprovalGates(baseUrl, token, topLevelApproved) {
     ["arcigy.generate_contract_documents", { intake: {} }],
     ["arcigy.approve_prepared_outreach_reply", { preparedEventId: "smoke-prepared-reply" }],
     ["arcigy.send_approved_outreach_reply", { preparedEventId: "smoke-prepared-reply" }],
+    ["arcigy.update_client_need_status", { needSignalId: "smoke-client-need", status: "resolved" }],
     ["arcigy.append_leads_to_google_sheet", { rows: [["Smoke", "https://example.com"]] }],
   ];
   const bodies = [];
@@ -1360,6 +1371,7 @@ function listWebMcpTools() {
     { name: "arcigy.add_client_need_signal", requiresApproval: false },
     { name: "arcigy.ingest_client_message", requiresApproval: false },
     { name: "arcigy.get_client_need_alerts", requiresApproval: false },
+    { name: "arcigy.update_client_need_status", requiresApproval: true },
     { name: "arcigy.get_audit_events", requiresApproval: false },
     { name: "arcigy.jarvis_voice_event", requiresApproval: false },
     { name: "arcigy.get_system_health", requiresApproval: false },
@@ -2078,6 +2090,30 @@ function getClientNeedAlerts(payload = {}) {
     }),
   ]);
   return JSON.parse(result.stdout);
+}
+
+function updateClientNeedStatus(payload = {}) {
+  if (payload?.approval?.approved !== true) {
+    throw new Error('arcigy.update_client_need_status requires explicit approval. Send {"approval":{"approved":true}} after user confirmation.');
+  }
+  const needSignalId = String(payload?.needSignalId || payload?.id || "").trim();
+  if (!needSignalId) throw new Error("Client need signal id is required.");
+  const result = runPython([
+    "scripts/jarvis_local_db.py",
+    "update-need-status",
+    "--db",
+    payload?.dbPath || defaultDbPath,
+    "--payload",
+    JSON.stringify({
+      needSignalId,
+      status: payload?.status || "resolved",
+      note: payload?.note,
+      updatedBy: payload?.updatedBy || "desktop",
+    }),
+  ]);
+  const parsed = JSON.parse(result.stdout);
+  addAuditEvent("arcigy.update_client_need_status", "updated", payload, parsed, true);
+  return parsed;
 }
 
 function resolveColdOutreachPeriod(text) {

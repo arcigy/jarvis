@@ -111,6 +111,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /identifyEmail/);
   assert.match(html, /ingestClientMessage/);
   assert.match(html, /clientNeedAlerts/);
+  assert.match(html, /resolveClientNeed/);
+  assert.match(html, /ignoreClientNeed/);
   assert.match(html, /toggleClientNeedWatch/);
   assert.match(html, /clientAlertGrid/);
   assert.match(html, /clientAlertsResult/);
@@ -354,6 +356,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /\/api\/identify-email/);
   assert.match(renderer, /\/api\/ingest-client-message/);
   assert.match(renderer, /\/api\/client-need-alerts/);
+  assert.match(renderer, /\/api\/update-client-need-status/);
   assert.match(renderer, /\/api\/audit-events/);
   assert.match(renderer, /\/api\/sync-gmail-recent-messages/);
   assert.match(renderer, /\/api\/smartlead-campaign-status/);
@@ -478,6 +481,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /secret-redaction/);
   assert.match(main, /Identify a client by email and open needs/);
   assert.match(main, /List open client need alerts/);
+  assert.match(main, /Resolve a client need alert after approval/);
+  assert.match(main, /arcigy\.update_client_need_status/);
   assert.match(main, /Get Smartlead outreach brief/);
   assert.match(main, /maxCampaigns: 10/);
   assert.match(main, /runRemoteMcpSmoke/);
@@ -663,6 +668,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(preload, /identifyEmail/);
   assert.match(preload, /ingestClientMessage/);
   assert.match(preload, /getClientNeedAlerts/);
+  assert.match(preload, /updateClientNeedStatus/);
   assert.match(preload, /getAuditEvents/);
   assert.match(preload, /systemHealth/);
   assert.match(preload, /generateAiReply/);

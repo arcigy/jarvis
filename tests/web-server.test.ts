@@ -481,7 +481,7 @@ test("local web bridge serves UI and API health", async () => {
       body: JSON.stringify({ dbPath, limit: 5 }),
     });
     assert.equal(clientAlerts.status, 200);
-    const clientAlertsBody = (await clientAlerts.json()) as { count: number; alerts: Array<{ person: { primaryEmail: string } }> };
+    const clientAlertsBody = (await clientAlerts.json()) as { count: number; alerts: Array<{ person: { primaryEmail: string }; needSignal: { id: string } }> };
     assert.equal(clientAlertsBody.count, 1);
     assert.equal(clientAlertsBody.alerts[0].person.primaryEmail, "client@example.com");
 
@@ -494,6 +494,31 @@ test("local web bridge serves UI and API health", async () => {
     const memoryOperatorBriefingBody = (await memoryOperatorBriefing.json()) as { sections: { clientNeeds: string } };
     assert.match(memoryOperatorBriefingBody.sections.clientNeeds, /client@example\.com/);
     assert.match(memoryOperatorBriefingBody.sections.clientNeeds, /onboarding automatizaciu/);
+
+    const rejectedUpdate = await fetch(`${baseUrl}/api/update-client-need-status`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ dbPath, needSignalId: clientAlertsBody.alerts[0].needSignal.id, status: "resolved" }),
+    });
+    assert.equal(rejectedUpdate.status, 409);
+
+    const approvedUpdate = await fetch(`${baseUrl}/api/update-client-need-status`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ dbPath, needSignalId: clientAlertsBody.alerts[0].needSignal.id, status: "resolved", approval: { approved: true } }),
+    });
+    assert.equal(approvedUpdate.status, 200);
+    const approvedUpdateBody = (await approvedUpdate.json()) as { needSignal: { status: string } };
+    assert.equal(approvedUpdateBody.needSignal.status, "resolved");
+
+    const clearedAlerts = await fetch(`${baseUrl}/api/client-need-alerts`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ dbPath, limit: 5 }),
+    });
+    assert.equal(clearedAlerts.status, 200);
+    const clearedAlertsBody = (await clearedAlerts.json()) as { count: number };
+    assert.equal(clearedAlertsBody.count, 0);
   } finally {
     await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   }

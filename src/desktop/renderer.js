@@ -15,6 +15,7 @@ const state = {
   lastReadinessNoticeSignature: null,
   clientAlertWatchEnabled: true,
   clientAlertPollTimer: null,
+  lastClientNeedAlerts: [],
   seenClientNeedAlertIds: new Set(),
   clientAlertPollMs: 60000,
   clientAlertGmailSyncPollMs: 300000,
@@ -73,6 +74,8 @@ const elements = {
   identifyEmail: document.querySelector("#identifyEmail"),
   ingestClientMessage: document.querySelector("#ingestClientMessage"),
   clientNeedAlerts: document.querySelector("#clientNeedAlerts"),
+  resolveClientNeed: document.querySelector("#resolveClientNeed"),
+  ignoreClientNeed: document.querySelector("#ignoreClientNeed"),
   toggleClientNeedWatch: document.querySelector("#toggleClientNeedWatch"),
   memoryResult: document.querySelector("#memoryResult"),
   clientAlertGrid: document.querySelector("#clientAlertGrid"),
@@ -166,6 +169,7 @@ const arcigyApi = window.arcigyDesktop ?? {
   identifyEmail: (payload) => postJson("/api/identify-email", payload),
   ingestClientMessage: (payload) => postJson("/api/ingest-client-message", payload),
   getClientNeedAlerts: (payload) => postJson("/api/client-need-alerts", payload),
+  updateClientNeedStatus: (payload) => postJson("/api/update-client-need-status", payload),
   getAuditEvents: (payload) => postJson("/api/audit-events", payload),
   generateAiReply: (payload) => postJson("/api/generate-ai-reply", payload),
   webBridgePreflight: () => getJson("/api/web-bridge-preflight"),
@@ -768,11 +772,37 @@ function notifyClientNeedAlert(alert, result) {
   notifyOperator("Arcigy Jarvis: client request", `${name}: ${summary}${more}`.slice(0, 240), "arcigy-client-need");
 }
 
+function latestClientNeedAlert() {
+  return state.lastClientNeedAlerts.find((alert) => alert?.needSignal?.id);
+}
+
+async function updateLatestClientNeedStatus(status) {
+  const alert = latestClientNeedAlert();
+  if (!alert) throw new Error("Load client alerts first. No open client request is selected.");
+  const person = alert.person ?? {};
+  const need = alert.needSignal ?? {};
+  const name = person.displayName ?? person.companyName ?? person.primaryEmail ?? "client";
+  const label = status === "ignored" ? "ignore" : "resolve";
+  const ok = window.confirm(`Jarvis will ${label} this client request:\n\n${name}\n${need.summary ?? "Open request"}`);
+  if (!ok) return null;
+  const result = await arcigyApi.updateClientNeedStatus({
+    needSignalId: need.id,
+    status,
+    note: `Marked ${status} from Jarvis desktop UI.`,
+    updatedBy: "desktop",
+    approval: { approved: true },
+  });
+  state.seenClientNeedAlertIds.delete(clientAlertKey(alert));
+  await refreshClientNeedAlerts({ announceNew: false, loadingText: "Refreshing client alerts..." });
+  return result;
+}
+
 async function refreshClientNeedAlerts({ announceNew = false, loadingText = null } = {}) {
   if (loadingText) elements.clientAlertsResult.textContent = loadingText;
   await maybeSyncGmailForClientAlerts();
   const result = await arcigyApi.getClientNeedAlerts({ limit: 10 });
   const alerts = result.alerts ?? [];
+  state.lastClientNeedAlerts = alerts;
   const newAlerts = alerts.filter((alert) => {
     const key = clientAlertKey(alert);
     return key && !state.seenClientNeedAlertIds.has(key);
@@ -1538,6 +1568,26 @@ elements.clientNeedAlerts.addEventListener("click", async () => {
     await maybeSyncGmailForClientAlerts({ force: true });
     const result = await refreshClientNeedAlerts({ announceNew: false, loadingText: "Loading client alerts..." });
     if (result.count > 0 && result.summary) speak(result.summary);
+  } catch (error) {
+    elements.clientAlertsResult.textContent = safeUiErrorText(error);
+  }
+});
+elements.resolveClientNeed.addEventListener("click", async () => {
+  try {
+    elements.clientAlertsResult.textContent = "Resolving newest client alert...";
+    const result = await updateLatestClientNeedStatus("resolved");
+    if (result?.summary) speak(result.summary);
+    else elements.clientAlertsResult.textContent = "Client alert update cancelled.";
+  } catch (error) {
+    elements.clientAlertsResult.textContent = safeUiErrorText(error);
+  }
+});
+elements.ignoreClientNeed.addEventListener("click", async () => {
+  try {
+    elements.clientAlertsResult.textContent = "Ignoring newest client alert...";
+    const result = await updateLatestClientNeedStatus("ignored");
+    if (result?.summary) speak(result.summary);
+    else elements.clientAlertsResult.textContent = "Client alert update cancelled.";
   } catch (error) {
     elements.clientAlertsResult.textContent = safeUiErrorText(error);
   }

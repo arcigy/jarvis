@@ -16,6 +16,7 @@ export type JarvisMcpToolName =
   | "arcigy.add_client_need_signal"
   | "arcigy.ingest_client_message"
   | "arcigy.get_client_need_alerts"
+  | "arcigy.update_client_need_status"
   | "arcigy.get_audit_events"
   | "arcigy.identify_email"
   | "arcigy.get_system_health"
@@ -47,6 +48,7 @@ export const localStateWriteToolNames = new Set<JarvisMcpToolName>([
   "arcigy.upsert_local_person",
   "arcigy.add_client_need_signal",
   "arcigy.ingest_client_message",
+  "arcigy.update_client_need_status",
   "arcigy.sync_gmail_recent_messages",
 ]);
 
@@ -129,6 +131,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
       name: "arcigy.get_client_need_alerts",
       description: "Vrati persistentny inbox otvorenych klientskych poziadaviek, ktore ma Jarvis pripomenut.",
       requiresApproval: false,
+    },
+    {
+      name: "arcigy.update_client_need_status",
+      description: "Oznaci klientsku poziadavku ako seen, resolved alebo ignored po explicitnom potvrdeni operatorom.",
+      requiresApproval: true,
     },
     {
       name: "arcigy.get_audit_events",

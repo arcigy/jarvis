@@ -446,6 +446,32 @@ export function createJarvisMcpServer(): McpServer {
   );
 
   server.registerTool(
+    "arcigy.update_client_need_status",
+    {
+      title: "Update client need status",
+      description: "Mark a local client need alert as seen, resolved, or ignored after explicit operator confirmation.",
+      inputSchema: {
+        dbPath: z.string().optional(),
+        needSignalId: z.string().min(1),
+        status: z.enum(["new", "seen", "resolved", "ignored"]),
+        note: z.string().optional(),
+        updatedBy: z.string().optional(),
+        approval: approvalSchema,
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async ({ dbPath, approval, ...payload }) => {
+      requireExplicitApproval("arcigy.update_client_need_status", { approval });
+      return jsonDbTool("update-need-status", payload, dbPath);
+    }
+  );
+
+  server.registerTool(
     "arcigy.get_audit_events",
     {
       title: "Get audit events",
@@ -942,6 +968,7 @@ function jsonDbTool(
     | "get-prepared-reply"
     | "ingest-message"
     | "list-open-needs"
+    | "update-need-status"
     | "add-audit-event"
     | "list-audit-events",
   payload: Record<string, unknown>,
@@ -961,6 +988,7 @@ function runDbCommand(
     | "get-prepared-reply"
     | "ingest-message"
     | "list-open-needs"
+    | "update-need-status"
     | "add-audit-event"
     | "list-audit-events",
   payload: Record<string, unknown>,

@@ -170,7 +170,7 @@ export async function buildRemoteMcpConnectionPack(
       "Run the smokeTestUrl before handoff and require ready checks for pack-limits, approval-gate, approval-shape-gate, and secret-redaction.",
       "Call MCP tools with POST JSON to mcpToolCallPattern.",
       "Use the bearer auth header placeholder; the real token must be supplied by the operator and is never returned by this pack.",
-      "Treat generate_contract_documents, approve_prepared_outreach_reply, send_approved_outreach_reply, and append_leads_to_google_sheet as approval-gated actions.",
+      "Treat generate_contract_documents, approve_prepared_outreach_reply, send_approved_outreach_reply, update_client_need_status, and append_leads_to_google_sheet as approval-gated actions.",
       "Treat localStateWrite tools as local memory writes. Prefer dryRun: true for sync_gmail_recent_messages before ingesting messages.",
       "Use get_operator_briefing for a Jarvis-style daily status before making recommendations.",
     ],
@@ -282,6 +282,14 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       url: toolUrl("arcigy.get_client_need_alerts"),
       body: { status: "new", limit: 10 },
       approvalRequired: false,
+    },
+    {
+      label: "Resolve a client need alert after approval",
+      tool: "arcigy.update_client_need_status",
+      method: "POST",
+      url: toolUrl("arcigy.update_client_need_status"),
+      body: { needSignalId: "client_need_signal_id", status: "resolved", approval: { approved: true } },
+      approvalRequired: true,
     },
     {
       label: "Review recent Jarvis audit events",

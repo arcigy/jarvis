@@ -50,6 +50,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.add_client_need_signal",
     "arcigy.ingest_client_message",
     "arcigy.get_client_need_alerts",
+    "arcigy.update_client_need_status",
     "arcigy.get_audit_events",
     "arcigy.jarvis_voice_event",
     "arcigy.get_system_health",
@@ -70,6 +71,7 @@ test("MCP tools expose the requested automation surface", () => {
   assert.ok(localStateWriteToolNames.has("arcigy.sync_gmail_recent_messages"));
   assert.ok(localStateWriteToolNames.has("arcigy.ingest_client_message"));
   assert.ok(localStateWriteToolNames.has("arcigy.prepare_positive_outreach_reply"));
+  assert.ok(localStateWriteToolNames.has("arcigy.update_client_need_status"));
   assert.equal(localStateWriteToolNames.has("arcigy.generate_contract_documents"), false);
   for (const tool of listJarvisMcpTools()) {
     assert.equal(tool.description.length > 20, true);
@@ -138,6 +140,7 @@ test("remote MCP smoke checks every response for bearer token leaks", async () =
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
     ) {
       return responseJson({ error: `token leaked ${token}` }, 409);
@@ -192,6 +195,7 @@ test("remote MCP smoke requires valid quick-start URLs", async () => {
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
     ) {
       return responseJson({ error: "approval required" }, 409);
@@ -246,6 +250,7 @@ test("remote MCP smoke requires quick-start approval policy parity", async () =>
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
     ) {
       return responseJson({ error: "approval required" }, 409);
@@ -320,6 +325,7 @@ test("remote MCP smoke blocks generic secret patterns in response bodies", async
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
     ) {
       return responseJson({ error: "approval required" }, 409);
@@ -373,6 +379,7 @@ test("remote MCP smoke requires exact manifest and pack tool registries", async 
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
     ) {
       return responseJson({ error: "approval required" }, 409);
@@ -428,6 +435,7 @@ test("remote MCP smoke requires valid manifest tool metadata", async () => {
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
     ) {
       return responseJson({ error: "approval required" }, 409);
@@ -480,6 +488,7 @@ test("remote MCP smoke requires exact manifest and pack tool policies", async ()
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
     ) {
       return responseJson({ error: "approval required" }, 409);
@@ -533,6 +542,7 @@ test("remote MCP smoke requires guarded connection pack limits", async () => {
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
     ) {
       return responseJson({ error: "approval required" }, 409);
@@ -715,6 +725,7 @@ test("remote MCP smoke requires the audit trail quick-start", async () => {
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
     ) {
       return responseJson({ error: "approval required" }, 409);
@@ -2117,6 +2128,62 @@ test("local SQLite CLI deduplicates Gmail messages by external id", () => {
   assert.equal(second.status, "duplicate");
   assert.equal(second.messageActivity.id, first.messageActivity.id);
   assert.equal(alerts.count, 1);
+});
+
+test("local SQLite CLI updates client need status", () => {
+  const dir = mkdtempSync(join(tmpdir(), "jarvis-need-status-db-"));
+  const dbPath = join(dir, "jarvis.db");
+  const python = process.env.JARVIS_PYTHON || "python";
+
+  const ingested = runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "ingest-message",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify({
+      fromEmail: "client@example.com",
+      source: "email",
+      subject: "Request",
+      text: "Potrebujem upravit onboarding automatizaciu.",
+      occurredAt: "2026-06-07T10:00:00Z",
+    }),
+  ]);
+
+  const updated = runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "update-need-status",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify({
+      needSignalId: ingested.needSignal.id,
+      status: "resolved",
+      note: "Handled by operator.",
+      updatedBy: "test",
+    }),
+  ]);
+  const open = runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "list-open-needs",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify({ status: "new", limit: 10 }),
+  ]);
+  const resolved = runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "list-open-needs",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify({ status: "resolved", limit: 10 }),
+  ]);
+
+  assert.equal(updated.needSignal.status, "resolved");
+  assert.equal(updated.needSignal.data.statusUpdate.updatedBy, "test");
+  assert.equal(open.count, 0);
+  assert.equal(resolved.count, 1);
 });
 
 test("local SQLite CLI summarizes cold outreach events by period", () => {

@@ -146,6 +146,19 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
     return;
   }
 
+  if (request.method === "POST" && url.pathname === "/api/update-client-need-status") {
+    const payload = await readJson(request);
+    const approvalError = getApprovalError("arcigy.update_client_need_status", payload);
+    if (approvalError) {
+      writeJson(response, 409, { error: approvalError });
+      return;
+    }
+    const result = runDbTool("update-need-status", payload);
+    addAuditEvent("arcigy.update_client_need_status", "updated", payload, result, true);
+    writeJson(response, 200, result);
+    return;
+  }
+
   if (request.method === "POST" && url.pathname === "/api/audit-events") {
     const payload = await readJson(request);
     writeJson(response, 200, runDbTool("list-audit-events", payload));
@@ -491,6 +504,12 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
   }
   if (name === "arcigy.get_client_need_alerts") {
     writeJson(response, 200, { result: getClientNeedAlerts(payload) });
+    return;
+  }
+  if (name === "arcigy.update_client_need_status") {
+    const result = runDbTool("update-need-status", payload);
+    addAuditEvent("arcigy.update_client_need_status", "updated", payload, result, true);
+    writeJson(response, 200, { result });
     return;
   }
   if (name === "arcigy.get_audit_events") {

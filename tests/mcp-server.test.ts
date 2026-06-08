@@ -251,7 +251,7 @@ test("Jarvis MCP server persists and identifies local people through SQLite tool
   });
   const person = getStructuredResult(upsert) as { id: string };
 
-  await client.callTool({
+  const needResult = await client.callTool({
     name: "arcigy.add_client_need_signal",
     arguments: {
       dbPath,
@@ -260,6 +260,7 @@ test("Jarvis MCP server persists and identifies local people through SQLite tool
       confidence: 0.88,
     },
   });
+  const need = getStructuredResult(needResult) as { id: string };
 
   const identified = await client.callTool({
     name: "arcigy.identify_email",
@@ -283,6 +284,30 @@ test("Jarvis MCP server persists and identifies local people through SQLite tool
   const alertBody = getStructuredResult(alerts) as { count: number; alerts: Array<{ person: { primaryEmail: string } }> };
   assert.equal(alertBody.count, 1);
   assert.equal(alertBody.alerts[0].person.primaryEmail, "founder@example.com");
+
+  assertToolError(
+    await client.callTool({
+      name: "arcigy.update_client_need_status",
+      arguments: {
+        dbPath,
+        needSignalId: need.id,
+        status: "resolved",
+      },
+    }),
+    /requires explicit approval/
+  );
+
+  const updated = await client.callTool({
+    name: "arcigy.update_client_need_status",
+    arguments: {
+      dbPath,
+      needSignalId: need.id,
+      status: "resolved",
+      approval: { approved: true },
+    },
+  });
+  const updatedBody = getStructuredResult(updated) as { needSignal: { status: string } };
+  assert.equal(updatedBody.needSignal.status, "resolved");
 
   await client.close();
   await server.close();

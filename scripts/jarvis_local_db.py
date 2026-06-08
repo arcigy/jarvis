@@ -161,6 +161,41 @@ def add_need_signal(db_path: Path, payload: dict[str, Any]) -> dict[str, Any]:
     return row_to_need_signal(row)
 
 
+def update_need_status(db_path: Path, payload: dict[str, Any]) -> dict[str, Any]:
+    init_db(db_path)
+    signal_id = payload.get("needSignalId") or payload.get("id")
+    if not signal_id:
+        raise ValueError("Missing required field: needSignalId")
+    status = str(required(payload, "status"))
+    allowed = {"new", "seen", "resolved", "ignored"}
+    if status not in allowed:
+        raise ValueError("status must be one of: new, seen, resolved, ignored")
+
+    conn = connect(db_path)
+    row = conn.execute("select * from client_need_signals where id = ?", (str(signal_id),)).fetchone()
+    if row is None:
+        raise ValueError("Client need signal not found.")
+
+    data = json.loads(row["data_json"] or "{}")
+    data["statusUpdate"] = {
+        "status": status,
+        "note": redact_text(payload.get("note", "")) if payload.get("note") else None,
+        "updatedBy": redact_text(payload.get("updatedBy", "jarvis")),
+        "updatedAt": datetime.now(timezone.utc).isoformat(),
+    }
+    conn.execute(
+        "update client_need_signals set status = ?, data_json = ? where id = ?",
+        (status, safe_data_json(data), str(signal_id)),
+    )
+    conn.commit()
+    updated = conn.execute("select * from client_need_signals where id = ?", (str(signal_id),)).fetchone()
+    return {
+        "status": "updated",
+        "needSignal": row_to_need_signal(updated),
+        "summary": f"Jarvis: klientska poziadavka je oznacena ako {status}.",
+    }
+
+
 def add_cold_event(db_path: Path, payload: dict[str, Any]) -> dict[str, Any]:
     init_db(db_path)
     event_id = payload.get("id") or f"cold_{uuid.uuid4().hex}"
@@ -1010,6 +1045,7 @@ def main() -> None:
             "identify",
             "ingest-message",
             "list-open-needs",
+            "update-need-status",
             "add-audit-event",
             "list-audit-events",
         ],
@@ -1040,6 +1076,8 @@ def main() -> None:
             result = ingest_message(args.db, load_payload(args.payload))
         elif args.command == "list-open-needs":
             result = list_open_needs(args.db, load_payload(args.payload))
+        elif args.command == "update-need-status":
+            result = update_need_status(args.db, load_payload(args.payload))
         elif args.command == "add-audit-event":
             result = add_audit_event(args.db, load_payload(args.payload))
         elif args.command == "list-audit-events":
