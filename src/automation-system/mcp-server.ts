@@ -46,7 +46,6 @@ export function createJarvisMcpServer(): McpServer {
         intake: z.record(z.string(), z.unknown()).optional(),
         outputDir: z.string().min(1).optional(),
         approval: approvalSchema,
-        approved: z.boolean().optional(),
       },
       annotations: {
         readOnlyHint: false,
@@ -55,8 +54,8 @@ export function createJarvisMcpServer(): McpServer {
         openWorldHint: false,
       },
     },
-    async ({ inputJsonPath, intake, outputDir, approval, approved }) => {
-      requireExplicitApproval("arcigy.generate_contract_documents", { approval, approved });
+    async ({ inputJsonPath, intake, outputDir, approval }) => {
+      requireExplicitApproval("arcigy.generate_contract_documents", { approval });
       if (!inputJsonPath && !intake) {
         throw new Error("Provide either inputJsonPath or inline intake payload.");
       }
@@ -176,7 +175,6 @@ export function createJarvisMcpServer(): McpServer {
         dbPath: z.string().optional(),
         preparedEventId: z.string().min(1),
         approval: approvalSchema,
-        approved: z.boolean().optional(),
         approvalNote: z.string().optional(),
         approvedBy: z.string().optional(),
         occurredAt: z.string().optional(),
@@ -798,7 +796,6 @@ export function createJarvisMcpServer(): McpServer {
         accountEnvKey: z.string().optional(),
         rows: z.array(z.array(z.union([z.string(), z.number(), z.boolean(), z.null()]))).min(1),
         approval: approvalSchema,
-        approved: z.boolean().optional(),
       },
       annotations: {
         readOnlyHint: false,
@@ -916,8 +913,8 @@ function runDbCommand(
   return JSON.parse(result.stdout);
 }
 
-function requireExplicitApproval(name: string, payload: { approval?: { approved?: boolean }; approved?: boolean }) {
-  if (payload.approval?.approved === true || payload.approved === true) return;
+function requireExplicitApproval(name: string, payload: { approval?: { approved?: boolean } }) {
+  if (payload.approval?.approved === true) return;
   throw new Error(`${name} requires explicit approval. Send {"approval":{"approved":true}} after user confirmation.`);
 }
 

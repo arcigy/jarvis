@@ -157,6 +157,20 @@ test("local web bridge serves UI and API health", async () => {
     });
     assert.equal(unapprovedPreparedReply.status, 409);
 
+    const topLevelApprovedPreparedReply = await fetch(`${baseUrl}/api/mcp/arcigy.approve_prepared_outreach_reply`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ dbPath: mcpDbPath, preparedEventId: coldEvent.result.id, approved: true }),
+    });
+    assert.equal(topLevelApprovedPreparedReply.status, 409);
+
+    const directTopLevelApprovedPreparedReply = await fetch(`${baseUrl}/api/approve-prepared-outreach-reply`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ dbPath: mcpDbPath, preparedEventId: coldEvent.result.id, approved: true }),
+    });
+    assert.equal(directTopLevelApprovedPreparedReply.status, 409);
+
     const approvedPreparedReply = await postJson(`${baseUrl}/api/mcp/arcigy.approve_prepared_outreach_reply`, {
       dbPath: mcpDbPath,
       preparedEventId: coldEvent.result.id,
@@ -182,12 +196,30 @@ test("local web bridge serves UI and API health", async () => {
     });
     assert.equal(unapprovedContract.status, 409);
 
+    const topLevelApprovedContract = await fetch(`${baseUrl}/api/mcp/arcigy.generate_contract_documents`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        approved: true,
+        intake: JSON.parse(readFileSync("docs/contracts/examples/sample-intake.json", "utf-8")),
+        outputDir: contractOutputDir,
+      }),
+    });
+    assert.equal(topLevelApprovedContract.status, 409);
+
     const unapprovedSheetExport = await fetch(`${baseUrl}/api/mcp/arcigy.append_leads_to_google_sheet`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ rows: [["ACME", "https://example.com"]] }),
     });
     assert.equal(unapprovedSheetExport.status, 409);
+
+    const topLevelApprovedSheetExport = await fetch(`${baseUrl}/api/mcp/arcigy.append_leads_to_google_sheet`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ approved: true, rows: [["ACME", "https://example.com"]] }),
+    });
+    assert.equal(topLevelApprovedSheetExport.status, 409);
 
     const contractTool = await postJson(`${baseUrl}/api/mcp/arcigy.generate_contract_documents`, {
       approval: { approved: true },

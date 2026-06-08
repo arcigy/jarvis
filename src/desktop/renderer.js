@@ -1171,7 +1171,7 @@ elements.approvePreparedReply.addEventListener("click", async () => {
     }
     const result = await arcigyApi.approvePreparedOutreachReply({
       preparedEventId: first.id,
-      approved: true,
+      approval: { approved: true },
       approvedBy: "operator",
     });
     elements.preparedReplyResult.textContent = result.summary;

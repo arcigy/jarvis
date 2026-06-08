@@ -183,6 +183,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /window\.confirm\(`Export \$\{state\.lastLeads\.length\} lead\(s\) to Google Sheets\?`\)/);
   assert.match(renderer, /window\.confirm\(`Approve prepared reply to \$\{first\.leadEmail\}/);
   assert.match(renderer, /Prepared reply approval cancelled before any write/);
+  assert.match(renderer, /preparedEventId: first\.id,\s+approval: \{ approved: true \}/);
   assert.match(renderer, /approval: \{ approved: true \}/);
   assert.match(renderer, /providerStatus/);
   assert.match(renderer, /renderCommandDeck/);

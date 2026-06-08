@@ -294,6 +294,19 @@ test("Jarvis MCP server generates contracts from inline intake payload", async (
       name: "arcigy.generate_contract_documents",
       arguments: {
         intake,
+        outputDir,
+        approved: true,
+      },
+    }),
+    /requires explicit approval/
+  );
+  assert.equal(existsSync(join(outputDir, "generation-manifest.json")), false);
+
+  assertToolError(
+    await client.callTool({
+      name: "arcigy.generate_contract_documents",
+      arguments: {
+        intake,
         outputDir: join(tmpdir(), "outside-jarvis-mcp-contracts"),
         approval: { approved: true },
       },
@@ -446,6 +459,13 @@ test("Jarvis MCP server summarizes cold outreach from local SQLite events", asyn
     await client.callTool({
       name: "arcigy.approve_prepared_outreach_reply",
       arguments: { dbPath, preparedEventId: preparedBody.id, approvedBy: "test" },
+    }),
+    /requires explicit approval/
+  );
+  assertToolError(
+    await client.callTool({
+      name: "arcigy.approve_prepared_outreach_reply",
+      arguments: { dbPath, preparedEventId: preparedBody.id, approved: true, approvedBy: "test" },
     }),
     /requires explicit approval/
   );

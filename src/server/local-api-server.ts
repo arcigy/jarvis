@@ -120,8 +120,8 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
 
   if (request.method === "POST" && url.pathname === "/api/approve-prepared-outreach-reply") {
     const payload = await readJson(request);
-    if (payload.approved !== true && (payload.approval as { approved?: unknown } | undefined)?.approved !== true) {
-      writeJson(response, 409, { error: "Prepared outreach reply approval requires explicit approved: true." });
+    if ((payload.approval as { approved?: unknown } | undefined)?.approved !== true) {
+      writeJson(response, 409, { error: 'Prepared outreach reply approval requires explicit {"approval":{"approved":true}}.' });
       return;
     }
     writeJson(response, 200, runDbTool("approve-prepared-reply", payload));
@@ -624,7 +624,7 @@ function getApprovalError(name: string, payload: Record<string, unknown>): strin
   const tool = listJarvisMcpTools().find((item) => item.name === name);
   if (!tool?.requiresApproval) return null;
   const approval = payload.approval as { approved?: unknown } | undefined;
-  if (approval?.approved === true || payload.approved === true) return null;
+  if (approval?.approved === true) return null;
   return `${name} requires explicit approval. Send {"approval":{"approved":true}} after user confirmation.`;
 }
 

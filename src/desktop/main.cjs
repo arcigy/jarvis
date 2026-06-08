@@ -1405,8 +1405,8 @@ function getPreparedOutreachReplies(payload = {}) {
 }
 
 function approvePreparedOutreachReply(payload = {}) {
-  if (payload?.approved !== true && payload?.approval?.approved !== true) {
-    throw new Error("Prepared outreach reply approval requires explicit approved: true.");
+  if (payload?.approval?.approved !== true) {
+    throw new Error('Prepared outreach reply approval requires explicit {"approval":{"approved":true}}.');
   }
   const result = runPython([
     "scripts/jarvis_local_db.py",
