@@ -490,10 +490,13 @@ function renderSmartleadStatus(result) {
 
 function renderSmartleadBrief(result) {
   const metrics = result.metrics ?? {};
+  const campaignLine = result.campaignCount > 1
+    ? `${result.campaignCount} campaigns: ${(result.campaignIds ?? []).join(", ")}`
+    : result.campaignId ?? "-";
   return [
     result.summary ?? "Smartlead brief is empty.",
     "",
-    `Campaign: ${result.campaignId ?? "-"}`,
+    `Campaign: ${campaignLine}`,
     `Contacted: ${metrics.contacted ?? 0}`,
     `Opened: ${metrics.opened ?? 0} (${metrics.openRate ?? 0}%)`,
     `Replied: ${metrics.replied ?? 0} (${metrics.replyRate ?? 0}%)`,
@@ -960,14 +963,11 @@ elements.checkSmartlead.addEventListener("click", async () => {
 elements.smartleadBrief.addEventListener("click", async () => {
   try {
     const campaignId = elements.smartleadCampaignId.value.trim();
-    if (!campaignId) {
-      elements.smartleadResult.textContent = "Enter a Smartlead campaign ID first.";
-      return;
-    }
-    elements.smartleadResult.textContent = "Building Smartlead Jarvis brief...";
+    elements.smartleadResult.textContent = campaignId ? "Building Smartlead Jarvis brief..." : "Building Smartlead Jarvis brief across campaigns...";
     const result = await arcigyApi.getSmartleadOutreachBrief({
       campaignId,
       periodLabel: "poslednych 7 dni",
+      maxCampaigns: 10,
     });
     elements.smartleadResult.textContent = renderSmartleadBrief(result);
     speak(result.summary);

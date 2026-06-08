@@ -232,7 +232,7 @@ test("local web bridge serves UI and API health", async () => {
       mcpToolCallPattern: string;
       auth: { header: string; tokenValueReturned: boolean };
       tools: { count: number; approvalRequired: string[] };
-      quickStartCalls: Array<{ tool: string; approvalRequired: boolean }>;
+      quickStartCalls: Array<{ tool: string; approvalRequired: boolean; body: Record<string, unknown> }>;
       tunnel: { secureCommand: string };
     };
     assert.match(remotePackBody.manifestUrl, /\/\.well-known\/arcigy-jarvis\.json$/);
@@ -243,6 +243,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(remotePackBody.tools.count, 27);
     assert.ok(remotePackBody.tools.approvalRequired.includes("arcigy.append_leads_to_google_sheet"));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.run_remote_mcp_smoke" && call.approvalRequired === false));
+    assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_outreach_brief" && !("campaignId" in call.body)));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.generate_contract_documents" && call.approvalRequired === true));
     assert.equal(remotePackBody.tunnel.secureCommand, "npm run web:tunnel:secure");
 

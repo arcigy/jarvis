@@ -654,8 +654,9 @@ export function createJarvisMcpServer(): McpServer {
       title: "Smartlead outreach brief",
       description: "Normalize Smartlead campaign statistics into a Jarvis cold outreach briefing.",
       inputSchema: {
-        campaignId: z.string().min(1),
+        campaignId: z.string().optional(),
         periodLabel: z.string().default("poslednych 7 dni"),
+        maxCampaigns: z.number().int().min(1).max(25).default(10),
         preparedPositiveReplyCount: z.number().int().min(0).default(0),
         pendingApprovalCount: z.number().int().min(0).default(0),
       },

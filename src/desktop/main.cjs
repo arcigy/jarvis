@@ -530,6 +530,14 @@ function buildRemoteMcpQuickStartCalls(baseUrl) {
       approvalRequired: false,
     },
     {
+      label: "Get Smartlead outreach brief",
+      tool: "arcigy.get_smartlead_outreach_brief",
+      method: "POST",
+      url: toolUrl("arcigy.get_smartlead_outreach_brief"),
+      body: { periodLabel: "poslednych 7 dni", maxCampaigns: 10 },
+      approvalRequired: false,
+    },
+    {
       label: "Draft a Gemini client reply",
       tool: "arcigy.generate_ai_reply",
       method: "POST",
@@ -1212,10 +1220,39 @@ async function getSmartleadCampaignStatus(payload) {
 
 async function getSmartleadOutreachBrief(payload) {
   const campaignId = String(payload?.campaignId ?? "").trim();
-  if (!campaignId) throw new Error("Smartlead campaign ID is required.");
+  if (!campaignId) {
+    const campaignStatus = await getSmartleadCampaignStatus({});
+    const campaigns = Array.isArray(campaignStatus.campaigns) ? campaignStatus.campaigns.filter((campaign) => campaign?.id !== undefined && campaign?.id !== null) : [];
+    const selected = campaigns.slice(0, clampMaxCampaigns(payload?.maxCampaigns));
+    if (!selected.length) throw new Error("Smartlead did not return any campaigns to summarize.");
+    const campaignStats = await Promise.all(
+      selected.map(async (campaign) => {
+        const id = String(campaign.id);
+        const status = await getSmartleadCampaignStatus({ campaignId: id });
+        return {
+          campaignId: id,
+          name: campaign.name,
+          status: campaign.status,
+          statistics: status.statistics,
+        };
+      })
+    );
+    return buildSmartleadOutreachBrief({
+      campaignId: "all",
+      campaignIds: campaignStats.map((item) => item.campaignId),
+      campaignCount: campaignStats.length,
+      periodLabel: String(payload?.periodLabel ?? "poslednych 7 dni"),
+      statistics: campaignStats,
+      preparedPositiveReplyCount: Math.max(0, Math.floor(Number(payload?.preparedPositiveReplyCount ?? 0))),
+      pendingApprovalCount: Math.max(0, Math.floor(Number(payload?.pendingApprovalCount ?? 0))),
+    });
+  }
+
   const status = await getSmartleadCampaignStatus({ campaignId });
   return buildSmartleadOutreachBrief({
     campaignId,
+    campaignIds: [campaignId],
+    campaignCount: 1,
     periodLabel: String(payload?.periodLabel ?? "poslednych 7 dni"),
     statistics: status.statistics,
     preparedPositiveReplyCount: Math.max(0, Math.floor(Number(payload?.preparedPositiveReplyCount ?? 0))),
@@ -1224,21 +1261,29 @@ async function getSmartleadOutreachBrief(payload) {
 }
 
 function buildSmartleadOutreachBrief(input) {
-  const contacted = readSmartleadMetric(input.statistics, ["sent_count", "sent", "emails_sent", "total_sent", "sent_emails_count"]);
-  const opened = readSmartleadMetric(input.statistics, ["open_count", "opened", "opened_count", "unique_open_count", "total_opens"]);
-  const replied = readSmartleadMetric(input.statistics, ["reply_count", "replied", "replied_count", "unique_reply_count", "total_replies"]);
+  const contacted =
+    readOptionalSmartleadMetric(input.statistics, ["sent_count", "sent", "emails_sent", "total_sent", "sent_emails_count", "total_stats"]) ??
+    countPresentSmartleadFields(input.statistics, ["sent_time"]);
+  const opened =
+    readOptionalSmartleadMetric(input.statistics, ["open_count", "opened", "opened_count", "unique_open_count", "total_opens"]) ??
+    countPresentSmartleadFields(input.statistics, ["open_time"]);
+  const replied =
+    readOptionalSmartleadMetric(input.statistics, ["reply_count", "replied", "replied_count", "unique_reply_count", "total_replies"]) ??
+    countPresentSmartleadFields(input.statistics, ["reply_time"]);
   const positiveReplies = readOptionalSmartleadMetric(input.statistics, [
     "positive_reply_count",
     "positive_replies",
     "positive_replied_count",
     "interested_count",
-  ]);
+  ]) ?? countTextSmartleadFields(input.statistics, ["lead_category"], ["interested", "positive", "meeting", "booked", "qualified"]);
   const openRate = rate(opened, contacted);
   const replyRate = rate(replied, contacted);
   const positiveReplyRate = positiveReplies === null ? null : rate(positiveReplies, replied);
   const notes = [];
+  const campaignCount = input.campaignCount ?? input.campaignIds?.length ?? 1;
+  const campaignScope = campaignCount > 1 ? ` v ${campaignCount} kampaniach` : "";
   const summaryParts = [
-    `Za ${input.periodLabel} sme cez Smartlead napisali ${contacted} ludom.`,
+    `Za ${input.periodLabel} sme cez Smartlead napisali ${contacted} ludom${campaignScope}.`,
     `${openRate}% si email otvorilo, ${replied} ludi odpisalo.`,
   ];
 
@@ -1258,6 +1303,8 @@ function buildSmartleadOutreachBrief(input) {
 
   return {
     campaignId: input.campaignId,
+    campaignIds: input.campaignIds ?? [input.campaignId],
+    campaignCount,
     periodLabel: input.periodLabel,
     summary: summaryParts.join(" "),
     statistics: input.statistics,
@@ -1274,8 +1321,10 @@ function buildSmartleadOutreachBrief(input) {
   };
 }
 
-function readSmartleadMetric(value, keys) {
-  return readOptionalSmartleadMetric(value, keys) ?? 0;
+function clampMaxCampaigns(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 10;
+  return Math.max(1, Math.min(Math.floor(numeric), 25));
 }
 
 function readOptionalSmartleadMetric(value, keys) {
@@ -1315,6 +1364,39 @@ function toNumber(value) {
 function rate(part, total) {
   if (total <= 0) return 0;
   return Math.round((part / total) * 1000) / 10;
+}
+
+function countPresentSmartleadFields(value, keys) {
+  const wanted = new Set(keys.map(normalizeMetricKey));
+  return countSmartleadFields(value, (key, item) => wanted.has(normalizeMetricKey(key)) && isPresent(item));
+}
+
+function countTextSmartleadFields(value, keys, needles) {
+  const wanted = new Set(keys.map(normalizeMetricKey));
+  const normalizedNeedles = needles.map(normalizeMetricKey);
+  let fieldSeen = false;
+  const count = countSmartleadFields(value, (key, item) => {
+    if (!wanted.has(normalizeMetricKey(key))) return false;
+    fieldSeen = true;
+    return typeof item === "string" && normalizedNeedles.some((needle) => normalizeMetricKey(item).includes(needle));
+  });
+  return fieldSeen ? count : null;
+}
+
+function countSmartleadFields(value, predicate) {
+  if (Array.isArray(value)) return value.reduce((sum, item) => sum + countSmartleadFields(item, predicate), 0);
+  if (!value || typeof value !== "object") return 0;
+  let count = 0;
+  for (const [key, item] of Object.entries(value)) {
+    if (predicate(key, item)) count += 1;
+    count += countSmartleadFields(item, predicate);
+  }
+  return count;
+}
+
+function isPresent(value) {
+  if (value === null || value === undefined) return false;
+  return typeof value !== "string" || value.trim().length > 0;
 }
 
 async function discoverLeads(payload) {

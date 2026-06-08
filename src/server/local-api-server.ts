@@ -1023,11 +1023,10 @@ function optionalString(value: unknown): string | undefined {
 }
 
 function toSmartleadOutreachBriefInput(payload: Record<string, unknown>) {
-  const campaignId = optionalString(payload.campaignId);
-  if (!campaignId) throw httpError(400, "campaignId is required.");
   return {
-    campaignId,
+    campaignId: optionalString(payload.campaignId),
     periodLabel: optionalString(payload.periodLabel),
+    maxCampaigns: nonNegativeInteger(payload.maxCampaigns),
     preparedPositiveReplyCount: nonNegativeInteger(payload.preparedPositiveReplyCount),
     pendingApprovalCount: nonNegativeInteger(payload.pendingApprovalCount),
   };

@@ -376,9 +376,60 @@ test("Smartlead outreach brief normalizes campaign statistics into Jarvis style"
   assert.match(brief.summary, /poslem ich az na tvoje potvrdenie/);
 });
 
+test("Smartlead outreach brief aggregates campaigns when campaignId is omitted", async () => {
+  const seenUrls: string[] = [];
+  const fetchImpl = async (url: string | URL | Request) => {
+    const target = String(url);
+    seenUrls.push(target);
+    if (target.includes("/campaigns/?")) {
+      return responseJson([
+        { id: 1, name: "Founders" },
+        { id: 2, name: "Agencies" },
+        { id: 3, name: "Skipped" },
+      ]);
+    }
+    if (target.includes("/campaigns/1/statistics")) {
+      return responseJson({
+        total_stats: 30,
+        data: [
+          { open_count: 1, reply_time: "2026-06-03T08:00:00Z", lead_category: "Interested" },
+          { open_count: 2, reply_time: null, lead_category: null },
+        ],
+      });
+    }
+    if (target.includes("/campaigns/2/statistics")) {
+      return responseJson({
+        total_stats: 70,
+        data: [
+          { open_count: 35, reply_time: "2026-06-03T09:00:00Z", lead_category: "Meeting booked" },
+          { open_count: 12, reply_time: "2026-06-03T10:00:00Z", lead_category: null },
+        ],
+      });
+    }
+    throw new Error(`Unexpected Smartlead URL: ${target}`);
+  };
+
+  const brief = await getSmartleadOutreachBrief(
+    { periodLabel: "poslednych 7 dni", maxCampaigns: 2 },
+    { SMARTLEAD_API_KEY: "smartlead-key" },
+    fetchImpl as typeof fetch
+  );
+
+  assert.equal(brief.campaignId, "all");
+  assert.deepEqual(brief.campaignIds, ["1", "2"]);
+  assert.equal(brief.campaignCount, 2);
+  assert.equal(brief.metrics.contacted, 100);
+  assert.equal(brief.metrics.opened, 50);
+  assert.equal(brief.metrics.replied, 3);
+  assert.equal(brief.metrics.positiveReplies, 2);
+  assert.match(brief.summary, /100 ludom v 2 kampaniach/);
+  assert.equal(seenUrls.some((url) => url.includes("/campaigns/3/statistics")), false);
+});
+
 test("Smartlead outreach brief does not invent positive replies when missing", () => {
   const brief = buildSmartleadOutreachBrief({
     campaignId: "123",
+    campaignIds: ["123"],
     periodLabel: "dnes",
     statistics: { total_sent: 20, opened_count: 10, replied_count: 3 },
   });

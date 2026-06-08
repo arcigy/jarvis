@@ -203,7 +203,7 @@ External agent setup flow:
 3. The runner starts `npm run web` if needed, checks `/api/web-bridge-preflight`, starts ngrok, finds the public HTTPS URL, verifies the protected manifest, and runs `/api/remote-mcp-smoke`.
 4. Give Claude, ChatGPT, Grok, or another remote agent the printed external manifest URL, `/api/remote-mcp-pack`, `/api/remote-mcp-smoke`, plus `Authorization: Bearer <JARVIS_WEB_TOKEN>`.
 5. Use the returned `tools[].url` values for web MCP-style calls. Each tool expects JSON in the POST body and returns `{ "result": ... }`.
-6. Use `quickStartCalls[]` from the connection pack for safe first calls: smoke proof, operator briefing, Gemini reply draft, lead discovery, and approval-gated contract generation.
+6. Use `quickStartCalls[]` from the connection pack for safe first calls: smoke proof, operator briefing, Smartlead outreach brief, Gemini reply draft, lead discovery, and approval-gated contract generation.
 7. Run `arcigy.run_remote_mcp_smoke` or `GET /api/remote-mcp-smoke` before handoff when you need proof that manifest, read-only calls, approval gates, and token redaction work.
 8. For manifest tools with `requiresApproval: true`, include `"approval": { "approved": true }` only after explicit user confirmation.
 

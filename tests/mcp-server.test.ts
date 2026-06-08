@@ -94,7 +94,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
     smokeTestUrl: string;
     auth: { header: string; tokenValueReturned: boolean };
     tools: { count: number; approvalRequired: string[] };
-    quickStartCalls: Array<{ tool: string; approvalRequired: boolean }>;
+    quickStartCalls: Array<{ tool: string; approvalRequired: boolean; body: Record<string, unknown> }>;
     tunnel: { secureCommand: string };
   };
   assert.equal(pack.manifestUrl, "https://jarvis.example.ngrok-free.app/.well-known/arcigy-jarvis.json");
@@ -105,6 +105,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(pack.tools.approvalRequired.includes("arcigy.generate_contract_documents"));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.run_remote_mcp_smoke" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_outreach_brief" && call.approvalRequired === false));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_outreach_brief" && !("campaignId" in call.body)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.generate_contract_documents" && call.approvalRequired === true));
   assert.equal(pack.tunnel.secureCommand, "npm run web:tunnel:secure");
 

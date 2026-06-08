@@ -17,14 +17,17 @@ export type SmartleadCampaignStatus = {
 };
 
 export type SmartleadOutreachBriefInput = {
-  campaignId: string;
+  campaignId?: string;
   periodLabel?: string;
+  maxCampaigns?: number;
   preparedPositiveReplyCount?: number;
   pendingApprovalCount?: number;
 };
 
 export type SmartleadOutreachBrief = {
   campaignId: string;
+  campaignIds: string[];
+  campaignCount: number;
   periodLabel: string;
   summary: string;
   statistics: unknown;
@@ -67,15 +70,46 @@ export async function getSmartleadOutreachBrief(
   env: RuntimeEnv = process.env,
   fetchImpl: FetchLike = fetch
 ): Promise<SmartleadOutreachBrief> {
-  if (!input.campaignId.trim()) {
-    throw new Error("Smartlead outreach brief requires campaignId.");
+  const campaignId = input.campaignId?.trim();
+  if (campaignId) {
+    const status = await getSmartleadCampaignStatus({ campaignId }, env, fetchImpl);
+    return buildSmartleadOutreachBrief({
+      campaignId,
+      campaignIds: [campaignId],
+      campaignCount: 1,
+      periodLabel: input.periodLabel ?? "poslednych 7 dni",
+      statistics: status.statistics,
+      preparedPositiveReplyCount: input.preparedPositiveReplyCount ?? 0,
+      pendingApprovalCount: input.pendingApprovalCount ?? 0,
+    });
   }
 
-  const status = await getSmartleadCampaignStatus({ campaignId: input.campaignId }, env, fetchImpl);
+  const campaignsStatus = await getSmartleadCampaignStatus({}, env, fetchImpl);
+  const campaigns = (campaignsStatus.campaigns ?? []).filter((campaign) => campaign.id !== undefined && campaign.id !== null);
+  const selectedCampaigns = campaigns.slice(0, clampMaxCampaigns(input.maxCampaigns));
+  if (!selectedCampaigns.length) {
+    throw new Error("Smartlead did not return any campaigns to summarize.");
+  }
+
+  const campaignStats = await Promise.all(
+    selectedCampaigns.map(async (campaign) => {
+      const id = String(campaign.id);
+      const status = await getSmartleadCampaignStatus({ campaignId: id }, env, fetchImpl);
+      return {
+        campaignId: id,
+        name: campaign.name,
+        status: campaign.status,
+        statistics: status.statistics,
+      };
+    })
+  );
+
   return buildSmartleadOutreachBrief({
-    campaignId: input.campaignId,
+    campaignId: "all",
+    campaignIds: campaignStats.map((item) => item.campaignId),
+    campaignCount: campaignStats.length,
     periodLabel: input.periodLabel ?? "poslednych 7 dni",
-    statistics: status.statistics,
+    statistics: campaignStats,
     preparedPositiveReplyCount: input.preparedPositiveReplyCount ?? 0,
     pendingApprovalCount: input.pendingApprovalCount ?? 0,
   });
@@ -83,27 +117,37 @@ export async function getSmartleadOutreachBrief(
 
 export function buildSmartleadOutreachBrief(input: {
   campaignId: string;
+  campaignIds?: string[];
+  campaignCount?: number;
   periodLabel: string;
   statistics: unknown;
   preparedPositiveReplyCount?: number;
   pendingApprovalCount?: number;
 }): SmartleadOutreachBrief {
-  const contacted = readMetric(input.statistics, ["sent_count", "sent", "emails_sent", "total_sent", "sent_emails_count"]);
-  const opened = readMetric(input.statistics, ["open_count", "opened", "opened_count", "unique_open_count", "total_opens"]);
-  const replied = readMetric(input.statistics, ["reply_count", "replied", "replied_count", "unique_reply_count", "total_replies"]);
+  const contacted =
+    readOptionalMetric(input.statistics, ["sent_count", "sent", "emails_sent", "total_sent", "sent_emails_count", "total_stats"]) ??
+    countPresentFields(input.statistics, ["sent_time"]);
+  const opened =
+    readOptionalMetric(input.statistics, ["open_count", "opened", "opened_count", "unique_open_count", "total_opens"]) ??
+    countPresentFields(input.statistics, ["open_time"]);
+  const replied =
+    readOptionalMetric(input.statistics, ["reply_count", "replied", "replied_count", "unique_reply_count", "total_replies"]) ??
+    countPresentFields(input.statistics, ["reply_time"]);
   const positiveReplies = readOptionalMetric(input.statistics, [
     "positive_reply_count",
     "positive_replies",
     "positive_replied_count",
     "interested_count",
-  ]);
+  ]) ?? countTextFields(input.statistics, ["lead_category"], ["interested", "positive", "meeting", "booked", "qualified"]);
 
   const openRate = rate(opened, contacted);
   const replyRate = rate(replied, contacted);
   const positiveReplyRate = positiveReplies === null ? null : rate(positiveReplies, replied);
   const notes: string[] = [];
+  const campaignCount = input.campaignCount ?? input.campaignIds?.length ?? 1;
+  const campaignScope = campaignCount > 1 ? ` v ${campaignCount} kampaniach` : "";
   const summaryParts = [
-    `Za ${input.periodLabel} sme cez Smartlead napisali ${contacted} ludom.`,
+    `Za ${input.periodLabel} sme cez Smartlead napisali ${contacted} ludom${campaignScope}.`,
     `${openRate}% si email otvorilo, ${replied} ludi odpisalo.`,
   ];
 
@@ -126,6 +170,8 @@ export function buildSmartleadOutreachBrief(input: {
 
   return {
     campaignId: input.campaignId,
+    campaignIds: input.campaignIds ?? [input.campaignId],
+    campaignCount,
     periodLabel: input.periodLabel,
     summary: summaryParts.join(" "),
     statistics: input.statistics,
@@ -142,6 +188,11 @@ export function buildSmartleadOutreachBrief(input: {
   };
 }
 
+function clampMaxCampaigns(value: number | undefined): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return 10;
+  return Math.max(1, Math.min(Math.floor(value), 25));
+}
+
 async function smartleadFetch<T>(path: string, apiKey: string, fetchImpl: FetchLike): Promise<T> {
   const separator = path.includes("?") ? "&" : "?";
   const response = await fetchImpl(`${smartleadBaseUrl}${path}${separator}api_key=${encodeURIComponent(apiKey)}`);
@@ -154,10 +205,6 @@ async function smartleadFetch<T>(path: string, apiKey: string, fetchImpl: FetchL
 function rate(part: number, total: number): number {
   if (total <= 0) return 0;
   return Math.round((part / total) * 1000) / 10;
-}
-
-function readMetric(value: unknown, keys: string[]): number {
-  return readOptionalMetric(value, keys) ?? 0;
 }
 
 function readOptionalMetric(value: unknown, keys: string[]): number | null {
@@ -197,4 +244,44 @@ function toNumber(value: unknown): number | null {
     if (Number.isFinite(parsed)) return parsed;
   }
   return null;
+}
+
+function countPresentFields(value: unknown, keys: string[]): number {
+  const wanted = new Set(keys.map(normalizeKey));
+  return countMatchingFields(value, (key, item) => wanted.has(normalizeKey(key)) && isPresent(item));
+}
+
+function countTextFields(value: unknown, keys: string[], needles: string[]): number | null {
+  const wanted = new Set(keys.map(normalizeKey));
+  const normalizedNeedles = needles.map(normalizeKey);
+  let fieldSeen = false;
+  const count = countMatchingFields(
+    value,
+    (key, item) => {
+      if (!wanted.has(normalizeKey(key))) return false;
+      fieldSeen = true;
+      return typeof item === "string" && normalizedNeedles.some((needle) => normalizeKey(item).includes(needle));
+    }
+  );
+  return fieldSeen ? count : null;
+}
+
+function countMatchingFields(value: unknown, predicate: (key: string, item: unknown) => boolean): number {
+  if (Array.isArray(value)) {
+    return value.reduce((sum, item) => sum + countMatchingFields(item, predicate), 0);
+  }
+  if (!value || typeof value !== "object") {
+    return 0;
+  }
+  let count = 0;
+  for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+    if (predicate(key, item)) count += 1;
+    count += countMatchingFields(item, predicate);
+  }
+  return count;
+}
+
+function isPresent(value: unknown): boolean {
+  if (value === null || value === undefined) return false;
+  return typeof value !== "string" || value.trim().length > 0;
 }

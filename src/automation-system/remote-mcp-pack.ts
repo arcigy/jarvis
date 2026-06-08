@@ -157,7 +157,7 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       tool: "arcigy.get_smartlead_outreach_brief",
       method: "POST",
       url: toolUrl("arcigy.get_smartlead_outreach_brief"),
-      body: { campaignId: "SMARTLEAD_CAMPAIGN_ID", periodLabel: "poslednych 7 dni" },
+      body: { periodLabel: "poslednych 7 dni", maxCampaigns: 10 },
       approvalRequired: false,
     },
     {
