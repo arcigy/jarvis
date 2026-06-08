@@ -276,6 +276,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /leadProviderStatus/);
   assert.match(main, /ipcMain\.handle\("contracts:generate"/);
   assert.match(main, /arcigy\.generate_contract_documents requires explicit approval/);
+  assert.match(main, /cleanPythonErrorMessage/);
+  assert.match(main, /ValueError\|FileNotFoundError\|TypeError\|Error/);
   assert.match(main, /ipcMain\.handle\("contracts:draftIntake"/);
   assert.match(main, /generateGeminiTextForContract/);
   assert.match(main, /parseJsonObject/);

@@ -1083,10 +1083,21 @@ function runPython(args: string[]): { stdout: string; stderr: string } {
 }
 
 function pythonToolError(message: string): Error {
-  const statusCode = /Unresolved contract intake placeholder|Generated DOCX still contains unresolved placeholder|Missing required field|Contract intake JSON is required/i.test(message)
+  const cleaned = cleanPythonErrorMessage(message);
+  const statusCode = /Unresolved contract intake placeholder|Generated DOCX still contains unresolved placeholder|Missing required field|Contract intake JSON is required/i.test(cleaned)
     ? 400
     : 500;
-  return Object.assign(new Error(message), { statusCode });
+  return Object.assign(new Error(cleaned), { statusCode });
+}
+
+function cleanPythonErrorMessage(message: string): string {
+  const lines = String(message)
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const valueError = [...lines].reverse().find((line) => /^(ValueError|FileNotFoundError|TypeError|Error):\s*/.test(line));
+  if (valueError) return valueError.replace(/^(ValueError|FileNotFoundError|TypeError|Error):\s*/, "");
+  return lines.at(-1) || String(message);
 }
 
 function optionalString(value: unknown): string | undefined {

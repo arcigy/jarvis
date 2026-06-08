@@ -203,7 +203,9 @@ test("local web bridge serves UI and API health", async () => {
       }),
     });
     assert.equal(unfinishedDirectContract.status, 400);
-    assert.match(((await unfinishedDirectContract.json()) as { error: string }).error, /Unresolved contract intake placeholder/);
+    const unfinishedDirectContractError = ((await unfinishedDirectContract.json()) as { error: string }).error;
+    assert.match(unfinishedDirectContractError, /Unresolved contract intake placeholder/);
+    assert.doesNotMatch(unfinishedDirectContractError, /Traceback|generate_contract_documents\.py/);
 
     const unfinishedMcpContract = await fetch(`${baseUrl}/api/mcp/arcigy.generate_contract_documents`, {
       method: "POST",
@@ -215,7 +217,9 @@ test("local web bridge serves UI and API health", async () => {
       }),
     });
     assert.equal(unfinishedMcpContract.status, 400);
-    assert.match(((await unfinishedMcpContract.json()) as { error: string }).error, /Unresolved contract intake placeholder/);
+    const unfinishedMcpContractError = ((await unfinishedMcpContract.json()) as { error: string }).error;
+    assert.match(unfinishedMcpContractError, /Unresolved contract intake placeholder/);
+    assert.doesNotMatch(unfinishedMcpContractError, /Traceback|generate_contract_documents\.py/);
 
     const rejectedPath = await fetch(`${baseUrl}/api/mcp/arcigy.generate_contract_documents`, {
       method: "POST",
