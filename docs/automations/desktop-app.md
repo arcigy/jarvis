@@ -23,7 +23,7 @@ This opens a local Electron desktop window. It is a working fallback shell until
 - The diagnostics action checks configured integrations and can run live read-only probes, including Postgres TCP and Redis PING.
 - The cold outreach panel lists prepared positive-reply drafts and only marks the first pending reply approved after the user clicks `Approve first`.
 - The client memory panel identifies email addresses and ingests client requests into the local SQLite database.
-- The client memory panel starts a local watch loop that refreshes open requests every minute and speaks only newly detected client needs.
+- The client memory panel starts a local watch loop that refreshes open requests every minute, speaks only newly detected client needs, and raises a desktop notification for new client requests when notifications are allowed.
 - The Gemini panel drafts client replies without sending them.
 - The operations panel syncs recent Gmail messages into the local SQLite memory and checks Smartlead campaign status.
 - The lead discovery panel runs company discovery through Serper and Google Places, then exports selected results to Google Sheets only after the user clicks `Export`.

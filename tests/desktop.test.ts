@@ -194,6 +194,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /Gmail auto-sync checked/);
   assert.match(renderer, /in:inbox newer_than:2d/);
   assert.match(renderer, /seenClientNeedAlertIds/);
+  assert.match(renderer, /notifyClientNeedAlert/);
+  assert.match(renderer, /new Notification/);
   assert.match(renderer, /window\.setInterval/);
   assert.match(renderer, /announceNew/);
   assert.equal(existsSync("src/desktop/assets/jarvis-command-core.png"), true);

@@ -195,6 +195,26 @@ function speak(text) {
   }
 }
 
+function notifyOperator(title, body, tag = "arcigy-jarvis") {
+  if (!("Notification" in window)) return;
+  const show = () => {
+    try {
+      new Notification(title, { body, tag, renotify: true });
+    } catch {
+      return;
+    }
+  };
+  if (Notification.permission === "granted") {
+    show();
+    return;
+  }
+  if (Notification.permission === "default") {
+    void Notification.requestPermission().then((permission) => {
+      if (permission === "granted") show();
+    });
+  }
+}
+
 function renderHealth(health) {
   elements.healthGrid.innerHTML = "";
   for (const item of health.integrations ?? []) {
@@ -436,6 +456,15 @@ function clientAlertKey(alert) {
   return need.id ?? [person.primaryEmail, need.summary, need.occurredAt].filter(Boolean).join("|");
 }
 
+function notifyClientNeedAlert(alert, result) {
+  const person = alert.person ?? {};
+  const need = alert.needSignal ?? {};
+  const name = person.displayName ?? person.companyName ?? person.primaryEmail ?? "Client";
+  const summary = need.summary ?? result.summary ?? "New client request detected.";
+  const more = Number(result.count ?? 0) > 1 ? ` Open requests: ${result.count}.` : "";
+  notifyOperator("Arcigy Jarvis: client request", `${name}: ${summary}${more}`.slice(0, 240), "arcigy-client-need");
+}
+
 async function refreshClientNeedAlerts({ announceNew = false, loadingText = null } = {}) {
   if (loadingText) elements.clientAlertsResult.textContent = loadingText;
   await maybeSyncGmailForClientAlerts();
@@ -457,6 +486,7 @@ async function refreshClientNeedAlerts({ announceNew = false, loadingText = null
     : `Client alert watch paused. Open requests: ${result.count ?? alerts.length}. ${state.lastClientAlertGmailSyncSummary}`;
 
   if (announceNew && newAlerts.length) {
+    notifyClientNeedAlert(newAlerts[0], result);
     speak(newAlerts[0].jarvisAlert ?? result.summary ?? "Jarvis: Mas novu klientsku poziadavku.");
   }
   return result;
