@@ -1058,6 +1058,27 @@ test("integration diagnostics retry transient fetch failures", async () => {
   assert.equal(gemini?.status, "ready");
 });
 
+test("integration diagnostics redact secrets from provider errors", async () => {
+  const googleKey = "AI" + "za" + "S" + "y" + "B".repeat(32);
+  const providerKey = ["aaaaaaaa", "bbbb", "cccc", "dddd", "eeeeeeeeeeee"].join("-") + "_ehpdn6s";
+  const databaseUrl = "postgresql://postgres:super-private@example.com:5432/db";
+  const fetchImpl = async () => {
+    throw new Error(`fetch failed with ${googleKey} ${providerKey} ${databaseUrl}`);
+  };
+
+  const diagnostics = await runIntegrationDiagnostics({ live: true }, { GEMINI_API_KEY: "gemini" }, fetchImpl as typeof fetch);
+  const gemini = diagnostics.checks.find((check) => check.key === "gemini");
+  const text = JSON.stringify(diagnostics);
+
+  assert.equal(gemini?.status, "failed");
+  assert.equal(text.includes(googleKey), false);
+  assert.equal(text.includes(providerKey), false);
+  assert.equal(text.includes("super-private"), false);
+  assert.match(gemini?.message ?? "", /\[redacted-google-api-key\]/);
+  assert.match(gemini?.message ?? "", /\[redacted-provider-key\]/);
+  assert.match(gemini?.message ?? "", /postgresql:\/\/postgres:\[redacted\]@example\.com/);
+});
+
 test("production readiness treats Serper exhaustion as advisory when other lead provider works", async () => {
   const fetchImpl = async (url: string | URL | Request) => {
     const target = String(url);

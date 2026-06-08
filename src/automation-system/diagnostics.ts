@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { connect as connectNet } from "node:net";
 import { connect as connectTls } from "node:tls";
 
+import { redactSensitiveText } from "./ai-safety.ts";
 import { getEnv, getIntegrationHealth, type RuntimeEnv } from "./env.ts";
 import { generateGeminiText, type FetchLike } from "./gemini.ts";
 import { defaultGmailBriefingQuery, listConfiguredGmailAccounts, listRecentGmailMessageEvents, refreshGoogleAccessToken } from "./gmail.ts";
@@ -74,7 +75,7 @@ async function updateLiveCheck(checks: DiagnosticCheck[], key: string, run: () =
     check.status = "ready";
   } catch (error) {
     check.status = "failed";
-    check.message = error instanceof Error ? error.message : String(error);
+    check.message = redactSensitiveText(error instanceof Error ? error.message : String(error));
   }
 }
 
