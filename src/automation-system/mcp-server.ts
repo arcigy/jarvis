@@ -995,7 +995,7 @@ function hasConfiguredWebToken() {
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   runJarvisMcpServer().catch((error) => {
-    console.error(error);
+    console.error(safeErrorMessage(error));
     process.exit(1);
   });
 }
