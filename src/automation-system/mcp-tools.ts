@@ -24,6 +24,7 @@ export type JarvisMcpToolName =
   | "arcigy.generate_ai_reply"
   | "arcigy.sync_gmail_recent_messages"
   | "arcigy.get_smartlead_campaign_status"
+  | "arcigy.get_smartlead_outreach_brief"
   | "arcigy.search_serper"
   | "arcigy.search_google_places"
   | "arcigy.discover_leads"
@@ -155,6 +156,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.get_smartlead_campaign_status",
       description: "Načíta kampane alebo štatistiky kampane zo Smartlead API.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.get_smartlead_outreach_brief",
+      description: "Normalizuje Smartlead statistiky kampane do hotoveho Jarvis cold outreach briefu.",
       requiresApproval: false,
     },
     {

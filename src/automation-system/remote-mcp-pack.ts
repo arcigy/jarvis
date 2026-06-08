@@ -153,6 +153,14 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Get Smartlead outreach brief",
+      tool: "arcigy.get_smartlead_outreach_brief",
+      method: "POST",
+      url: toolUrl("arcigy.get_smartlead_outreach_brief"),
+      body: { campaignId: "SMARTLEAD_CAMPAIGN_ID", periodLabel: "poslednych 7 dni" },
+      approvalRequired: false,
+    },
+    {
       label: "Draft a Gemini client reply",
       tool: "arcigy.generate_ai_reply",
       method: "POST",

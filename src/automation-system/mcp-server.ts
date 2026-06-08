@@ -20,7 +20,7 @@ import { buildOperatorBriefing } from "./operator-briefing.ts";
 import { buildProductionReadinessReport } from "./production-readiness.ts";
 import { buildRemoteMcpConnectionPack } from "./remote-mcp-pack.ts";
 import { runRemoteMcpSmoke } from "./remote-mcp-smoke.ts";
-import { getSmartleadCampaignStatus } from "./smartlead.ts";
+import { getSmartleadCampaignStatus, getSmartleadOutreachBrief } from "./smartlead.ts";
 import type { ClientNeedSignal, LocalPerson } from "./types.ts";
 
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
@@ -646,6 +646,27 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async ({ campaignId }) => jsonResult(await getSmartleadCampaignStatus({ campaignId }))
+  );
+
+  server.registerTool(
+    "arcigy.get_smartlead_outreach_brief",
+    {
+      title: "Smartlead outreach brief",
+      description: "Normalize Smartlead campaign statistics into a Jarvis cold outreach briefing.",
+      inputSchema: {
+        campaignId: z.string().min(1),
+        periodLabel: z.string().default("poslednych 7 dni"),
+        preparedPositiveReplyCount: z.number().int().min(0).default(0),
+        pendingApprovalCount: z.number().int().min(0).default(0),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (input) => jsonResult(await getSmartleadOutreachBrief(input))
   );
 
   server.registerTool(

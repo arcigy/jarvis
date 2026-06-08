@@ -636,6 +636,7 @@ function listWebMcpTools() {
     { name: "arcigy.generate_ai_reply", requiresApproval: false },
     { name: "arcigy.sync_gmail_recent_messages", requiresApproval: false },
     { name: "arcigy.get_smartlead_campaign_status", requiresApproval: false },
+    { name: "arcigy.get_smartlead_outreach_brief", requiresApproval: false },
     { name: "arcigy.search_serper", requiresApproval: false },
     { name: "arcigy.search_google_places", requiresApproval: false },
     { name: "arcigy.discover_leads", requiresApproval: false },

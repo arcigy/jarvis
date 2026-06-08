@@ -16,7 +16,7 @@ import { buildOperatorBriefing } from "../automation-system/operator-briefing.ts
 import { buildProductionReadinessReport } from "../automation-system/production-readiness.ts";
 import { buildRemoteMcpConnectionPack } from "../automation-system/remote-mcp-pack.ts";
 import { runRemoteMcpSmoke } from "../automation-system/remote-mcp-smoke.ts";
-import { getSmartleadCampaignStatus } from "../automation-system/smartlead.ts";
+import { getSmartleadCampaignStatus, getSmartleadOutreachBrief } from "../automation-system/smartlead.ts";
 
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
 const desktopRoot = join(repoRoot, "src", "desktop");
@@ -221,6 +221,12 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
   if (request.method === "POST" && url.pathname === "/api/smartlead-campaign-status") {
     const payload = await readJson(request);
     writeJson(response, 200, await getSmartleadCampaignStatus({ campaignId: optionalString(payload.campaignId) }));
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/smartlead-outreach-brief") {
+    const payload = await readJson(request);
+    writeJson(response, 200, await getSmartleadOutreachBrief(toSmartleadOutreachBriefInput(payload)));
     return;
   }
 
@@ -541,6 +547,10 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
   }
   if (name === "arcigy.get_smartlead_campaign_status") {
     writeJson(response, 200, { result: await getSmartleadCampaignStatus({ campaignId: optionalString(payload.campaignId) }) });
+    return;
+  }
+  if (name === "arcigy.get_smartlead_outreach_brief") {
+    writeJson(response, 200, { result: await getSmartleadOutreachBrief(toSmartleadOutreachBriefInput(payload)) });
     return;
   }
   if (name === "arcigy.discover_leads") {
@@ -1010,6 +1020,22 @@ function runPython(args: string[]): { stdout: string; stderr: string } {
 
 function optionalString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+function toSmartleadOutreachBriefInput(payload: Record<string, unknown>) {
+  const campaignId = optionalString(payload.campaignId);
+  if (!campaignId) throw httpError(400, "campaignId is required.");
+  return {
+    campaignId,
+    periodLabel: optionalString(payload.periodLabel),
+    preparedPositiveReplyCount: nonNegativeInteger(payload.preparedPositiveReplyCount),
+    pendingApprovalCount: nonNegativeInteger(payload.pendingApprovalCount),
+  };
+}
+
+function nonNegativeInteger(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+  return Math.max(0, Math.floor(value));
 }
 
 function resolveRepoPath(value: unknown, fallback: string, label: string): string {

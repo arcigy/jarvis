@@ -19,7 +19,7 @@ import {
   identifyEmailMcpAnswer,
   listJarvisMcpTools,
 } from "../src/automation-system/mcp-tools.ts";
-import { getSmartleadCampaignStatus } from "../src/automation-system/smartlead.ts";
+import { buildSmartleadOutreachBrief, getSmartleadCampaignStatus, getSmartleadOutreachBrief } from "../src/automation-system/smartlead.ts";
 import {
   containsWakeWord,
   createJarvisVoiceSession,
@@ -53,6 +53,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.generate_ai_reply",
     "arcigy.sync_gmail_recent_messages",
     "arcigy.get_smartlead_campaign_status",
+    "arcigy.get_smartlead_outreach_brief",
     "arcigy.search_serper",
     "arcigy.search_google_places",
     "arcigy.discover_leads",
@@ -69,7 +70,7 @@ test("production readiness report returns blockers and next actions without secr
   });
 
   assert.equal(report.status, "blocked");
-  assert.equal(report.mcp.toolCount, 26);
+  assert.equal(report.mcp.toolCount, 27);
   assert.ok(report.blockers.some((blocker) => blocker.key === "redis" && blocker.severity === "warning"));
   assert.ok(report.nextActions.some((action) => action.includes("REDIS_URL")));
   assert.ok(report.fixGuide.some((step) => step.id === "redis-real-password" && step.envKeys.includes("REDIS_URL")));
@@ -349,6 +350,42 @@ test("Smartlead helper fetches campaign statistics", async () => {
   assert.equal(status.campaignId, "123");
   assert.match(seenUrls[0], /campaigns\/123\/statistics/);
   assert.match(seenUrls[0], /api_key=/);
+});
+
+test("Smartlead outreach brief normalizes campaign statistics into Jarvis style", async () => {
+  const fetchImpl = async () =>
+    responseJson({
+      sent_count: "100",
+      unique_open_count: 51,
+      reply_count: 12,
+      positive_reply_count: 4,
+    });
+
+  const brief = await getSmartleadOutreachBrief(
+    { campaignId: "123", periodLabel: "poslednych 7 dni", preparedPositiveReplyCount: 4, pendingApprovalCount: 2 },
+    { SMARTLEAD_API_KEY: "smartlead-key" },
+    fetchImpl as typeof fetch
+  );
+
+  assert.equal(brief.metrics.contacted, 100);
+  assert.equal(brief.metrics.openRate, 51);
+  assert.equal(brief.metrics.replyRate, 12);
+  assert.equal(brief.metrics.positiveReplies, 4);
+  assert.match(brief.summary, /cez Smartlead napisali 100 ludom/);
+  assert.match(brief.summary, /12 ludi odpisalo, z toho 4 pozitivne/);
+  assert.match(brief.summary, /poslem ich az na tvoje potvrdenie/);
+});
+
+test("Smartlead outreach brief does not invent positive replies when missing", () => {
+  const brief = buildSmartleadOutreachBrief({
+    campaignId: "123",
+    periodLabel: "dnes",
+    statistics: { total_sent: 20, opened_count: 10, replied_count: 3 },
+  });
+
+  assert.equal(brief.metrics.positiveReplies, null);
+  assert.match(brief.summary, /Smartlead v tomto reporte neposlal/);
+  assert.ok(brief.notes.some((note) => note.includes("positive reply field")));
 });
 
 test("lead discovery helpers call Serper, Google Places, and Google Sheets", async () => {

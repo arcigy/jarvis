@@ -69,6 +69,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(manifest.auth.requiredForExternalHosts, true);
     assert.match(manifest.endpoints.mcpToolCallPattern, /\/api\/mcp\/\{toolName\}$/);
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.draft_contract_intake" && tool.method === "POST"));
+    assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.get_smartlead_outreach_brief" && tool.method === "POST"));
 
     const mcpBrief = await postJson(`${baseUrl}/api/mcp/arcigy.get_cold_outreach_brief`, {
       periodLabel: "dnes",
@@ -213,12 +214,12 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(readiness.status, 200);
     const readinessBody = (await readiness.json()) as { status: string; mcp: { toolCount: number }; nextActions: string[]; fixGuide: unknown[] };
     assert.ok(["ready", "attention", "blocked"].includes(readinessBody.status));
-    assert.equal(readinessBody.mcp.toolCount, 26);
+    assert.equal(readinessBody.mcp.toolCount, 27);
     assert.ok(Array.isArray(readinessBody.nextActions));
     assert.ok(Array.isArray(readinessBody.fixGuide));
 
     const mcpReadiness = await postJson(`${baseUrl}/api/mcp/arcigy.get_production_readiness`, { live: false });
-    assert.equal(mcpReadiness.result.mcp.toolCount, 26);
+    assert.equal(mcpReadiness.result.mcp.toolCount, 27);
     assert.ok(Array.isArray(mcpReadiness.result.fixGuide));
 
     const remotePack = await fetch(`${baseUrl}/api/remote-mcp-pack?includeReadiness=false`);
@@ -239,25 +240,25 @@ test("local web bridge serves UI and API health", async () => {
     assert.match(remotePackBody.mcpToolCallPattern, /\/api\/mcp\/\{toolName\}$/);
     assert.equal(remotePackBody.auth.header, "Authorization: Bearer <JARVIS_WEB_TOKEN>");
     assert.equal(remotePackBody.auth.tokenValueReturned, false);
-    assert.equal(remotePackBody.tools.count, 26);
+    assert.equal(remotePackBody.tools.count, 27);
     assert.ok(remotePackBody.tools.approvalRequired.includes("arcigy.append_leads_to_google_sheet"));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.run_remote_mcp_smoke" && call.approvalRequired === false));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.generate_contract_documents" && call.approvalRequired === true));
     assert.equal(remotePackBody.tunnel.secureCommand, "npm run web:tunnel:secure");
 
     const mcpRemotePack = await postJson(`${baseUrl}/api/mcp/arcigy.get_remote_mcp_pack`, { includeReadiness: false });
-    assert.equal(mcpRemotePack.result.tools.count, 26);
+    assert.equal(mcpRemotePack.result.tools.count, 27);
 
     const smoke = await fetch(`${baseUrl}/api/remote-mcp-smoke`);
     assert.equal(smoke.status, 200);
     const smokeBody = (await smoke.json()) as { status: string; expectedToolCount: number; checks: Array<{ key: string; status: string }> };
     assert.equal(smokeBody.status, "ready");
-    assert.equal(smokeBody.expectedToolCount, 26);
+    assert.equal(smokeBody.expectedToolCount, 27);
     assert.ok(smokeBody.checks.some((check) => check.key === "approval-gate" && check.status === "ready"));
 
     const mcpSmoke = await postJson(`${baseUrl}/api/mcp/arcigy.run_remote_mcp_smoke`, {});
     assert.equal(mcpSmoke.result.status, "ready");
-    assert.equal(mcpSmoke.result.expectedToolCount, 26);
+    assert.equal(mcpSmoke.result.expectedToolCount, 27);
 
     const voice = await fetch(`${baseUrl}/api/jarvis/voice-event`, {
       method: "POST",
@@ -422,7 +423,7 @@ test("local web bridge preflight reports tunnel readiness without leaking secret
     assert.match(body.manifestUrl, /\/\.well-known\/arcigy-jarvis\.json$/);
     assert.equal(body.tunnelCommand, "npm run web:tunnel");
     assert.equal(body.tunnelProvider, "ngrok");
-    assert.ok(body.mcpToolCount >= 26);
+    assert.ok(body.mcpToolCount >= 27);
     assert.ok(body.riskyToolsRequiringApproval.includes("arcigy.generate_contract_documents"));
     assert.ok(body.riskyToolsRequiringApproval.includes("arcigy.approve_prepared_outreach_reply"));
     assert.ok(body.riskyToolsRequiringApproval.includes("arcigy.append_leads_to_google_sheet"));

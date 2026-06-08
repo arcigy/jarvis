@@ -76,6 +76,7 @@ The desktop MCP panel now runs an automatic preflight watch every two minutes. I
 - `arcigy.generate_ai_reply`: uses Gemini to draft a client reply without sending it.
 - `arcigy.sync_gmail_recent_messages`: fetches Gmail messages and ingests client requests into SQLite.
 - `arcigy.get_smartlead_campaign_status`: reads Smartlead campaigns or campaign statistics.
+- `arcigy.get_smartlead_outreach_brief`: normalizes Smartlead campaign statistics into one Jarvis cold outreach briefing.
 - `arcigy.search_serper`: read-only Serper web search for lead discovery.
 - `arcigy.search_google_places`: read-only Google Places Text Search for company discovery.
 - `arcigy.discover_leads`: combines Serper and Google Places into normalized lead candidates.

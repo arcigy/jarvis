@@ -42,6 +42,7 @@ Server tools:
 - `arcigy.generate_ai_reply`
 - `arcigy.sync_gmail_recent_messages`
 - `arcigy.get_smartlead_campaign_status`
+- `arcigy.get_smartlead_outreach_brief`
 - `arcigy.search_serper`
 - `arcigy.search_google_places`
 - `arcigy.discover_leads`
@@ -165,6 +166,7 @@ It serves the same UI at `http://127.0.0.1:8765` and exposes local HTTP endpoint
 - `POST /api/generate-contracts`
 - `POST /api/sync-gmail-recent-messages`
 - `POST /api/smartlead-campaign-status`
+- `POST /api/smartlead-outreach-brief`
 - `POST /api/discover-leads`
 - `POST /api/search-serper`
 - `POST /api/search-google-places`
@@ -185,6 +187,7 @@ It serves the same UI at `http://127.0.0.1:8765` and exposes local HTTP endpoint
 - `POST /api/mcp/arcigy.get_client_need_alerts`
 - `POST /api/mcp/arcigy.sync_gmail_recent_messages`
 - `POST /api/mcp/arcigy.get_smartlead_campaign_status`
+- `POST /api/mcp/arcigy.get_smartlead_outreach_brief`
 - `POST /api/mcp/arcigy.search_serper`
 - `POST /api/mcp/arcigy.search_google_places`
 - `POST /api/mcp/arcigy.discover_leads`
