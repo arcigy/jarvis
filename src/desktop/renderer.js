@@ -914,8 +914,9 @@ function startWebBridgeWatch() {
 
 async function getJson(url) {
   const response = await fetch(url, { headers: authHeaders() });
-  if (!response.ok) throw new Error(`Request failed: ${response.status}`);
-  return response.json();
+  const value = await readJsonResponse(response);
+  if (!response.ok) throw new Error(responseErrorMessage(response, value));
+  return value;
 }
 
 async function postJson(url, payload) {
@@ -924,9 +925,28 @@ async function postJson(url, payload) {
     headers: { "content-type": "application/json", ...authHeaders() },
     body: JSON.stringify(payload ?? {}),
   });
-  const value = await response.json();
-  if (!response.ok) throw new Error(value?.error || `Request failed: ${response.status}`);
+  const value = await readJsonResponse(response);
+  if (!response.ok) throw new Error(responseErrorMessage(response, value));
   return value;
+}
+
+async function readJsonResponse(response) {
+  const text = await response.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    if (!response.ok) {
+      const preview = redactSensitiveText(text).trim().slice(0, 240);
+      throw new Error(`Request failed: ${response.status}${preview ? `: ${preview}` : ""}`);
+    }
+    throw new Error(`Invalid JSON response: ${response.status}`);
+  }
+}
+
+function responseErrorMessage(response, value) {
+  const error = typeof value?.error === "string" ? value.error.trim() : "";
+  return error ? redactSensitiveText(error) : `Request failed: ${response.status}`;
 }
 
 function authHeaders() {

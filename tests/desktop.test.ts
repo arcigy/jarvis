@@ -124,6 +124,10 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.doesNotMatch(renderer, /window\.localStorage\.setItem\("arcigyJarvisToken"/);
   assert.match(renderer, /function redactSensitiveText/);
   assert.match(renderer, /function safeUiErrorText/);
+  assert.match(renderer, /async function readJsonResponse/);
+  assert.match(renderer, /function responseErrorMessage/);
+  assert.match(renderer, /redactSensitiveText\(text\)\.trim\(\)\.slice\(0, 240\)/);
+  assert.match(renderer, /Invalid JSON response/);
   assert.match(renderer, /function requiredInputValue/);
   assert.match(renderer, /Client message is required before drafting/);
   assert.match(renderer, /Contract brief is required before AI drafting/);
