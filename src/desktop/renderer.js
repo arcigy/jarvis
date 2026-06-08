@@ -975,6 +975,11 @@ elements.approvePreparedReply.addEventListener("click", async () => {
       return;
     }
     const first = state.lastPreparedReplies[0];
+    const approved = window.confirm(`Approve prepared reply to ${first.leadEmail}${first.subject ? ` about ${first.subject}` : ""}?`);
+    if (!approved) {
+      elements.preparedReplyResult.textContent = "Prepared reply approval cancelled before any write.";
+      return;
+    }
     const result = await arcigyApi.approvePreparedOutreachReply({
       preparedEventId: first.id,
       approved: true,

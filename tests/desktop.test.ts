@@ -140,6 +140,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /arcigyApi\.discoverLeads/);
   assert.match(renderer, /arcigyApi\.appendLeadsToGoogleSheet/);
   assert.match(renderer, /window\.confirm\(`Export \$\{state\.lastLeads\.length\} lead\(s\) to Google Sheets\?`\)/);
+  assert.match(renderer, /window\.confirm\(`Approve prepared reply to \$\{first\.leadEmail\}/);
+  assert.match(renderer, /Prepared reply approval cancelled before any write/);
   assert.match(renderer, /approval: \{ approved: true \}/);
   assert.match(renderer, /providerStatus/);
   assert.match(renderer, /renderCommandDeck/);
