@@ -5,6 +5,7 @@ import { createServer } from "node:net";
 import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { redactSensitiveText } from "../src/automation-system/ai-safety.ts";
 import { getIntegrationHealth, loadLocalEnv } from "../src/automation-system/env.ts";
 import { runIntegrationDiagnostics } from "../src/automation-system/diagnostics.ts";
 import { listJarvisMcpTools } from "../src/automation-system/mcp-tools.ts";
@@ -588,7 +589,7 @@ function isDoctorArtifact(artifact: string): boolean {
 }
 
 function trimOutput(value: string | null | undefined): string {
-  return String(value ?? "").trim().slice(0, 2000);
+  return redactSensitiveText(String(value ?? "")).trim().slice(0, 2000);
 }
 
 function renderHumanSummary(summary: DoctorSummary): string {

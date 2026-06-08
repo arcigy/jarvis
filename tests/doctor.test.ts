@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
 
 test("Jarvis doctor reports local readiness without leaking secrets", () => {
+  const doctorSource = readFileSync("scripts/jarvis_doctor.ts", "utf-8");
+  assert.match(doctorSource, /import \{ redactSensitiveText \}/);
+  assert.match(doctorSource, /return redactSensitiveText\(String\(value \?\? ""\)\)\.trim\(\)\.slice\(0, 2000\)/);
+
   const result = spawnSync("node", ["scripts/jarvis_doctor.ts", "--json", "--no-env-file"], {
     cwd: process.cwd(),
     encoding: "utf-8",
