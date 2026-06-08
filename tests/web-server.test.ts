@@ -408,7 +408,7 @@ test("local web bridge serves UI and API health", async () => {
       smokeTestUrl: string;
       mcpToolCallPattern: string;
       auth: { header: string; tokenStrong: boolean; tokenValueReturned: boolean };
-      limits: { maxJsonBytes: number; pathPolicy: string; writesRequireExplicitToolCall: boolean };
+      limits: { maxJsonBytes: number; pathPolicy: string; writesRequireExplicitToolCall: boolean; authFailureThrottle: { enabled: boolean; limit: number; windowMs: number; scope: string } };
       tools: { count: number; approvalRequired: string[]; readOnlyOrDraft: string[]; localStateWrite: string[] };
       quickStartCalls: Array<{ tool: string; method: string; url: string; approvalRequired: boolean; body: Record<string, unknown> }>;
       handoff: { connectionPackUrl: string; requiredProof: Array<{ key: string; url: string; expected: string }>; agentFirstSteps: string[] };
@@ -427,6 +427,10 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(remotePackBody.limits.pathPolicy, "repo-only");
     assert.equal(remotePackBody.limits.maxJsonBytes > 0, true);
     assert.equal(remotePackBody.limits.writesRequireExplicitToolCall, true);
+    assert.equal(remotePackBody.limits.authFailureThrottle.enabled, true);
+    assert.equal(remotePackBody.limits.authFailureThrottle.scope, "external-host-and-client");
+    assert.equal(remotePackBody.limits.authFailureThrottle.limit > 0, true);
+    assert.equal(remotePackBody.limits.authFailureThrottle.windowMs > 0, true);
     assert.equal(remotePackBody.tools.count, listJarvisMcpTools().length);
     assert.match(remotePackBody.handoff.connectionPackUrl, /\/api\/remote-mcp-pack\?includeReadiness=true&live=true$/);
     assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "action-manifest" && item.url.endsWith("/.well-known/ai-plugin.json")));
@@ -437,13 +441,14 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("pack-limits")));
     assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("cors-preflight")));
     assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("external-auth-gate")));
+    assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("pack-auth-throttle-policy")));
     assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("openapi-schema")));
     assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("approval-shape-gate")));
     assert.ok(remotePackBody.handoff.agentFirstSteps.some((step) => step.includes("secret-redaction")));
     assert.deepEqual(remotePackBody.agentCompatibility.supportedAgents.slice(0, 3), ["Claude", "ChatGPT", "Grok"]);
     assert.ok(remotePackBody.agentCompatibility.requiredBeforeWork.some((step) => step.includes("repo-only limits")));
     assert.ok(remotePackBody.agentCompatibility.requiredBeforeWork.some((step) => step.includes("pack-limits")));
-    assert.ok(remotePackBody.agentCompatibility.requiredBeforeWork.some((step) => step.includes("cors-preflight") && step.includes("external-auth-gate") && step.includes("action-manifest")));
+    assert.ok(remotePackBody.agentCompatibility.requiredBeforeWork.some((step) => step.includes("cors-preflight") && step.includes("external-auth-gate") && step.includes("pack-auth-throttle-policy") && step.includes("action-manifest")));
     assert.ok(remotePackBody.agentCompatibility.safetyRules.some((rule) => rule.includes("family-friendly")));
     assert.match(remotePackBody.agentPromptTemplates.grok, /xAI-compatible agents/);
     assert.match(remotePackBody.agentPromptTemplates.grok, /approvalRequired tools/);
@@ -495,6 +500,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(smokeBody.checks.some((check) => check.key === "openapi-schema" && check.status === "ready"));
     assert.ok(smokeBody.checks.some((check) => check.key === "cors-preflight" && check.status === "ready"));
     assert.ok(smokeBody.checks.some((check) => check.key === "external-auth-gate" && check.status === "ready"));
+    assert.ok(smokeBody.checks.some((check) => check.key === "pack-auth-throttle-policy" && check.status === "ready"));
     assert.ok(smokeBody.checks.some((check) => check.key === "secure-tunnel-status" && check.status === "ready"));
     assert.ok(smokeBody.checks.some((check) => check.key === "manifest-local-write-policy" && check.status === "ready"));
     assert.ok(smokeBody.checks.some((check) => check.key === "pack-local-write-policy" && check.status === "ready"));

@@ -102,6 +102,13 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
   );
   checks.push(
     check(
+      hasAuthThrottlePolicy(pack.body?.limits),
+      "pack-auth-throttle-policy",
+      "Connection pack exposes enabled external auth failure throttling with bounded attempts and a finite window."
+    )
+  );
+  checks.push(
+    check(
       hasTunnelControls(pack.body?.tunnel, baseUrl),
       "pack-tunnel-controls",
       "Connection pack exposes secure tunnel status/start/stop URLs with browser token requirements."
@@ -208,7 +215,7 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
     baseUrl,
     summary:
       status === "ready"
-        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, action manifest, OpenAPI action schema, CORS preflight, external auth gate, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
+        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, action manifest, OpenAPI action schema, CORS preflight, external auth gate, auth throttle policy, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((item) => item.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -264,6 +271,23 @@ function hasGuardedPackLimits(value: unknown): boolean {
     limits.maxJsonBytes > 0 &&
     limits.pathPolicy === "repo-only" &&
     limits.writesRequireExplicitToolCall === true
+  );
+}
+
+function hasAuthThrottlePolicy(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const throttle = (value as { authFailureThrottle?: unknown }).authFailureThrottle as
+    | { enabled?: unknown; limit?: unknown; windowMs?: unknown; scope?: unknown }
+    | undefined;
+  return (
+    throttle?.enabled === true &&
+    typeof throttle.limit === "number" &&
+    Number.isFinite(throttle.limit) &&
+    throttle.limit > 0 &&
+    typeof throttle.windowMs === "number" &&
+    Number.isFinite(throttle.windowMs) &&
+    throttle.windowMs > 0 &&
+    throttle.scope === "external-host-and-client"
   );
 }
 
@@ -517,7 +541,7 @@ function hasHandoffProof(value: unknown, baseUrl: string): boolean {
     proofKeys.has("connection-pack") &&
     proofKeys.has("secure-tunnel-status") &&
     proofKeys.has("remote-smoke") &&
-    ["action-manifest", "openapi-schema", "cors-preflight", "external-auth-gate", "approval-shape-gate", "secret-redaction"].every((key) => remoteSmokeExpected.includes(key)) &&
+    ["action-manifest", "openapi-schema", "cors-preflight", "external-auth-gate", "pack-auth-throttle-policy", "approval-shape-gate", "secret-redaction"].every((key) => remoteSmokeExpected.includes(key)) &&
     agentFirstSteps.some((step) => typeof step === "string" && step.includes("arcigy.get_operator_briefing")) &&
     agentFirstSteps.some((step) => typeof step === "string" && step.includes("status=ready"))
   );

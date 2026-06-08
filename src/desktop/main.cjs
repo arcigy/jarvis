@@ -539,7 +539,7 @@ function buildReadinessLaunchEvidence(status, launchChecklist, nextActions) {
       requiredBeforeExternalAgent: [
         "Run npm run web:tunnel:secure or use the browser Start tunnel button with a strong JARVIS_WEB_TOKEN.",
         "Fetch /.well-known/ai-plugin.json, /api/openapi.json, /.well-known/arcigy-jarvis.json, and /api/remote-mcp-pack?includeReadiness=true&live=true through the external URL.",
-        "Run /api/remote-mcp-smoke and require status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, approval-gate, approval-shape-gate, and secret-redaction ready before any remote agent uses write-capable tools.",
+        "Run /api/remote-mcp-smoke and require status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, approval-gate, approval-shape-gate, and secret-redaction ready before any remote agent uses write-capable tools.",
       ],
       smokeCommand: "npm run remote:mcp:smoke -- --url <external-url>",
       tunnelCommand: "npm run web:tunnel:secure",
@@ -814,6 +814,12 @@ async function getRemoteMcpPack(payload = {}) {
       maxJsonBytes: getMaxJsonBytes(),
       pathPolicy: "repo-only",
       writesRequireExplicitToolCall: true,
+      authFailureThrottle: {
+        enabled: true,
+        limit: getAuthFailureLimit(),
+        windowMs: getAuthFailureWindowMs(),
+        scope: "external-host-and-client",
+      },
     },
     readiness: readiness
       ? {
@@ -832,7 +838,7 @@ async function getRemoteMcpPack(payload = {}) {
       "Fetch the manifestUrl first to list live tools and schemas.",
       "Fetch actionManifestUrl when the remote agent supports ai-plugin/action manifests.",
       "Import openApiSchemaUrl when the remote agent supports ChatGPT custom actions, Grok actions, or OpenAPI-based HTTP tool setup.",
-      "Run the smokeTestUrl before handoff and require ready checks for action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-limits, approval-gate, approval-shape-gate, and secret-redaction.",
+      "Run the smokeTestUrl before handoff and require ready checks for action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, approval-gate, approval-shape-gate, and secret-redaction.",
       "Call MCP tools with POST JSON to mcpToolCallPattern.",
       "Use the bearer auth header placeholder; the real token must be supplied by the operator and is never returned by this pack.",
       "Use tunnel.statusUrl to inspect public tunnel URLs from the redacted secure-tunnel log. Browser-launched tunnel start requires a strong JARVIS_WEB_TOKEN.",
@@ -867,7 +873,7 @@ function buildRemoteMcpAgentCompatibility() {
       "Fetch actionManifestUrl if the agent supports ai-plugin/action manifests.",
       "Import openApiSchemaUrl if the agent supports OpenAPI or custom actions.",
       "Fetch handoff.connectionPackUrl and confirm tokenValueReturned=false plus repo-only limits.",
-      "Run smokeTestUrl and require status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-limits, approval-gate, approval-shape-gate, and secret-redaction ready.",
+      "Run smokeTestUrl and require status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, approval-gate, approval-shape-gate, and secret-redaction ready.",
       "Inspect tunnel.statusUrl after any tunnel start and never ask for the real bearer token.",
     ],
     safetyRules: [
@@ -895,7 +901,7 @@ function buildRemoteMcpHandoffRunbook(baseUrl) {
       "Fetch connectionPackUrl with Authorization: Bearer <JARVIS_WEB_TOKEN>.",
       "Fetch actionManifestUrl if the agent supports ai-plugin/action manifests.",
       "Fetch openApiSchemaUrl if the agent supports OpenAPI/custom actions.",
-      "Run smokeTestUrl and require status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-limits, approval-gate, approval-shape-gate, and secret-redaction ready before using MCP tools.",
+      "Run smokeTestUrl and require status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, approval-gate, approval-shape-gate, and secret-redaction ready before using MCP tools.",
       "Fetch tunnel.statusUrl if the operator needs the current public tunnel URLs; token values must remain redacted.",
       "Call arcigy.get_operator_briefing before proposing work.",
       "Use read-only or draft tools first; use dryRun: true before Gmail sync writes.",
@@ -930,7 +936,7 @@ function buildRemoteMcpHandoffRunbook(baseUrl) {
       {
         key: "remote-smoke",
         url: `${baseUrl}/api/remote-mcp-smoke`,
-        expected: 'status=ready, including action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-limits, secret-redaction, approval-gate, and approval-shape-gate for top-level {"approved":true} payload rejection.',
+        expected: 'status=ready, including action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, secret-redaction, approval-gate, and approval-shape-gate for top-level {"approved":true} payload rejection.',
       },
     ],
   };
@@ -1218,6 +1224,13 @@ async function runRemoteMcpSmoke(payload = {}) {
   );
   checks.push(
     smokeCheck(
+      hasAuthThrottlePolicy(pack.body?.limits),
+      "pack-auth-throttle-policy",
+      "Connection pack exposes enabled external auth failure throttling with bounded attempts and a finite window."
+    )
+  );
+  checks.push(
+    smokeCheck(
       hasTunnelControls(pack.body?.tunnel, baseUrl),
       "pack-tunnel-controls",
       "Connection pack exposes secure tunnel status/start/stop URLs with browser token requirements."
@@ -1317,7 +1330,7 @@ async function runRemoteMcpSmoke(payload = {}) {
     baseUrl,
     summary:
       status === "ready"
-      ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, action manifest, OpenAPI action schema, CORS preflight, external auth gate, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
+      ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, action manifest, OpenAPI action schema, CORS preflight, external auth gate, auth throttle policy, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((check) => check.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -1380,6 +1393,21 @@ function hasGuardedPackLimits(value) {
     value.maxJsonBytes > 0 &&
     value.pathPolicy === "repo-only" &&
     value.writesRequireExplicitToolCall === true
+  );
+}
+
+function hasAuthThrottlePolicy(value) {
+  if (!value || typeof value !== "object") return false;
+  const throttle = value.authFailureThrottle;
+  return (
+    throttle?.enabled === true &&
+    typeof throttle.limit === "number" &&
+    Number.isFinite(throttle.limit) &&
+    throttle.limit > 0 &&
+    typeof throttle.windowMs === "number" &&
+    Number.isFinite(throttle.windowMs) &&
+    throttle.windowMs > 0 &&
+    throttle.scope === "external-host-and-client"
   );
 }
 
@@ -1571,7 +1599,7 @@ function hasHandoffProof(value, baseUrl) {
     proofKeys.has("connection-pack") &&
     proofKeys.has("secure-tunnel-status") &&
     proofKeys.has("remote-smoke") &&
-    ["action-manifest", "openapi-schema", "cors-preflight", "external-auth-gate", "approval-shape-gate", "secret-redaction"].every((key) => remoteSmokeExpected.includes(key)) &&
+    ["action-manifest", "openapi-schema", "cors-preflight", "external-auth-gate", "pack-auth-throttle-policy", "approval-shape-gate", "secret-redaction"].every((key) => remoteSmokeExpected.includes(key)) &&
     agentFirstSteps.some((step) => typeof step === "string" && step.includes("arcigy.get_operator_briefing")) &&
     agentFirstSteps.some((step) => typeof step === "string" && step.includes("status=ready"))
   );
@@ -1728,6 +1756,16 @@ function isStrongWebToken(value) {
 function getMaxJsonBytes() {
   const value = Number(process.env.JARVIS_MAX_JSON_BYTES || 1000000);
   return Number.isFinite(value) && value > 0 ? value : 1000000;
+}
+
+function getAuthFailureLimit() {
+  const value = Number(process.env.JARVIS_AUTH_FAILURE_LIMIT || 20);
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : 20;
+}
+
+function getAuthFailureWindowMs() {
+  const value = Number(process.env.JARVIS_AUTH_FAILURE_WINDOW_MS || 60000);
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : 60000;
 }
 
 function isCommandAvailable(command) {

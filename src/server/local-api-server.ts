@@ -969,6 +969,8 @@ async function getRemoteMcpPack(request: IncomingMessage, url: URL | null, paylo
     tokenStrong: isStrongWebToken(getWebToken()),
     localhostBypass: process.env.JARVIS_WEB_REQUIRE_AUTH !== "true",
     maxJsonBytes: getMaxJsonBytes(),
+    authFailureLimit: getAuthFailureLimit(),
+    authFailureWindowMs: getAuthFailureWindowMs(),
     source: "web",
   });
 }
