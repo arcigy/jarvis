@@ -1096,7 +1096,7 @@ elements.memoryEmail.value = "client@example.com";
 elements.memorySubject.value = "Onboarding automatizacia";
 elements.memoryMessage.value = "Potrebujem upravit onboarding automatizaciu do piatku.";
 elements.clientMessage.value = "Potrebujem upravit onboarding automatizaciu do piatku.";
-elements.gmailQuery.value = "newer_than:7d";
+elements.gmailQuery.value = "in:inbox newer_than:7d";
 elements.leadQuery.value = "automation agency Bratislava";
 void refreshHealth();
 startWebBridgeWatch();

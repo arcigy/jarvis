@@ -9,6 +9,8 @@ let mainWindow;
 let tray;
 const repoRoot = path.resolve(__dirname, "..", "..");
 const defaultDbPath = path.join(repoRoot, "data", "jarvis-local.db");
+const defaultGmailSyncQuery = "in:inbox newer_than:7d";
+const defaultGmailBriefingQuery = "in:inbox newer_than:2d";
 loadLocalEnv();
 
 function createWindow() {
@@ -941,7 +943,7 @@ async function maybeSyncGmailForOperatorBriefing(payload, dbPath) {
     const result = await syncGmailRecentMessages({
       dbPath,
       accountEnvKey: payload?.accountEnvKey,
-      query: payload?.gmailQuery || "newer_than:2d",
+      query: payload?.gmailQuery || defaultGmailBriefingQuery,
       maxResults: Number(payload?.gmailMaxResults || 5),
       dryRun: false,
     });
@@ -1122,7 +1124,7 @@ function normalizeTranscript(text) {
 
 async function syncGmailRecentMessages(payload) {
   const accountEnvKey = String(payload?.accountEnvKey ?? "").trim();
-  const query = String(payload?.query ?? "newer_than:7d").trim() || "newer_than:7d";
+  const query = String(payload?.query ?? defaultGmailSyncQuery).trim() || defaultGmailSyncQuery;
   const maxResults = Math.max(1, Math.min(Number(payload?.maxResults ?? 10), 25));
   const dryRun = payload?.dryRun === true;
   const dbPath = payload?.dbPath || defaultDbPath;
@@ -1182,7 +1184,7 @@ async function listRecentGmailMessageEvents(account, options) {
   const accessToken = await refreshGoogleAccessToken(account.refreshToken);
   const params = new URLSearchParams({
     maxResults: String(options.maxResults ?? 10),
-    q: options.query ?? "newer_than:7d",
+    q: options.query ?? defaultGmailSyncQuery,
   });
   const listed = await gmailFetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages?${params.toString()}`, accessToken);
   const events = [];

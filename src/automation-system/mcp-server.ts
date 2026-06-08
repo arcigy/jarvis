@@ -8,7 +8,7 @@ import { draftContractIntake } from "./contract-intake-draft.ts";
 import { runIntegrationDiagnostics } from "./diagnostics.ts";
 import { getIntegrationHealth, loadLocalEnv, summarizeIntegrationHealth } from "./env.ts";
 import { buildClientReplyPrompt, generateGeminiText } from "./gemini.ts";
-import { listConfiguredGmailAccounts, listRecentGmailMessageEvents } from "./gmail.ts";
+import { defaultGmailBriefingQuery, defaultGmailSyncQuery, listConfiguredGmailAccounts, listRecentGmailMessageEvents } from "./gmail.ts";
 import { handleJarvisVoiceEvent, type JarvisVoiceSession } from "./jarvis-voice.ts";
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "./lead-discovery.ts";
 import {
@@ -533,7 +533,7 @@ export function createJarvisMcpServer(): McpServer {
         live: z.boolean().default(false),
         syncGmail: z.boolean().default(true),
         accountEnvKey: z.string().optional(),
-        gmailQuery: z.string().default("newer_than:2d"),
+        gmailQuery: z.string().default(defaultGmailBriefingQuery),
         gmailMaxResults: z.number().int().min(1).max(25).default(5),
       },
       annotations: {
@@ -596,7 +596,7 @@ export function createJarvisMcpServer(): McpServer {
       inputSchema: {
         dbPath: z.string().optional(),
         accountEnvKey: z.string().optional(),
-        query: z.string().default("newer_than:7d"),
+        query: z.string().default(defaultGmailSyncQuery),
         maxResults: z.number().int().min(1).max(25).default(10),
         dryRun: z.boolean().default(false),
       },

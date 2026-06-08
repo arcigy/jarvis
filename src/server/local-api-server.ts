@@ -8,7 +8,7 @@ import { draftContractIntake } from "../automation-system/contract-intake-draft.
 import { runIntegrationDiagnostics } from "../automation-system/diagnostics.ts";
 import { getIntegrationHealth, loadLocalEnv } from "../automation-system/env.ts";
 import { buildClientReplyPrompt, generateGeminiText } from "../automation-system/gemini.ts";
-import { listConfiguredGmailAccounts, listRecentGmailMessageEvents } from "../automation-system/gmail.ts";
+import { defaultGmailBriefingQuery, defaultGmailSyncQuery, listConfiguredGmailAccounts, listRecentGmailMessageEvents } from "../automation-system/gmail.ts";
 import { containsWakeWord, type JarvisVoiceSession } from "../automation-system/jarvis-voice.ts";
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "../automation-system/lead-discovery.ts";
 import { buildContractGenerationCommand, getColdOutreachMcpAnswer, listJarvisMcpTools } from "../automation-system/mcp-tools.ts";
@@ -632,7 +632,7 @@ function runDbTool(command: string, payload: Record<string, unknown>) {
 
 async function syncGmailRecentMessages(payload: Record<string, unknown>) {
   const accountEnvKey = optionalString(payload.accountEnvKey);
-  const query = optionalString(payload.query) ?? "newer_than:7d";
+  const query = optionalString(payload.query) ?? defaultGmailSyncQuery;
   const maxResults = typeof payload.maxResults === "number" ? Math.max(1, Math.min(payload.maxResults, 25)) : 10;
   const dryRun = payload.dryRun === true;
   const dbPath = resolveRepoPath(payload.dbPath, defaultDbPath, "dbPath");
@@ -771,7 +771,7 @@ async function maybeSyncGmailForOperatorBriefing(payload: Record<string, unknown
     const result = await syncGmailRecentMessages({
       dbPath,
       accountEnvKey: optionalString(payload.accountEnvKey),
-      query: optionalString(payload.gmailQuery) ?? "newer_than:2d",
+      query: optionalString(payload.gmailQuery) ?? defaultGmailBriefingQuery,
       maxResults: typeof payload.gmailMaxResults === "number" ? payload.gmailMaxResults : 5,
       dryRun: false,
     });

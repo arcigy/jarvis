@@ -108,6 +108,8 @@ Gemini calls retry transient `429`, `500`, `502`, `503`, and `504` responses bef
 
 Lead discovery returns provider-level status for Serper and Google Places. If Serper credits are exhausted, `discover_leads` can still return Google Places leads and tells Jarvis exactly which provider failed; the direct `search_serper` tool still reports the Serper failure.
 
+Gmail sync defaults to `in:inbox newer_than:7d`; live operator briefing uses `in:inbox newer_than:2d` so Jarvis focuses on incoming client requests.
+
 Serper is treated as an optional lead provider in readiness because Google Places keeps the shipped lead discovery workflow functional. A failed Serper check remains visible as a warning until credits are restored.
 
 Use `arcigy.get_production_readiness` or `POST /api/production-readiness` for a secret-safe status report. It returns blockers, next actions, and a `fixGuide` with env key names and validation commands, never the secret values.

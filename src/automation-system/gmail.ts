@@ -1,6 +1,9 @@
 import { gmailRefreshTokenEnv, getEnv, requireEnv, type RuntimeEnv } from "./env.ts";
 import type { FetchLike } from "./gemini.ts";
 
+export const defaultGmailSyncQuery = "in:inbox newer_than:7d";
+export const defaultGmailBriefingQuery = "in:inbox newer_than:2d";
+
 export type GmailAccount = {
   envKey: string;
   label: string;
@@ -82,7 +85,7 @@ export async function listRecentGmailMessageEvents(
   const accessToken = await refreshGoogleAccessToken(account.refreshToken, env, fetchImpl);
   const params = new URLSearchParams({
     maxResults: String(options.maxResults ?? 10),
-    q: options.query ?? "newer_than:7d",
+    q: options.query ?? defaultGmailSyncQuery,
   });
   const listResponse = await gmailFetch<GmailListResponse>(
     `https://gmail.googleapis.com/gmail/v1/users/me/messages?${params.toString()}`,

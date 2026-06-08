@@ -73,6 +73,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /get_client_need_alerts/);
   assert.match(html, /Operations sync/);
   assert.match(html, /gmailQuery/);
+  assert.match(html, /in:inbox newer_than:7d/);
   assert.match(html, /syncGmail/);
   assert.match(html, /smartleadCampaignId/);
   assert.match(html, /checkSmartlead/);
@@ -117,6 +118,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /arcigyApi\.systemHealth/);
   assert.match(renderer, /arcigyApi\.generateAiReply/);
   assert.match(renderer, /arcigyApi\.syncGmailRecentMessages/);
+  assert.match(renderer, /in:inbox newer_than:7d/);
   assert.match(renderer, /arcigyApi\.getSmartleadCampaignStatus/);
   assert.match(renderer, /arcigyApi\.getSmartleadOutreachBrief/);
   assert.match(renderer, /arcigyApi\.discoverLeads/);
@@ -225,6 +227,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /ipcMain\.handle\("jarvis:discoverLeads"/);
   assert.match(main, /ipcMain\.handle\("jarvis:appendLeadsToGoogleSheet"/);
   assert.match(main, /listRecentGmailMessageEvents/);
+  assert.match(main, /defaultGmailSyncQuery/);
+  assert.match(main, /defaultGmailBriefingQuery/);
   assert.match(main, /getSmartleadCampaignStatus/);
   assert.match(main, /getSmartleadOutreachBrief/);
   assert.match(main, /buildSmartleadOutreachBrief/);

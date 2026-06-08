@@ -11,7 +11,7 @@ import { draftContractIntake, parseJsonObject } from "../src/automation-system/c
 import { runIntegrationDiagnostics } from "../src/automation-system/diagnostics.ts";
 import { getIntegrationHealth } from "../src/automation-system/env.ts";
 import { buildClientReplyPrompt, generateGeminiText } from "../src/automation-system/gemini.ts";
-import { listRecentGmailMessageEvents, parseFromHeader } from "../src/automation-system/gmail.ts";
+import { defaultGmailSyncQuery, listRecentGmailMessageEvents, parseFromHeader } from "../src/automation-system/gmail.ts";
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "../src/automation-system/lead-discovery.ts";
 import {
   buildContractGenerationCommand,
@@ -334,6 +334,28 @@ test("Gmail helper refreshes OAuth token and normalizes message events", async (
   assert.equal(parseFromHeader("Client <client@example.com>").email, "client@example.com");
   assert.equal(events[0].fromEmail, "client@example.com");
   assert.equal(events[0].subject, "Report");
+});
+
+test("Gmail helper defaults to inbox sync query", async () => {
+  const calls: string[] = [];
+  const fetchImpl = async (url: string | URL | Request) => {
+    const target = String(url);
+    calls.push(target);
+    if (target.includes("oauth2.googleapis.com")) return responseJson({ access_token: "access-token" });
+    if (target.includes("/messages?")) return responseJson({ messages: [] });
+    throw new Error(`Unexpected URL: ${target}`);
+  };
+
+  await listRecentGmailMessageEvents(
+    { envKey: "GMAIL_REFRESH_TOKEN_TEST", label: "test", refreshToken: "refresh" },
+    {},
+    { GOOGLE_CLIENT_ID: "client", GOOGLE_CLIENT_SECRET: "secret" },
+    fetchImpl as typeof fetch
+  );
+
+  const listUrl = calls.find((url) => url.includes("/messages?")) ?? "";
+  assert.equal(defaultGmailSyncQuery, "in:inbox newer_than:7d");
+  assert.equal(new URL(listUrl).searchParams.get("q"), defaultGmailSyncQuery);
 });
 
 test("Smartlead helper fetches campaign statistics", async () => {
