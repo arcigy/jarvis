@@ -7,6 +7,7 @@ import { listJarvisMcpTools } from "../src/automation-system/mcp-tools.ts";
 test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () => {
   const html = readFileSync("src/desktop/index.html", "utf-8");
   const renderer = readFileSync("src/desktop/renderer.js", "utf-8");
+  const styles = readFileSync("src/desktop/styles.css", "utf-8");
   const main = readFileSync("src/desktop/main.cjs", "utf-8");
   const preload = readFileSync("src/desktop/preload.cjs", "utf-8");
   const visualAsset = readFileSync("src/desktop/assets/jarvis-command-core.png");
@@ -25,6 +26,12 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /id="approvalLockCount"/);
   assert.match(html, /id="liveBlockerCount"/);
   assert.match(html, /id="commandTimeline"/);
+  assert.match(html, /id="missionRail"/);
+  assert.match(html, /id="missionReadiness"/);
+  assert.match(html, /id="missionVoice"/);
+  assert.match(html, /id="missionGmail"/);
+  assert.match(html, /id="missionRemote"/);
+  assert.match(html, /id="missionContracts"/);
   assert.match(html, /id="readinessReport"/);
   assert.match(html, /id="operatorBriefing"/);
   assert.match(html, /id="bridgeCockpit"/);
@@ -148,6 +155,11 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /providerStatus/);
   assert.match(renderer, /renderCommandDeck/);
   assert.match(renderer, /buildCommandTimeline/);
+  assert.match(renderer, /setMissionSignal/);
+  assert.match(renderer, /renderMissionSignals/);
+  assert.match(renderer, /missionRemote/);
+  assert.match(renderer, /smoke ready/);
+  assert.ok(renderer.includes('badges.join(" / ")'));
   assert.match(renderer, /readyIntegrations/);
   assert.match(renderer, /approvalLockCount/);
   assert.match(renderer, /liveBlockerCount/);
@@ -212,10 +224,15 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /new Notification/);
   assert.match(renderer, /window\.setInterval/);
   assert.match(renderer, /announceNew/);
+  assert.match(styles, /\.missionRail/);
+  assert.match(styles, /\.missionSignal\[data-state="ready"\]/);
+  assert.match(styles, /@keyframes signalSweep/);
+  assert.match(styles, /prefers-reduced-motion/);
   assert.equal(existsSync("src/desktop/assets/jarvis-command-core.png"), true);
   assert.equal(visualAsset.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
   assert.equal(statSync("src/desktop/assets/jarvis-command-core.png").size > 200000, true);
   assert.doesNotMatch(renderer, /demoColdOutreachMetrics/);
+  assert.doesNotMatch(renderer, /Â/);
   assert.doesNotMatch(renderer, /Za dnes sme napísali/);
   assert.doesNotMatch(html, /[\u0102\u00c4\u0139\u00e2]/);
   assert.doesNotMatch(main, /[\u0102\u00c4\u0139\u00e2]/);

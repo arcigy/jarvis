@@ -177,6 +177,82 @@ h2 {
   text-align: center;
 }
 
+.missionRail {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(120px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.missionSignal {
+  position: relative;
+  overflow: hidden;
+  min-height: 74px;
+  border: 1px solid #26302f;
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgb(67 217 196 / 12%), transparent 46%),
+    linear-gradient(180deg, rgb(14 21 22 / 92%), rgb(8 13 14 / 94%));
+  padding: 12px;
+}
+
+.missionSignal::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 9%), transparent);
+  transform: translateX(-110%);
+  animation: signalSweep 6s ease-in-out infinite;
+}
+
+.missionSignal::after {
+  content: "";
+  position: absolute;
+  inset: auto 12px 10px;
+  height: 2px;
+  border-radius: 999px;
+  background: #56615f;
+}
+
+.missionSignal[data-state="ready"] {
+  border-color: rgb(67 217 196 / 55%);
+}
+
+.missionSignal[data-state="ready"]::after {
+  background: #43d9c4;
+  box-shadow: 0 0 16px rgb(67 217 196 / 58%);
+}
+
+.missionSignal[data-state="attention"] {
+  border-color: rgb(240 184 79 / 58%);
+}
+
+.missionSignal[data-state="attention"]::after {
+  background: #f0b84f;
+  box-shadow: 0 0 16px rgb(240 184 79 / 48%);
+}
+
+.missionSignal span,
+.missionSignal strong {
+  position: relative;
+  z-index: 1;
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.missionSignal span {
+  color: #91a19d;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.missionSignal strong {
+  margin-top: 9px;
+  color: #eef4f2;
+  font-size: 17px;
+  line-height: 1.15;
+}
+
 .statusGrid {
   display: grid;
   grid-template-columns: repeat(6, minmax(96px, 1fr));
@@ -603,6 +679,7 @@ h2 {
   body::after,
   .deckVisual::before,
   .bridgeCockpit div::before,
+  .missionSignal::before,
   .scanFrame span:nth-child(3),
   .orb {
     animation: none;
@@ -658,6 +735,13 @@ h2 {
   55%,
   100% {
     transform: translateX(100%);
+  }
+}
+
+@keyframes signalSweep {
+  48%,
+  100% {
+    transform: translateX(110%);
   }
 }
 
@@ -778,6 +862,7 @@ ul {
   }
 
   .statusGrid,
+  .missionRail,
   .commandDeck,
   .bridgeCockpit,
   .handoffGrid,

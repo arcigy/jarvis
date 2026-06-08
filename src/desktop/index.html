@@ -35,6 +35,29 @@
         <div class="status" id="statusBadge">Idle</div>
       </header>
 
+      <section class="missionRail" id="missionRail" aria-label="Live mission signals">
+        <div class="missionSignal" data-state="checking">
+          <span>Readiness</span>
+          <strong id="missionReadiness">checking</strong>
+        </div>
+        <div class="missionSignal" data-state="ready">
+          <span>Voice</span>
+          <strong id="missionVoice">idle</strong>
+        </div>
+        <div class="missionSignal" data-state="checking">
+          <span>Gmail watch</span>
+          <strong id="missionGmail">checking</strong>
+        </div>
+        <div class="missionSignal" data-state="checking">
+          <span>Remote MCP</span>
+          <strong id="missionRemote">checking</strong>
+        </div>
+        <div class="missionSignal" data-state="checking">
+          <span>Contracts</span>
+          <strong id="missionContracts">checking</strong>
+        </div>
+      </section>
+
       <section class="statusGrid" id="healthGrid" aria-label="Integration status"></section>
 
       <section class="commandDeck" id="commandDeck" aria-label="Production command deck">

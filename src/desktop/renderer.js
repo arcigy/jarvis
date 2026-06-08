@@ -25,6 +25,11 @@ const elements = {
   navButtons: [...document.querySelectorAll("nav button[data-target]")],
   statusBadge: document.querySelector("#statusBadge"),
   healthGrid: document.querySelector("#healthGrid"),
+  missionReadiness: document.querySelector("#missionReadiness"),
+  missionVoice: document.querySelector("#missionVoice"),
+  missionGmail: document.querySelector("#missionGmail"),
+  missionRemote: document.querySelector("#missionRemote"),
+  missionContracts: document.querySelector("#missionContracts"),
   readyIntegrations: document.querySelector("#readyIntegrations"),
   mcpToolCount: document.querySelector("#mcpToolCount"),
   approvalLockCount: document.querySelector("#approvalLockCount"),
@@ -153,6 +158,7 @@ function setMode(mode) {
   state.mode = mode;
   elements.statusBadge.textContent = mode === "idle" ? "Idle" : mode === "awake" ? "Awake" : "Listening";
   elements.orb.dataset.mode = mode;
+  setMissionSignal(elements.missionVoice, mode === "idle" ? "idle" : mode, mode === "idle" ? "ready" : "attention");
 }
 
 function setupNavigation() {
@@ -239,6 +245,7 @@ function renderCommandDeck(health, bridge = null) {
   elements.approvalLockCount.textContent = bridge ? String(approvalTools.length) : "--";
   elements.liveBlockerCount.textContent = String(blockers.length);
   elements.commandTimeline.textContent = buildCommandTimeline(blockers, bridge, advisories);
+  renderMissionSignals(health, bridge);
 }
 
 function buildCommandTimeline(blockers, bridge, advisories = []) {
@@ -252,6 +259,25 @@ function buildCommandTimeline(blockers, bridge, advisories = []) {
     .slice(0, 3)
     .join(" | ");
   return `${blockers.length} integration gate(s) need attention. ${blockerText}. ${bridgeState}`;
+}
+
+function setMissionSignal(node, text, stateName) {
+  if (!node) return;
+  node.textContent = text;
+  node.closest(".missionSignal")?.setAttribute("data-state", stateName);
+}
+
+function renderMissionSignals(health, bridge = null) {
+  const integrations = health.integrations ?? [];
+  const requiredBlockers = integrations.filter((item) => !item.configured && item.requiredForProduction !== false);
+  const advisories = integrations.filter((item) => !item.configured && item.requiredForProduction === false);
+  const gmail = integrations.find((item) => item.key === "gmail");
+  const gemini = integrations.find((item) => item.key === "gemini");
+  const readinessText = requiredBlockers.length ? `${requiredBlockers.length} blocker` : advisories.length ? `${advisories.length} advisory` : "ready";
+  setMissionSignal(elements.missionReadiness, readinessText, requiredBlockers.length || advisories.length ? "attention" : "ready");
+  setMissionSignal(elements.missionGmail, gmail?.configured ? (state.clientAlertWatchEnabled ? "watching" : "paused") : "needs auth", gmail?.configured ? "ready" : "attention");
+  setMissionSignal(elements.missionRemote, bridge ? (bridge.readyForTunnel ? "ready" : "locked") : "checking", bridge ? (bridge.readyForTunnel ? "ready" : "attention") : "checking");
+  setMissionSignal(elements.missionContracts, gemini?.configured ? "Gemini ready" : "needs Gemini", gemini?.configured ? "ready" : "attention");
 }
 
 function renderReadinessReport(report) {
@@ -543,6 +569,7 @@ async function maybeSyncGmailForClientAlerts({ force = false } = {}) {
 function startClientNeedWatch() {
   state.clientAlertWatchEnabled = true;
   elements.toggleClientNeedWatch.textContent = "Pause watch";
+  setMissionSignal(elements.missionGmail, "watching", "ready");
   if (state.clientAlertPollTimer) window.clearInterval(state.clientAlertPollTimer);
   void refreshClientNeedAlerts({ announceNew: false }).catch((error) => {
     elements.clientAlertWatchStatus.textContent = error instanceof Error ? error.message : String(error);
@@ -561,6 +588,7 @@ function stopClientNeedWatch() {
   state.clientAlertPollTimer = null;
   elements.toggleClientNeedWatch.textContent = "Resume watch";
   elements.clientAlertWatchStatus.textContent = "Client alert watch paused.";
+  setMissionSignal(elements.missionGmail, "paused", "attention");
 }
 
 function renderSmartleadStatus(result) {
@@ -618,6 +646,7 @@ function renderBridgeCockpit(result) {
   elements.bridgeManifestState.dataset.state = result.manifestUrl ? "ready" : "attention";
   elements.bridgeToolState.dataset.state = result.mcpToolCount ? "ready" : "attention";
   if (warnings.length) elements.bridgeTunnelState.dataset.state = "attention";
+  setMissionSignal(elements.missionRemote, result.readyForTunnel ? "ready" : "locked", result.readyForTunnel ? "ready" : "attention");
 }
 
 async function refreshWebBridge({ loadingText = null } = {}) {
@@ -665,7 +694,7 @@ function renderMcpToolList(pack) {
     const toolBadges = document.createElement("span");
     node.className = "toolRow";
     toolName.textContent = name;
-    toolBadges.textContent = badges.join(" · ") || "standard";
+    toolBadges.textContent = badges.join(" / ") || "standard";
     node.append(toolName, toolBadges);
     elements.mcpToolList.appendChild(node);
   }
@@ -704,6 +733,7 @@ function buildRemoteAgentPrompt(pack) {
 function renderRemoteMcpSmoke(report) {
   state.lastRemoteMcpSmoke = report;
   elements.remoteSmokeResult.dataset.state = report.status === "ready" ? "ready" : "attention";
+  setMissionSignal(elements.missionRemote, report.status === "ready" ? "smoke ready" : "smoke blocked", report.status === "ready" ? "ready" : "attention");
   elements.remoteSmokeResult.textContent = [
     report.summary ?? `Remote MCP smoke: ${report.status}`,
     "",
