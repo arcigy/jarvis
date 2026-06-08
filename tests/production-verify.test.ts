@@ -17,6 +17,11 @@ test("production verifier wires every live release gate", () => {
   assert.match(script, /runSecretScan/);
   assert.match(script, /git", \["ls-files", "-z"\]/);
   assert.match(script, /JARVIS_VERIFY_WEB_URL/);
+  assert.match(script, /redactSensitiveText/);
+  assert.match(script, /process\.stdout\.write\(redactSensitiveText\(result\.stdout\)\)/);
+  assert.match(script, /process\.stderr\.write\(redactSensitiveText\(result\.stderr\)\)/);
+  assert.match(script, /redactSensitiveText\(String\(chunk\)\)/);
+  assert.match(script, /redactSensitiveText\(check\.detail\)/);
   assert.match(script, /Arcigy Jarvis production verification/);
   assert.doesNotMatch(script, /API_SECRET_KEY=dummy/);
 });

@@ -5,6 +5,8 @@ import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 
+import { redactSensitiveText } from "../src/automation-system/ai-safety.ts";
+
 const repoRoot = fileURLToPath(new URL("../", import.meta.url));
 const webUrl = process.env.JARVIS_VERIFY_WEB_URL || "http://127.0.0.1:8765";
 const checks: Array<{ name: string; status: "ready" | "failed"; detail: string }> = [];
@@ -38,10 +40,10 @@ function runCommand(name: string, command: string, args: string[], extraEnv: Rec
     env: { ...process.env, ...extraEnv },
     shell: process.platform === "win32" && command.endsWith(".cmd"),
   });
-  if (result.stdout) process.stdout.write(result.stdout);
-  if (result.stderr) process.stderr.write(result.stderr);
+  if (result.stdout) process.stdout.write(redactSensitiveText(result.stdout));
+  if (result.stderr) process.stderr.write(redactSensitiveText(result.stderr));
   if (result.status !== 0) {
-    checks.push({ name, status: "failed", detail: result.error ? result.error.message : `Exited with status ${result.status}.` });
+    checks.push({ name, status: "failed", detail: result.error ? redactSensitiveText(result.error.message) : `Exited with status ${result.status}.` });
     process.stdout.write(renderSummary());
     process.exit(result.status ?? 1);
   }
@@ -73,8 +75,8 @@ async function ensureWebBridge() {
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
-  webChild.stdout?.on("data", (chunk) => process.stdout.write(`[web] ${chunk}`));
-  webChild.stderr?.on("data", (chunk) => process.stderr.write(`[web] ${chunk}`));
+  webChild.stdout?.on("data", (chunk) => process.stdout.write(`[web] ${redactSensitiveText(String(chunk))}`));
+  webChild.stderr?.on("data", (chunk) => process.stderr.write(`[web] ${redactSensitiveText(String(chunk))}`));
 
   const deadline = Date.now() + 15_000;
   while (Date.now() < deadline) {
@@ -145,7 +147,7 @@ function renderSummary(): string {
     "",
     "Arcigy Jarvis production verification",
     `Status: ${failed ? "failed" : "ready"} (${ready} ready, ${failed} failed)`,
-    ...checks.map((check) => `[${check.status.toUpperCase()}] ${check.name}: ${check.detail}`),
+    ...checks.map((check) => `[${check.status.toUpperCase()}] ${check.name}: ${redactSensitiveText(check.detail)}`),
     "",
   ].join("\n");
 }
