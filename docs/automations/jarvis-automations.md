@@ -54,6 +54,8 @@ MCP nástroje:
 
 `arcigy.get_client_need_alerts` vracia persistentny inbox otvorenych poziadaviek zo SQLite, aby Jarvis vedel sam pripomenut, co klient alebo lead aktualne chce.
 
+Desktop UI tento inbox sleduje kazdu minutu a cez TTS oznami iba novo zachytene poziadavky.
+
 ## Jarvis hlas
 
 Desktop listener je definovaný ako vypnutá automatizácia, kým nebude pripojená desktopová vrstva. Wake word je `Jarvis`; po aktivácii má spustiť lokálny intent, použiť schválené MCP nástroje a odpovedať hlasom.

@@ -41,7 +41,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /identifyEmail/);
   assert.match(html, /ingestClientMessage/);
   assert.match(html, /clientNeedAlerts/);
+  assert.match(html, /toggleClientNeedWatch/);
   assert.match(html, /clientAlertsResult/);
+  assert.match(html, /clientAlertWatchStatus/);
   assert.match(html, /get_client_need_alerts/);
   assert.match(html, /Operations sync/);
   assert.match(html, /gmailQuery/);
@@ -99,6 +101,12 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /buildContractIntakeFromForm/);
   assert.match(renderer, /fillContractForm/);
   assert.match(renderer, /renderClientNeedAlerts/);
+  assert.match(renderer, /startClientNeedWatch/);
+  assert.match(renderer, /stopClientNeedWatch/);
+  assert.match(renderer, /clientAlertPollMs: 60000/);
+  assert.match(renderer, /seenClientNeedAlertIds/);
+  assert.match(renderer, /window\.setInterval/);
+  assert.match(renderer, /announceNew/);
   assert.doesNotMatch(renderer, /demoColdOutreachMetrics/);
   assert.doesNotMatch(renderer, /Za dnes sme napísali/);
   assert.doesNotMatch(html, /[\u0102\u00c4\u0139\u00e2]/);

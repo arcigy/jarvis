@@ -485,6 +485,17 @@ input:focus {
   align-items: start;
 }
 
+.watchStatus {
+  margin-top: 12px;
+  border: 1px solid rgb(67 217 196 / 34%);
+  border-radius: 8px;
+  background: rgb(67 217 196 / 7%);
+  color: #9cf8ed;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .response {
   white-space: pre-wrap;
   margin-top: 14px;

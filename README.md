@@ -70,6 +70,7 @@ The Electron shell opens a local Arcigy Jarvis console with:
 - local Electron IPC bridge for Jarvis voice events and cold outreach briefs
 - voice cold outreach answers backed by `data\jarvis-local.db`
 - client need alerts inbox backed by local SQLite memory
+- proactive client need watch that polls local memory and speaks newly detected requests
 - runtime integration health for Gemini, Gmail, Smartlead, Postgres, Redis, Serper
 - live diagnostics for Gemini, Gmail OAuth, Smartlead, Postgres TCP, Redis PING, Google Places, Serper, and Google Sheets metadata
 - Gemini draft replies that are prepared locally and not sent automatically

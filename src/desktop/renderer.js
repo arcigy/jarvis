@@ -4,6 +4,10 @@ const state = {
   recognition: null,
   listening: false,
   lastLeads: [],
+  clientAlertWatchEnabled: true,
+  clientAlertPollTimer: null,
+  seenClientNeedAlertIds: new Set(),
+  clientAlertPollMs: 60000,
 };
 
 const elements = {
@@ -29,8 +33,10 @@ const elements = {
   identifyEmail: document.querySelector("#identifyEmail"),
   ingestClientMessage: document.querySelector("#ingestClientMessage"),
   clientNeedAlerts: document.querySelector("#clientNeedAlerts"),
+  toggleClientNeedWatch: document.querySelector("#toggleClientNeedWatch"),
   memoryResult: document.querySelector("#memoryResult"),
   clientAlertsResult: document.querySelector("#clientAlertsResult"),
+  clientAlertWatchStatus: document.querySelector("#clientAlertWatchStatus"),
   clientMessage: document.querySelector("#clientMessage"),
   draftReply: document.querySelector("#draftReply"),
   draftResult: document.querySelector("#draftResult"),
@@ -320,6 +326,60 @@ function renderClientNeedAlerts(result) {
   ].join("\n");
 }
 
+function clientAlertKey(alert) {
+  const person = alert.person ?? {};
+  const need = alert.needSignal ?? {};
+  return need.id ?? [person.primaryEmail, need.summary, need.occurredAt].filter(Boolean).join("|");
+}
+
+async function refreshClientNeedAlerts({ announceNew = false, loadingText = null } = {}) {
+  if (loadingText) elements.clientAlertsResult.textContent = loadingText;
+  const result = await arcigyApi.getClientNeedAlerts({ limit: 10 });
+  const alerts = result.alerts ?? [];
+  const newAlerts = alerts.filter((alert) => {
+    const key = clientAlertKey(alert);
+    return key && !state.seenClientNeedAlertIds.has(key);
+  });
+
+  elements.clientAlertsResult.textContent = renderClientNeedAlerts(result);
+  for (const alert of alerts) {
+    const key = clientAlertKey(alert);
+    if (key) state.seenClientNeedAlertIds.add(key);
+  }
+
+  elements.clientAlertWatchStatus.textContent = state.clientAlertWatchEnabled
+    ? `Client alert watch active. Open requests: ${result.count ?? alerts.length}.`
+    : `Client alert watch paused. Open requests: ${result.count ?? alerts.length}.`;
+
+  if (announceNew && newAlerts.length) {
+    speak(newAlerts[0].jarvisAlert ?? result.summary ?? "Jarvis: Mas novu klientsku poziadavku.");
+  }
+  return result;
+}
+
+function startClientNeedWatch() {
+  state.clientAlertWatchEnabled = true;
+  elements.toggleClientNeedWatch.textContent = "Pause watch";
+  if (state.clientAlertPollTimer) window.clearInterval(state.clientAlertPollTimer);
+  void refreshClientNeedAlerts({ announceNew: false }).catch((error) => {
+    elements.clientAlertWatchStatus.textContent = error instanceof Error ? error.message : String(error);
+  });
+  state.clientAlertPollTimer = window.setInterval(() => {
+    if (!state.clientAlertWatchEnabled) return;
+    void refreshClientNeedAlerts({ announceNew: true }).catch((error) => {
+      elements.clientAlertWatchStatus.textContent = error instanceof Error ? error.message : String(error);
+    });
+  }, state.clientAlertPollMs);
+}
+
+function stopClientNeedWatch() {
+  state.clientAlertWatchEnabled = false;
+  if (state.clientAlertPollTimer) window.clearInterval(state.clientAlertPollTimer);
+  state.clientAlertPollTimer = null;
+  elements.toggleClientNeedWatch.textContent = "Resume watch";
+  elements.clientAlertWatchStatus.textContent = "Client alert watch paused.";
+}
+
 function renderSmartleadStatus(result) {
   if (Array.isArray(result.campaigns)) {
     const campaigns = result.campaigns.slice(0, 8);
@@ -570,21 +630,22 @@ elements.ingestClientMessage.addEventListener("click", async () => {
     });
     elements.memoryResult.textContent = renderIngestedMessage(result);
     if (result.jarvisAlert) speak(result.jarvisAlert);
-    const alerts = await arcigyApi.getClientNeedAlerts({ limit: 10 });
-    elements.clientAlertsResult.textContent = renderClientNeedAlerts(alerts);
+    await refreshClientNeedAlerts({ announceNew: false });
   } catch (error) {
     elements.memoryResult.textContent = error instanceof Error ? error.message : String(error);
   }
 });
 elements.clientNeedAlerts.addEventListener("click", async () => {
   try {
-    elements.clientAlertsResult.textContent = "Loading client alerts...";
-    const result = await arcigyApi.getClientNeedAlerts({ limit: 10 });
-    elements.clientAlertsResult.textContent = renderClientNeedAlerts(result);
+    const result = await refreshClientNeedAlerts({ announceNew: false, loadingText: "Loading client alerts..." });
     if (result.count > 0 && result.summary) speak(result.summary);
   } catch (error) {
     elements.clientAlertsResult.textContent = error instanceof Error ? error.message : String(error);
   }
+});
+elements.toggleClientNeedWatch.addEventListener("click", () => {
+  if (state.clientAlertWatchEnabled) stopClientNeedWatch();
+  else startClientNeedWatch();
 });
 elements.draftReply.addEventListener("click", async () => {
   try {
@@ -735,4 +796,5 @@ elements.clientMessage.value = "Potrebujem upravit onboarding automatizaciu do p
 elements.gmailQuery.value = "newer_than:7d";
 elements.leadQuery.value = "automation agency Bratislava";
 void refreshHealth();
+startClientNeedWatch();
 setMode("idle");
