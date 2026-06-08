@@ -526,6 +526,7 @@ const localStateWriteTools = new Set([
 
 function buildRemoteMcpQuickStartCalls(baseUrl) {
   const toolUrl = (name) => `${baseUrl}/api/mcp/${name}`;
+  const contractIntake = buildQuickStartContractIntake();
   return [
     {
       label: "Run remote MCP smoke proof",
@@ -580,10 +581,61 @@ function buildRemoteMcpQuickStartCalls(baseUrl) {
       tool: "arcigy.generate_contract_documents",
       method: "POST",
       url: toolUrl("arcigy.generate_contract_documents"),
-      body: { approval: { approved: true }, intake: { client: {}, project: {}, pricing: {} } },
+      body: { approval: { approved: true }, intake: contractIntake },
       approvalRequired: true,
     },
   ];
+}
+
+function buildQuickStartContractIntake() {
+  return {
+    client: {
+      businessName: "Demo Klient s. r. o.",
+      registeredAddress: "Hlavna 1, 811 01 Bratislava",
+      companyId: "12345678",
+      taxId: "SK1234567890",
+      representativeName: "Jan Novak",
+      representativeRole: "konatel",
+      email: "jan.novak@example.com",
+      phone: "+421 900 000 000",
+    },
+    contacts: {
+      clientAuthorizedContact: "Jan Novak, jan.novak@example.com, +421 900 000 000",
+      arcigyAuthorizedContact: "Branislav Laubert, Co-Founder & CEO, branislav@arcigy.group, +421 951 268 376",
+    },
+    project: {
+      name: "Demo automatizacna aplikacia",
+      goal: "Automatizovat prijem leadov, klientsku evidenciu a reportovanie.",
+      includedUserAccounts: 2,
+      feedbackRounds: 3,
+      includedModules: [
+        {
+          name: "Lead intake",
+          purpose: "Zachytava a triedi nove dopyty.",
+          inputs: "Kontaktne udaje, zdroj leadu, stav spracovania.",
+          outputs: "Prehlad leadov a notifikacie pre operatora.",
+          outOfScope: "Platene reklamne kampane.",
+        },
+      ],
+      outputs: ["Webova aplikacia", "Administracny dashboard", "Zakladny reporting"],
+      aiFeatures: ["Navrh odpovedi klientom", "Sumarizacia poziadaviek"],
+      acceptanceCriteria: ["Operator vie vytvorit lead", "Dashboard zobrazi aktualny stav", "Report sa da exportovat"],
+    },
+    pricing: {
+      implementationFeeEur: 2000,
+      depositPercent: 30,
+      monthlyFeeEur: 200,
+      initialTermMonths: 6,
+      invoiceDueDays: 14,
+    },
+    dates: {
+      frameworkAgreementDate: "2026-06-08",
+      projectAppendixDate: "2026-06-08",
+      plannedLaunchDate: "2026-07-15",
+    },
+    specialTerms: ["Demo quick-start payload; operator must replace client data before real use."],
+    additionalAttachments: [],
+  };
 }
 
 async function runRemoteMcpSmoke(payload = {}) {

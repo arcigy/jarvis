@@ -113,7 +113,14 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_outreach_brief" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_outreach_brief" && !("campaignId" in call.body)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.sync_gmail_recent_messages" && call.body.dryRun === true));
-  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.generate_contract_documents" && call.approvalRequired === true));
+  const contractQuickStart = pack.quickStartCalls.find((call) => call.tool === "arcigy.generate_contract_documents");
+  assert.equal(contractQuickStart?.approvalRequired, true);
+  assert.equal((contractQuickStart?.body.approval as { approved?: boolean } | undefined)?.approved, true);
+  const contractIntake = contractQuickStart?.body.intake as { client?: { businessName?: string }; project?: { includedModules?: unknown[] }; pricing?: unknown } | undefined;
+  assert.equal(contractIntake?.client?.businessName, "Demo Klient s. r. o.");
+  assert.ok(Array.isArray(contractIntake?.project?.includedModules));
+  assert.ok(contractIntake?.pricing);
+  assert.doesNotMatch(JSON.stringify(contractQuickStart?.body), /dopln|todo|tbd|xxx|\?\?\?/i);
   assert.equal(pack.tunnel.secureCommand, "npm run web:tunnel:secure");
 
   assertToolError(
