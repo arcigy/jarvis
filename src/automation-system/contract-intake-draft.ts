@@ -1,5 +1,5 @@
 import { generateGeminiText, type FetchLike } from "./gemini.ts";
-import { safeAiJson, safeAiPromptPart } from "./ai-safety.ts";
+import { safeAiJson, safeAiPromptPart, safeUntrustedAiPromptPart } from "./ai-safety.ts";
 import type { RuntimeEnv } from "./env.ts";
 
 export type ContractIntakeDraftInput = {
@@ -28,7 +28,7 @@ export async function draftContractIntake(
         "Base intake JSON:",
         safeAiJson(input.baseIntake ?? {}),
         "Business brief:",
-        brief,
+        safeUntrustedAiPromptPart(brief, "contract business brief"),
       ].join("\n"),
     },
     env,

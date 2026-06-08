@@ -704,7 +704,9 @@ test("local web bridge MCP AI reply preserves prompt options", async () => {
     assert.match(requestText, /Klient: ACME Board/);
     assert.match(requestText, /Jazyk odpovede: en/);
     assert.match(requestText, /Ton: warm/);
-    assert.match(requestText, /Kontext: Renewal conversation/);
+    assert.match(requestText, /BEGIN UNTRUSTED CLIENT CONTEXT/);
+    assert.match(requestText, /Renewal conversation/);
+    assert.match(requestText, /BEGIN UNTRUSTED CLIENT MESSAGE/);
   } finally {
     globalThis.fetch = originalFetch;
     if (previousGeminiKey === undefined) delete process.env.GEMINI_API_KEY;

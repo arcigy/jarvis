@@ -1,5 +1,5 @@
 import { requireEnv, type RuntimeEnv } from "./env.ts";
-import { redactSensitiveText, safeAiPromptPart, withAiSafetySystemInstruction } from "./ai-safety.ts";
+import { redactSensitiveText, safeAiPromptPart, safeUntrustedAiPromptPart, withAiSafetySystemInstruction } from "./ai-safety.ts";
 
 export type FetchLike = typeof fetch;
 
@@ -148,9 +148,9 @@ export function buildClientReplyPrompt(input: ClientReplyDraftInput): GeminiText
       client,
       `Jazyk odpovede: ${language}.`,
       `Ton: ${tone}.`,
-      input.context ? `Kontext: ${safeAiPromptPart(input.context)}` : null,
+      input.context ? `Kontext:\n${safeUntrustedAiPromptPart(input.context, "client context")}` : null,
       "Sprava klienta:",
-      safeAiPromptPart(input.message),
+      safeUntrustedAiPromptPart(input.message, "client message"),
       "Vytvor kratky navrh odpovede. Uved aj 1 vetu, co ma pouzivatel schvalit pred odoslanim.",
     ]
       .filter(Boolean)
@@ -170,9 +170,9 @@ export function buildPositiveOutreachReplyPrompt(input: PositiveOutreachReplyDra
       input.companyName ? `Firma: ${safeAiPromptPart(input.companyName)}.` : null,
       `Jazyk odpovede: ${language}.`,
       `Ton: ${tone}.`,
-      input.context ? `Kontext kampane: ${safeAiPromptPart(input.context)}` : null,
+      input.context ? `Kontext kampane:\n${safeUntrustedAiPromptPart(input.context, "campaign context")}` : null,
       "Pozitivny signal od leadu:",
-      safeAiPromptPart(input.positiveSignal),
+      safeUntrustedAiPromptPart(input.positiveSignal, "positive lead signal"),
       [
         "Vytvor kratky navrh odpovede pre pozitivny lead.",
         "Ciel: posunut lead na jasny dalsi krok, idealne kratky call alebo doplnenie detailov.",
