@@ -105,6 +105,8 @@ const elements = {
   mcpToolListStatus: document.querySelector("#mcpToolListStatus"),
   mcpToolList: document.querySelector("#mcpToolList"),
   remoteAgentPrompt: document.querySelector("#remoteAgentPrompt"),
+  copyTunnelCommand: document.querySelector("#copyTunnelCommand"),
+  copyGrokPrompt: document.querySelector("#copyGrokPrompt"),
   copyRemotePack: document.querySelector("#copyRemotePack"),
   runRemoteSmoke: document.querySelector("#runRemoteSmoke"),
   remoteSmokeResult: document.querySelector("#remoteSmokeResult"),
@@ -966,6 +968,48 @@ async function copyRemotePack() {
   }, 1400);
 }
 
+async function copyGrokPrompt() {
+  if (!state.lastRemoteMcpPack) {
+    elements.remoteAgentPrompt.textContent = "Load the web bridge first.";
+    return;
+  }
+  const pack = state.lastRemoteMcpPack;
+  const handoffStatus = buildCopiedHandoffStatus(state.lastRemoteMcpSmoke);
+  const prompt = pack.agentPromptTemplates?.grok ?? "Use the Arcigy Jarvis HTTP JSON MCP bridge. Run smoke first and never call approvalRequired tools without approval.";
+  const payload = [
+    handoffStatus.text,
+    "",
+    "Grok startup prompt:",
+    prompt,
+    "",
+    `Manifest: ${pack.manifestUrl}`,
+    `Connection pack: ${pack.handoff?.connectionPackUrl ?? `${pack.baseUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`}`,
+    `Smoke test: ${pack.smokeTestUrl}`,
+    `Tool call pattern: ${pack.mcpToolCallPattern}`,
+    `Auth header: ${pack.auth?.header ?? "Authorization: Bearer <JARVIS_WEB_TOKEN>"}`,
+  ].join("\n");
+  await writeClipboardText(payload);
+  elements.copyGrokPrompt.textContent = "Copied";
+  window.setTimeout(() => {
+    elements.copyGrokPrompt.textContent = "Copy Grok";
+  }, 1400);
+}
+
+async function copyTunnelCommand() {
+  const command = state.lastRemoteMcpPack?.tunnel?.secureCommand ?? "npm run web:tunnel:secure";
+  const payload = [
+    command,
+    "",
+    "Keep this terminal process open while Grok, Claude, or ChatGPT uses the remote MCP bridge.",
+    "After the tunnel URL appears, run remote smoke and copy the Grok prompt from Jarvis.",
+  ].join("\n");
+  await writeClipboardText(payload);
+  elements.copyTunnelCommand.textContent = "Copied";
+  window.setTimeout(() => {
+    elements.copyTunnelCommand.textContent = "Copy tunnel";
+  }, 1400);
+}
+
 function buildCopiedHandoffStatus(smokeReport) {
   if (!smokeReport) {
     return {
@@ -1454,6 +1498,20 @@ elements.checkWebBridge.addEventListener("click", async () => {
 elements.copyRemotePack.addEventListener("click", async () => {
   try {
     await copyRemotePack();
+  } catch (error) {
+    elements.remoteAgentPrompt.textContent = safeUiErrorText(error);
+  }
+});
+elements.copyGrokPrompt.addEventListener("click", async () => {
+  try {
+    await copyGrokPrompt();
+  } catch (error) {
+    elements.remoteAgentPrompt.textContent = safeUiErrorText(error);
+  }
+});
+elements.copyTunnelCommand.addEventListener("click", async () => {
+  try {
+    await copyTunnelCommand();
   } catch (error) {
     elements.remoteAgentPrompt.textContent = safeUiErrorText(error);
   }

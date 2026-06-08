@@ -67,6 +67,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /id="mcpToolList"/);
   assert.match(html, /Live MCP tool registry/);
   assert.match(html, /id="remoteAgentPrompt"/);
+  assert.match(html, /id="copyTunnelCommand"/);
+  assert.match(html, /id="copyGrokPrompt"/);
   assert.match(html, /id="copyRemotePack"/);
   assert.match(html, /id="runRemoteSmoke"/);
   assert.match(html, /id="remoteSmokeResult"/);
@@ -183,8 +185,14 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /Supported agents:/);
   assert.match(renderer, /Agent-specific startup prompts/);
   assert.match(renderer, /agentPromptTemplates/);
+  assert.match(renderer, /function copyGrokPrompt/);
+  assert.match(renderer, /Grok startup prompt/);
+  assert.match(renderer, /function copyTunnelCommand/);
+  assert.match(renderer, /npm run web:tunnel:secure/);
   assert.match(renderer, /Safety rules:/);
   assert.match(renderer, /copyRemotePack/);
+  assert.match(renderer, /copyGrokPrompt/);
+  assert.match(renderer, /copyTunnelCommand/);
   assert.match(renderer, /writeClipboardText/);
   assert.match(renderer, /const copied = document\.execCommand\("copy"\)/);
   assert.match(renderer, /Clipboard copy failed/);
@@ -440,6 +448,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /summarizeHealthForVoice/);
   assert.match(main, /isProductionReadinessVoiceCommand/);
   assert.match(main, /isRemoteMcpVoiceCommand/);
+  assert.match(main, /"grok", "xai", "x\.ai"/);
   assert.match(main, /isContractVoiceCommand/);
   assert.match(main, /isClientNeedsVoiceCommand/);
   assert.match(main, /isGmailVoiceCommand/);

@@ -746,6 +746,11 @@ h2 {
   gap: 12px;
 }
 
+.handoffHead .buttonGroup {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .handoffHead span,
 .handoffGrid span {
   display: block;

@@ -1513,7 +1513,7 @@ function isProductionReadinessVoiceCommand(text) {
 }
 
 function isRemoteMcpVoiceCommand(text) {
-  return ["remote mcp", "mcp", "tunel", "tunnel", "handoff", "claude", "chatgpt"].some((term) => text.includes(term));
+  return ["remote mcp", "mcp", "tunel", "tunnel", "handoff", "claude", "chatgpt", "grok", "xai", "x.ai"].some((term) => text.includes(term));
 }
 
 function isContractVoiceCommand(text) {
