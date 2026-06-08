@@ -12,6 +12,8 @@ test("web tunnel script orchestrates protected Jarvis MCP exposure", () => {
   assert.match(script, /randomBytes/);
   assert.match(script, /src\/server\/local-api-server\.ts/);
   assert.match(script, /\/api\/web-bridge-preflight/);
+  assert.match(script, /fetchJson<Preflight>\(`\$\{origin\}\/api\/web-bridge-preflight`, token\)/);
+  assert.match(script, /headers\.authorization = `Bearer \$\{token\}`/);
   assert.match(script, /\/\.well-known\/arcigy-jarvis\.json/);
   assert.match(script, /\/api\/remote-mcp-smoke/);
   assert.match(script, /verifyRemoteMcpSmoke/);

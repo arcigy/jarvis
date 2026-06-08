@@ -95,7 +95,7 @@ async function main() {
       await waitForWebBridge();
     }
 
-    const preflight = await fetchJson<Preflight>(`${origin}/api/web-bridge-preflight`);
+    const preflight = await fetchJson<Preflight>(`${origin}/api/web-bridge-preflight`, token);
     if (!preflight.readyForTunnel && !allowMissingToken) {
       if (generatedToken && preflight.tokenConfigured === false) {
         exitWithMessage(
@@ -258,9 +258,11 @@ async function verifyRemoteMcpSmoke(publicUrl: string, token: string | null): Pr
   return body;
 }
 
-async function fetchJson<T>(url: string): Promise<T> {
+async function fetchJson<T>(url: string, token: string | null = null): Promise<T> {
+  const headers: Record<string, string> = { "ngrok-skip-browser-warning": "true" };
+  if (token) headers.authorization = `Bearer ${token}`;
   const response = await fetch(url, {
-    headers: { "ngrok-skip-browser-warning": "true" },
+    headers,
   });
   if (!response.ok) throw new Error(`${url} returned HTTP ${response.status}`);
   return (await response.json()) as T;
