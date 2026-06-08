@@ -205,6 +205,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /Connection pack:/);
   assert.match(renderer, /Required proof:/);
   assert.match(renderer, /Agent first steps:/);
+  assert.match(main, /top-level \{"approved":true\} payloads/);
   assert.match(renderer, /\/api\/remote-mcp-pack/);
   assert.match(renderer, /\/api\/remote-mcp-smoke/);
   assert.match(renderer, /arcigy\.get_remote_mcp_pack/);

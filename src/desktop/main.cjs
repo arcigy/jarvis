@@ -689,7 +689,7 @@ function buildRemoteMcpHandoffRunbook(baseUrl) {
       {
         key: "remote-smoke",
         url: `${baseUrl}/api/remote-mcp-smoke`,
-        expected: "status=ready for manifest, tool count, local write policy, approval gate, and secret redaction.",
+        expected: 'status=ready, including all approval-required write tools rejecting unapproved and top-level {"approved":true} payloads.',
       },
     ],
   };

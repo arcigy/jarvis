@@ -346,7 +346,7 @@ test("local web bridge serves UI and API health", async () => {
       auth: { header: string; tokenStrong: boolean; tokenValueReturned: boolean };
       tools: { count: number; approvalRequired: string[]; readOnlyOrDraft: string[]; localStateWrite: string[] };
       quickStartCalls: Array<{ tool: string; approvalRequired: boolean; body: Record<string, unknown> }>;
-      handoff: { connectionPackUrl: string; requiredProof: Array<{ key: string; url: string }>; agentFirstSteps: string[] };
+      handoff: { connectionPackUrl: string; requiredProof: Array<{ key: string; url: string; expected: string }>; agentFirstSteps: string[] };
       agentCompatibility: { supportedAgents: string[]; safetyRules: string[]; requiredBeforeWork: string[] };
       tunnel: { secureCommand: string };
     };
@@ -359,6 +359,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(remotePackBody.tools.count, 28);
     assert.match(remotePackBody.handoff.connectionPackUrl, /\/api\/remote-mcp-pack\?includeReadiness=true&live=true$/);
     assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "connection-pack" && item.url.includes("includeReadiness=true")));
+    assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes('top-level {"approved":true}')));
     assert.ok(remotePackBody.handoff.agentFirstSteps.some((step) => step.includes("status=ready")));
     assert.deepEqual(remotePackBody.agentCompatibility.supportedAgents.slice(0, 3), ["Claude", "ChatGPT", "Grok"]);
     assert.ok(remotePackBody.agentCompatibility.requiredBeforeWork.some((step) => step.includes("status=ready")));
