@@ -894,11 +894,13 @@ function approvePreparedOutreachReply(payload = {}) {
 
 async function getOperatorBriefing(payload = {}) {
   const period = resolveColdOutreachPeriod(String(payload?.text ?? payload?.periodLabel ?? ""));
+  const dbPath = payload?.dbPath || defaultDbPath;
+  const liveSyncSummary = await maybeSyncGmailForOperatorBriefing(payload, dbPath);
   const coldResult = runPython([
     "scripts/jarvis_local_db.py",
     "cold-brief",
     "--db",
-    payload?.dbPath || defaultDbPath,
+    dbPath,
     "--payload",
     JSON.stringify({
       since: payload?.since || period.since,
@@ -907,14 +909,15 @@ async function getOperatorBriefing(payload = {}) {
     }),
   ]);
   const cold = JSON.parse(coldResult.stdout);
-  const clientNeeds = getClientNeedAlerts({ dbPath: payload?.dbPath || defaultDbPath, status: "new", limit: 10 });
-  const preparedReplies = getPreparedOutreachReplies({ dbPath: payload?.dbPath || defaultDbPath, status: "pending", limit: 10 });
-  const readiness = getProductionReadiness({ live: payload?.live === true, dbPath: payload?.dbPath || defaultDbPath });
+  const clientNeeds = getClientNeedAlerts({ dbPath, status: "new", limit: 10 });
+  const preparedReplies = getPreparedOutreachReplies({ dbPath, status: "pending", limit: 10 });
+  const readiness = getProductionReadiness({ live: payload?.live === true, dbPath });
   const coldOutreachSummary = await getOperatorColdOutreachSummary(payload?.live === true, String(payload?.periodLabel || period.periodLabel), cold.summary);
   return buildOperatorBriefing({
     readinessStatus: readiness.status,
     readinessSummary: readiness.summary,
     coldOutreachSummary,
+    liveSyncSummary,
     openClientNeedCount: Number(clientNeeds.count || 0),
     preparedReplyCount: Number(preparedReplies.count || 0),
     nextActions: readiness.nextActions || [],
@@ -932,11 +935,32 @@ async function getOperatorColdOutreachSummary(live, periodLabel, localSummary) {
   }
 }
 
+async function maybeSyncGmailForOperatorBriefing(payload, dbPath) {
+  if (payload?.live !== true || payload?.syncGmail === false) return null;
+  try {
+    const result = await syncGmailRecentMessages({
+      dbPath,
+      accountEnvKey: payload?.accountEnvKey,
+      query: payload?.gmailQuery || "newer_than:2d",
+      maxResults: Number(payload?.gmailMaxResults || 5),
+      dryRun: false,
+    });
+    const fetched = result.synced.reduce((sum, item) => sum + item.fetched, 0);
+    const ingested = result.synced.reduce((sum, item) => sum + item.ingested, 0);
+    const alerts = result.synced.reduce((sum, item) => sum + item.alerts.length, 0);
+    return `Gmail checked ${result.synced.length} account(s), fetched ${fetched} message(s), ingested ${ingested}, raised ${alerts} alert(s).`;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return `Gmail live sync unavailable: ${message}`;
+  }
+}
+
 function buildOperatorBriefing(input) {
   const nextAction = input.nextActions?.[0] || "Ziadny urgentny krok.";
   const sections = {
     readiness: `Readiness: ${input.readinessStatus}. ${input.readinessSummary}`,
     coldOutreach: `Cold outreach: ${input.coldOutreachSummary}`,
+    liveSync: input.liveSyncSummary ? `Live sync: ${input.liveSyncSummary}` : undefined,
     clientNeeds:
       input.openClientNeedCount > 0
         ? `Klientske poziadavky: ${input.openClientNeedCount} otvorenych.`
@@ -951,10 +975,11 @@ function buildOperatorBriefing(input) {
     "Jarvis briefing.",
     sections.readiness,
     sections.coldOutreach,
+    sections.liveSync,
     sections.clientNeeds,
     sections.preparedReplies,
     sections.nextAction,
-  ].join(" ");
+  ].filter(Boolean).join(" ");
   return {
     summary: speechText,
     speechText,

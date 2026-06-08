@@ -735,6 +735,7 @@ function getClientNeedAlerts(payload: Record<string, unknown>) {
 async function getOperatorBriefing(payload: Record<string, unknown>) {
   const period = resolveColdOutreachPeriod(String(payload.text ?? payload.periodLabel ?? ""));
   const dbPath = resolveRepoPath(payload.dbPath, defaultDbPath, "dbPath");
+  const liveSyncSummary = await maybeSyncGmailForOperatorBriefing(payload, dbPath);
   const cold = JSON.parse(
     runPython([
       "scripts/jarvis_local_db.py",
@@ -757,10 +758,31 @@ async function getOperatorBriefing(payload: Record<string, unknown>) {
     readinessStatus: readiness.status,
     readinessSummary: readiness.summary,
     coldOutreachSummary,
+    liveSyncSummary,
     openClientNeedCount: Number(clientNeeds.count ?? 0),
     preparedReplyCount: Number(preparedReplies.count ?? 0),
     nextActions: readiness.nextActions,
   });
+}
+
+async function maybeSyncGmailForOperatorBriefing(payload: Record<string, unknown>, dbPath: string): Promise<string | null> {
+  if (payload.live !== true || payload.syncGmail === false) return null;
+  try {
+    const result = await syncGmailRecentMessages({
+      dbPath,
+      accountEnvKey: optionalString(payload.accountEnvKey),
+      query: optionalString(payload.gmailQuery) ?? "newer_than:2d",
+      maxResults: typeof payload.gmailMaxResults === "number" ? payload.gmailMaxResults : 5,
+      dryRun: false,
+    });
+    const fetched = result.synced.reduce((sum, item) => sum + item.fetched, 0);
+    const ingested = result.synced.reduce((sum, item) => sum + item.ingested, 0);
+    const alerts = result.synced.reduce((sum, item) => sum + item.alerts.length, 0);
+    return `Gmail checked ${result.synced.length} account(s), fetched ${fetched} message(s), ingested ${ingested}, raised ${alerts} alert(s).`;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return `Gmail live sync unavailable: ${message}`;
+  }
 }
 
 async function getColdOutreachBriefSummary(payload: Record<string, unknown>, live: boolean): Promise<string> {

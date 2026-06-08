@@ -73,7 +73,7 @@ The desktop MCP panel now runs an automatic preflight watch every two minutes. I
 - `arcigy.get_production_readiness`: summarizes production readiness, blockers, next actions, MCP tool count, approval locks, and optional live diagnostics.
 - `arcigy.get_remote_mcp_pack`: returns a secret-safe connection pack for Claude, ChatGPT, Grok, or another remote MCP agent.
 - `arcigy.run_remote_mcp_smoke`: verifies remote web MCP manifest, connection pack, read-only tool call, approval gate, and token redaction.
-- `arcigy.get_operator_briefing`: combines readiness, cold outreach, open client requests, and prepared reply approvals into one Jarvis briefing; with `live=true`, cold outreach prefers live Smartlead statistics and falls back to local SQLite.
+- `arcigy.get_operator_briefing`: combines readiness, cold outreach, open client requests, and prepared reply approvals into one Jarvis briefing; with `live=true`, it syncs recent Gmail messages, cold outreach prefers live Smartlead statistics, and both fall back safely.
 - `arcigy.generate_ai_reply`: uses Gemini to draft a client reply without sending it.
 - `arcigy.sync_gmail_recent_messages`: fetches Gmail messages and ingests client requests into SQLite.
 - `arcigy.get_smartlead_campaign_status`: reads Smartlead campaigns or campaign statistics.

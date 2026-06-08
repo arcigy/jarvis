@@ -108,6 +108,7 @@ test("operator briefing combines readiness, outreach, client needs, and approval
     readinessStatus: "blocked",
     readinessSummary: "Production needs attention.",
     coldOutreachSummary: "Za dnes sme napisali 10 ludom.",
+    liveSyncSummary: "Gmail checked 4 account(s), fetched 8 message(s), ingested 8, raised 2 alert(s).",
     openClientNeedCount: 2,
     preparedReplyCount: 1,
     nextActions: ["Replace REDIS_URL."],
@@ -115,6 +116,7 @@ test("operator briefing combines readiness, outreach, client needs, and approval
 
   assert.match(briefing.speechText, /Jarvis briefing/);
   assert.match(briefing.speechText, /Cold outreach/);
+  assert.match(briefing.speechText, /Live sync/);
   assert.match(briefing.speechText, /Klientske poziadavky: 2/);
   assert.match(briefing.speechText, /Pripravene odpovede: 1/);
   assert.equal(briefing.sections.nextAction, "Najblizsi krok: Replace REDIS_URL.");

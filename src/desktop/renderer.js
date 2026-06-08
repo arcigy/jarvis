@@ -255,6 +255,7 @@ function renderOperatorBriefing(briefing) {
     "",
     sections.readiness,
     sections.coldOutreach,
+    sections.liveSync,
     sections.clientNeeds,
     sections.preparedReplies,
     sections.nextAction,

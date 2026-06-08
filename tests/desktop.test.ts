@@ -135,6 +135,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /arcigy\.run_remote_mcp_smoke/);
   assert.match(renderer, /renderReadinessReport/);
   assert.match(renderer, /renderOperatorBriefing/);
+  assert.match(renderer, /sections\.liveSync/);
   assert.match(renderer, /refreshOperatorBriefing/);
   assert.match(renderer, /live: true/);
   assert.match(renderer, /Building live operator briefing/);
@@ -212,6 +213,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /summarizeLeadsForVoice/);
   assert.match(main, /getOperatorBriefing/);
   assert.match(main, /getOperatorColdOutreachSummary/);
+  assert.match(main, /maybeSyncGmailForOperatorBriefing/);
+  assert.match(main, /Gmail checked/);
   assert.match(main, /payload\?\.live !== false/);
   assert.match(main, /cleanVoiceQuery/);
   assert.match(main, /ipcMain\.handle\("jarvis:systemHealth"/);

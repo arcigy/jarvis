@@ -531,6 +531,10 @@ export function createJarvisMcpServer(): McpServer {
         until: z.string().optional(),
         periodLabel: z.string().default("poslednych 7 dni"),
         live: z.boolean().default(false),
+        syncGmail: z.boolean().default(true),
+        accountEnvKey: z.string().optional(),
+        gmailQuery: z.string().default("newer_than:2d"),
+        gmailMaxResults: z.number().int().min(1).max(25).default(5),
       },
       annotations: {
         readOnlyHint: true,
@@ -539,9 +543,10 @@ export function createJarvisMcpServer(): McpServer {
         openWorldHint: false,
       },
     },
-    async ({ dbPath, since, until, periodLabel, live }) => {
+    async ({ dbPath, since, until, periodLabel, live, syncGmail, accountEnvKey, gmailQuery, gmailMaxResults }) => {
       const now = new Date();
       const defaultSince = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const liveSyncSummary = await maybeSyncGmailForOperatorBriefing({ live, syncGmail, accountEnvKey, gmailQuery, gmailMaxResults }, dbPath);
       const localCold = runDbCommand("cold-brief", { since: since ?? defaultSince, until: until ?? now.toISOString(), periodLabel }, dbPath);
       const clientNeeds = runDbCommand("list-open-needs", { status: "new", limit: 10 }, dbPath);
       const preparedReplies = runDbCommand("list-prepared-replies", { status: "pending", limit: 10 }, dbPath);
@@ -552,6 +557,7 @@ export function createJarvisMcpServer(): McpServer {
           readinessStatus: readiness.status,
           readinessSummary: readiness.summary,
           coldOutreachSummary,
+          liveSyncSummary,
           openClientNeedCount: Number(clientNeeds.count ?? 0),
           preparedReplyCount: Number(preparedReplies.count ?? 0),
           nextActions: readiness.nextActions,
@@ -820,6 +826,36 @@ function runDbCommand(
   }
   const result = runPython(args);
   return JSON.parse(result.stdout);
+}
+
+async function maybeSyncGmailForOperatorBriefing(
+  input: { live: boolean; syncGmail: boolean; accountEnvKey?: string; gmailQuery: string; gmailMaxResults: number },
+  dbPath?: string
+): Promise<string | null> {
+  if (!input.live || !input.syncGmail) return null;
+  try {
+    const accounts = listConfiguredGmailAccounts().filter((account) => !input.accountEnvKey || account.envKey === input.accountEnvKey);
+    if (!accounts.length) {
+      throw new Error(input.accountEnvKey ? `Configured Gmail account not found: ${input.accountEnvKey}` : "No configured Gmail accounts found.");
+    }
+    const synced = [];
+    for (const account of accounts) {
+      const events = await listRecentGmailMessageEvents(account, { query: input.gmailQuery, maxResults: input.gmailMaxResults });
+      const ingested = events.map((event) => runDbCommand("ingest-message", event, dbPath));
+      synced.push({
+        fetched: events.length,
+        ingested: ingested.length,
+        alerts: ingested.map((item) => item.jarvisAlert).filter(Boolean).length,
+      });
+    }
+    const fetched = synced.reduce((sum, item) => sum + item.fetched, 0);
+    const ingested = synced.reduce((sum, item) => sum + item.ingested, 0);
+    const alerts = synced.reduce((sum, item) => sum + item.alerts, 0);
+    return `Gmail checked ${synced.length} account(s), fetched ${fetched} message(s), ingested ${ingested}, raised ${alerts} alert(s).`;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return `Gmail live sync unavailable: ${message}`;
+  }
 }
 
 async function getOperatorColdOutreachSummary(live: boolean, periodLabel: string, localSummary: string): Promise<string> {
