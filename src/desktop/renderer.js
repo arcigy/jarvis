@@ -76,6 +76,7 @@ const elements = {
   handoffTunnelCommand: document.querySelector("#handoffTunnelCommand"),
   handoffSmokeUrl: document.querySelector("#handoffSmokeUrl"),
   handoffApprovalTools: document.querySelector("#handoffApprovalTools"),
+  handoffLocalWriteTools: document.querySelector("#handoffLocalWriteTools"),
   remoteAgentPrompt: document.querySelector("#remoteAgentPrompt"),
   copyRemotePack: document.querySelector("#copyRemotePack"),
   runRemoteSmoke: document.querySelector("#runRemoteSmoke"),
@@ -578,6 +579,7 @@ async function refreshWebBridge({ loadingText = null } = {}) {
 function renderRemoteMcpPack(pack) {
   state.lastRemoteMcpPack = pack;
   const approvalTools = pack.tools?.approvalRequired ?? [];
+  const localWriteTools = pack.tools?.localStateWrite ?? [];
   elements.handoffStatus.textContent = pack.auth?.tokenConfigured ? "armed" : "local only";
   elements.handoffStatus.dataset.state = pack.auth?.tokenConfigured ? "ready" : "attention";
   elements.handoffManifestUrl.textContent = pack.manifestUrl ?? "--";
@@ -585,11 +587,13 @@ function renderRemoteMcpPack(pack) {
   elements.handoffTunnelCommand.textContent = pack.tunnel?.secureCommand ?? "npm run web:tunnel:secure";
   elements.handoffSmokeUrl.textContent = pack.smokeTestUrl ?? "--";
   elements.handoffApprovalTools.textContent = approvalTools.length ? `${approvalTools.length}: ${approvalTools.join(", ")}` : "none";
+  elements.handoffLocalWriteTools.textContent = localWriteTools.length ? `${localWriteTools.length}: ${localWriteTools.join(", ")}` : "none";
   elements.remoteAgentPrompt.textContent = buildRemoteAgentPrompt(pack);
 }
 
 function buildRemoteAgentPrompt(pack) {
   const approvalTools = pack.tools?.approvalRequired ?? [];
+  const localWriteTools = pack.tools?.localStateWrite ?? [];
   const quickStart = (pack.quickStartCalls ?? [])
     .map((call) => `- ${call.label}: ${call.tool} ${JSON.stringify(call.body)}`)
     .join("\n");
@@ -600,9 +604,11 @@ function buildRemoteAgentPrompt(pack) {
     `Auth header: ${pack.auth?.header ?? "Authorization: Bearer <JARVIS_WEB_TOKEN>"}`,
     `Tools: ${pack.tools?.count ?? 0}`,
     `Approval required: ${approvalTools.join(", ") || "none"}`,
+    `Local memory writes: ${localWriteTools.join(", ") || "none"}`,
     `Secure tunnel: ${pack.tunnel?.secureCommand ?? "npm run web:tunnel:secure"}`,
     `Smoke test: ${pack.smokeTestUrl ?? "--"}`,
     "Rule: never call approval-required tools without explicit operator confirmation.",
+    "Rule: treat local memory write tools as persistent local state changes; preview Gmail with dryRun: true first.",
     "Start with arcigy.get_operator_briefing, then use read-only tools before proposing any write action.",
     quickStart ? `Quick-start calls:\n${quickStart}` : "",
   ].join("\n");

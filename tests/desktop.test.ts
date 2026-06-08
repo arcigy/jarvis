@@ -38,6 +38,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /id="handoffTunnelCommand"/);
   assert.match(html, /id="handoffSmokeUrl"/);
   assert.match(html, /id="handoffApprovalTools"/);
+  assert.match(html, /id="handoffLocalWriteTools"/);
   assert.match(html, /id="remoteAgentPrompt"/);
   assert.match(html, /id="copyRemotePack"/);
   assert.match(html, /id="runRemoteSmoke"/);
@@ -102,6 +103,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /arcigyApi\.remoteMcpSmoke/);
   assert.match(renderer, /renderBridgeCockpit/);
   assert.match(renderer, /renderRemoteMcpPack/);
+  assert.match(renderer, /handoffLocalWriteTools/);
+  assert.match(renderer, /Local memory writes:/);
+  assert.match(renderer, /preview Gmail with dryRun: true first/);
   assert.match(renderer, /renderRemoteMcpSmoke/);
   assert.match(renderer, /buildRemoteAgentPrompt/);
   assert.match(renderer, /Quick-start calls/);
