@@ -123,35 +123,7 @@ test("remote MCP smoke checks every response for bearer token leaks", async () =
           localStateWrite: ["arcigy.sync_gmail_recent_messages"],
           readOnlyOrDraft: ["arcigy.generate_ai_reply"],
         },
-        quickStartCalls: [
-          {
-            tool: "arcigy.identify_email",
-            approvalRequired: false,
-            body: { email: "client@example.com" },
-          },
-          {
-            tool: "arcigy.get_client_need_alerts",
-            approvalRequired: false,
-            body: { status: "new", limit: 10 },
-          },
-          {
-            tool: "arcigy.draft_contract_intake",
-            approvalRequired: false,
-            body: { brief: "Klient potrebuje webovu aplikaciu pre lead intake, reporting a klientsku evidenciu." },
-          },
-          {
-            tool: "arcigy.generate_contract_documents",
-            approvalRequired: true,
-            body: {
-              approval: { approved: true },
-              intake: {
-                client: { businessName: "Demo", email: "demo@example.com" },
-                project: { includedModules: ["Portal"] },
-                pricing: { monthlyFee: 100 },
-              },
-            },
-          },
-        ],
+        quickStartCalls: remoteSmokeQuickStartFixture(),
       });
     }
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) {
@@ -173,6 +145,58 @@ test("remote MCP smoke checks every response for bearer token leaks", async () =
   assert.equal(report.status, "blocked");
   assert.ok(report.checks.some((check) => check.key === "approval-shape-gate" && check.status === "ready"));
   assert.ok(report.checks.some((check) => check.key === "secret-redaction" && check.status === "blocked"));
+});
+
+test("remote MCP smoke requires valid quick-start URLs", async () => {
+  const expectedNames = listJarvisMcpTools().map((tool) => tool.name);
+  const tools = expectedNames.map((name) => ({ name }));
+  const fetchImpl = async (target: string | URL) => {
+    const url = String(target);
+    if (url.endsWith("/.well-known/arcigy-jarvis.json")) {
+      return responseJson({
+        tools,
+        auth: { header: "Authorization: Bearer <JARVIS_WEB_TOKEN>" },
+        toolPolicy: {
+          localStateWrite: ["arcigy.sync_gmail_recent_messages"],
+          readOnlyOrDraft: ["arcigy.generate_ai_reply"],
+        },
+      });
+    }
+    if (url.includes("/api/remote-mcp-pack")) {
+      return responseJson({
+        auth: { tokenValueReturned: false },
+        agentCompatibility: remoteAgentCompatibilityFixture(),
+        handoff: {
+          connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
+          requiredProof: [{ key: "manifest" }, { key: "connection-pack" }, { key: "remote-smoke" }],
+          agentFirstSteps: ["Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
+        },
+        tools: {
+          names: expectedNames,
+          localStateWrite: ["arcigy.sync_gmail_recent_messages"],
+          readOnlyOrDraft: ["arcigy.generate_ai_reply"],
+        },
+        quickStartCalls: remoteSmokeQuickStartFixture().map((call, index) =>
+          index === 0 ? { ...call, url: "https://jarvis.example/api/not-mcp/arcigy.run_remote_mcp_smoke" } : call
+        ),
+      });
+    }
+    if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
+    if (
+      url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
+      url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
+    ) {
+      return responseJson({ error: "approval required" }, 409);
+    }
+    return responseJson({ error: "unexpected URL" }, 404);
+  };
+
+  const report = await runRemoteMcpSmoke({ baseUrl: "https://jarvis.example", fetchImpl: fetchImpl as typeof fetch });
+
+  assert.equal(report.status, "blocked");
+  assert.ok(report.checks.some((check) => check.key === "pack-quick-start-urls" && check.status === "blocked"));
+  assert.ok(report.checks.some((check) => check.key === "pack-tool-registry" && check.status === "ready"));
 });
 
 test("remote MCP smoke redacts secrets from fetch failures", async () => {
@@ -2077,31 +2101,24 @@ function remoteAgentCompatibilityFixture() {
 }
 
 function remoteSmokeQuickStartFixture() {
+  const baseUrl = "https://jarvis.example";
+  const call = (tool: string, body: Record<string, unknown>, approvalRequired = false) => ({
+    tool,
+    method: "POST",
+    url: `${baseUrl}/api/mcp/${tool}`,
+    approvalRequired,
+    body,
+  });
   return [
-    {
-      tool: "arcigy.identify_email",
-      approvalRequired: false,
-      body: { email: "client@example.com" },
-    },
-    {
-      tool: "arcigy.get_client_need_alerts",
-      approvalRequired: false,
-      body: { status: "new", limit: 10 },
-    },
-    {
-      tool: "arcigy.get_audit_events",
-      approvalRequired: false,
-      body: { limit: 20 },
-    },
-    {
-      tool: "arcigy.draft_contract_intake",
-      approvalRequired: false,
-      body: { brief: "Klient potrebuje webovu aplikaciu pre lead intake, reporting a klientsku evidenciu." },
-    },
-    {
-      tool: "arcigy.generate_contract_documents",
-      approvalRequired: true,
-      body: {
+    call("arcigy.run_remote_mcp_smoke", {}),
+    call("arcigy.get_operator_briefing", { periodLabel: "poslednych 7 dni", live: false }),
+    call("arcigy.identify_email", { email: "client@example.com" }),
+    call("arcigy.get_client_need_alerts", { status: "new", limit: 10 }),
+    call("arcigy.get_audit_events", { limit: 20 }),
+    call("arcigy.draft_contract_intake", { brief: "Klient potrebuje webovu aplikaciu pre lead intake, reporting a klientsku evidenciu." }),
+    call(
+      "arcigy.generate_contract_documents",
+      {
         approval: { approved: true },
         intake: {
           client: { businessName: "Demo", email: "demo@example.com" },
@@ -2109,7 +2126,8 @@ function remoteSmokeQuickStartFixture() {
           pricing: { monthlyFee: 100 },
         },
       },
-    },
+      true
+    ),
   ];
 }
 

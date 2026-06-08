@@ -72,6 +72,13 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
   );
   checks.push(
     check(
+      hasValidQuickStartUrls(pack.body?.quickStartCalls, baseUrl),
+      "pack-quick-start-urls",
+      "Connection pack quick-start calls use POST URLs for registered MCP tools."
+    )
+  );
+  checks.push(
+    check(
       hasUsableContractQuickStart(pack.body?.quickStartCalls),
       "pack-contract-quick-start",
       "Connection pack includes a usable approval-gated contract quick-start payload."
@@ -132,7 +139,7 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
     baseUrl,
     summary:
       status === "ready"
-        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, local write policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
+        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, local write policy, quick-start URLs, contract draft, contract quick-start, client memory quick-start, audit quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((item) => item.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -204,6 +211,21 @@ function expectedToolNames(): string[] {
 
 function sameStringArray(actual: unknown[], expected: string[]): boolean {
   return actual.length === expected.length && actual.every((item, index) => item === expected[index]);
+}
+
+function hasValidQuickStartUrls(value: unknown, baseUrl: string): boolean {
+  if (!Array.isArray(value) || value.length === 0) return false;
+  const names = new Set(expectedToolNames());
+  return value.every((item) => {
+    if (!item || typeof item !== "object") return false;
+    const call = item as { tool?: unknown; method?: unknown; url?: unknown };
+    return (
+      typeof call.tool === "string" &&
+      names.has(call.tool) &&
+      call.method === "POST" &&
+      call.url === `${baseUrl}/api/mcp/${call.tool}`
+    );
+  });
 }
 
 function hasUsableContractQuickStart(value: unknown): boolean {

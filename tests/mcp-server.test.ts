@@ -127,7 +127,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
     smokeTestUrl: string;
     auth: { header: string; tokenValueReturned: boolean };
     tools: { count: number; approvalRequired: string[]; readOnlyOrDraft: string[]; localStateWrite: string[] };
-    quickStartCalls: Array<{ tool: string; approvalRequired: boolean; body: Record<string, unknown> }>;
+    quickStartCalls: Array<{ tool: string; method: string; url: string; approvalRequired: boolean; body: Record<string, unknown> }>;
     handoff: { connectionPackUrl: string; requiredProof: Array<{ key: string; url: string; expected: string }>; agentFirstSteps: string[] };
     agentCompatibility: { supportedAgents: string[]; safetyRules: string[]; requiredBeforeWork: string[] };
     tunnel: { secureCommand: string };
@@ -143,6 +143,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.equal(pack.tools.readOnlyOrDraft.includes("arcigy.sync_gmail_recent_messages"), false);
   assert.equal(pack.tools.readOnlyOrDraft.includes("arcigy.upsert_local_person"), false);
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.run_remote_mcp_smoke" && call.approvalRequired === false));
+  assert.ok(pack.quickStartCalls.every((call) => call.method === "POST" && call.url === `https://jarvis.example.ngrok-free.app/api/mcp/${call.tool}`));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.identify_email" && call.approvalRequired === false && typeof call.body.email === "string"));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_client_need_alerts" && call.approvalRequired === false && call.body.status === "new"));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_audit_events" && call.approvalRequired === false && call.body.limit === 20));
