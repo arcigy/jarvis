@@ -70,6 +70,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /id="remoteAgentPrompt"/);
   assert.match(html, /id="startSecureTunnel"/);
   assert.match(html, /id="stopSecureTunnel"/);
+  assert.match(html, /id="checkTunnelStatus"/);
   assert.match(html, /id="openTunnelLog"/);
   assert.match(html, /id="copyTunnelCommand"/);
   assert.match(html, /id="copyClaudePrompt"/);
@@ -147,6 +148,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /arcigyApi\.webBridgePreflight/);
   assert.match(renderer, /arcigyApi\.startSecureTunnel/);
   assert.match(renderer, /arcigyApi\.stopSecureTunnel/);
+  assert.match(renderer, /arcigyApi\.getSecureTunnelStatus/);
+  assert.match(renderer, /checkTunnelStatus: document\.querySelector\("#checkTunnelStatus"\)/);
   assert.match(renderer, /openTunnelLog: document\.querySelector\("#openTunnelLog"\)/);
   assert.match(renderer, /arcigyApi\.remoteMcpPack/);
   assert.match(renderer, /arcigyApi\.remoteMcpSmoke/);
@@ -226,6 +229,11 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /Stop the secure Jarvis MCP tunnel started from this desktop session/);
   assert.match(renderer, /Secure tunnel stop cancelled/);
   assert.match(renderer, /arcigyApi\.stopSecureTunnel\(\)/);
+  assert.match(renderer, /elements\.checkTunnelStatus\.addEventListener\("click"/);
+  assert.match(renderer, /refreshSecureTunnelStatus/);
+  assert.match(renderer, /renderSecureTunnelStatus/);
+  assert.match(renderer, /Public MCP base URL/);
+  assert.match(renderer, /present in private log, not shown here/);
   assert.match(renderer, /No secure tunnel process is tracked in this desktop session/);
   assert.match(renderer, /secureTunnelLogPath: null/);
   assert.match(renderer, /state\.secureTunnelLogPath = result\.logPath/);
@@ -459,8 +467,13 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /ipcMain\.handle\("jarvis:webBridgePreflight"/);
   assert.match(main, /ipcMain\.handle\("jarvis:startSecureTunnel"/);
   assert.match(main, /ipcMain\.handle\("jarvis:stopSecureTunnel"/);
+  assert.match(main, /ipcMain\.handle\("jarvis:getSecureTunnelStatus"/);
   assert.match(main, /function startSecureTunnel/);
   assert.match(main, /function stopSecureTunnel/);
+  assert.match(main, /function getSecureTunnelStatus/);
+  assert.match(main, /redactedTail/);
+  assert.match(main, /tokenPresent/);
+  assert.match(main, /One-time token: \[redacted\]/);
   assert.match(main, /spawn\(command, \["run", "web:tunnel:secure"\]/);
   assert.match(main, /spawnSync\("taskkill", \["\/pid", String\(pid\), "\/T", "\/F"\]/);
   assert.match(main, /process\.kill\(-pid, "SIGTERM"\)/);
@@ -669,6 +682,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(preload, /webBridgePreflight/);
   assert.match(preload, /startSecureTunnel: \(\) => ipcRenderer\.invoke\("jarvis:startSecureTunnel"\)/);
   assert.match(preload, /stopSecureTunnel: \(\) => ipcRenderer\.invoke\("jarvis:stopSecureTunnel"\)/);
+  assert.match(preload, /getSecureTunnelStatus: \(\) => ipcRenderer\.invoke\("jarvis:getSecureTunnelStatus"\)/);
   assert.match(preload, /remoteMcpPack/);
   assert.match(preload, /remoteMcpSmoke/);
   assert.match(preload, /getPreparedOutreachReplies/);

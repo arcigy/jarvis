@@ -28,6 +28,7 @@ This opens a local Electron desktop window. It is a working fallback shell until
 - The operations panel syncs recent Gmail messages into the local SQLite memory and checks Smartlead campaign status.
 - The lead discovery panel runs company discovery through Serper and Google Places, then exports selected results to Google Sheets only after the user clicks `Export`.
 - The contract panel accepts a structured intake form, can draft the intake JSON from an AI brief, keeps the JSON editable, and generates local DOCX files through the main-process bridge.
+- The MCP panel can start/stop the secure ngrok tunnel and read the private tunnel log to populate public MCP URLs without displaying the bearer token.
 
 ## Security shape
 

@@ -23,6 +23,7 @@ const state = {
   lastClientAlertGmailSyncSummary: "Gmail auto-sync pending.",
   contractFormDirty: false,
   secureTunnelLogPath: null,
+  lastSecureTunnelStatus: null,
 };
 
 const elements = {
@@ -119,6 +120,7 @@ const elements = {
   remoteAgentPrompt: document.querySelector("#remoteAgentPrompt"),
   startSecureTunnel: document.querySelector("#startSecureTunnel"),
   stopSecureTunnel: document.querySelector("#stopSecureTunnel"),
+  checkTunnelStatus: document.querySelector("#checkTunnelStatus"),
   openTunnelLog: document.querySelector("#openTunnelLog"),
   copyTunnelCommand: document.querySelector("#copyTunnelCommand"),
   copyClaudePrompt: document.querySelector("#copyClaudePrompt"),
@@ -165,6 +167,7 @@ const arcigyApi = window.arcigyDesktop ?? {
   operatorBriefing: (payload) => postJson("/api/operator-briefing", payload),
   startSecureTunnel: async () => ({ started: false, reason: "desktop-only" }),
   stopSecureTunnel: async () => ({ stopped: false, reason: "desktop-only" }),
+  getSecureTunnelStatus: async () => ({ running: false, ready: false, reason: "desktop-only" }),
   getPreparedOutreachReplies: (payload) => postJson("/api/prepared-outreach-replies", payload),
   getApprovalQueue: (payload) => postJson("/api/approval-queue", payload),
   preparePositiveOutreachReply: (payload) => postJson("/api/mcp/arcigy.prepare_positive_outreach_reply", payload).then((value) => value.result),
@@ -1022,6 +1025,41 @@ function renderRemoteMcpPack(pack) {
   elements.remoteAgentPrompt.textContent = buildRemoteAgentPrompt(pack, matchingSmoke);
 }
 
+function renderSecureTunnelStatus(status) {
+  state.lastSecureTunnelStatus = status;
+  if (status.logPath) state.secureTunnelLogPath = status.logPath;
+  if (status.ready && status.publicUrl) {
+    elements.handoffStatus.textContent = "tunnel live";
+    elements.handoffStatus.dataset.state = "ready";
+    elements.handoffManifestUrl.textContent = status.manifestUrl ?? "--";
+    elements.handoffToolPattern.textContent = status.mcpToolCallPattern ?? "--";
+    elements.handoffSmokeUrl.textContent = status.smokeUrl ?? "--";
+    elements.handoffProofGates.textContent = status.smokeSummary ? "ready: external smoke logged" : "ready: tunnel URL extracted";
+    elements.handoffProofGates.dataset.state = "ready";
+    setMissionSignal(elements.missionRemote, "tunnel live", "ready");
+    setCortexSignal(elements.cortexRemote, "tunnel live", "ready");
+  } else if (status.running) {
+    elements.handoffStatus.textContent = "starting";
+    elements.handoffStatus.dataset.state = "attention";
+    elements.handoffProofGates.textContent = "waiting for tunnel ready log";
+    elements.handoffProofGates.dataset.state = "attention";
+  }
+  elements.remoteAgentPrompt.textContent = [
+    status.summary ?? "Secure tunnel status loaded.",
+    `Running: ${status.running ? "yes" : "no"}`,
+    `Ready: ${status.ready ? "yes" : "no"}`,
+    status.publicUrl ? `Public MCP base URL: ${status.publicUrl}` : null,
+    status.connectionPackUrl ? `Connection pack: ${status.connectionPackUrl}` : null,
+    status.smokeUrl ? `Smoke test: ${status.smokeUrl}` : null,
+    status.mcpToolCallPattern ? `Tool call pattern: ${status.mcpToolCallPattern}` : null,
+    `Bearer token: ${status.tokenPresent ? "present in private log, not shown here" : "not detected"}`,
+    status.logPath ? `Private log: ${status.logPath}` : null,
+    status.redactedTail ? `\nRedacted log tail:\n${status.redactedTail}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
 function renderMcpToolList(pack) {
   const tools = pack.tools?.names ?? [];
   const approvalTools = new Set(pack.tools?.approvalRequired ?? []);
@@ -1199,6 +1237,13 @@ async function copyTunnelCommand() {
   window.setTimeout(() => {
     elements.copyTunnelCommand.textContent = "Copy tunnel";
   }, 1400);
+}
+
+async function refreshSecureTunnelStatus() {
+  elements.remoteAgentPrompt.textContent = "Checking secure tunnel status from the private log...";
+  const status = await arcigyApi.getSecureTunnelStatus();
+  renderSecureTunnelStatus(status);
+  return status;
 }
 
 function buildCopiedHandoffStatus(smokeReport) {
@@ -1821,6 +1866,13 @@ elements.copyTunnelCommand.addEventListener("click", async () => {
     elements.remoteAgentPrompt.textContent = safeUiErrorText(error);
   }
 });
+elements.checkTunnelStatus.addEventListener("click", async () => {
+  try {
+    await refreshSecureTunnelStatus();
+  } catch (error) {
+    elements.remoteAgentPrompt.textContent = safeUiErrorText(error);
+  }
+});
 elements.startSecureTunnel.addEventListener("click", async () => {
   try {
     const confirmed = window.confirm(`Start a secure Jarvis MCP tunnel for remote agents? Keep the tunnel log private because it can contain a one-time bearer token.`);
@@ -1841,6 +1893,11 @@ elements.startSecureTunnel.addEventListener("click", async () => {
     ]
       .filter(Boolean)
       .join("\n");
+    window.setTimeout(() => {
+      void refreshSecureTunnelStatus().catch((error) => {
+        elements.remoteAgentPrompt.textContent = safeUiErrorText(error);
+      });
+    }, 2500);
   } catch (error) {
     elements.remoteAgentPrompt.textContent = safeUiErrorText(error);
   }
@@ -1862,6 +1919,7 @@ elements.stopSecureTunnel.addEventListener("click", async () => {
     ]
       .filter(Boolean)
       .join("\n");
+    await refreshSecureTunnelStatus();
   } catch (error) {
     elements.remoteAgentPrompt.textContent = safeUiErrorText(error);
   }

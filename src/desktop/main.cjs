@@ -54,13 +54,13 @@ function startSecureTunnel() {
       alreadyRunning: true,
       pid: tunnelProcess.pid,
       command: "npm run web:tunnel:secure",
-      logPath: path.join(repoRoot, "generated", "jarvis-secure-tunnel.log"),
+      logPath: secureTunnelLogPath(),
     };
   }
 
   const logDir = path.join(repoRoot, "generated");
   fs.mkdirSync(logDir, { recursive: true });
-  const logPath = path.join(logDir, "jarvis-secure-tunnel.log");
+  const logPath = secureTunnelLogPath();
   fs.appendFileSync(logPath, `\n[${new Date().toISOString()}] Starting npm run web:tunnel:secure\n`, "utf-8");
   const outputFd = fs.openSync(logPath, "a");
   const errorFd = fs.openSync(logPath, "a");
@@ -94,7 +94,7 @@ function startSecureTunnel() {
 }
 
 function stopSecureTunnel() {
-  const logPath = path.join(repoRoot, "generated", "jarvis-secure-tunnel.log");
+  const logPath = secureTunnelLogPath();
   if (!tunnelProcess || tunnelProcess.exitCode !== null || tunnelProcess.killed || !tunnelProcess.pid) {
     return { stopped: false, wasRunning: false, logPath };
   }
@@ -115,6 +115,52 @@ function stopSecureTunnel() {
   return { stopped: true, wasRunning: true, pid, logPath };
 }
 
+function getSecureTunnelStatus() {
+  const logPath = secureTunnelLogPath();
+  const running = Boolean(tunnelProcess && tunnelProcess.exitCode === null && !tunnelProcess.killed);
+  if (!fs.existsSync(logPath)) {
+    return {
+      running,
+      logExists: false,
+      ready: false,
+      logPath,
+      summary: running ? "Secure tunnel process is starting; log is not written yet." : "No secure tunnel log exists yet.",
+    };
+  }
+
+  const raw = fs.readFileSync(logPath, "utf-8").slice(-80_000);
+  const safe = redactSensitiveText(raw).replace(/One-time token:\s*\S+/gi, "One-time token: [redacted]");
+  const publicUrl =
+    matchFirst(raw, /External manifest:\s*(https:\/\/[^\s/]+(?:\/[^\s]*)?)\/\.well-known\/arcigy-jarvis\.json/i) ||
+    matchFirst(raw, /External connection pack:\s*(https:\/\/[^\s/]+(?:\/[^\s]*)?)\/api\/remote-mcp-pack/i) ||
+    matchFirst(raw, /External smoke test:\s*(https:\/\/[^\s/]+(?:\/[^\s]*)?)\/api\/remote-mcp-smoke/i);
+  const ready = /Arcigy Jarvis tunnel is ready\./.test(raw) && Boolean(publicUrl);
+  const smokeSummary = matchFirst(safe, /Smoke:\s*([^\r\n]+)/i);
+  return {
+    running,
+    logExists: true,
+    ready,
+    logPath,
+    publicUrl,
+    manifestUrl: publicUrl ? `${publicUrl}/.well-known/arcigy-jarvis.json` : null,
+    connectionPackUrl: publicUrl ? `${publicUrl}/api/remote-mcp-pack?includeReadiness=true&live=true` : null,
+    smokeUrl: publicUrl ? `${publicUrl}/api/remote-mcp-smoke` : null,
+    mcpToolCallPattern: publicUrl ? `${publicUrl}/api/mcp/{toolName}` : null,
+    tokenPresent: /One-time token:\s*\S+|Token source:\s*JARVIS_WEB_TOKEN/i.test(raw),
+    smokeSummary,
+    summary: ready ? "Secure tunnel is ready. Public MCP URLs were extracted without returning the bearer token." : "Secure tunnel is not ready yet.",
+    redactedTail: safe.split(/\r?\n/).filter(Boolean).slice(-18).join("\n"),
+  };
+}
+
+function secureTunnelLogPath() {
+  return path.join(repoRoot, "generated", "jarvis-secure-tunnel.log");
+}
+
+function matchFirst(value, pattern) {
+  return String(value).match(pattern)?.[1]?.replace(/\/$/, "") || null;
+}
+
 app.whenReady().then(() => {
   ipcMain.handle("app:version", () => app.getVersion());
   ipcMain.handle("app:openPath", (_event, targetPath) => shell.openPath(targetPath));
@@ -128,6 +174,7 @@ app.whenReady().then(() => {
   ipcMain.handle("jarvis:webBridgePreflight", () => getWebBridgePreflight());
   ipcMain.handle("jarvis:startSecureTunnel", () => startSecureTunnel());
   ipcMain.handle("jarvis:stopSecureTunnel", () => stopSecureTunnel());
+  ipcMain.handle("jarvis:getSecureTunnelStatus", () => getSecureTunnelStatus());
   ipcMain.handle("jarvis:remoteMcpPack", (_event, payload) => getRemoteMcpPack(payload));
   ipcMain.handle("jarvis:remoteMcpSmoke", (_event, payload) => runRemoteMcpSmoke(payload));
   ipcMain.handle("jarvis:getPreparedOutreachReplies", (_event, payload) => getPreparedOutreachReplies(payload));
