@@ -1,8 +1,14 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 test("Jarvis readiness CLI reports blockers without leaking secrets", () => {
+  const source = readFileSync("scripts/jarvis_readiness.ts", "utf-8");
+  assert.match(source, /import \{ redactSensitiveText \}/);
+  assert.match(source, /redactSensitiveText\(JSON\.stringify\(report, null, 2\)\)/);
+  assert.match(source, /return redactSensitiveText\(\[/);
+
   const result = spawnSync("node", ["scripts/jarvis_readiness.ts", "--json", "--no-env-file"], {
     cwd: process.cwd(),
     encoding: "utf-8",

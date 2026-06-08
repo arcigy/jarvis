@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { fileURLToPath } from "node:url";
 
+import { redactSensitiveText } from "../src/automation-system/ai-safety.ts";
 import { getEnv, loadLocalEnv } from "../src/automation-system/env.ts";
 import { runRemoteMcpSmoke, type RemoteMcpSmokeReport } from "../src/automation-system/remote-mcp-smoke.ts";
 
@@ -42,7 +43,7 @@ const bearerToken = getArg("token", "") || (tokenEnv ? getEnv(process.env, token
 const report = await runRemoteMcpSmoke({ baseUrl, bearerToken });
 
 if (jsonOutput) {
-  process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+  process.stdout.write(`${redactSensitiveText(JSON.stringify(report, null, 2))}\n`);
 } else {
   process.stdout.write(renderSmoke(report));
 }
@@ -58,7 +59,7 @@ function getArg(name: string, fallback: string): string {
 }
 
 function renderSmoke(report: RemoteMcpSmokeReport): string {
-  return [
+  return redactSensitiveText([
     "Arcigy Jarvis remote MCP smoke",
     `Status: ${report.status}`,
     report.summary,
@@ -70,5 +71,5 @@ function renderSmoke(report: RemoteMcpSmokeReport): string {
     "Checks:",
     ...report.checks.map((check) => `- [${check.status}] ${check.key}: ${check.message}`),
     "",
-  ].join("\n");
+  ].join("\n"));
 }

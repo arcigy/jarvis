@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { fileURLToPath } from "node:url";
 
+import { redactSensitiveText } from "../src/automation-system/ai-safety.ts";
 import { loadLocalEnv } from "../src/automation-system/env.ts";
 import { buildProductionReadinessReport, type ProductionReadinessReport } from "../src/automation-system/production-readiness.ts";
 
@@ -38,7 +39,7 @@ if (!skipEnvFile) loadLocalEnv(repoRoot);
 const report = await buildProductionReadinessReport({ live });
 
 if (jsonOutput) {
-  process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+  process.stdout.write(`${redactSensitiveText(JSON.stringify(report, null, 2))}\n`);
 } else {
   process.stdout.write(renderReadiness(report));
 }
@@ -46,7 +47,7 @@ if (jsonOutput) {
 process.exitCode = report.status === "blocked" ? 1 : 0;
 
 function renderReadiness(report: ProductionReadinessReport): string {
-  return [
+  return redactSensitiveText([
     "Arcigy Jarvis readiness",
     `Status: ${report.status}`,
     report.summary,
@@ -71,5 +72,5 @@ function renderReadiness(report: ProductionReadinessReport): string {
       [`- ${step.title}`, `  Env: ${step.envKeys.join(", ") || "none"}`, `  Validate: ${step.validationCommand}`, `  ${step.detail}`].join("\n")
     ),
     "",
-  ].join("\n");
+  ].join("\n"));
 }

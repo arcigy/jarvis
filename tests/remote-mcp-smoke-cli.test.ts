@@ -7,7 +7,11 @@ import { createLocalApiServer } from "../src/server/local-api-server.ts";
 
 test("remote MCP smoke CLI help and package script are wired", () => {
   const packageJson = JSON.parse(readFileSync("package.json", "utf-8")) as { scripts: Record<string, string> };
+  const source = readFileSync("scripts/remote_mcp_smoke.ts", "utf-8");
   assert.equal(packageJson.scripts["remote:mcp:smoke"], "node scripts/remote_mcp_smoke.ts");
+  assert.match(source, /import \{ redactSensitiveText \}/);
+  assert.match(source, /redactSensitiveText\(JSON\.stringify\(report, null, 2\)\)/);
+  assert.match(source, /return redactSensitiveText\(\[/);
 
   const result = spawnSync("node", ["scripts/remote_mcp_smoke.ts", "--help"], {
     cwd: process.cwd(),
