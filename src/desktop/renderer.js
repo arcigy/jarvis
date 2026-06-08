@@ -827,8 +827,11 @@ function buildRemoteAgentPrompt(pack) {
   const compatibility = pack.agentCompatibility;
   const supportedAgents = (compatibility?.supportedAgents ?? []).join(", ");
   const safetyRules = (compatibility?.safetyRules ?? []).map((rule) => `- ${rule}`).join("\n");
+  const limits = pack.limits
+    ? `Limits: pathPolicy=${pack.limits.pathPolicy}, maxJsonBytes=${pack.limits.maxJsonBytes}, writesRequireExplicitToolCall=${pack.limits.writesRequireExplicitToolCall}`
+    : "";
   const quickStart = (pack.quickStartCalls ?? [])
-    .map((call) => `- ${call.label}: ${call.tool} ${JSON.stringify(call.body)}`)
+    .map((call) => `- ${call.label}: ${call.method} ${call.url} approvalRequired=${call.approvalRequired} body=${JSON.stringify(call.body)}`)
     .join("\n");
   return [
     "Arcigy Jarvis remote MCP connection pack",
@@ -839,6 +842,7 @@ function buildRemoteAgentPrompt(pack) {
     `Tools: ${pack.tools?.count ?? 0}`,
     `Approval required: ${approvalTools.join(", ") || "none"}`,
     `Local memory writes: ${localWriteTools.join(", ") || "none"}`,
+    limits,
     supportedAgents ? `Supported agents: ${supportedAgents}` : "",
     compatibility?.protocol ? `Protocol: ${compatibility.protocol}` : "",
     `Secure tunnel: ${pack.tunnel?.secureCommand ?? "npm run web:tunnel:secure"}`,

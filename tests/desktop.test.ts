@@ -203,8 +203,11 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /Tunnel command/);
   assert.match(renderer, /Tool call pattern/);
   assert.match(renderer, /Connection pack:/);
+  assert.match(renderer, /Limits: pathPolicy=\$\{pack\.limits\.pathPolicy\}/);
   assert.match(renderer, /Required proof:/);
   assert.match(renderer, /Agent first steps:/);
+  assert.match(renderer, /approvalRequired=\$\{call\.approvalRequired\}/);
+  assert.match(renderer, /\$\{call\.method\} \$\{call\.url\}/);
   assert.match(main, /approval-shape-gate/);
   assert.match(renderer, /\/api\/remote-mcp-pack/);
   assert.match(renderer, /\/api\/remote-mcp-smoke/);
