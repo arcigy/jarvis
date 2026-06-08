@@ -162,13 +162,13 @@ function getSystemHealth() {
     ["gmail", ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP"]],
     ["smartlead", ["SMARTLEAD_API_KEY"]],
     ["postgres", ["DATABASE_URL"]],
-    ["redis", ["REDIS_URL"]],
+    ["redis", ["REDIS_URL"], false],
     ["serper", ["SERPER_API_KEY"]],
     ["googleMaps", ["GOOGLE_MAPS_API_KEY"]],
     ["googleSheets", ["GOOGLE_SHEET_ID", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"]],
-  ].map(([key, required]) => {
+  ].map(([key, required, requiredForProduction = true]) => {
     const missing = required.flatMap((name) => getRuntimeEnvIssue(name));
-    return { key, configured: missing.length === 0, missing };
+    return { key, configured: missing.length === 0, missing, requiredForProduction };
   });
   return {
     integrations,
@@ -267,7 +267,7 @@ async function getProductionReadiness(payload) {
         ? []
         : item.missing.map((missing) => ({
             key: item.key,
-            severity: "blocking",
+            severity: item.requiredForProduction === false ? "warning" : "blocking",
             message: `Missing or invalid runtime config: ${missing}`,
             nextAction: readinessNextAction(item.key, missing),
           }))
@@ -276,7 +276,7 @@ async function getProductionReadiness(payload) {
       .filter((check) => check.status !== "ready")
       .map((check) => ({
         key: check.key,
-        severity: check.status === "missing" ? "blocking" : "warning",
+        severity: check.key === "redis" ? "warning" : "blocking",
         message: check.message,
         nextAction: readinessNextAction(check.key, check.message),
       })),
@@ -284,14 +284,17 @@ async function getProductionReadiness(payload) {
   const uniqueBlockers = dedupeReadinessBlockers(blockers);
   const ready = health.integrations.filter((item) => item.configured).length;
   const blocking = uniqueBlockers.filter((blocker) => blocker.severity === "blocking").length;
-  const status = blocking ? "blocked" : uniqueBlockers.length ? "attention" : "ready";
+  const status = blocking ? "blocked" : "ready";
+  const warnings = uniqueBlockers.length - blocking;
   return {
     status,
     checkedAt: new Date().toISOString(),
     summary:
       status === "ready"
-        ? `Production gates ready: ${ready}/${health.integrations.length} integrations configured and ${bridge.mcpToolCount} MCP tools available.`
-        : `Production needs attention: ${ready}/${health.integrations.length} integrations ready, ${bridge.mcpToolCount} MCP tools available, ${blocking} blocker(s), ${uniqueBlockers.length - blocking} warning(s).`,
+        ? warnings
+          ? `Production gates ready: ${ready}/${health.integrations.length} integrations configured, ${bridge.mcpToolCount} MCP tools available, ${warnings} non-blocking warning(s).`
+          : `Production gates ready: ${ready}/${health.integrations.length} integrations configured and ${bridge.mcpToolCount} MCP tools available.`
+        : `Production needs attention: ${ready}/${health.integrations.length} integrations ready, ${bridge.mcpToolCount} MCP tools available, ${blocking} blocker(s), ${warnings} warning(s).`,
     integrations: {
       ready,
       total: health.integrations.length,
@@ -325,7 +328,7 @@ function readinessNextAction(key, message) {
 function dedupeReadinessBlockers(blockers) {
   const seen = new Set();
   return blockers.filter((blocker) => {
-    const key = `${blocker.key}:${blocker.message}`;
+    const key = `${blocker.key}:${blocker.severity}:${blocker.nextAction}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;

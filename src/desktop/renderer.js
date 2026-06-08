@@ -185,18 +185,22 @@ function renderHealth(health) {
 function renderCommandDeck(health, bridge = null) {
   const integrations = health.integrations ?? [];
   const readyCount = integrations.filter((item) => item.configured).length;
-  const blockers = integrations.filter((item) => !item.configured);
+  const blockers = integrations.filter((item) => !item.configured && item.requiredForProduction !== false);
+  const advisories = integrations.filter((item) => !item.configured && item.requiredForProduction === false);
   const approvalTools = bridge?.riskyToolsRequiringApproval ?? [];
   elements.readyIntegrations.textContent = `${readyCount}/${integrations.length || "--"}`;
   elements.mcpToolCount.textContent = bridge?.mcpToolCount ? String(bridge.mcpToolCount) : "--";
   elements.approvalLockCount.textContent = bridge ? String(approvalTools.length) : "--";
   elements.liveBlockerCount.textContent = String(blockers.length);
-  elements.commandTimeline.textContent = buildCommandTimeline(blockers, bridge);
+  elements.commandTimeline.textContent = buildCommandTimeline(blockers, bridge, advisories);
 }
 
-function buildCommandTimeline(blockers, bridge) {
+function buildCommandTimeline(blockers, bridge, advisories = []) {
   const bridgeState = bridge ? (bridge.readyForTunnel ? "MCP bridge ready for tunnel." : "MCP bridge needs attention.") : "MCP bridge preflight not loaded.";
-  if (!blockers.length) return `All configured integration gates are ready. ${bridgeState}`;
+  if (!blockers.length) {
+    const advisoryText = advisories.length ? ` Non-blocking advisory: ${advisories.map((item) => item.key).join(", ")}.` : "";
+    return `All required integration gates are ready.${advisoryText} ${bridgeState}`;
+  }
   const blockerText = blockers
     .map((item) => `${item.key}: ${(item.missing ?? []).join(", ")}`)
     .slice(0, 3)

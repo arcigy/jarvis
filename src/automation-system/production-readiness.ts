@@ -58,7 +58,7 @@ export async function buildProductionReadinessReport(
   ];
   const uniqueBlockers = dedupeBlockers(blockers);
   const blockingCount = uniqueBlockers.filter((blocker) => blocker.severity === "blocking").length;
-  const status: ReadinessStatus = blockingCount ? "blocked" : uniqueBlockers.length ? "attention" : "ready";
+  const status: ReadinessStatus = blockingCount ? "blocked" : "ready";
   const readyIntegrations = health.filter((item) => item.configured).length;
 
   return {
@@ -68,7 +68,7 @@ export async function buildProductionReadinessReport(
     integrations: {
       ready: readyIntegrations,
       total: health.length,
-      missing: health.filter((item) => !item.configured).map((item) => ({ key: item.key, missing: item.missing })),
+    missing: health.filter((item) => !item.configured).map((item) => ({ key: item.key, missing: item.missing })),
     },
     mcp: {
       toolCount: tools.length,
@@ -85,7 +85,7 @@ function integrationHealthBlockers(item: IntegrationHealth): ReadinessBlocker[] 
   if (item.configured) return [];
   return item.missing.map((missing) => ({
     key: item.key,
-    severity: "blocking",
+    severity: item.requiredForProduction ? "blocking" : "warning",
     message: `Missing or invalid runtime config: ${missing}`,
     nextAction: nextActionFor(item.key, missing),
   }));
@@ -93,10 +93,11 @@ function integrationHealthBlockers(item: IntegrationHealth): ReadinessBlocker[] 
 
 function diagnosticBlockers(check: DiagnosticCheck): ReadinessBlocker[] {
   if (check.status === "ready") return [];
+  const requiredForProduction = check.key !== "redis";
   return [
     {
       key: check.key,
-      severity: check.status === "missing" ? "blocking" : "warning",
+      severity: requiredForProduction ? "blocking" : "warning",
       message: check.message,
       nextAction: nextActionFor(check.key, check.message),
     },
@@ -119,7 +120,7 @@ function nextActionFor(key: string, message: string): string {
 function dedupeBlockers(blockers: ReadinessBlocker[]): ReadinessBlocker[] {
   const seen = new Set<string>();
   return blockers.filter((blocker) => {
-    const key = `${blocker.key}:${blocker.message}`;
+    const key = `${blocker.key}:${blocker.severity}:${blocker.nextAction}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -127,9 +128,13 @@ function dedupeBlockers(blockers: ReadinessBlocker[]): ReadinessBlocker[] {
 }
 
 function buildSummary(status: ReadinessStatus, ready: number, total: number, toolCount: number, blockers: ReadinessBlocker[]): string {
-  if (status === "ready") return `Production gates ready: ${ready}/${total} integrations configured and ${toolCount} MCP tools available.`;
   const blocking = blockers.filter((blocker) => blocker.severity === "blocking").length;
   const warnings = blockers.length - blocking;
+  if (status === "ready") {
+    return warnings
+      ? `Production gates ready: ${ready}/${total} integrations configured, ${toolCount} MCP tools available, ${warnings} non-blocking warning(s).`
+      : `Production gates ready: ${ready}/${total} integrations configured and ${toolCount} MCP tools available.`;
+  }
   return `Production needs attention: ${ready}/${total} integrations ready, ${toolCount} MCP tools available, ${blocking} blocker(s), ${warnings} warning(s).`;
 }
 

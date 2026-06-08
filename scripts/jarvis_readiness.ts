@@ -55,7 +55,7 @@ function renderReadiness(report: ProductionReadinessReport): string {
     `MCP tools: ${report.mcp.toolCount}`,
     `Approval locks: ${report.mcp.approvalRequired.length}`,
     "",
-    report.blockers.length ? "Blockers:" : "Blockers: none",
+    report.blockers.length ? "Findings:" : "Findings: none",
     ...report.blockers.map((blocker) => `- [${blocker.severity}] ${blocker.key}: ${blocker.message}`),
     "",
     "Next actions:",

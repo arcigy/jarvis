@@ -68,11 +68,36 @@ test("production readiness report returns blockers and next actions without secr
 
   assert.equal(report.status, "blocked");
   assert.equal(report.mcp.toolCount, 24);
-  assert.ok(report.blockers.some((blocker) => blocker.key === "redis"));
+  assert.ok(report.blockers.some((blocker) => blocker.key === "redis" && blocker.severity === "warning"));
   assert.ok(report.nextActions.some((action) => action.includes("REDIS_URL")));
   assert.ok(report.fixGuide.some((step) => step.id === "redis-real-password" && step.envKeys.includes("REDIS_URL")));
   assert.ok(report.fixGuide.every((step) => step.validationCommand.includes("doctor")));
   assert.equal(JSON.stringify(report).includes("PASSWORD"), false);
+});
+
+test("production readiness treats unused Redis as non-blocking advisory", async () => {
+  const report = await buildProductionReadinessReport(
+    { live: false },
+    {
+      GEMINI_API_KEY: "gemini",
+      GOOGLE_CLIENT_ID: "client",
+      GOOGLE_CLIENT_SECRET: "secret",
+      GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP: "refresh",
+      GMAIL_REFRESH_TOKEN_BRANISLAV_L_ARCIGY_GROUP: "refresh-2",
+      GMAIL_REFRESH_TOKEN_ANDREJ_ARCIGY_GROUP: "refresh-3",
+      GMAIL_REFRESH_TOKEN_ANDREJ_R_ARCIGY_GROUP: "refresh-4",
+      SMARTLEAD_API_KEY: "smartlead",
+      DATABASE_URL: "postgres://postgres:secret@example.com:5432/db",
+      REDIS_URL: "redis://default:PASSWORD@example.com:6379",
+      GOOGLE_SHEET_ID: "sheet",
+      GOOGLE_MAPS_API_KEY: "maps",
+      SERPER_API_KEY: "serper",
+    }
+  );
+
+  assert.equal(report.status, "ready");
+  assert.ok(report.blockers.some((blocker) => blocker.key === "redis" && blocker.severity === "warning"));
+  assert.match(report.summary, /non-blocking warning/);
 });
 
 test("operator briefing combines readiness, outreach, client needs, and approvals", () => {
@@ -221,6 +246,7 @@ test("runtime integration health rejects placeholder URL credentials", () => {
 
   assert.deepEqual(health.find((item) => item.key === "postgres")?.missing, ["DATABASE_URL contains a placeholder credential"]);
   assert.deepEqual(health.find((item) => item.key === "redis")?.missing, ["REDIS_URL contains a placeholder credential"]);
+  assert.equal(health.find((item) => item.key === "redis")?.requiredForProduction, false);
 });
 
 test("Gemini reply helper calls generateContent and extracts text", async () => {

@@ -17,6 +17,7 @@ export type IntegrationHealth = {
   key: IntegrationKey;
   configured: boolean;
   missing: string[];
+  requiredForProduction: boolean;
 };
 
 export const gmailRefreshTokenEnv = [
@@ -26,12 +27,12 @@ export const gmailRefreshTokenEnv = [
   "GMAIL_REFRESH_TOKEN_ANDREJ_R_ARCIGY_GROUP",
 ] as const;
 
-const integrations: Array<{ key: IntegrationKey; required: string[] }> = [
+const integrations: Array<{ key: IntegrationKey; required: string[]; requiredForProduction?: boolean }> = [
   { key: "gemini", required: ["GEMINI_API_KEY"] },
   { key: "gmail", required: ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", ...gmailRefreshTokenEnv] },
   { key: "smartlead", required: ["SMARTLEAD_API_KEY"] },
   { key: "postgres", required: ["DATABASE_URL"] },
-  { key: "redis", required: ["REDIS_URL"] },
+  { key: "redis", required: ["REDIS_URL"], requiredForProduction: false },
   { key: "googleSheets", required: ["GOOGLE_SHEET_ID", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"] },
   { key: "googleMaps", required: ["GOOGLE_MAPS_API_KEY"] },
   { key: "serper", required: ["SERPER_API_KEY"] },
@@ -58,6 +59,7 @@ export function getIntegrationHealth(env: RuntimeEnv = process.env): Integration
       key: integration.key,
       configured: missing.length === 0,
       missing,
+      requiredForProduction: integration.requiredForProduction !== false,
     };
   });
 }

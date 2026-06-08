@@ -127,17 +127,22 @@ function checkMcpToolRegistry(): DoctorCheck {
 
 function checkRuntimeEnv(): DoctorCheck {
   const health = getIntegrationHealth();
-  const missing = health.filter((item) => !item.configured).map((item) => ({ key: item.key, missing: item.missing }));
-  const status: CheckStatus = missing.length ? (strictEnv ? "failed" : "warning") : "ready";
+  const missing = health.filter((item) => !item.configured).map((item) => ({ key: item.key, missing: item.missing, requiredForProduction: item.requiredForProduction }));
+  const blockingMissing = missing.filter((item) => item.requiredForProduction);
+  const advisoryMissing = missing.filter((item) => !item.requiredForProduction);
+  const status: CheckStatus = blockingMissing.length ? (strictEnv ? "failed" : "warning") : "ready";
   return {
     key: "runtimeEnv",
     status,
-    message: missing.length
-      ? `${missing.length} integration group(s) are missing runtime env. Run with --strict-env to fail on this.`
-      : `${health.length} integration group(s) have runtime env configured.`,
+    message: blockingMissing.length
+      ? `${blockingMissing.length} required integration group(s) are missing runtime env. Run with --strict-env to fail on this.`
+      : advisoryMissing.length
+        ? `${health.length - advisoryMissing.length}/${health.length} production integration group(s) are configured; ${advisoryMissing.length} non-blocking advisory remains.`
+        : `${health.length} integration group(s) have runtime env configured.`,
     details: {
       configured: health.filter((item) => item.configured).map((item) => item.key),
       missing,
+      advisoryMissing,
     },
   };
 }
@@ -146,17 +151,22 @@ async function checkLiveIntegrationDiagnostics(): Promise<DoctorCheck> {
   const dbPath = safeGeneratedPath(`doctor-live-diagnostics-${Date.now()}-${process.pid}.db`);
   const diagnostics = await runIntegrationDiagnostics({ live: true, dbPath });
   const notReady = diagnostics.checks.filter((check) => check.status !== "ready");
+  const blockingNotReady = notReady.filter((check) => check.key !== "redis");
+  const advisoryNotReady = notReady.filter((check) => check.key === "redis");
   return {
     key: "liveIntegrationDiagnostics",
-    status: notReady.length ? "failed" : "ready",
-    message: notReady.length
-      ? `${notReady.length} live integration check(s) are not ready.`
-      : `${diagnostics.checks.length} live integration check(s) passed.`,
+    status: blockingNotReady.length ? "failed" : "ready",
+    message: blockingNotReady.length
+      ? `${blockingNotReady.length} live integration check(s) are not ready.`
+      : advisoryNotReady.length
+        ? `${diagnostics.checks.length - advisoryNotReady.length}/${diagnostics.checks.length} live integration check(s) passed; Redis is a non-blocking advisory.`
+        : `${diagnostics.checks.length} live integration check(s) passed.`,
     details: {
       live: diagnostics.live,
       checkedAt: diagnostics.checkedAt,
       dbPath,
       notReady,
+      advisoryNotReady,
       ready: diagnostics.checks.filter((check) => check.status === "ready").map((check) => check.key),
     },
   };

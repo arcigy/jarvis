@@ -27,6 +27,38 @@ test("Jarvis readiness CLI reports blockers without leaking secrets", () => {
   assert.ok(body.fixGuide.some((step) => step.id === "redis-real-password" && step.envKeys.includes("REDIS_URL")));
 });
 
+test("Jarvis readiness CLI exits ready when only unused Redis is invalid", () => {
+  const result = spawnSync("node", ["scripts/jarvis_readiness.ts", "--json", "--no-env-file"], {
+    cwd: process.cwd(),
+    encoding: "utf-8",
+    env: {
+      ...process.env,
+      GEMINI_API_KEY: "gemini",
+      GOOGLE_CLIENT_ID: "client",
+      GOOGLE_CLIENT_SECRET: "secret",
+      GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP: "refresh",
+      GMAIL_REFRESH_TOKEN_BRANISLAV_L_ARCIGY_GROUP: "refresh-2",
+      GMAIL_REFRESH_TOKEN_ANDREJ_ARCIGY_GROUP: "refresh-3",
+      GMAIL_REFRESH_TOKEN_ANDREJ_R_ARCIGY_GROUP: "refresh-4",
+      SMARTLEAD_API_KEY: "smartlead",
+      DATABASE_URL: "postgres://postgres:secret@example.com:5432/db",
+      REDIS_URL: "redis://default:PASSWORD@example.com:6379",
+      GOOGLE_SHEET_ID: "sheet",
+      GOOGLE_MAPS_API_KEY: "maps",
+      SERPER_API_KEY: "serper",
+    },
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout.includes("PASSWORD"), false);
+  const body = JSON.parse(result.stdout) as {
+    status: string;
+    blockers: Array<{ key: string; severity: string }>;
+  };
+  assert.equal(body.status, "ready");
+  assert.ok(body.blockers.some((blocker) => blocker.key === "redis" && blocker.severity === "warning"));
+});
+
 test("Jarvis readiness CLI help is available without env", () => {
   const result = spawnSync("node", ["scripts/jarvis_readiness.ts", "--help"], {
     cwd: process.cwd(),
