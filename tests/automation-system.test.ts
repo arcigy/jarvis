@@ -1939,6 +1939,9 @@ test("Jarvis voice resolves production, remote MCP, contracts, Gmail, and client
   assert.equal(resolveJarvisIntentFromTranscript("Jarvis priprav zmluvny intake")?.kind, "voice_capability");
   assert.equal(resolveJarvisIntentFromTranscript("Jarvis skontroluj Gmail inbox")?.kind, "voice_capability");
   assert.equal(resolveJarvisIntentFromTranscript("Jarvis ake su klientske poziadavky?")?.kind, "voice_capability");
+  const approvalIntent = resolveJarvisIntentFromTranscript("Jarvis co caka na moje potvrdenie?");
+  assert.equal(approvalIntent?.kind, "voice_capability");
+  assert.equal(approvalIntent?.kind === "voice_capability" ? approvalIntent.capability : null, "approval_queue");
 
   const wake = handleJarvisVoiceEvent(createJarvisVoiceSession(), {
     type: "transcript",

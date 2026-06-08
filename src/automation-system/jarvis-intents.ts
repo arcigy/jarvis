@@ -24,6 +24,7 @@ export type JarvisVoiceCapability =
   | "operator_briefing"
   | "production_readiness"
   | "remote_mcp"
+  | "approval_queue"
   | "contract_generation"
   | "client_memory"
   | "gmail_sync"
@@ -61,6 +62,7 @@ export function resolveJarvisIntentFromTranscript(transcript: string): JarvisInt
 function resolveVoiceCapability(text: string): JarvisVoiceCapability | null {
   if (hasAny(text, ["cold outreach", "outreach", "smartlead", "pozitivne odpovede"])) return "cold_outreach_brief";
   if (hasAny(text, ["briefing", "prehlad", "co sa deje", "co sa dialo", "operator"])) return "operator_briefing";
+  if (hasAny(text, ["approval", "schvalenie", "schvalit", "potvrdenie", "potvrdit", "na moje znamenie", "cakaju na mna"])) return "approval_queue";
   if (hasAny(text, ["production", "produkcia", "readiness", "launch", "checklist", "nasadenie"])) return "production_readiness";
   if (hasAny(text, ["remote mcp", "mcp", "tunel", "tunnel", "handoff", "claude", "chatgpt", "grok", "xai", "x.ai"])) return "remote_mcp";
   if (hasAny(text, ["zmluva", "zmluvy", "contract", "priloha", "docx", "intake"])) return "contract_generation";
@@ -82,6 +84,8 @@ function answerVoiceCapability(capability: JarvisVoiceCapability): string {
       "Viem skontrolovať produkčný stav: integrácie, live diagnostiku, MCP registry, approval locks a launch checklist.",
     remote_mcp:
       "Viem pripraviť remote MCP handoff pre Claude, ChatGPT alebo Grok: manifest, connection pack, smoke test, bearer auth placeholder, agent prompt a quick-start volania.",
+    approval_queue:
+      "Viem precitat approval queue: pripravene odpovede a klientske rozhodnutia, ktore cakaju na tvoje potvrdenie. Bez potvrdenia nic neposlem ani neuzavriem.",
     contract_generation:
       "Viem pripraviť zmluvný intake a po tvojom schválení vygenerovať DOCX rámcovú zmluvu aj prílohy. Bez schválenia iba draftujem dáta.",
     client_memory:

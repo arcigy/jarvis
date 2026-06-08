@@ -1165,6 +1165,11 @@ async function handleWebVoiceEvent(payload: Record<string, unknown>) {
     return voiceDone(session, text, briefing.speechText);
   }
 
+  if (isApprovalQueueVoiceCommand(lowered)) {
+    const queue = runDbTool("list-approval-queue", { dbPath: payload.dbPath, limit: 20 });
+    return voiceDone(session, text, summarizeApprovalQueueForVoice(queue));
+  }
+
   if (lowered.includes("cold") || lowered.includes("outreach")) {
     return voiceDone(session, text, await getColdOutreachBriefSummary({ ...payload, text }, payload.live !== false));
   }
@@ -1197,7 +1202,7 @@ async function handleWebVoiceEvent(payload: Record<string, unknown>) {
   return voiceDone(
     session,
     text,
-    "Rozumiem. Viem hlasom pripravit briefing, skontrolovat cold outreach, integracie, identifikovat email, vyhladat leady alebo pripravit Gemini odpoved."
+    "Rozumiem. Viem hlasom pripravit briefing, precitat approval queue, skontrolovat cold outreach, integracie, identifikovat email, vyhladat leady alebo pripravit Gemini odpoved."
   );
 }
 
@@ -1238,6 +1243,27 @@ function summarizeLeadsForVoice(result: { leads: Array<{ name: string }>; source
   const names = leads.slice(0, 3).map((lead) => lead.name).join(", ");
   const sources = (result.sources || []).join(", ") || "ziadny zdroj";
   return `Nasiel som ${leads.length} leadov cez ${sources}. Top vysledky: ${names}.`;
+}
+
+function isApprovalQueueVoiceCommand(text: string) {
+  return ["approval", "schvalenie", "schvalit", "potvrdenie", "potvrdit", "na moje znamenie", "cakaju na mna", "co caka"].some((term) => text.includes(term));
+}
+
+function summarizeApprovalQueueForVoice(result: { count?: unknown; items?: unknown }) {
+  const items = Array.isArray(result.items) ? result.items : [];
+  const count = Number(result.count || items.length || 0);
+  if (count <= 0) return "Approval queue je prazdna. Nic necaka na tvoje potvrdenie.";
+  const topItems = items
+    .slice(0, 3)
+    .map((raw) => {
+      const item = raw as { title?: unknown; type?: unknown; summary?: unknown };
+      const title = typeof item.title === "string" ? item.title : typeof item.type === "string" ? item.type : "approval item";
+      const summary = typeof item.summary === "string" ? item.summary : "bez detailu";
+      return `${title}: ${summary}`;
+    })
+    .filter(Boolean);
+  const detail = topItems.length ? `Najblizsie: ${topItems.join("; ")}.` : "";
+  return `Na tvoje potvrdenie caka ${count} veci. ${detail} Nic neposlem ani neuzavriem bez explicitneho schvalenia.`;
 }
 
 function extractEmail(text: string) {

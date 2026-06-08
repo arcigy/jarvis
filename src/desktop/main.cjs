@@ -200,6 +200,11 @@ async function handleVoiceEvent(payload) {
     return voiceDone(session, text, summarizeRemoteMcpForVoice(pack));
   }
 
+  if (isApprovalQueueVoiceCommand(lowered)) {
+    const queue = getApprovalQueue({ dbPath: payload?.dbPath, limit: 20 });
+    return voiceDone(session, text, summarizeApprovalQueueForVoice(queue));
+  }
+
   if (isContractVoiceCommand(lowered)) {
     const brief = cleanVoiceQuery(text, ["jarvis", "zmluva", "zmluvy", "contract", "kontrakt", "formular", "formulár", "intake", "navrhni", "draft"]);
     if (lowered.includes("vygeneruj") || lowered.includes("generuj")) {
@@ -260,7 +265,7 @@ async function handleVoiceEvent(payload) {
   return voiceDone(
     session,
     text,
-    "Rozumiem. Viem hlasom pripravit briefing, skontrolovat produkciu, remote MCP, zmluvy, cold outreach, Gmail, klientske poziadavky, integracie, email, leady alebo Gemini odpoved."
+    "Rozumiem. Viem hlasom pripravit briefing, precitat approval queue, skontrolovat produkciu, remote MCP, zmluvy, cold outreach, Gmail, klientske poziadavky, integracie, email, leady alebo Gemini odpoved."
   );
 }
 
@@ -1626,6 +1631,10 @@ function isRemoteMcpVoiceCommand(text) {
   return ["remote mcp", "mcp", "tunel", "tunnel", "handoff", "claude", "chatgpt", "grok", "xai", "x.ai"].some((term) => text.includes(term));
 }
 
+function isApprovalQueueVoiceCommand(text) {
+  return ["approval", "schvalenie", "schvalit", "potvrdenie", "potvrdit", "na moje znamenie", "cakaju na mna", "co caka"].some((term) => text.includes(term));
+}
+
 function isContractVoiceCommand(text) {
   return ["zmluva", "zmluvy", "contract", "kontrakt", "priloha", "docx", "intake"].some((term) => text.includes(term));
 }
@@ -2061,6 +2070,22 @@ function summarizeClientNeeds(count, highlights) {
     .filter(Boolean);
   if (!topItems.length) return `Klientske poziadavky: ${count} otvorenych.`;
   return `Klientske poziadavky: ${count} otvorenych. Najnovsie: ${topItems.join("; ")}.`;
+}
+
+function summarizeApprovalQueueForVoice(result) {
+  const items = Array.isArray(result?.items) ? result.items : [];
+  const count = Number(result?.count || items.length || 0);
+  if (count <= 0) return "Approval queue je prazdna. Nic necaka na tvoje potvrdenie.";
+  const topItems = items
+    .slice(0, 3)
+    .map((item) => {
+      const title = item?.title || item?.type || "approval item";
+      const summary = item?.summary || "bez detailu";
+      return `${title}: ${summary}`;
+    })
+    .filter(Boolean);
+  const detail = topItems.length ? `Najblizsie: ${topItems.join("; ")}.` : "";
+  return `Na tvoje potvrdenie caka ${count} veci. ${detail} Nic neposlem ani neuzavriem bez explicitneho schvalenia.`;
 }
 
 function identifyEmail(payload) {

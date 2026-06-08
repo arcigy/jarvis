@@ -495,6 +495,21 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(approvalQueueBody.count, 1);
     assert.equal(approvalQueueBody.items[0].approvalTool, "arcigy.update_client_need_status");
 
+    const voiceApprovalQueue = await fetch(`${baseUrl}/api/jarvis/voice-event`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        dbPath,
+        text: "co caka na moje potvrdenie",
+        session: { state: "awake", wakeWord: "jarvis" },
+      }),
+    });
+    assert.equal(voiceApprovalQueue.status, 200);
+    const voiceApprovalQueueBody = (await voiceApprovalQueue.json()) as { shouldStopRecording: boolean; speakText?: string };
+    assert.equal(voiceApprovalQueueBody.shouldStopRecording, true);
+    assert.match(voiceApprovalQueueBody.speakText ?? "", /Na tvoje potvrdenie caka 1/);
+    assert.match(voiceApprovalQueueBody.speakText ?? "", /Nic neposlem ani neuzavriem/);
+
     const memoryOperatorBriefing = await fetch(`${baseUrl}/api/operator-briefing`, {
       method: "POST",
       headers: { "content-type": "application/json" },
