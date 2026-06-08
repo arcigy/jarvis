@@ -11,6 +11,7 @@ export type JarvisMcpToolName =
   | "arcigy.upsert_local_person"
   | "arcigy.add_client_need_signal"
   | "arcigy.ingest_client_message"
+  | "arcigy.get_client_need_alerts"
   | "arcigy.identify_email"
   | "arcigy.get_system_health"
   | "arcigy.run_integration_diagnostics"
@@ -84,6 +85,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.ingest_client_message",
       description: "Uloží prijatú správu/email, spáruje odosielateľa a pri požiadavke vytvorí Jarvis alert.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.get_client_need_alerts",
+      description: "Vrati persistentny inbox otvorenych klientskych poziadaviek, ktore ma Jarvis pripomenut.",
       requiresApproval: false,
     },
     {

@@ -77,6 +77,13 @@ test("local web bridge serves UI and API health", async () => {
     });
     assert.equal(need.result.personId, upsert.result.id);
 
+    const mcpAlerts = await postJson(`${baseUrl}/api/mcp/arcigy.get_client_need_alerts`, {
+      dbPath: mcpDbPath,
+      limit: 5,
+    });
+    assert.equal(mcpAlerts.result.count, 1);
+    assert.equal(mcpAlerts.result.alerts[0].person.primaryEmail, "founder@example.com");
+
     const coldEvent = await postJson(`${baseUrl}/api/mcp/arcigy.add_cold_outreach_event`, {
       dbPath: mcpDbPath,
       leadEmail: "lead@example.com",
@@ -145,12 +152,12 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(readiness.status, 200);
     const readinessBody = (await readiness.json()) as { status: string; mcp: { toolCount: number }; nextActions: string[]; fixGuide: unknown[] };
     assert.ok(["ready", "attention", "blocked"].includes(readinessBody.status));
-    assert.equal(readinessBody.mcp.toolCount, 20);
+    assert.equal(readinessBody.mcp.toolCount, 21);
     assert.ok(Array.isArray(readinessBody.nextActions));
     assert.ok(Array.isArray(readinessBody.fixGuide));
 
     const mcpReadiness = await postJson(`${baseUrl}/api/mcp/arcigy.get_production_readiness`, { live: false });
-    assert.equal(mcpReadiness.result.mcp.toolCount, 20);
+    assert.equal(mcpReadiness.result.mcp.toolCount, 21);
     assert.ok(Array.isArray(mcpReadiness.result.fixGuide));
 
     const voice = await fetch(`${baseUrl}/api/jarvis/voice-event`, {
@@ -196,6 +203,16 @@ test("local web bridge serves UI and API health", async () => {
     const identifiedBody = (await identified.json()) as { person?: { primaryEmail: string }; openNeedSignals: unknown[] };
     assert.equal(identifiedBody.person?.primaryEmail, "client@example.com");
     assert.equal(identifiedBody.openNeedSignals.length, 1);
+
+    const clientAlerts = await fetch(`${baseUrl}/api/client-need-alerts`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ dbPath, limit: 5 }),
+    });
+    assert.equal(clientAlerts.status, 200);
+    const clientAlertsBody = (await clientAlerts.json()) as { count: number; alerts: Array<{ person: { primaryEmail: string } }> };
+    assert.equal(clientAlertsBody.count, 1);
+    assert.equal(clientAlertsBody.alerts[0].person.primaryEmail, "client@example.com");
   } finally {
     await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   }
@@ -306,7 +323,7 @@ test("local web bridge preflight reports tunnel readiness without leaking secret
     assert.match(body.manifestUrl, /\/\.well-known\/arcigy-jarvis\.json$/);
     assert.equal(body.tunnelCommand, "npm run web:tunnel");
     assert.equal(body.tunnelProvider, "ngrok");
-    assert.ok(body.mcpToolCount >= 20);
+    assert.ok(body.mcpToolCount >= 21);
     assert.ok(body.riskyToolsRequiringApproval.includes("arcigy.generate_contract_documents"));
     assert.ok(body.riskyToolsRequiringApproval.includes("arcigy.append_leads_to_google_sheet"));
     assert.equal(body.pathPolicy, "repo-only");

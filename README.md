@@ -29,6 +29,7 @@ Server tools:
 - `arcigy.upsert_local_person`
 - `arcigy.add_client_need_signal`
 - `arcigy.ingest_client_message`
+- `arcigy.get_client_need_alerts`
 - `arcigy.identify_email`
 - `arcigy.get_system_health`
 - `arcigy.run_integration_diagnostics`
@@ -68,6 +69,7 @@ The Electron shell opens a local Arcigy Jarvis console with:
 - Slovak TTS via `speechSynthesis`
 - local Electron IPC bridge for Jarvis voice events and cold outreach briefs
 - voice cold outreach answers backed by `data\jarvis-local.db`
+- client need alerts inbox backed by local SQLite memory
 - runtime integration health for Gemini, Gmail, Smartlead, Postgres, Redis, Serper
 - live diagnostics for Gemini, Gmail OAuth, Smartlead, Postgres TCP, Redis PING, Google Places, Serper, and Google Sheets metadata
 - Gemini draft replies that are prepared locally and not sent automatically
@@ -135,6 +137,7 @@ It serves the same UI at `http://127.0.0.1:8765` and exposes local HTTP endpoint
 - `POST /api/cold-outreach-brief`
 - `POST /api/identify-email`
 - `POST /api/ingest-client-message`
+- `POST /api/client-need-alerts`
 - `POST /api/generate-ai-reply`
 - `POST /api/draft-contract-intake`
 - `POST /api/generate-contracts`
@@ -152,6 +155,7 @@ It serves the same UI at `http://127.0.0.1:8765` and exposes local HTTP endpoint
 - `POST /api/mcp/arcigy.get_cold_outreach_brief_from_db`
 - `POST /api/mcp/arcigy.identify_email`
 - `POST /api/mcp/arcigy.ingest_client_message`
+- `POST /api/mcp/arcigy.get_client_need_alerts`
 - `POST /api/mcp/arcigy.sync_gmail_recent_messages`
 - `POST /api/mcp/arcigy.get_smartlead_campaign_status`
 - `POST /api/mcp/arcigy.search_serper`
@@ -193,6 +197,7 @@ Initialize or use the SQLite DB:
 $env:PYTHONIOENCODING='utf-8'
 python scripts\jarvis_local_db.py init --db data\jarvis-local.db
 python scripts\jarvis_local_db.py identify --db data\jarvis-local.db --email klient@example.com
+python scripts\jarvis_local_db.py list-open-needs --db data\jarvis-local.db --payload "{""status"":""new"",""limit"":10}"
 python scripts\jarvis_local_db.py ingest-message --db data\jarvis-local.db --payload "{""fromEmail"":""klient@example.com"",""source"":""email"",""text"":""Potrebujem upraviť automatizáciu.""}"
 ```
 

@@ -24,6 +24,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(names.includes("arcigy.add_cold_outreach_event"));
   assert.ok(names.includes("arcigy.identify_email"));
   assert.ok(names.includes("arcigy.ingest_client_message"));
+  assert.ok(names.includes("arcigy.get_client_need_alerts"));
   assert.ok(names.includes("arcigy.jarvis_voice_event"));
   assert.ok(names.includes("arcigy.get_system_health"));
   assert.ok(names.includes("arcigy.run_integration_diagnostics"));
@@ -74,7 +75,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   });
   const readiness = getStructuredResult(readinessResult) as { status: string; mcp: { toolCount: number }; nextActions: string[]; fixGuide: unknown[] };
   assert.ok(["ready", "attention", "blocked"].includes(readiness.status));
-  assert.equal(readiness.mcp.toolCount, 20);
+  assert.equal(readiness.mcp.toolCount, 21);
   assert.ok(Array.isArray(readiness.nextActions));
   assert.ok(Array.isArray(readiness.fixGuide));
 
@@ -127,6 +128,14 @@ test("Jarvis MCP server persists and identifies local people through SQLite tool
 
   assert.equal(match.reason, "exact_email_match");
   assert.equal(match.openNeedSignals[0].summary, "chce pripraviť novú automatizáciu");
+
+  const alerts = await client.callTool({
+    name: "arcigy.get_client_need_alerts",
+    arguments: { dbPath, limit: 5 },
+  });
+  const alertBody = getStructuredResult(alerts) as { count: number; alerts: Array<{ person: { primaryEmail: string } }> };
+  assert.equal(alertBody.count, 1);
+  assert.equal(alertBody.alerts[0].person.primaryEmail, "founder@example.com");
 
   await client.close();
   await server.close();

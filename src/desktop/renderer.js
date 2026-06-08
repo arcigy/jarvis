@@ -28,7 +28,9 @@ const elements = {
   memoryMessage: document.querySelector("#memoryMessage"),
   identifyEmail: document.querySelector("#identifyEmail"),
   ingestClientMessage: document.querySelector("#ingestClientMessage"),
+  clientNeedAlerts: document.querySelector("#clientNeedAlerts"),
   memoryResult: document.querySelector("#memoryResult"),
+  clientAlertsResult: document.querySelector("#clientAlertsResult"),
   clientMessage: document.querySelector("#clientMessage"),
   draftReply: document.querySelector("#draftReply"),
   draftResult: document.querySelector("#draftResult"),
@@ -77,6 +79,7 @@ const arcigyApi = window.arcigyDesktop ?? {
   productionReadiness: (payload) => postJson("/api/production-readiness", payload),
   identifyEmail: (payload) => postJson("/api/identify-email", payload),
   ingestClientMessage: (payload) => postJson("/api/ingest-client-message", payload),
+  getClientNeedAlerts: (payload) => postJson("/api/client-need-alerts", payload),
   generateAiReply: (payload) => postJson("/api/generate-ai-reply", payload),
   webBridgePreflight: () => getJson("/api/web-bridge-preflight"),
   syncGmailRecentMessages: (payload) => postJson("/api/sync-gmail-recent-messages", payload),
@@ -299,6 +302,21 @@ function renderIngestedMessage(result) {
     "",
     "Identity:",
     renderIdentity(result.identity),
+  ].join("\n");
+}
+
+function renderClientNeedAlerts(result) {
+  const alerts = result.alerts ?? [];
+  if (!alerts.length) return result.summary ?? "No open client requests.";
+  return [
+    result.summary ?? `Open client requests: ${alerts.length}`,
+    "",
+    ...alerts.slice(0, 10).map((alert, index) => {
+      const person = alert.person ?? {};
+      const need = alert.needSignal ?? {};
+      const name = person.displayName ?? person.companyName ?? person.primaryEmail ?? "Unknown";
+      return [`${index + 1}. ${name}`, `   Email: ${person.primaryEmail ?? "-"}`, `   Need: ${need.summary ?? "-"}`, `   Since: ${need.occurredAt ?? "-"}`].join("\n");
+    }),
   ].join("\n");
 }
 
@@ -552,8 +570,20 @@ elements.ingestClientMessage.addEventListener("click", async () => {
     });
     elements.memoryResult.textContent = renderIngestedMessage(result);
     if (result.jarvisAlert) speak(result.jarvisAlert);
+    const alerts = await arcigyApi.getClientNeedAlerts({ limit: 10 });
+    elements.clientAlertsResult.textContent = renderClientNeedAlerts(alerts);
   } catch (error) {
     elements.memoryResult.textContent = error instanceof Error ? error.message : String(error);
+  }
+});
+elements.clientNeedAlerts.addEventListener("click", async () => {
+  try {
+    elements.clientAlertsResult.textContent = "Loading client alerts...";
+    const result = await arcigyApi.getClientNeedAlerts({ limit: 10 });
+    elements.clientAlertsResult.textContent = renderClientNeedAlerts(result);
+    if (result.count > 0 && result.summary) speak(result.summary);
+  } catch (error) {
+    elements.clientAlertsResult.textContent = error instanceof Error ? error.message : String(error);
   }
 });
 elements.draftReply.addEventListener("click", async () => {

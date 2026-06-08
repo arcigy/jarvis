@@ -54,6 +54,7 @@ app.whenReady().then(() => {
   ipcMain.handle("jarvis:webBridgePreflight", () => getWebBridgePreflight());
   ipcMain.handle("jarvis:identifyEmail", (_event, payload) => identifyEmail(payload));
   ipcMain.handle("jarvis:ingestClientMessage", (_event, payload) => ingestClientMessage(payload));
+  ipcMain.handle("jarvis:getClientNeedAlerts", (_event, payload) => getClientNeedAlerts(payload));
   ipcMain.handle("jarvis:generateAiReply", (_event, payload) => generateAiReply(payload));
   ipcMain.handle("jarvis:syncGmailRecentMessages", (_event, payload) => syncGmailRecentMessages(payload));
   ipcMain.handle("jarvis:getSmartleadCampaignStatus", (_event, payload) => getSmartleadCampaignStatus(payload));
@@ -443,6 +444,7 @@ function listWebMcpTools() {
     { name: "arcigy.upsert_local_person", requiresApproval: false },
     { name: "arcigy.add_client_need_signal", requiresApproval: false },
     { name: "arcigy.ingest_client_message", requiresApproval: false },
+    { name: "arcigy.get_client_need_alerts", requiresApproval: false },
     { name: "arcigy.jarvis_voice_event", requiresApproval: false },
     { name: "arcigy.get_system_health", requiresApproval: false },
     { name: "arcigy.run_integration_diagnostics", requiresApproval: false },
@@ -708,6 +710,21 @@ function ingestClientMessage(payload) {
       text,
       source: payload?.source || "jarvis-ui",
       createIfUnknown: payload?.createIfUnknown !== false,
+    }),
+  ]);
+  return JSON.parse(result.stdout);
+}
+
+function getClientNeedAlerts(payload = {}) {
+  const result = runPython([
+    "scripts/jarvis_local_db.py",
+    "list-open-needs",
+    "--db",
+    payload?.dbPath || defaultDbPath,
+    "--payload",
+    JSON.stringify({
+      status: payload?.status || "new",
+      limit: payload?.limit || 10,
     }),
   ]);
   return JSON.parse(result.stdout);

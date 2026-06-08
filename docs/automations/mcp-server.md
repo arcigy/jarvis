@@ -42,6 +42,7 @@ External hosts require `Authorization: Bearer <JARVIS_WEB_TOKEN>`. The manifest 
 - `arcigy.upsert_local_person`: local client/lead/contact upsert into SQLite.
 - `arcigy.add_client_need_signal`: stores that a client needs something.
 - `arcigy.ingest_client_message`: stores a received email/message, identifies the sender, and returns a Jarvis alert when the message contains a request.
+- `arcigy.get_client_need_alerts`: returns the persistent inbox of open client requests Jarvis should proactively mention.
 - `arcigy.identify_email`: exact email/domain identity lookup with open need signals.
 - `arcigy.get_system_health`: checks runtime configuration without exposing secrets.
 - `arcigy.run_integration_diagnostics`: runs configured checks or explicit live read-only probes, including Postgres TCP and Redis PING.

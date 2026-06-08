@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld("arcigyDesktop", {
   webBridgePreflight: () => ipcRenderer.invoke("jarvis:webBridgePreflight"),
   identifyEmail: (payload) => ipcRenderer.invoke("jarvis:identifyEmail", payload),
   ingestClientMessage: (payload) => ipcRenderer.invoke("jarvis:ingestClientMessage", payload),
+  getClientNeedAlerts: (payload) => ipcRenderer.invoke("jarvis:getClientNeedAlerts", payload),
   generateAiReply: (payload) => ipcRenderer.invoke("jarvis:generateAiReply", payload),
   syncGmailRecentMessages: (payload) => ipcRenderer.invoke("jarvis:syncGmailRecentMessages", payload),
   getSmartleadCampaignStatus: (payload) => ipcRenderer.invoke("jarvis:getSmartleadCampaignStatus", payload),

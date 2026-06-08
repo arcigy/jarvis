@@ -47,9 +47,12 @@ MCP nástroje:
 - `arcigy.upsert_local_person`
 - `arcigy.add_client_need_signal`
 - `arcigy.ingest_client_message`
+- `arcigy.get_client_need_alerts`
 - `arcigy.identify_email`
 
 `arcigy.ingest_client_message` slúži pre prijatý email alebo správu. Podľa emailu spáruje klienta/leada, uloží aktivitu do `local_email_activity`, pri texte typu "potrebujem/chcem/prosím" vytvorí `client_need_signals` a vráti `jarvisAlert`, ktorý môže desktop alebo MCP klient rovno prečítať.
+
+`arcigy.get_client_need_alerts` vracia persistentny inbox otvorenych poziadaviek zo SQLite, aby Jarvis vedel sam pripomenut, co klient alebo lead aktualne chce.
 
 ## Jarvis hlas
 

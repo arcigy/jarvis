@@ -136,6 +136,7 @@
             <div class="buttonGroup">
               <button id="identifyEmail">Identify</button>
               <button id="ingestClientMessage">Ingest</button>
+              <button id="clientNeedAlerts">Alerts</button>
             </div>
           </div>
           <div class="splitControls">
@@ -153,6 +154,7 @@
             <textarea id="memoryMessage" spellcheck="false" placeholder="Client request or email body"></textarea>
           </label>
           <div class="response compact" id="memoryResult">Ready to identify email or save a client need.</div>
+          <div class="response compact" id="clientAlertsResult">No client alerts loaded.</div>
         </article>
 
         <article class="panel" id="leadPanel">
@@ -212,6 +214,7 @@
             <li>upsert_local_person</li>
             <li>add_client_need_signal</li>
             <li>ingest_client_message</li>
+            <li>get_client_need_alerts</li>
             <li>identify_email</li>
             <li>jarvis_voice_event</li>
           </ul>

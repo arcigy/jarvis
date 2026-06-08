@@ -227,6 +227,56 @@ def identify(db_path: Path, email: str) -> dict[str, Any]:
     }
 
 
+def list_open_needs(db_path: Path, payload: dict[str, Any]) -> dict[str, Any]:
+    init_db(db_path)
+    limit = int(payload.get("limit", 10))
+    status = payload.get("status", "new")
+    conn = connect(db_path)
+    rows = [
+        row
+        for row in conn.execute(
+            """
+            select
+              s.*,
+              p.primary_email,
+              p.display_name,
+              p.company_name,
+              p.kind
+            from client_need_signals s
+            join local_people p on p.id = s.person_id
+            where s.status = ?
+            order by s.occurred_at desc
+            limit ?
+            """,
+            (status, max(1, min(limit, 50))),
+        )
+    ]
+    alerts = []
+    for row in rows:
+        person = {
+            "id": row["person_id"],
+            "kind": row["kind"],
+            "primaryEmail": row["primary_email"],
+            "displayName": row["display_name"],
+            "companyName": row["company_name"],
+        }
+        need = row_to_need_signal(row)
+        name = person.get("displayName") or person.get("companyName") or person.get("primaryEmail")
+        alerts.append(
+            {
+                "person": person,
+                "needSignal": need,
+                "jarvisAlert": f"Jarvis: {name} ma otvorenu poziadavku: {need['summary']}.",
+            }
+        )
+    return {
+        "status": status,
+        "count": len(alerts),
+        "alerts": alerts,
+        "summary": build_open_needs_summary(alerts),
+    }
+
+
 def ingest_message(db_path: Path, payload: dict[str, Any]) -> dict[str, Any]:
     init_db(db_path)
     email = normalize_email(payload.get("email") or payload.get("fromEmail") or required(payload, "fromEmail"))
@@ -375,6 +425,15 @@ def build_jarvis_need_alert(identity: dict[str, Any], need_signal: dict[str, Any
     return f"Jarvis: {name} chce alebo potrebuje: {summary}. Mám ti pripraviť odpoveď?"
 
 
+def build_open_needs_summary(alerts: list[dict[str, Any]]) -> str:
+    if not alerts:
+        return "Jarvis: Nemam ziadne otvorene klientske poziadavky."
+    first = alerts[0]
+    person = first["person"]
+    name = person.get("displayName") or person.get("companyName") or person.get("primaryEmail")
+    return f"Jarvis: Mas {len(alerts)} otvorenych klientskych poziadaviek. Najnovsia: {name} - {first['needSignal']['summary']}."
+
+
 def build_cold_outreach_summary(metrics: dict[str, Any]) -> str:
     contacted = int(metrics["contacted"])
     opened = int(metrics["opened"])
@@ -482,7 +541,7 @@ def load_payload(raw: str | None) -> dict[str, Any]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Jarvis local SQLite DB helper.")
-    parser.add_argument("command", choices=["init", "upsert-person", "add-need-signal", "add-cold-event", "cold-brief", "identify", "ingest-message"])
+    parser.add_argument("command", choices=["init", "upsert-person", "add-need-signal", "add-cold-event", "cold-brief", "identify", "ingest-message", "list-open-needs"])
     parser.add_argument("--db", type=Path, default=ROOT / "data" / "jarvis-local.db")
     parser.add_argument("--payload")
     parser.add_argument("--email")
@@ -501,6 +560,8 @@ def main() -> None:
             result = cold_brief(args.db, load_payload(args.payload))
         elif args.command == "ingest-message":
             result = ingest_message(args.db, load_payload(args.payload))
+        elif args.command == "list-open-needs":
+            result = list_open_needs(args.db, load_payload(args.payload))
         else:
             if not args.email:
                 raise ValueError("--email is required for identify")

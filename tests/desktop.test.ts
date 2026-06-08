@@ -40,6 +40,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /memoryEmail/);
   assert.match(html, /identifyEmail/);
   assert.match(html, /ingestClientMessage/);
+  assert.match(html, /clientNeedAlerts/);
+  assert.match(html, /clientAlertsResult/);
+  assert.match(html, /get_client_need_alerts/);
   assert.match(html, /Operations sync/);
   assert.match(html, /gmailQuery/);
   assert.match(html, /syncGmail/);
@@ -62,6 +65,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /arcigyApi\.coldOutreachBrief/);
   assert.match(renderer, /arcigyApi\.identifyEmail/);
   assert.match(renderer, /arcigyApi\.ingestClientMessage/);
+  assert.match(renderer, /arcigyApi\.getClientNeedAlerts/);
   assert.match(renderer, /arcigyApi\.generateContracts/);
   assert.match(renderer, /arcigyApi\.draftContractIntake/);
   assert.match(renderer, /arcigyApi\.systemHealth/);
@@ -85,6 +89,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /\/api\/web-bridge-preflight/);
   assert.match(renderer, /\/api\/identify-email/);
   assert.match(renderer, /\/api\/ingest-client-message/);
+  assert.match(renderer, /\/api\/client-need-alerts/);
   assert.match(renderer, /\/api\/sync-gmail-recent-messages/);
   assert.match(renderer, /\/api\/smartlead-campaign-status/);
   assert.match(renderer, /\/api\/discover-leads/);
@@ -93,6 +98,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /sampleContractIntake/);
   assert.match(renderer, /buildContractIntakeFromForm/);
   assert.match(renderer, /fillContractForm/);
+  assert.match(renderer, /renderClientNeedAlerts/);
   assert.doesNotMatch(renderer, /demoColdOutreachMetrics/);
   assert.doesNotMatch(renderer, /Za dnes sme napísali/);
   assert.doesNotMatch(html, /[\u0102\u00c4\u0139\u00e2]/);
@@ -100,6 +106,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /ipcMain\.handle\("jarvis:coldOutreachBrief"/);
   assert.match(main, /ipcMain\.handle\("jarvis:identifyEmail"/);
   assert.match(main, /ipcMain\.handle\("jarvis:ingestClientMessage"/);
+  assert.match(main, /ipcMain\.handle\("jarvis:getClientNeedAlerts"/);
   assert.match(main, /ipcMain\.handle\("jarvis:voiceEvent"/);
   assert.match(main, /ipcMain\.handle\("jarvis:runDiagnostics"/);
   assert.match(main, /ipcMain\.handle\("jarvis:productionReadiness"/);
@@ -135,6 +142,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /generateGeminiTextForContract/);
   assert.match(main, /parseJsonObject/);
   assert.match(main, /jarvis_local_db\.py/);
+  assert.match(main, /list-open-needs/);
   assert.match(main, /cold-brief/);
   assert.match(main, /defaultDbPath/);
   assert.match(main, /contextIsolation: true/);
@@ -147,6 +155,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(preload, /coldOutreachBrief/);
   assert.match(preload, /identifyEmail/);
   assert.match(preload, /ingestClientMessage/);
+  assert.match(preload, /getClientNeedAlerts/);
   assert.match(preload, /systemHealth/);
   assert.match(preload, /generateAiReply/);
   assert.match(preload, /syncGmailRecentMessages/);

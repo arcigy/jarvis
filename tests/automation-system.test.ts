@@ -39,6 +39,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.upsert_local_person",
     "arcigy.add_client_need_signal",
     "arcigy.ingest_client_message",
+    "arcigy.get_client_need_alerts",
     "arcigy.jarvis_voice_event",
     "arcigy.get_system_health",
     "arcigy.run_integration_diagnostics",
@@ -62,7 +63,7 @@ test("production readiness report returns blockers and next actions without secr
   });
 
   assert.equal(report.status, "blocked");
-  assert.equal(report.mcp.toolCount, 20);
+  assert.equal(report.mcp.toolCount, 21);
   assert.ok(report.blockers.some((blocker) => blocker.key === "redis"));
   assert.ok(report.nextActions.some((action) => action.includes("REDIS_URL")));
   assert.ok(report.fixGuide.some((step) => step.id === "redis-real-password" && step.envKeys.includes("REDIS_URL")));
@@ -551,6 +552,52 @@ test("local SQLite CLI persists people and need signals", () => {
 
   assert.equal(match.reason, "exact_email_match");
   assert.equal(match.openNeedSignals[0].summary, "chce nový report pre cold outreach");
+});
+
+test("local SQLite CLI lists open need alerts", () => {
+  const dir = mkdtempSync(join(tmpdir(), "jarvis-alerts-db-"));
+  const dbPath = join(dir, "jarvis.db");
+  const python = process.env.JARVIS_PYTHON || "python";
+
+  const person = runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "upsert-person",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify({
+      kind: "client",
+      primaryEmail: "ceo@acme.com",
+      displayName: "ACME CEO",
+      companyName: "ACME",
+    }),
+  ]);
+
+  runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "add-need-signal",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify({
+      personId: person.id,
+      summary: "chce novy report pre cold outreach",
+      confidence: 0.91,
+    }),
+  ]);
+
+  const alerts = runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "list-open-needs",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify({ limit: 5 }),
+  ]);
+
+  assert.equal(alerts.count, 1);
+  assert.equal(alerts.alerts[0].person.primaryEmail, "ceo@acme.com");
+  assert.match(alerts.summary, /otvorenych klientskych poziadaviek/);
 });
 
 test("local SQLite CLI ingests client messages and raises need alerts", () => {

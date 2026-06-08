@@ -311,6 +311,26 @@ export function createJarvisMcpServer(): McpServer {
   );
 
   server.registerTool(
+    "arcigy.get_client_need_alerts",
+    {
+      title: "Get client need alerts",
+      description: "Return open client/lead requests from local SQLite memory so Jarvis can proactively tell the operator.",
+      inputSchema: {
+        dbPath: z.string().optional(),
+        status: z.enum(["new", "seen", "resolved", "ignored"]).default("new"),
+        limit: z.number().int().min(1).max(50).default(10),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async ({ dbPath, ...payload }) => jsonDbTool("list-open-needs", payload, dbPath)
+  );
+
+  server.registerTool(
     "arcigy.jarvis_voice_event",
     {
       title: "Jarvis voice event",
@@ -606,7 +626,7 @@ function runPython(args: string[]): { stdout: string; stderr: string } {
 }
 
 function jsonDbTool(
-  command: "upsert-person" | "add-need-signal" | "add-cold-event" | "cold-brief" | "ingest-message",
+  command: "upsert-person" | "add-need-signal" | "add-cold-event" | "cold-brief" | "ingest-message" | "list-open-needs",
   payload: Record<string, unknown>,
   dbPath?: string
 ) {
@@ -614,7 +634,7 @@ function jsonDbTool(
 }
 
 function runDbCommand(
-  command: "upsert-person" | "add-need-signal" | "add-cold-event" | "cold-brief" | "ingest-message",
+  command: "upsert-person" | "add-need-signal" | "add-cold-event" | "cold-brief" | "ingest-message" | "list-open-needs",
   payload: Record<string, unknown>,
   dbPath?: string
 ) {

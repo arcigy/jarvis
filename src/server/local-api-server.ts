@@ -117,6 +117,12 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
     return;
   }
 
+  if (request.method === "POST" && url.pathname === "/api/client-need-alerts") {
+    const payload = await readJson(request);
+    writeJson(response, 200, getClientNeedAlerts(payload));
+    return;
+  }
+
   if (request.method === "POST" && url.pathname === "/api/generate-ai-reply") {
     const payload = await readJson(request);
     const result = await generateGeminiText(
@@ -410,6 +416,10 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
     writeJson(response, 200, { result: runDbTool("add-need-signal", payload) });
     return;
   }
+  if (name === "arcigy.get_client_need_alerts") {
+    writeJson(response, 200, { result: getClientNeedAlerts(payload) });
+    return;
+  }
   if (name === "arcigy.jarvis_voice_event") {
     writeJson(response, 200, { result: await handleWebVoiceEvent(payload) });
     return;
@@ -621,6 +631,22 @@ function ingestClientMessage(payload: Record<string, unknown>) {
         text,
         source: optionalString(payload.source) ?? "jarvis-ui",
         createIfUnknown: payload.createIfUnknown !== false,
+      }),
+    ]).stdout
+  );
+}
+
+function getClientNeedAlerts(payload: Record<string, unknown>) {
+  return JSON.parse(
+    runPython([
+      "scripts/jarvis_local_db.py",
+      "list-open-needs",
+      "--db",
+      resolveRepoPath(payload.dbPath, defaultDbPath, "dbPath"),
+      "--payload",
+      JSON.stringify({
+        status: payload.status ?? "new",
+        limit: payload.limit ?? 10,
       }),
     ]).stdout
   );
