@@ -106,6 +106,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /ingestClientMessage/);
   assert.match(html, /clientNeedAlerts/);
   assert.match(html, /toggleClientNeedWatch/);
+  assert.match(html, /clientAlertGrid/);
   assert.match(html, /clientAlertsResult/);
   assert.match(html, /clientAlertWatchStatus/);
   assert.match(html, /Operations sync/);
@@ -310,6 +311,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /buildContractIntakeFromForm/);
   assert.match(renderer, /fillContractForm/);
   assert.match(renderer, /renderClientNeedAlerts/);
+  assert.match(renderer, /function renderClientAlertGrid/);
+  assert.match(renderer, /elements\.clientAlertGrid\.replaceChildren\(\)/);
+  assert.match(renderer, /elements\.clientAlertGrid\.appendChild\(node\)/);
   assert.match(renderer, /renderPreparedReplies/);
   assert.match(renderer, /renderAuditEvents/);
   assert.match(renderer, /lastPreparedReplies/);
@@ -333,7 +337,10 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(styles, /\.launchQueue,\s+\.cortexMap/s);
   assert.match(styles, /\.diagnosticsGrid/);
   assert.match(styles, /\.diagnosticCard\[data-state="ready"\]/);
-  assert.match(styles, /\.diagnosticsGrid,\s+\.toolMatrix/s);
+  assert.match(styles, /\.diagnosticsGrid,\s+\.clientAlertGrid/s);
+  assert.match(styles, /\.clientAlertGrid/);
+  assert.match(styles, /\.clientAlertCard/);
+  assert.match(styles, /\.clientAlertGrid,\s+\.toolMatrix/s);
   assert.match(styles, /\.cortexMap/);
   assert.match(styles, /\.cortexNode\[data-state="ready"\]/);
   assert.match(styles, /@keyframes cortexSweep/);

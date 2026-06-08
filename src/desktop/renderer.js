@@ -71,6 +71,7 @@ const elements = {
   clientNeedAlerts: document.querySelector("#clientNeedAlerts"),
   toggleClientNeedWatch: document.querySelector("#toggleClientNeedWatch"),
   memoryResult: document.querySelector("#memoryResult"),
+  clientAlertGrid: document.querySelector("#clientAlertGrid"),
   clientAlertsResult: document.querySelector("#clientAlertsResult"),
   clientAlertWatchStatus: document.querySelector("#clientAlertWatchStatus"),
   clientMessage: document.querySelector("#clientMessage"),
@@ -676,6 +677,25 @@ function renderClientNeedAlerts(result) {
   ].join("\n");
 }
 
+function renderClientAlertGrid(result) {
+  const alerts = result.alerts ?? [];
+  elements.clientAlertGrid.replaceChildren();
+  for (const alert of alerts.slice(0, 6)) {
+    const person = alert.person ?? {};
+    const need = alert.needSignal ?? {};
+    const node = document.createElement("div");
+    const name = document.createElement("strong");
+    const meta = document.createElement("span");
+    const summary = document.createElement("p");
+    node.className = "clientAlertCard";
+    name.textContent = person.displayName ?? person.companyName ?? person.primaryEmail ?? "Unknown client";
+    meta.textContent = [person.primaryEmail, need.occurredAt].filter(Boolean).join(" / ") || "local memory";
+    summary.textContent = need.summary ?? "Open client request.";
+    node.append(name, meta, summary);
+    elements.clientAlertGrid.appendChild(node);
+  }
+}
+
 function clientAlertKey(alert) {
   const person = alert.person ?? {};
   const need = alert.needSignal ?? {};
@@ -701,6 +721,7 @@ async function refreshClientNeedAlerts({ announceNew = false, loadingText = null
     return key && !state.seenClientNeedAlertIds.has(key);
   });
 
+  renderClientAlertGrid(result);
   elements.clientAlertsResult.textContent = renderClientNeedAlerts(result);
   for (const alert of alerts) {
     const key = clientAlertKey(alert);

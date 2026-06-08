@@ -906,6 +906,49 @@ h2 {
   border-color: rgb(240 184 79 / 55%);
 }
 
+.clientAlertGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.clientAlertCard {
+  min-width: 0;
+  border: 1px solid rgb(240 184 79 / 38%);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgb(240 184 79 / 9%), transparent 52%),
+    rgb(9 15 16 / 84%);
+  padding: 10px;
+}
+
+.clientAlertCard strong,
+.clientAlertCard span {
+  display: block;
+}
+
+.clientAlertCard strong {
+  color: #eef4f2;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.clientAlertCard span {
+  margin-top: 5px;
+  color: #91a19d;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.clientAlertCard p {
+  margin: 8px 0 0;
+  color: #ffd893;
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
 .orb {
   position: relative;
   width: 150px;
@@ -1140,6 +1183,7 @@ ul {
   .bridgeCockpit,
   .handoffGrid,
   .diagnosticsGrid,
+  .clientAlertGrid,
   .toolMatrix,
   .grid {
     grid-template-columns: 1fr;
