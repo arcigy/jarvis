@@ -732,6 +732,13 @@ async function runRemoteMcpSmoke(payload = {}) {
       "Connection pack includes a usable approval-gated contract quick-start payload."
     )
   );
+  checks.push(
+    smokeCheck(
+      hasHandoffProof(pack.body?.handoff, baseUrl),
+      "pack-handoff-proof",
+      "Connection pack includes remote handoff proof URLs and first-step instructions."
+    )
+  );
   const health = await fetchJson(`${baseUrl}/api/mcp/arcigy.get_system_health`, token, { format: "json" });
   checks.push(smokeCheck(health.ok && Array.isArray(health.body?.result?.integrations), "read-only-tool-call", "Read-only MCP tool call returned integration health."));
   const approvalGate = await fetchJson(`${baseUrl}/api/mcp/arcigy.generate_contract_documents`, token, { intake: {} });
@@ -748,7 +755,7 @@ async function runRemoteMcpSmoke(payload = {}) {
     baseUrl,
     summary:
       status === "ready"
-        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, local write policy, contract quick-start, read-only call, approval gate, and secret policy passed.`
+        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, local write policy, contract quick-start, handoff proof, read-only call, approval gate, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((check) => check.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -778,6 +785,21 @@ function hasUsableContractQuickStart(value) {
     Array.isArray(intake?.project?.includedModules) &&
     Boolean(intake?.pricing);
   return hasRequiredShape && !/dopln|todo|tbd|xxx|\?\?\?/i.test(JSON.stringify(call.body));
+}
+
+function hasHandoffProof(value, baseUrl) {
+  if (!value || typeof value !== "object") return false;
+  if (value.connectionPackUrl !== `${baseUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`) return false;
+  const requiredProof = Array.isArray(value.requiredProof) ? value.requiredProof : [];
+  const agentFirstSteps = Array.isArray(value.agentFirstSteps) ? value.agentFirstSteps : [];
+  const proofKeys = new Set(requiredProof.map((item) => item?.key));
+  return (
+    proofKeys.has("manifest") &&
+    proofKeys.has("connection-pack") &&
+    proofKeys.has("remote-smoke") &&
+    agentFirstSteps.some((step) => typeof step === "string" && step.includes("arcigy.get_operator_briefing")) &&
+    agentFirstSteps.some((step) => typeof step === "string" && step.includes("status=ready"))
+  );
 }
 
 async function fetchJson(url, token, payload = null) {

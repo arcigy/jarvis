@@ -42,6 +42,7 @@ test("Jarvis doctor reports local readiness without leaking secrets", () => {
     deniedExternalManifestStatus?: number;
     approvalGateReady?: boolean;
     remoteMcpSmokeReady?: boolean;
+    remoteMcpHandoffProofReady?: boolean;
     deniedContractStatus?: number;
     webContractOutputDir?: string;
   };
@@ -53,6 +54,7 @@ test("Jarvis doctor reports local readiness without leaking secrets", () => {
   assert.equal(webBridgeDetails?.deniedExternalManifestStatus, 401);
   assert.equal(webBridgeDetails?.approvalGateReady, true);
   assert.equal(webBridgeDetails?.remoteMcpSmokeReady, true);
+  assert.equal(webBridgeDetails?.remoteMcpHandoffProofReady, true);
   assert.equal(webBridgeDetails?.deniedContractStatus, 409);
   assert.equal(existsSync((localDb?.details as { dbPath: string }).dbPath), false);
   assert.equal(existsSync((contractGeneration?.details as { outputDir: string }).outputDir), false);

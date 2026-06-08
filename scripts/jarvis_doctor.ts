@@ -418,6 +418,11 @@ async function checkWebBridgeSmoke(): Promise<DoctorCheck> {
     const remoteMcpSmokeReady =
       (remoteMcpSmoke as { status?: unknown }).status === "ready" &&
       (remoteMcpSmoke as { expectedToolCount?: unknown }).expectedToolCount === expectedToolCount;
+    const remoteMcpHandoffProofReady =
+      Array.isArray((remoteMcpSmoke as { checks?: unknown }).checks) &&
+      ((remoteMcpSmoke as { checks: Array<{ key?: unknown; status?: unknown }> }).checks ?? []).some(
+        (check) => check.key === "pack-handoff-proof" && check.status === "ready"
+      );
     const ready =
       mcpToolCount === expectedToolCount &&
       manifestToolCount === expectedToolCount &&
@@ -426,7 +431,8 @@ async function checkWebBridgeSmoke(): Promise<DoctorCheck> {
       mcpToolCallReady &&
       externalAuthReady &&
       approvalGateReady &&
-      remoteMcpSmokeReady;
+      remoteMcpSmokeReady &&
+      remoteMcpHandoffProofReady;
 
     return {
       key: "webBridgeSmoke",
@@ -446,6 +452,7 @@ async function checkWebBridgeSmoke(): Promise<DoctorCheck> {
         deniedExternalManifestStatus,
         approvalGateReady,
         remoteMcpSmokeReady,
+        remoteMcpHandoffProofReady,
         deniedContractStatus,
         webContractOutputDir,
       },
