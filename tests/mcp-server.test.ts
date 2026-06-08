@@ -145,6 +145,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.run_remote_mcp_smoke" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.identify_email" && call.approvalRequired === false && typeof call.body.email === "string"));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_client_need_alerts" && call.approvalRequired === false && call.body.status === "new"));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_audit_events" && call.approvalRequired === false && call.body.limit === 20));
   assert.equal(pack.handoff.connectionPackUrl, "https://jarvis.example.ngrok-free.app/api/remote-mcp-pack?includeReadiness=true&live=true");
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.url.endsWith("/api/remote-mcp-smoke")));
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes('top-level {"approved":true}')));

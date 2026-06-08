@@ -105,6 +105,13 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
       "Connection pack includes read-only client identity and open-need quick-start calls."
     )
   );
+  checks.push(
+    check(
+      hasAuditQuickStart(pack.body?.quickStartCalls),
+      "pack-audit-quick-start",
+      "Connection pack includes a read-only audit trail quick-start call."
+    )
+  );
 
   const health = await postJson(fetchImpl, `${baseUrl}/api/mcp/arcigy.get_system_health`, { format: "json" }, input.bearerToken);
   checks.push(check(health.ok && Array.isArray(health.body?.result?.integrations), "read-only-tool-call", "Read-only MCP tool call returned integration health."));
@@ -125,7 +132,7 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
     baseUrl,
     summary:
       status === "ready"
-        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, local write policy, contract draft, contract quick-start, client memory quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
+        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, local write policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((item) => item.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -270,6 +277,14 @@ function hasClientMemoryQuickStarts(value: unknown): boolean {
     alerts.body?.status === "new" &&
     typeof alerts.body?.limit === "number"
   );
+}
+
+function hasAuditQuickStart(value: unknown): boolean {
+  if (!Array.isArray(value)) return false;
+  const call = value.find((item) => item && typeof item === "object" && (item as { tool?: unknown }).tool === "arcigy.get_audit_events") as
+    | { approvalRequired?: unknown; body?: { limit?: unknown; automationKey?: unknown; status?: unknown } }
+    | undefined;
+  return call?.approvalRequired === false && call.body?.limit === 20 && !("automationKey" in (call.body ?? {})) && !("status" in (call.body ?? {}));
 }
 
 async function getJson(fetchImpl: typeof fetch, url: string, bearerToken?: string) {

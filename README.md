@@ -32,6 +32,7 @@ Server tools:
 - `arcigy.add_client_need_signal`
 - `arcigy.ingest_client_message`
 - `arcigy.get_client_need_alerts`
+- `arcigy.get_audit_events`
 - `arcigy.identify_email`
 - `arcigy.get_system_health`
 - `arcigy.run_integration_diagnostics`
@@ -166,6 +167,7 @@ It serves the same UI at `http://127.0.0.1:8765` and exposes local HTTP endpoint
 - `POST /api/identify-email`
 - `POST /api/ingest-client-message`
 - `POST /api/client-need-alerts`
+- `POST /api/audit-events`
 - `POST /api/generate-ai-reply`
 - `POST /api/draft-contract-intake`
 - `POST /api/generate-contracts`
@@ -190,6 +192,7 @@ It serves the same UI at `http://127.0.0.1:8765` and exposes local HTTP endpoint
 - `POST /api/mcp/arcigy.identify_email`
 - `POST /api/mcp/arcigy.ingest_client_message`
 - `POST /api/mcp/arcigy.get_client_need_alerts`
+- `POST /api/mcp/arcigy.get_audit_events`
 - `POST /api/mcp/arcigy.sync_gmail_recent_messages`
 - `POST /api/mcp/arcigy.get_smartlead_campaign_status`
 - `POST /api/mcp/arcigy.get_smartlead_outreach_brief`
@@ -207,8 +210,8 @@ External agent setup flow:
 3. The runner starts `npm run web` if needed, checks `/api/web-bridge-preflight`, starts ngrok, finds the public HTTPS URL, verifies the protected manifest, and runs `/api/remote-mcp-smoke`.
 4. Give Claude, ChatGPT, Grok, or another remote agent the printed external manifest URL, `/api/remote-mcp-pack`, `/api/remote-mcp-smoke`, plus `Authorization: Bearer <JARVIS_WEB_TOKEN>`.
 5. Use the returned `tools[].url` values for web MCP-style calls. Each tool expects JSON in the POST body and returns `{ "result": ... }`.
-6. Use `quickStartCalls[]` from the connection pack for safe first calls: smoke proof, operator briefing, Smartlead outreach brief, Gemini reply draft, lead discovery, and approval-gated contract generation.
-7. Run `arcigy.run_remote_mcp_smoke` or `GET /api/remote-mcp-smoke` before handoff when you need proof that manifest, read-only calls, approval gates, and token redaction work.
+6. Use `quickStartCalls[]` from the connection pack for safe first calls: smoke proof, operator briefing, audit review, Smartlead outreach brief, Gemini reply draft, lead discovery, and approval-gated contract generation.
+7. Run `arcigy.run_remote_mcp_smoke` or `GET /api/remote-mcp-smoke` before handoff when you need proof that manifest, exact tool registry, read-only calls, audit quick-start, approval gates, and token redaction work.
 8. For manifest tools with `requiresApproval: true`, include `"approval": { "approved": true }` only after explicit user confirmation.
 
 Remote smoke can also be run without opening the UI:
