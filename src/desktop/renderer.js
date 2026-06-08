@@ -1369,9 +1369,11 @@ elements.runRemoteSmoke.addEventListener("click", async () => {
     const report = await arcigyApi.remoteMcpSmoke({ baseUrl: state.lastRemoteMcpPack?.baseUrl });
     renderRemoteMcpSmoke(report);
   } catch (error) {
+    state.lastRemoteMcpSmoke = null;
     elements.remoteSmokeResult.textContent = safeUiErrorText(error);
     elements.handoffProofGates.textContent = "blocked: smoke error";
     elements.handoffProofGates.dataset.state = "attention";
+    if (state.lastRemoteMcpPack) elements.remoteAgentPrompt.textContent = buildRemoteAgentPrompt(state.lastRemoteMcpPack, null);
   }
 });
 elements.readinessReport.addEventListener("click", async () => {
