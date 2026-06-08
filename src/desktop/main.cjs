@@ -59,6 +59,7 @@ app.whenReady().then(() => {
   ipcMain.handle("jarvis:remoteMcpPack", (_event, payload) => getRemoteMcpPack(payload));
   ipcMain.handle("jarvis:remoteMcpSmoke", (_event, payload) => runRemoteMcpSmoke(payload));
   ipcMain.handle("jarvis:getPreparedOutreachReplies", (_event, payload) => getPreparedOutreachReplies(payload));
+  ipcMain.handle("jarvis:preparePositiveOutreachReply", (_event, payload) => preparePositiveOutreachReply(payload));
   ipcMain.handle("jarvis:approvePreparedOutreachReply", (_event, payload) => approvePreparedOutreachReply(payload));
   ipcMain.handle("jarvis:sendApprovedOutreachReply", (_event, payload) => sendApprovedOutreachReply(payload));
   ipcMain.handle("jarvis:identifyEmail", (_event, payload) => identifyEmail(payload));
@@ -1612,6 +1613,80 @@ function getPreparedOutreachReplies(payload = {}) {
     }),
   ]);
   return JSON.parse(result.stdout);
+}
+
+async function preparePositiveOutreachReply(payload = {}) {
+  const leadEmail = safeAiPromptPart(payload?.leadEmail).toLowerCase();
+  const positiveSignal = safeAiPromptPart(payload?.positiveSignal);
+  if (!leadEmail) throw new Error("Lead email is required.");
+  if (!positiveSignal) throw new Error("Positive signal is required.");
+  const language = payload?.language === "en" ? "en" : "sk";
+  const tone = payload?.tone === "direct" || payload?.tone === "warm" ? payload.tone : "executive";
+  const prompt = [
+    `Lead email: ${leadEmail}.`,
+    payload?.leadName ? `Meno leadu: ${safeAiPromptPart(payload.leadName)}.` : null,
+    payload?.companyName ? `Firma: ${safeAiPromptPart(payload.companyName)}.` : null,
+    `Jazyk odpovede: ${language}.`,
+    `Ton: ${tone}.`,
+    payload?.context ? `Kontext kampane: ${safeAiPromptPart(payload.context)}` : null,
+    "Pozitivny signal od leadu:",
+    positiveSignal,
+    [
+      "Vytvor kratky navrh odpovede pre pozitivny lead.",
+      "Ciel: posunut lead na jasny dalsi krok, idealne kratky call alebo doplnenie detailov.",
+      "Neodosielaj nic, iba priprav draft.",
+      "Vrat iba samotny emailovy text bez markdownu, bez podpisu so secretmi a bez tvrdenia, ze sprava uz bola odoslana.",
+    ].join(" "),
+  ]
+    .filter(Boolean)
+    .join("\n");
+  const draft = await generateGeminiText({
+    prompt,
+    model: payload?.model,
+    temperature: 0.3,
+    systemInstruction:
+      "Si Arcigy Jarvis. Pripravuj profesionalne, vecne a family-friendly odpovede na pozitivne cold outreach reakcie. Nikdy neslubuj odoslanie bez schvalenia pouzivatelom. Ak vstup obsahuje citlive udaje alebo secrety, nereprodukuj ich.",
+  });
+  const event = JSON.parse(
+    runPython([
+      "scripts/jarvis_local_db.py",
+      "add-cold-event",
+      "--db",
+      payload?.dbPath || defaultDbPath,
+      "--payload",
+      JSON.stringify({
+        leadEmail,
+        leadName: payload?.leadName,
+        companyName: payload?.companyName,
+        campaignId: payload?.campaignId,
+        campaignName: payload?.campaignName,
+        eventType: "prepared_reply",
+        occurredAt: payload?.occurredAt,
+        data: {
+          replyText: draft.text,
+          subject: payload?.subject,
+          positiveSignal,
+          context: payload?.context,
+          language,
+          tone,
+          model: draft.model,
+          attempts: draft.attempts,
+          generatedBy: "gemini",
+          requiresApprovalBeforeSend: true,
+        },
+      }),
+    ]).stdout
+  );
+  const result = {
+    status: "prepared",
+    preparedReply: event,
+    replyText: draft.text,
+    model: draft.model,
+    attempts: draft.attempts,
+    summary: `Jarvis: Pripravil som odpoved pre ${leadEmail}. Caka na tvoje schvalenie pred odoslanim.`,
+  };
+  addAuditEvent("arcigy.prepare_positive_outreach_reply", "prepared", { leadEmail, subject: payload?.subject }, result, false);
+  return result;
 }
 
 function approvePreparedOutreachReply(payload = {}) {

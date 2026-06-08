@@ -158,9 +158,24 @@
           <div class="buttonGroup">
             <button id="coldBrief">Ask Jarvis</button>
             <button id="preparedReplies">Prepared replies</button>
+            <button id="preparePositiveReply">Prepare positive</button>
             <button id="approvePreparedReply">Approve first</button>
             <button id="sendApprovedReply">Send approved</button>
           </div>
+          <div class="splitControls">
+            <label>
+              Lead email
+              <input id="positiveLeadEmail" spellcheck="false" placeholder="lead@example.com" />
+            </label>
+            <label>
+              Subject
+              <input id="positiveReplySubject" spellcheck="false" placeholder="Re: Arcigy" />
+            </label>
+          </div>
+          <label>
+            Positive signal
+            <textarea id="positiveSignal" spellcheck="false" placeholder="Lead wants pricing, call, demo, or more details."></textarea>
+          </label>
           <div class="response compact" id="preparedReplyResult">No prepared replies loaded.</div>
         </article>
 

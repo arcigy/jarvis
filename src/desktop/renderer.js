@@ -51,8 +51,12 @@ const elements = {
   submitTranscript: document.querySelector("#submitTranscript"),
   coldBrief: document.querySelector("#coldBrief"),
   preparedReplies: document.querySelector("#preparedReplies"),
+  preparePositiveReply: document.querySelector("#preparePositiveReply"),
   approvePreparedReply: document.querySelector("#approvePreparedReply"),
   sendApprovedReply: document.querySelector("#sendApprovedReply"),
+  positiveLeadEmail: document.querySelector("#positiveLeadEmail"),
+  positiveReplySubject: document.querySelector("#positiveReplySubject"),
+  positiveSignal: document.querySelector("#positiveSignal"),
   preparedReplyResult: document.querySelector("#preparedReplyResult"),
   memoryEmail: document.querySelector("#memoryEmail"),
   memorySubject: document.querySelector("#memorySubject"),
@@ -134,6 +138,7 @@ const arcigyApi = window.arcigyDesktop ?? {
   productionReadiness: (payload) => postJson("/api/production-readiness", payload),
   operatorBriefing: (payload) => postJson("/api/operator-briefing", payload),
   getPreparedOutreachReplies: (payload) => postJson("/api/prepared-outreach-replies", payload),
+  preparePositiveOutreachReply: (payload) => postJson("/api/mcp/arcigy.prepare_positive_outreach_reply", payload).then((value) => value.result),
   approvePreparedOutreachReply: (payload) => postJson("/api/approve-prepared-outreach-reply", payload),
   sendApprovedOutreachReply: (payload) => postJson("/api/mcp/arcigy.send_approved_outreach_reply", payload).then((value) => value.result),
   identifyEmail: (payload) => postJson("/api/identify-email", payload),
@@ -1200,6 +1205,27 @@ elements.preparedReplies.addEventListener("click", async () => {
     if (result.count > 0 && result.summary) speak(result.summary);
   } catch (error) {
     state.lastPreparedReplies = [];
+    elements.preparedReplyResult.textContent = safeUiErrorText(error);
+  }
+});
+elements.preparePositiveReply.addEventListener("click", async () => {
+  try {
+    const leadEmail = requiredInputValue(elements.positiveLeadEmail, "Lead email is required before preparing a reply.");
+    const positiveSignal = requiredInputValue(elements.positiveSignal, "Positive signal is required before preparing a reply.");
+    elements.preparedReplyResult.textContent = "Preparing positive outreach reply...";
+    const result = await arcigyApi.preparePositiveOutreachReply({
+      leadEmail,
+      subject: elements.positiveReplySubject.value,
+      positiveSignal,
+      context: "Desktop cold outreach panel.",
+      language: "sk",
+      tone: "executive",
+    });
+    elements.preparedReplyResult.textContent = result.summary;
+    speak(result.summary);
+    const refreshed = await arcigyApi.getPreparedOutreachReplies({ status: "pending", limit: 10 });
+    state.lastPreparedReplies = refreshed.replies ?? [];
+  } catch (error) {
     elements.preparedReplyResult.textContent = safeUiErrorText(error);
   }
 });
