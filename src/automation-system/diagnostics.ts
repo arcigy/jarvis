@@ -164,7 +164,8 @@ async function checkGoogleSheets(env: RuntimeEnv, fetchImpl: FetchLike) {
       if (response.ok) return `Google Sheets metadata request responded using account ${index + 1}/${accounts.length}.`;
       lastError = `Google Sheets metadata request failed after account ${index + 1}/${accounts.length}: ${response.status}`;
     } catch (error) {
-      lastError = `Google Sheets metadata request failed after account ${index + 1}/${accounts.length}: ${error instanceof Error ? error.message : String(error)}`;
+      const message = redactSensitiveText(error instanceof Error ? error.message : String(error));
+      lastError = `Google Sheets metadata request failed after account ${index + 1}/${accounts.length}: ${message}`;
     }
   }
   throw new Error(lastError || "Google Sheets metadata request failed.");

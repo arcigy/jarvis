@@ -1187,6 +1187,40 @@ test("integration diagnostics redact secrets from provider errors", async () => 
   assert.match(gemini?.message ?? "", /postgresql:\/\/postgres:\[redacted\]@example\.com/);
 });
 
+test("integration diagnostics redact Google Sheets metadata transport errors", async () => {
+  const googleApiKey = `AI${"za"}Sy${"J".repeat(32)}`;
+  const providerKey = `${"a".repeat(8)}-${"b".repeat(4)}-${"d".repeat(4)}-${"f".repeat(4)}-${"c".repeat(12)}_ehpdn6s`;
+  const databaseUrl = "postgresql://postgres:sheets-private@example.com:5432/jarvis";
+  const fetchImpl = async (url: string | URL | Request) => {
+    const target = String(url);
+    if (target.includes("oauth2.googleapis.com") || target.includes("www.googleapis.com/oauth2/v4/token")) {
+      return responseJson({ access_token: "access-token" });
+    }
+    throw new Error(`sheets metadata failed ${googleApiKey} ${providerKey} ${databaseUrl}`);
+  };
+
+  const diagnostics = await runIntegrationDiagnostics(
+    { live: true },
+    {
+      GOOGLE_CLIENT_ID: "client",
+      GOOGLE_CLIENT_SECRET: "secret",
+      GOOGLE_SHEET_ID: "sheet-id",
+      GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP: "refresh",
+    },
+    fetchImpl as typeof fetch
+  );
+  const googleSheets = diagnostics.checks.find((check) => check.key === "googleSheets");
+  const text = JSON.stringify(diagnostics);
+
+  assert.equal(googleSheets?.status, "failed");
+  assert.equal(text.includes(googleApiKey), false);
+  assert.equal(text.includes(providerKey), false);
+  assert.equal(text.includes("sheets-private"), false);
+  assert.match(googleSheets?.message ?? "", /\[redacted-google-api-key\]/);
+  assert.match(googleSheets?.message ?? "", /\[redacted-provider-key\]/);
+  assert.match(googleSheets?.message ?? "", /postgresql:\/\/postgres:\[redacted\]@example\.com/);
+});
+
 test("production readiness treats Serper exhaustion as advisory when other lead provider works", async () => {
   const fetchImpl = async (url: string | URL | Request) => {
     const target = String(url);
