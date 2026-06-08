@@ -111,7 +111,7 @@ async function handleVoiceEvent(payload) {
   }
 
   if (lowered.includes("cold") || lowered.includes("outreach")) {
-    return voiceDone(session, text, getColdOutreachBrief({ text, dbPath: payload?.dbPath }));
+    return voiceDone(session, text, await getColdOutreachBrief({ text, dbPath: payload?.dbPath, live: payload?.live !== false }));
   }
 
   if (lowered.includes("integracie") || lowered.includes("system") || lowered.includes("health")) {
@@ -831,7 +831,7 @@ async function generateAiReply(payload) {
   });
 }
 
-function getColdOutreachBrief(payload) {
+async function getColdOutreachBrief(payload) {
   if (payload?.metrics) {
     return buildColdOutreachBrief(payload.metrics);
   }
@@ -853,7 +853,7 @@ function getColdOutreachBrief(payload) {
     }),
   ]);
   const parsed = JSON.parse(result.stdout);
-  return parsed.summary;
+  return getOperatorColdOutreachSummary(payload?.live !== false, String(payload?.periodLabel || period.periodLabel), parsed.summary);
 }
 
 function getPreparedOutreachReplies(payload = {}) {

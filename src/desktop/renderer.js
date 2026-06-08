@@ -105,7 +105,7 @@ const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecogni
 const webToken = resolveWebToken();
 const arcigyApi = window.arcigyDesktop ?? {
   systemHealth: () => getJson("/api/system-health"),
-  coldOutreachBrief: (payload) => postJson("/api/cold-outreach-brief", payload),
+  coldOutreachBrief: (payload) => postJson("/api/cold-outreach-brief", { ...payload, live: payload?.live ?? true }),
   jarvisVoiceEvent: (payload) => postJson("/api/jarvis/voice-event", payload),
   runDiagnostics: (payload) => postJson("/api/run-diagnostics", payload),
   productionReadiness: (payload) => postJson("/api/production-readiness", payload),
@@ -787,6 +787,7 @@ async function handleTranscript(text) {
   const result = await arcigyApi.jarvisVoiceEvent({
     session: state.session,
     text: trimmed,
+    live: true,
   });
 
   state.session = result.session;

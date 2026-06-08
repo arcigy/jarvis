@@ -107,20 +107,7 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
 
   if (request.method === "POST" && url.pathname === "/api/cold-outreach-brief") {
     const payload = await readJson(request);
-    const period = resolveColdOutreachPeriod(String(payload.text ?? payload.periodLabel ?? ""));
-    const result = runPython([
-      "scripts/jarvis_local_db.py",
-      "cold-brief",
-      "--db",
-      resolveRepoPath(payload.dbPath, defaultDbPath, "dbPath"),
-      "--payload",
-      JSON.stringify({
-        since: payload.since ?? period.since,
-        until: payload.until ?? period.until,
-        periodLabel: payload.periodLabel ?? period.periodLabel,
-      }),
-    ]);
-    writeJson(response, 200, JSON.parse(result.stdout).summary);
+    writeJson(response, 200, await getColdOutreachBriefSummary(payload, payload.live === true));
     return;
   }
 
@@ -776,6 +763,24 @@ async function getOperatorBriefing(payload: Record<string, unknown>) {
   });
 }
 
+async function getColdOutreachBriefSummary(payload: Record<string, unknown>, live: boolean): Promise<string> {
+  const period = resolveColdOutreachPeriod(String(payload.text ?? payload.periodLabel ?? ""));
+  const result = runPython([
+    "scripts/jarvis_local_db.py",
+    "cold-brief",
+    "--db",
+    resolveRepoPath(payload.dbPath, defaultDbPath, "dbPath"),
+    "--payload",
+    JSON.stringify({
+      since: payload.since ?? period.since,
+      until: payload.until ?? period.until,
+      periodLabel: payload.periodLabel ?? period.periodLabel,
+    }),
+  ]);
+  const local = JSON.parse(result.stdout);
+  return getOperatorColdOutreachSummary(live, String(payload.periodLabel ?? period.periodLabel), local.summary);
+}
+
 async function getOperatorColdOutreachSummary(live: boolean, periodLabel: string, localSummary: string): Promise<string> {
   if (!live) return localSummary;
   try {
@@ -896,20 +901,7 @@ async function handleWebVoiceEvent(payload: Record<string, unknown>) {
   }
 
   if (lowered.includes("cold") || lowered.includes("outreach")) {
-    const period = resolveColdOutreachPeriod(text);
-    const result = runPython([
-      "scripts/jarvis_local_db.py",
-      "cold-brief",
-      "--db",
-      resolveRepoPath(payload.dbPath, defaultDbPath, "dbPath"),
-      "--payload",
-      JSON.stringify({
-        since: period.since,
-        until: period.until,
-        periodLabel: period.periodLabel,
-      }),
-    ]);
-    return voiceDone(session, text, JSON.parse(result.stdout).summary);
+    return voiceDone(session, text, await getColdOutreachBriefSummary({ ...payload, text }, payload.live !== false));
   }
 
   if (lowered.includes("integracie") || lowered.includes("system") || lowered.includes("health")) {

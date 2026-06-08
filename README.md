@@ -78,7 +78,7 @@ The Electron shell opens a local Arcigy Jarvis console with:
 - first-screen operator briefing combining readiness, outreach, client requests, and pending approvals
 - explicit live operator briefing that prefers Smartlead outreach statistics when `live=true`
 - silent five-minute operator briefing refresh, with speech only after an explicit click
-- voice cold outreach answers backed by `data\jarvis-local.db`
+- voice cold outreach answers backed by live Smartlead statistics with `data\jarvis-local.db` fallback
 - prepared cold outreach reply inbox with explicit approval before marking a reply ready to send
 - client need alerts inbox backed by local SQLite memory
 - proactive client need watch that polls local memory and speaks newly detected requests

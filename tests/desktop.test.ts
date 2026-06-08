@@ -105,6 +105,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /startWebBridgeWatch/);
   assert.match(renderer, /webBridgePollMs: 120000/);
   assert.match(renderer, /arcigyApi\.coldOutreachBrief/);
+  assert.match(renderer, /live: payload\?\.live \?\? true/);
+  assert.match(renderer, /live: true/);
   assert.match(renderer, /arcigyApi\.getPreparedOutreachReplies/);
   assert.match(renderer, /arcigyApi\.approvePreparedOutreachReply/);
   assert.match(renderer, /arcigyApi\.identifyEmail/);
@@ -210,6 +212,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /summarizeLeadsForVoice/);
   assert.match(main, /getOperatorBriefing/);
   assert.match(main, /getOperatorColdOutreachSummary/);
+  assert.match(main, /payload\?\.live !== false/);
   assert.match(main, /cleanVoiceQuery/);
   assert.match(main, /ipcMain\.handle\("jarvis:systemHealth"/);
   assert.match(main, /ipcMain\.handle\("jarvis:generateAiReply"/);
