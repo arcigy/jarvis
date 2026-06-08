@@ -58,6 +58,7 @@ const elements = {
   gmailResult: document.querySelector("#gmailResult"),
   smartleadCampaignId: document.querySelector("#smartleadCampaignId"),
   checkSmartlead: document.querySelector("#checkSmartlead"),
+  smartleadBrief: document.querySelector("#smartleadBrief"),
   smartleadResult: document.querySelector("#smartleadResult"),
   checkWebBridge: document.querySelector("#checkWebBridge"),
   bridgeTunnelState: document.querySelector("#bridgeTunnelState"),
@@ -122,6 +123,7 @@ const arcigyApi = window.arcigyDesktop ?? {
     payload ? postJson("/api/mcp/arcigy.run_remote_mcp_smoke", payload).then((value) => value.result) : getJson("/api/remote-mcp-smoke"),
   syncGmailRecentMessages: (payload) => postJson("/api/sync-gmail-recent-messages", payload),
   getSmartleadCampaignStatus: (payload) => postJson("/api/smartlead-campaign-status", payload),
+  getSmartleadOutreachBrief: (payload) => postJson("/api/smartlead-outreach-brief", payload),
   discoverLeads: (payload) => postJson("/api/discover-leads", payload),
   appendLeadsToGoogleSheet: (payload) => postJson("/api/append-leads-to-google-sheet", payload),
   draftContractIntake: (payload) => postJson("/api/draft-contract-intake", payload),
@@ -484,6 +486,20 @@ function renderSmartleadStatus(result) {
     ].join("\n");
   }
   return JSON.stringify(result, null, 2);
+}
+
+function renderSmartleadBrief(result) {
+  const metrics = result.metrics ?? {};
+  return [
+    result.summary ?? "Smartlead brief is empty.",
+    "",
+    `Campaign: ${result.campaignId ?? "-"}`,
+    `Contacted: ${metrics.contacted ?? 0}`,
+    `Opened: ${metrics.opened ?? 0} (${metrics.openRate ?? 0}%)`,
+    `Replied: ${metrics.replied ?? 0} (${metrics.replyRate ?? 0}%)`,
+    `Positive: ${metrics.positiveReplies ?? "not classified"}`,
+    ...(result.notes?.length ? ["", ...result.notes.map((note) => `Note: ${note}`)] : []),
+  ].join("\n");
 }
 
 function renderWebBridgePreflight(result) {
@@ -937,6 +953,24 @@ elements.checkSmartlead.addEventListener("click", async () => {
       campaignId: elements.smartleadCampaignId.value,
     });
     elements.smartleadResult.textContent = renderSmartleadStatus(result);
+  } catch (error) {
+    elements.smartleadResult.textContent = error instanceof Error ? error.message : String(error);
+  }
+});
+elements.smartleadBrief.addEventListener("click", async () => {
+  try {
+    const campaignId = elements.smartleadCampaignId.value.trim();
+    if (!campaignId) {
+      elements.smartleadResult.textContent = "Enter a Smartlead campaign ID first.";
+      return;
+    }
+    elements.smartleadResult.textContent = "Building Smartlead Jarvis brief...";
+    const result = await arcigyApi.getSmartleadOutreachBrief({
+      campaignId,
+      periodLabel: "poslednych 7 dni",
+    });
+    elements.smartleadResult.textContent = renderSmartleadBrief(result);
+    speak(result.summary);
   } catch (error) {
     elements.smartleadResult.textContent = error instanceof Error ? error.message : String(error);
   }

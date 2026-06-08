@@ -83,6 +83,7 @@ The Electron shell opens a local Arcigy Jarvis console with:
 - proactive client need watch that polls local memory and speaks newly detected requests
 - runtime integration health for Gemini, Gmail, Smartlead, Postgres, Redis, Serper
 - live diagnostics for Gemini, Gmail OAuth, Smartlead, Postgres TCP, Redis PING, Google Places, Serper, and Google Sheets metadata
+- Smartlead campaign inspection plus Jarvis-style outreach briefing from campaign statistics
 - Gemini draft replies that are prepared locally and not sent automatically
 - local contract intake form plus editable JSON that generates DOCX files through the same generator as MCP
 

@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld("arcigyDesktop", {
   generateAiReply: (payload) => ipcRenderer.invoke("jarvis:generateAiReply", payload),
   syncGmailRecentMessages: (payload) => ipcRenderer.invoke("jarvis:syncGmailRecentMessages", payload),
   getSmartleadCampaignStatus: (payload) => ipcRenderer.invoke("jarvis:getSmartleadCampaignStatus", payload),
+  getSmartleadOutreachBrief: (payload) => ipcRenderer.invoke("jarvis:getSmartleadOutreachBrief", payload),
   discoverLeads: (payload) => ipcRenderer.invoke("jarvis:discoverLeads", payload),
   appendLeadsToGoogleSheet: (payload) => ipcRenderer.invoke("jarvis:appendLeadsToGoogleSheet", payload),
   draftContractIntake: (payload) => ipcRenderer.invoke("contracts:draftIntake", payload),

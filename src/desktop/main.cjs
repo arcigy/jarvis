@@ -63,6 +63,7 @@ app.whenReady().then(() => {
   ipcMain.handle("jarvis:generateAiReply", (_event, payload) => generateAiReply(payload));
   ipcMain.handle("jarvis:syncGmailRecentMessages", (_event, payload) => syncGmailRecentMessages(payload));
   ipcMain.handle("jarvis:getSmartleadCampaignStatus", (_event, payload) => getSmartleadCampaignStatus(payload));
+  ipcMain.handle("jarvis:getSmartleadOutreachBrief", (_event, payload) => getSmartleadOutreachBrief(payload));
   ipcMain.handle("jarvis:discoverLeads", (_event, payload) => discoverLeads(payload));
   ipcMain.handle("jarvis:appendLeadsToGoogleSheet", (_event, payload) => appendLeadsToGoogleSheet(payload));
   ipcMain.handle("contracts:draftIntake", (_event, payload) => draftContractIntake(payload));
@@ -1207,6 +1208,113 @@ async function getSmartleadCampaignStatus(payload) {
   if (!response.ok) throw new Error(`Smartlead request failed: ${response.status}`);
   const data = await response.json();
   return campaignId ? { campaignId, statistics: data } : { campaigns: data };
+}
+
+async function getSmartleadOutreachBrief(payload) {
+  const campaignId = String(payload?.campaignId ?? "").trim();
+  if (!campaignId) throw new Error("Smartlead campaign ID is required.");
+  const status = await getSmartleadCampaignStatus({ campaignId });
+  return buildSmartleadOutreachBrief({
+    campaignId,
+    periodLabel: String(payload?.periodLabel ?? "poslednych 7 dni"),
+    statistics: status.statistics,
+    preparedPositiveReplyCount: Math.max(0, Math.floor(Number(payload?.preparedPositiveReplyCount ?? 0))),
+    pendingApprovalCount: Math.max(0, Math.floor(Number(payload?.pendingApprovalCount ?? 0))),
+  });
+}
+
+function buildSmartleadOutreachBrief(input) {
+  const contacted = readSmartleadMetric(input.statistics, ["sent_count", "sent", "emails_sent", "total_sent", "sent_emails_count"]);
+  const opened = readSmartleadMetric(input.statistics, ["open_count", "opened", "opened_count", "unique_open_count", "total_opens"]);
+  const replied = readSmartleadMetric(input.statistics, ["reply_count", "replied", "replied_count", "unique_reply_count", "total_replies"]);
+  const positiveReplies = readOptionalSmartleadMetric(input.statistics, [
+    "positive_reply_count",
+    "positive_replies",
+    "positive_replied_count",
+    "interested_count",
+  ]);
+  const openRate = rate(opened, contacted);
+  const replyRate = rate(replied, contacted);
+  const positiveReplyRate = positiveReplies === null ? null : rate(positiveReplies, replied);
+  const notes = [];
+  const summaryParts = [
+    `Za ${input.periodLabel} sme cez Smartlead napisali ${contacted} ludom.`,
+    `${openRate}% si email otvorilo, ${replied} ludi odpisalo.`,
+  ];
+
+  if (positiveReplies === null) {
+    notes.push("Smartlead statistics did not include a positive reply field.");
+    summaryParts.push("Pozitivne odpovede Smartlead v tomto reporte neposlal; treba ich doplnit z lokalnej DB alebo klasifikovat z odpovedi.");
+  } else {
+    summaryParts[1] = `${openRate}% si email otvorilo, ${replied} ludi odpisalo, z toho ${positiveReplies} pozitivne.`;
+  }
+
+  if (input.preparedPositiveReplyCount > 0) {
+    summaryParts.push(`Pripravil som ti ${input.preparedPositiveReplyCount} odpovedi na pozitivne reakcie a poslem ich az na tvoje potvrdenie.`);
+  }
+  if (input.pendingApprovalCount > 0) {
+    summaryParts.push(`Caka ${input.pendingApprovalCount} odpovedi na schvalenie.`);
+  }
+
+  return {
+    campaignId: input.campaignId,
+    periodLabel: input.periodLabel,
+    summary: summaryParts.join(" "),
+    statistics: input.statistics,
+    metrics: {
+      contacted,
+      opened,
+      replied,
+      positiveReplies,
+      openRate,
+      replyRate,
+      positiveReplyRate,
+    },
+    notes,
+  };
+}
+
+function readSmartleadMetric(value, keys) {
+  return readOptionalSmartleadMetric(value, keys) ?? 0;
+}
+
+function readOptionalSmartleadMetric(value, keys) {
+  const wanted = new Set(keys.map(normalizeMetricKey));
+  const values = findSmartleadMetricValues(value, wanted);
+  if (!values.length) return null;
+  return values.reduce((sum, item) => sum + item, 0);
+}
+
+function findSmartleadMetricValues(value, wanted) {
+  if (Array.isArray(value)) return value.flatMap((item) => findSmartleadMetricValues(item, wanted));
+  if (!value || typeof value !== "object") return [];
+  const output = [];
+  for (const [key, item] of Object.entries(value)) {
+    if (wanted.has(normalizeMetricKey(key))) {
+      const numeric = toNumber(item);
+      if (numeric !== null) output.push(numeric);
+    }
+    output.push(...findSmartleadMetricValues(item, wanted));
+  }
+  return output;
+}
+
+function normalizeMetricKey(key) {
+  return String(key).replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+}
+
+function toNumber(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+function rate(part, total) {
+  if (total <= 0) return 0;
+  return Math.round((part / total) * 1000) / 10;
 }
 
 async function discoverLeads(payload) {
