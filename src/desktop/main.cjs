@@ -868,6 +868,13 @@ async function runRemoteMcpSmoke(payload = {}) {
       "Manifest exposes the exact Jarvis MCP tool registry."
     )
   );
+  checks.push(
+    smokeCheck(
+      hasValidManifestToolMetadata(manifestTools, baseUrl),
+      "manifest-tool-metadata",
+      "Manifest tool entries expose POST URLs and policy flags matching the MCP registry."
+    )
+  );
   checks.push(smokeCheck(manifest.body?.auth?.header === "Authorization: Bearer <JARVIS_WEB_TOKEN>", "auth-placeholder", "Manifest returns auth placeholder, not the token value."));
   checks.push(
     smokeCheck(
@@ -965,7 +972,7 @@ async function runRemoteMcpSmoke(payload = {}) {
     baseUrl,
     summary:
       status === "ready"
-        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, local write policy, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
+        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, manifest metadata, local write policy, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((check) => check.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -1018,6 +1025,24 @@ function hasExactManifestRegistry(value) {
     value.map((item) => (item && typeof item === "object" ? item.name : null)),
     expectedToolNames()
   );
+}
+
+function hasValidManifestToolMetadata(value, baseUrl) {
+  if (!Array.isArray(value) || value.length === 0) return false;
+  const approvalPolicy = new Map(listWebMcpTools().map((tool) => [tool.name, tool.requiresApproval]));
+  return value.every((item) => {
+    if (!item || typeof item !== "object" || typeof item.name !== "string" || !approvalPolicy.has(item.name)) return false;
+    const requiresApproval = approvalPolicy.get(item.name);
+    const localWrite = localStateWriteTools.has(item.name);
+    return (
+      item.method === "POST" &&
+      item.url === `${baseUrl}/api/mcp/${item.name}` &&
+      item.approval?.required === requiresApproval &&
+      (requiresApproval ? item.approval?.field === "approval.approved" : !("field" in (item.approval ?? {}))) &&
+      item.localStateWrite === localWrite &&
+      item.readOnlyOrDraft === (!requiresApproval && !localWrite)
+    );
+  });
 }
 
 function hasExactPackRegistry(value) {

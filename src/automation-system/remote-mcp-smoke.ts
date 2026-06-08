@@ -1,5 +1,5 @@
 import { redactSensitiveText } from "./ai-safety.ts";
-import { listJarvisMcpTools } from "./mcp-tools.ts";
+import { listJarvisMcpTools, localStateWriteToolNames } from "./mcp-tools.ts";
 
 export type RemoteMcpSmokeStatus = "ready" | "blocked";
 
@@ -42,6 +42,13 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
       hasExactManifestRegistry(manifestTools),
       "manifest-tool-registry",
       "Manifest exposes the exact Jarvis MCP tool registry."
+    )
+  );
+  checks.push(
+    check(
+      hasValidManifestToolMetadata(manifestTools, baseUrl),
+      "manifest-tool-metadata",
+      "Manifest tool entries expose POST URLs and policy flags matching the MCP registry."
     )
   );
   checks.push(check(manifest.body?.auth?.header === "Authorization: Bearer <JARVIS_WEB_TOKEN>", "auth-placeholder", "Manifest returns auth placeholder, not the token value."));
@@ -146,7 +153,7 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
     baseUrl,
     summary:
       status === "ready"
-        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, local write policy, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
+        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, manifest metadata, local write policy, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((item) => item.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -204,6 +211,34 @@ function hasExactManifestRegistry(value: unknown): boolean {
     value.map((item) => (item && typeof item === "object" ? (item as { name?: unknown }).name : null)),
     expectedToolNames()
   );
+}
+
+function hasValidManifestToolMetadata(value: unknown, baseUrl: string): boolean {
+  if (!Array.isArray(value) || value.length === 0) return false;
+  const approvalPolicy = new Map<string, boolean>(listJarvisMcpTools().map((tool) => [tool.name, tool.requiresApproval]));
+  const localWritePolicy = new Set<string>(localStateWriteToolNames);
+  return value.every((item) => {
+    if (!item || typeof item !== "object") return false;
+    const tool = item as {
+      name?: unknown;
+      method?: unknown;
+      url?: unknown;
+      approval?: { required?: unknown; field?: unknown };
+      localStateWrite?: unknown;
+      readOnlyOrDraft?: unknown;
+    };
+    if (typeof tool.name !== "string" || !approvalPolicy.has(tool.name)) return false;
+    const requiresApproval = approvalPolicy.get(tool.name);
+    const localWrite = localWritePolicy.has(tool.name);
+    return (
+      tool.method === "POST" &&
+      tool.url === `${baseUrl}/api/mcp/${tool.name}` &&
+      tool.approval?.required === requiresApproval &&
+      (requiresApproval ? tool.approval?.field === "approval.approved" : !("field" in (tool.approval ?? {}))) &&
+      tool.localStateWrite === localWrite &&
+      tool.readOnlyOrDraft === (!requiresApproval && !localWrite)
+    );
+  });
 }
 
 function hasExactPackRegistry(value: unknown): boolean {

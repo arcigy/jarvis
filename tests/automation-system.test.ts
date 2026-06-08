@@ -97,7 +97,7 @@ test("production readiness report returns blockers and next actions without secr
 
 test("remote MCP smoke checks every response for bearer token leaks", async () => {
   const token = "smoke-secret-token";
-  const tools = listJarvisMcpTools().map((tool) => ({ name: tool.name }));
+  const tools = remoteSmokeManifestToolsFixture();
   const fetchImpl = async (target: string | URL, init?: RequestInit) => {
     const url = String(target);
     if (url.endsWith("/.well-known/arcigy-jarvis.json")) {
@@ -149,7 +149,7 @@ test("remote MCP smoke checks every response for bearer token leaks", async () =
 
 test("remote MCP smoke requires valid quick-start URLs", async () => {
   const expectedNames = listJarvisMcpTools().map((tool) => tool.name);
-  const tools = expectedNames.map((name) => ({ name }));
+  const tools = remoteSmokeManifestToolsFixture();
   const fetchImpl = async (target: string | URL) => {
     const url = String(target);
     if (url.endsWith("/.well-known/arcigy-jarvis.json")) {
@@ -201,7 +201,7 @@ test("remote MCP smoke requires valid quick-start URLs", async () => {
 
 test("remote MCP smoke requires quick-start approval policy parity", async () => {
   const expectedNames = listJarvisMcpTools().map((tool) => tool.name);
-  const tools = expectedNames.map((name) => ({ name }));
+  const tools = remoteSmokeManifestToolsFixture();
   const fetchImpl = async (target: string | URL) => {
     const url = String(target);
     if (url.endsWith("/.well-known/arcigy-jarvis.json")) {
@@ -272,7 +272,7 @@ test("remote MCP smoke redacts secrets from fetch failures", async () => {
 });
 
 test("remote MCP smoke blocks generic secret patterns in response bodies", async () => {
-  const tools = listJarvisMcpTools().map((tool) => ({ name: tool.name }));
+  const tools = remoteSmokeManifestToolsFixture();
   const leakedGoogleKey = `AIza${"A".repeat(32)}`;
   const leakedDatabaseUrl = "postgresql://postgres:super-private@example.com:5432/db";
   const fetchImpl = async (target: string | URL) => {
@@ -324,9 +324,9 @@ test("remote MCP smoke blocks generic secret patterns in response bodies", async
 
 test("remote MCP smoke requires exact manifest and pack tool registries", async () => {
   const expectedNames = listJarvisMcpTools().map((tool) => tool.name);
-  const manifestTools = expectedNames.map((name, index) => ({
-    name: index === expectedNames.length - 1 ? "arcigy.unexpected_tool" : name,
-  }));
+  const manifestTools = remoteSmokeManifestToolsFixture().map((tool, index) =>
+    index === expectedNames.length - 1 ? { ...tool, name: "arcigy.unexpected_tool" } : tool
+  );
   const fetchImpl = async (target: string | URL) => {
     const url = String(target);
     if (url.endsWith("/.well-known/arcigy-jarvis.json")) {
@@ -375,8 +375,60 @@ test("remote MCP smoke requires exact manifest and pack tool registries", async 
   assert.ok(report.checks.some((check) => check.key === "pack-tool-registry" && check.status === "ready"));
 });
 
+test("remote MCP smoke requires valid manifest tool metadata", async () => {
+  const expectedNames = listJarvisMcpTools().map((tool) => tool.name);
+  const tools = remoteSmokeManifestToolsFixture().map((tool) =>
+    tool.name === "arcigy.generate_contract_documents" ? { ...tool, approval: { required: false }, readOnlyOrDraft: true } : tool
+  );
+  const fetchImpl = async (target: string | URL) => {
+    const url = String(target);
+    if (url.endsWith("/.well-known/arcigy-jarvis.json")) {
+      return responseJson({
+        tools,
+        auth: { header: "Authorization: Bearer <JARVIS_WEB_TOKEN>" },
+        toolPolicy: {
+          localStateWrite: ["arcigy.sync_gmail_recent_messages"],
+          readOnlyOrDraft: ["arcigy.generate_ai_reply"],
+        },
+      });
+    }
+    if (url.includes("/api/remote-mcp-pack")) {
+      return responseJson({
+        auth: { tokenValueReturned: false },
+        agentCompatibility: remoteAgentCompatibilityFixture(),
+        handoff: {
+          connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
+          requiredProof: [{ key: "manifest" }, { key: "connection-pack" }, { key: "remote-smoke" }],
+          agentFirstSteps: ["Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
+        },
+        tools: {
+          names: expectedNames,
+          localStateWrite: ["arcigy.sync_gmail_recent_messages"],
+          readOnlyOrDraft: ["arcigy.generate_ai_reply"],
+        },
+        quickStartCalls: remoteSmokeQuickStartFixture(),
+      });
+    }
+    if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
+    if (
+      url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
+      url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
+    ) {
+      return responseJson({ error: "approval required" }, 409);
+    }
+    return responseJson({ error: "unexpected URL" }, 404);
+  };
+
+  const report = await runRemoteMcpSmoke({ baseUrl: "https://jarvis.example", fetchImpl: fetchImpl as typeof fetch });
+
+  assert.equal(report.status, "blocked");
+  assert.ok(report.checks.some((check) => check.key === "manifest-tool-metadata" && check.status === "blocked"));
+  assert.ok(report.checks.some((check) => check.key === "manifest-tool-registry" && check.status === "ready"));
+});
+
 test("remote MCP smoke requires the handoff proof runbook", async () => {
-  const tools = listJarvisMcpTools().map((tool) => ({ name: tool.name }));
+  const tools = remoteSmokeManifestToolsFixture();
   const fetchImpl = async (target: string | URL) => {
     const url = String(target);
     if (url.endsWith("/.well-known/arcigy-jarvis.json")) {
@@ -440,7 +492,7 @@ test("remote MCP smoke requires the handoff proof runbook", async () => {
 });
 
 test("remote MCP smoke requires the contract draft quick-start", async () => {
-  const tools = listJarvisMcpTools().map((tool) => ({ name: tool.name }));
+  const tools = remoteSmokeManifestToolsFixture();
   const fetchImpl = async (target: string | URL) => {
     const url = String(target);
     if (url.endsWith("/.well-known/arcigy-jarvis.json")) {
@@ -505,7 +557,7 @@ test("remote MCP smoke requires the contract draft quick-start", async () => {
 
 test("remote MCP smoke requires the audit trail quick-start", async () => {
   const expectedNames = listJarvisMcpTools().map((tool) => tool.name);
-  const tools = expectedNames.map((name) => ({ name }));
+  const tools = remoteSmokeManifestToolsFixture();
   const fetchImpl = async (target: string | URL) => {
     const url = String(target);
     if (url.endsWith("/.well-known/arcigy-jarvis.json")) {
@@ -2150,6 +2202,21 @@ function remoteAgentCompatibilityFixture() {
     requiredBeforeWork: ["Run smokeTestUrl and require status=ready before using MCP tools."],
     safetyRules: ["Do not call approvalRequired tools without approval.", "Keep outputs family-friendly and secret-redacted."],
   };
+}
+
+function remoteSmokeManifestToolsFixture() {
+  const baseUrl = "https://jarvis.example";
+  return listJarvisMcpTools().map((tool) => {
+    const localWrite = localStateWriteToolNames.has(tool.name);
+    return {
+      ...tool,
+      approval: tool.requiresApproval ? { required: true, field: "approval.approved" } : { required: false },
+      localStateWrite: localWrite,
+      readOnlyOrDraft: !tool.requiresApproval && !localWrite,
+      method: "POST",
+      url: `${baseUrl}/api/mcp/${tool.name}`,
+    };
+  });
 }
 
 function remoteSmokeQuickStartFixture() {
