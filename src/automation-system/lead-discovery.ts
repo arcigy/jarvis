@@ -158,7 +158,8 @@ export async function appendRowsToGoogleSheet(
       }
       lastError = `Google Sheets append failed after account ${index + 1}/${accounts.length}: ${response.status}`;
     } catch (error) {
-      lastError = `Google Sheets append failed after account ${index + 1}/${accounts.length}: ${error instanceof Error ? error.message : String(error)}`;
+      const message = redactSensitiveText(error instanceof Error ? error.message : String(error));
+      lastError = `Google Sheets append failed after account ${index + 1}/${accounts.length}: ${message}`;
     }
     if (input.accountEnvKey) break;
   }

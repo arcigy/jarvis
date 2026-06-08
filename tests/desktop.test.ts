@@ -391,6 +391,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /check\.message = redactSensitiveText/);
   assert.match(main, /const message = redactSensitiveText\(error instanceof Error \? error\.message : String\(error\)\)/);
   assert.match(main, /async function refreshGoogleAccessToken[\s\S]+const message = redactSensitiveText\(error instanceof Error \? error\.message : String\(error\)\)[\s\S]+lastError = `\$\{new URL\(url\)\.hostname\}: \$\{message\}`/);
+  assert.match(main, /async function checkGoogleSheetsAccess[\s\S]+const message = redactSensitiveText\(error instanceof Error \? error\.message : String\(error\)\)[\s\S]+Google Sheets metadata request failed after account \$\{index \+ 1\}\/\$\{accounts\.length\}: \$\{message\}/);
+  assert.match(main, /async function appendLeadsToGoogleSheet[\s\S]+const message = redactSensitiveText\(error instanceof Error \? error\.message : String\(error\)\)[\s\S]+Google Sheets append failed after account \$\{index \+ 1\}\/\$\{accounts\.length\}: \$\{message\}/);
   assert.match(main, /message: redactSensitiveText\(error instanceof Error \? error\.message : String\(error\)\)/);
   assert.match(main, /const body = redactSensitiveText\(await response\.text\(\)\.catch\(\(\) => ""\)\)/);
   assert.match(main, /\{6,\}/);

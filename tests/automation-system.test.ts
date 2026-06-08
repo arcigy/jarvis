@@ -985,6 +985,43 @@ test("Google Sheets append falls back across configured OAuth accounts", async (
   assert.deepEqual(result, { updates: { updatedRows: 1 } });
 });
 
+test("Google Sheets append redacts secrets from transport errors", async () => {
+  const googleApiKey = `AI${"za"}Sy${"G".repeat(32)}`;
+  const providerKey = `${"f".repeat(8)}-${"e".repeat(4)}-${"d".repeat(4)}-${"c".repeat(4)}-${"b".repeat(12)}_ehpdn6s`;
+  const databaseUrl = "postgresql://postgres:private-pass@example.com:5432/jarvis";
+  const fetchImpl = async (url: string | URL | Request) => {
+    const target = String(url);
+    if (target.includes("oauth2.googleapis.com") || target.includes("www.googleapis.com/oauth2/v4/token")) {
+      return responseJson({ access_token: "access-token" });
+    }
+    throw new Error(`sheets transport failed ${googleApiKey} ${providerKey} ${databaseUrl}`);
+  };
+
+  await assert.rejects(
+    () =>
+      appendRowsToGoogleSheet(
+        { rows: [["ACME"]] },
+        {
+          GOOGLE_SHEET_ID: "sheet-id",
+          GOOGLE_CLIENT_ID: "client",
+          GOOGLE_CLIENT_SECRET: "secret",
+          GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP: "refresh",
+        },
+        fetchImpl as typeof fetch
+      ),
+    (error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      assert.equal(message.includes(googleApiKey), false);
+      assert.equal(message.includes(providerKey), false);
+      assert.equal(message.includes("private-pass"), false);
+      assert.match(message, /\[redacted-google-api-key\]/);
+      assert.match(message, /\[redacted-provider-key\]/);
+      assert.match(message, /postgresql:\/\/postgres:\[redacted\]@example\.com/);
+      return true;
+    }
+  );
+});
+
 test("lead discovery reports provider status and falls back when Serper credits are exhausted", async () => {
   const fetchImpl = async (url: string | URL | Request) => {
     const target = String(url);
