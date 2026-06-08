@@ -113,6 +113,7 @@ test("remote MCP smoke checks every response for bearer token leaks", async () =
     if (url.includes("/api/remote-mcp-pack")) {
       return responseJson({
         auth: { tokenValueReturned: false },
+        agentCompatibility: remoteAgentCompatibilityFixture(),
         handoff: {
           connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
           requiredProof: [{ key: "manifest" }, { key: "connection-pack" }, { key: "remote-smoke" }],
@@ -206,6 +207,7 @@ test("remote MCP smoke requires the handoff proof runbook", async () => {
     if (url.includes("/api/remote-mcp-pack")) {
       return responseJson({
         auth: { tokenValueReturned: false },
+        agentCompatibility: remoteAgentCompatibilityFixture(),
         tools: {
           localStateWrite: ["arcigy.sync_gmail_recent_messages"],
           readOnlyOrDraft: ["arcigy.generate_ai_reply"],
@@ -269,6 +271,7 @@ test("remote MCP smoke requires the contract draft quick-start", async () => {
     if (url.includes("/api/remote-mcp-pack")) {
       return responseJson({
         auth: { tokenValueReturned: false },
+        agentCompatibility: remoteAgentCompatibilityFixture(),
         handoff: {
           connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
           requiredProof: [{ key: "manifest" }, { key: "connection-pack" }, { key: "remote-smoke" }],
@@ -355,6 +358,11 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.readiness?.attentionQueue.some((item) => item.key === "redis"));
   assert.ok(pack.readiness?.launchChecklist.some((item) => item.id === "mcp-registry" && item.status === "ready"));
   assert.ok(pack.readiness?.fixGuide.some((step) => step.id === "redis-real-password"));
+  assert.deepEqual(pack.agentCompatibility.supportedAgents.slice(0, 3), ["Claude", "ChatGPT", "Grok"]);
+  assert.equal(pack.agentCompatibility.protocol, "HTTP JSON MCP bridge");
+  assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("status=ready")));
+  assert.ok(pack.agentCompatibility.safetyRules.some((rule) => rule.includes("family-friendly")));
+  assert.ok(pack.agentCompatibility.safetyRules.some((rule) => rule.includes("approvalRequired")));
   assert.equal(JSON.stringify(pack).includes("PASSWORD"), false);
 });
 
@@ -1899,6 +1907,14 @@ function responseJson(value: unknown, status = 200): Response {
     status,
     json: async () => value,
   } as Response;
+}
+
+function remoteAgentCompatibilityFixture() {
+  return {
+    supportedAgents: ["Claude", "ChatGPT", "Grok"],
+    requiredBeforeWork: ["Run smokeTestUrl and require status=ready before using MCP tools."],
+    safetyRules: ["Do not call approvalRequired tools without approval.", "Keep outputs family-friendly and secret-redacted."],
+  };
 }
 
 async function startTcpServer(onConnection?: (socket: Socket) => void) {

@@ -824,6 +824,9 @@ function buildRemoteAgentPrompt(pack) {
     .map((item) => `- ${item.key}: ${item.url} => ${item.expected}`)
     .join("\n");
   const agentFirstSteps = (pack.handoff?.agentFirstSteps ?? []).map((step) => `- ${step}`).join("\n");
+  const compatibility = pack.agentCompatibility;
+  const supportedAgents = (compatibility?.supportedAgents ?? []).join(", ");
+  const safetyRules = (compatibility?.safetyRules ?? []).map((rule) => `- ${rule}`).join("\n");
   const quickStart = (pack.quickStartCalls ?? [])
     .map((call) => `- ${call.label}: ${call.tool} ${JSON.stringify(call.body)}`)
     .join("\n");
@@ -836,10 +839,13 @@ function buildRemoteAgentPrompt(pack) {
     `Tools: ${pack.tools?.count ?? 0}`,
     `Approval required: ${approvalTools.join(", ") || "none"}`,
     `Local memory writes: ${localWriteTools.join(", ") || "none"}`,
+    supportedAgents ? `Supported agents: ${supportedAgents}` : "",
+    compatibility?.protocol ? `Protocol: ${compatibility.protocol}` : "",
     `Secure tunnel: ${pack.tunnel?.secureCommand ?? "npm run web:tunnel:secure"}`,
     `Smoke test: ${pack.smokeTestUrl ?? "--"}`,
     proof ? `Required proof:\n${proof}` : "",
     agentFirstSteps ? `Agent first steps:\n${agentFirstSteps}` : "",
+    safetyRules ? `Safety rules:\n${safetyRules}` : "",
     "Rule: never call approval-required tools without explicit operator confirmation.",
     "Rule: treat local memory write tools as persistent local state changes; preview Gmail with dryRun: true first.",
     "Start with arcigy.get_operator_briefing, then use read-only tools before proposing any write action.",

@@ -79,6 +79,13 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
   );
   checks.push(
     check(
+      hasAgentCompatibility(pack.body?.agentCompatibility),
+      "pack-agent-compatibility",
+      "Connection pack names Claude, ChatGPT, Grok, required proof, and safety rules."
+    )
+  );
+  checks.push(
+    check(
       hasClientMemoryQuickStarts(pack.body?.quickStartCalls),
       "pack-client-memory-quick-start",
       "Connection pack includes read-only client identity and open-need quick-start calls."
@@ -102,7 +109,7 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
     baseUrl,
     summary:
       status === "ready"
-        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, local write policy, contract draft, contract quick-start, client memory quick-start, handoff proof, read-only call, approval gate, and secret policy passed.`
+        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, local write policy, contract draft, contract quick-start, client memory quick-start, agent compatibility, handoff proof, read-only call, approval gate, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((item) => item.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -165,6 +172,20 @@ function hasHandoffProof(value: unknown, baseUrl: string): boolean {
     proofKeys.has("remote-smoke") &&
     agentFirstSteps.some((step) => typeof step === "string" && step.includes("arcigy.get_operator_briefing")) &&
     agentFirstSteps.some((step) => typeof step === "string" && step.includes("status=ready"))
+  );
+}
+
+function hasAgentCompatibility(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const compatibility = value as { supportedAgents?: unknown; requiredBeforeWork?: unknown; safetyRules?: unknown };
+  const agents = Array.isArray(compatibility.supportedAgents) ? compatibility.supportedAgents : [];
+  const requiredBeforeWork = Array.isArray(compatibility.requiredBeforeWork) ? compatibility.requiredBeforeWork : [];
+  const safetyRules = Array.isArray(compatibility.safetyRules) ? compatibility.safetyRules : [];
+  return (
+    ["Claude", "ChatGPT", "Grok"].every((agent) => agents.includes(agent)) &&
+    requiredBeforeWork.some((step) => typeof step === "string" && step.includes("status=ready")) &&
+    safetyRules.some((rule) => typeof rule === "string" && rule.includes("approvalRequired")) &&
+    safetyRules.some((rule) => typeof rule === "string" && rule.includes("family-friendly"))
   );
 }
 

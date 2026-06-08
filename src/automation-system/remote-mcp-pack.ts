@@ -67,6 +67,13 @@ export type RemoteMcpConnectionPack = {
     requiredPayload: { approval: { approved: true } };
     rule: string;
   };
+  agentCompatibility: {
+    supportedAgents: string[];
+    protocol: "HTTP JSON MCP bridge";
+    authentication: "Authorization bearer header";
+    requiredBeforeWork: string[];
+    safetyRules: string[];
+  };
   limits: {
     maxJsonBytes: number;
     pathPolicy: "repo-only";
@@ -133,6 +140,7 @@ export async function buildRemoteMcpConnectionPack(
       requiredPayload: { approval: { approved: true } },
       rule: "Never call approval-required tools until the operator explicitly confirms the exact action.",
     },
+    agentCompatibility: buildAgentCompatibility(),
     limits: {
       maxJsonBytes: input.maxJsonBytes ?? 1_000_000,
       pathPolicy: "repo-only",
@@ -158,6 +166,22 @@ export async function buildRemoteMcpConnectionPack(
       "Treat generate_contract_documents, approve_prepared_outreach_reply, and append_leads_to_google_sheet as approval-gated actions.",
       "Treat localStateWrite tools as local memory writes. Prefer dryRun: true for sync_gmail_recent_messages before ingesting messages.",
       "Use get_operator_briefing for a Jarvis-style daily status before making recommendations.",
+    ],
+  };
+}
+
+function buildAgentCompatibility(): RemoteMcpConnectionPack["agentCompatibility"] {
+  return {
+    supportedAgents: ["Claude", "ChatGPT", "Grok", "xAI-compatible HTTP agents", "generic MCP-capable HTTP agents"],
+    protocol: "HTTP JSON MCP bridge",
+    authentication: "Authorization bearer header",
+    requiredBeforeWork: ["Fetch manifestUrl.", "Fetch handoff.connectionPackUrl.", "Run smokeTestUrl and require status=ready."],
+    safetyRules: [
+      "Never request, print, store, or infer the real bearer token from this pack.",
+      "Start with read-only or draft tools before proposing any write action.",
+      "Use dryRun: true before Gmail sync writes.",
+      "Do not call approvalRequired tools until the operator confirms the exact payload.",
+      "Keep outputs family-friendly, client-safe, and secret-redacted.",
     ],
   };
 }

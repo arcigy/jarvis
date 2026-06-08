@@ -613,6 +613,7 @@ async function getRemoteMcpPack(payload = {}) {
       requiredPayload: { approval: { approved: true } },
       rule: "Never call approval-required tools until the operator explicitly confirms the exact action.",
     },
+    agentCompatibility: buildRemoteMcpAgentCompatibility(),
     limits: {
       maxJsonBytes: getMaxJsonBytes(),
       pathPolicy: "repo-only",
@@ -638,6 +639,22 @@ async function getRemoteMcpPack(payload = {}) {
       "Treat generate_contract_documents, approve_prepared_outreach_reply, and append_leads_to_google_sheet as approval-gated actions.",
       "Treat localStateWrite tools as local memory writes. Prefer dryRun: true for sync_gmail_recent_messages before ingesting messages.",
       "Use get_operator_briefing for a Jarvis-style daily status before making recommendations.",
+    ],
+  };
+}
+
+function buildRemoteMcpAgentCompatibility() {
+  return {
+    supportedAgents: ["Claude", "ChatGPT", "Grok", "xAI-compatible HTTP agents", "generic MCP-capable HTTP agents"],
+    protocol: "HTTP JSON MCP bridge",
+    authentication: "Authorization bearer header",
+    requiredBeforeWork: ["Fetch manifestUrl.", "Fetch handoff.connectionPackUrl.", "Run smokeTestUrl and require status=ready."],
+    safetyRules: [
+      "Never request, print, store, or infer the real bearer token from this pack.",
+      "Start with read-only or draft tools before proposing any write action.",
+      "Use dryRun: true before Gmail sync writes.",
+      "Do not call approvalRequired tools until the operator confirms the exact payload.",
+      "Keep outputs family-friendly, client-safe, and secret-redacted.",
     ],
   };
 }
@@ -885,6 +902,13 @@ async function runRemoteMcpSmoke(payload = {}) {
   );
   checks.push(
     smokeCheck(
+      hasAgentCompatibility(pack.body?.agentCompatibility),
+      "pack-agent-compatibility",
+      "Connection pack names Claude, ChatGPT, Grok, required proof, and safety rules."
+    )
+  );
+  checks.push(
+    smokeCheck(
       hasClientMemoryQuickStarts(pack.body?.quickStartCalls),
       "pack-client-memory-quick-start",
       "Connection pack includes read-only client identity and open-need quick-start calls."
@@ -906,7 +930,7 @@ async function runRemoteMcpSmoke(payload = {}) {
     baseUrl,
     summary:
       status === "ready"
-        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, local write policy, contract draft, contract quick-start, client memory quick-start, handoff proof, read-only call, approval gate, and secret policy passed.`
+        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, local write policy, contract draft, contract quick-start, client memory quick-start, agent compatibility, handoff proof, read-only call, approval gate, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((check) => check.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -962,6 +986,19 @@ function hasHandoffProof(value, baseUrl) {
     proofKeys.has("remote-smoke") &&
     agentFirstSteps.some((step) => typeof step === "string" && step.includes("arcigy.get_operator_briefing")) &&
     agentFirstSteps.some((step) => typeof step === "string" && step.includes("status=ready"))
+  );
+}
+
+function hasAgentCompatibility(value) {
+  if (!value || typeof value !== "object") return false;
+  const agents = Array.isArray(value.supportedAgents) ? value.supportedAgents : [];
+  const requiredBeforeWork = Array.isArray(value.requiredBeforeWork) ? value.requiredBeforeWork : [];
+  const safetyRules = Array.isArray(value.safetyRules) ? value.safetyRules : [];
+  return (
+    ["Claude", "ChatGPT", "Grok"].every((agent) => agents.includes(agent)) &&
+    requiredBeforeWork.some((step) => typeof step === "string" && step.includes("status=ready")) &&
+    safetyRules.some((rule) => typeof rule === "string" && rule.includes("approvalRequired")) &&
+    safetyRules.some((rule) => typeof rule === "string" && rule.includes("family-friendly"))
   );
 }
 

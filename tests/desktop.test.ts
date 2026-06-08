@@ -147,6 +147,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /renderRemoteMcpSmoke/);
   assert.match(renderer, /buildRemoteAgentPrompt/);
   assert.match(renderer, /Quick-start calls/);
+  assert.match(renderer, /Supported agents:/);
+  assert.match(renderer, /Safety rules:/);
   assert.match(renderer, /copyRemotePack/);
   assert.match(renderer, /writeClipboardText/);
   assert.match(renderer, /const copied = document\.execCommand\("copy"\)/);
@@ -309,6 +311,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /Preview Gmail without local writes/);
   assert.match(main, /dryRun: true/);
   assert.match(main, /buildRemoteMcpQuickStartCalls/);
+  assert.match(main, /buildRemoteMcpAgentCompatibility/);
+  assert.match(main, /"Claude", "ChatGPT", "Grok"/);
+  assert.match(main, /family-friendly, client-safe, and secret-redacted/);
   assert.match(main, /buildRemoteMcpHandoffRunbook/);
   assert.match(main, /connectionPackUrl/);
   assert.match(main, /Identify a client by email and open needs/);
