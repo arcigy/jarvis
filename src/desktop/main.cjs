@@ -107,7 +107,7 @@ async function handleVoiceEvent(payload) {
   }
 
   if (lowered.includes("briefing") || lowered.includes("prehlad") || lowered.includes("prehľad") || lowered.includes("co sa deje") || lowered.includes("čo sa deje")) {
-    return voiceDone(session, text, getOperatorBriefing({ ...payload, text }).speechText);
+    return voiceDone(session, text, (await getOperatorBriefing({ ...payload, text })).speechText);
   }
 
   if (lowered.includes("cold") || lowered.includes("outreach")) {
@@ -892,7 +892,7 @@ function approvePreparedOutreachReply(payload = {}) {
   return JSON.parse(result.stdout);
 }
 
-function getOperatorBriefing(payload = {}) {
+async function getOperatorBriefing(payload = {}) {
   const period = resolveColdOutreachPeriod(String(payload?.text ?? payload?.periodLabel ?? ""));
   const coldResult = runPython([
     "scripts/jarvis_local_db.py",
@@ -910,14 +910,26 @@ function getOperatorBriefing(payload = {}) {
   const clientNeeds = getClientNeedAlerts({ dbPath: payload?.dbPath || defaultDbPath, status: "new", limit: 10 });
   const preparedReplies = getPreparedOutreachReplies({ dbPath: payload?.dbPath || defaultDbPath, status: "pending", limit: 10 });
   const readiness = getProductionReadiness({ live: payload?.live === true, dbPath: payload?.dbPath || defaultDbPath });
+  const coldOutreachSummary = await getOperatorColdOutreachSummary(payload?.live === true, String(payload?.periodLabel || period.periodLabel), cold.summary);
   return buildOperatorBriefing({
     readinessStatus: readiness.status,
     readinessSummary: readiness.summary,
-    coldOutreachSummary: cold.summary,
+    coldOutreachSummary,
     openClientNeedCount: Number(clientNeeds.count || 0),
     preparedReplyCount: Number(preparedReplies.count || 0),
     nextActions: readiness.nextActions || [],
   });
+}
+
+async function getOperatorColdOutreachSummary(live, periodLabel, localSummary) {
+  if (!live) return localSummary;
+  try {
+    const smartlead = await getSmartleadOutreachBrief({ periodLabel, maxCampaigns: 10 });
+    return smartlead.summary;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return `${localSummary} Live Smartlead summary unavailable: ${message}`;
+  }
 }
 
 function buildOperatorBriefing(input) {

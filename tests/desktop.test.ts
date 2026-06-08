@@ -134,6 +134,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /renderReadinessReport/);
   assert.match(renderer, /renderOperatorBriefing/);
   assert.match(renderer, /refreshOperatorBriefing/);
+  assert.match(renderer, /live: true/);
+  assert.match(renderer, /Building live operator briefing/);
   assert.match(renderer, /startOperatorBriefingWatch/);
   assert.match(renderer, /operatorBriefingPollMs: 300000/);
   assert.match(renderer, /Fix guide/);
@@ -207,6 +209,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /summarizeIdentityForVoice/);
   assert.match(main, /summarizeLeadsForVoice/);
   assert.match(main, /getOperatorBriefing/);
+  assert.match(main, /getOperatorColdOutreachSummary/);
   assert.match(main, /cleanVoiceQuery/);
   assert.match(main, /ipcMain\.handle\("jarvis:systemHealth"/);
   assert.match(main, /ipcMain\.handle\("jarvis:generateAiReply"/);

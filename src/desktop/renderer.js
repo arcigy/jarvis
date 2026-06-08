@@ -263,9 +263,9 @@ function renderOperatorBriefing(briefing) {
     .join("\n");
 }
 
-async function refreshOperatorBriefing({ speakResult = false, loadingText = null } = {}) {
+async function refreshOperatorBriefing({ speakResult = false, loadingText = null, live = false } = {}) {
   if (loadingText) elements.commandTimeline.textContent = loadingText;
-  const briefing = await arcigyApi.operatorBriefing({ periodLabel: "poslednych 7 dni" });
+  const briefing = await arcigyApi.operatorBriefing({ periodLabel: "poslednych 7 dni", live });
   elements.commandTimeline.textContent = briefing.sections?.nextAction ?? briefing.summary;
   elements.response.textContent = renderOperatorBriefing(briefing);
   if (speakResult) speak(briefing.speechText ?? briefing.summary);
@@ -1010,7 +1010,7 @@ elements.readinessReport.addEventListener("click", async () => {
 });
 elements.operatorBriefing.addEventListener("click", async () => {
   try {
-    await refreshOperatorBriefing({ speakResult: true, loadingText: "Building operator briefing..." });
+    await refreshOperatorBriefing({ speakResult: true, loadingText: "Building live operator briefing...", live: true });
   } catch (error) {
     elements.commandTimeline.textContent = error instanceof Error ? error.message : String(error);
   }

@@ -542,15 +542,16 @@ export function createJarvisMcpServer(): McpServer {
     async ({ dbPath, since, until, periodLabel, live }) => {
       const now = new Date();
       const defaultSince = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
-      const cold = runDbCommand("cold-brief", { since: since ?? defaultSince, until: until ?? now.toISOString(), periodLabel }, dbPath);
+      const localCold = runDbCommand("cold-brief", { since: since ?? defaultSince, until: until ?? now.toISOString(), periodLabel }, dbPath);
       const clientNeeds = runDbCommand("list-open-needs", { status: "new", limit: 10 }, dbPath);
       const preparedReplies = runDbCommand("list-prepared-replies", { status: "pending", limit: 10 }, dbPath);
       const readiness = await buildProductionReadinessReport({ live, dbPath });
+      const coldOutreachSummary = await getOperatorColdOutreachSummary(live, periodLabel, localCold.summary);
       return jsonResult(
         buildOperatorBriefing({
           readinessStatus: readiness.status,
           readinessSummary: readiness.summary,
-          coldOutreachSummary: cold.summary,
+          coldOutreachSummary,
           openClientNeedCount: Number(clientNeeds.count ?? 0),
           preparedReplyCount: Number(preparedReplies.count ?? 0),
           nextActions: readiness.nextActions,
@@ -819,6 +820,17 @@ function runDbCommand(
   }
   const result = runPython(args);
   return JSON.parse(result.stdout);
+}
+
+async function getOperatorColdOutreachSummary(live: boolean, periodLabel: string, localSummary: string): Promise<string> {
+  if (!live) return localSummary;
+  try {
+    const smartlead = await getSmartleadOutreachBrief({ periodLabel, maxCampaigns: 10 });
+    return smartlead.summary;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return `${localSummary} Live Smartlead summary unavailable: ${message}`;
+  }
 }
 
 function textResult(text: string) {

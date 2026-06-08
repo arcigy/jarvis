@@ -765,14 +765,26 @@ async function getOperatorBriefing(payload: Record<string, unknown>) {
   const clientNeeds = getClientNeedAlerts({ dbPath, status: "new", limit: 10 });
   const preparedReplies = runDbTool("list-prepared-replies", { dbPath, status: "pending", limit: 10 });
   const readiness = await buildProductionReadinessReport({ live: payload.live === true, dbPath });
+  const coldOutreachSummary = await getOperatorColdOutreachSummary(payload.live === true, String(payload.periodLabel ?? period.periodLabel), cold.summary);
   return buildOperatorBriefing({
     readinessStatus: readiness.status,
     readinessSummary: readiness.summary,
-    coldOutreachSummary: cold.summary,
+    coldOutreachSummary,
     openClientNeedCount: Number(clientNeeds.count ?? 0),
     preparedReplyCount: Number(preparedReplies.count ?? 0),
     nextActions: readiness.nextActions,
   });
+}
+
+async function getOperatorColdOutreachSummary(live: boolean, periodLabel: string, localSummary: string): Promise<string> {
+  if (!live) return localSummary;
+  try {
+    const smartlead = await getSmartleadOutreachBrief({ periodLabel, maxCampaigns: 10 });
+    return smartlead.summary;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return `${localSummary} Live Smartlead summary unavailable: ${message}`;
+  }
 }
 
 function serveStatic(pathname: string, response: ServerResponse, headOnly: boolean) {
