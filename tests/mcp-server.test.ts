@@ -31,6 +31,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(names.includes("arcigy.get_cold_outreach_brief_from_db"));
   assert.ok(names.includes("arcigy.add_cold_outreach_event"));
   assert.ok(names.includes("arcigy.get_prepared_outreach_replies"));
+  assert.ok(names.includes("arcigy.get_approval_queue"));
   assert.ok(names.includes("arcigy.prepare_positive_outreach_reply"));
   assert.ok(names.includes("arcigy.approve_prepared_outreach_reply"));
   assert.ok(names.includes("arcigy.send_approved_outreach_reply"));
@@ -284,6 +285,14 @@ test("Jarvis MCP server persists and identifies local people through SQLite tool
   const alertBody = getStructuredResult(alerts) as { count: number; alerts: Array<{ person: { primaryEmail: string } }> };
   assert.equal(alertBody.count, 1);
   assert.equal(alertBody.alerts[0].person.primaryEmail, "founder@example.com");
+
+  const queue = await client.callTool({
+    name: "arcigy.get_approval_queue",
+    arguments: { dbPath, limit: 5 },
+  });
+  const queueBody = getStructuredResult(queue) as { count: number; items: Array<{ approvalTool: string }> };
+  assert.equal(queueBody.count, 1);
+  assert.equal(queueBody.items[0].approvalTool, "arcigy.update_client_need_status");
 
   assertToolError(
     await client.callTool({

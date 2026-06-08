@@ -363,6 +363,68 @@ def list_prepared_replies(db_path: Path, payload: dict[str, Any]) -> dict[str, A
     }
 
 
+def list_approval_queue(db_path: Path, payload: dict[str, Any]) -> dict[str, Any]:
+    init_db(db_path)
+    limit = max(1, min(int(payload.get("limit", 20)), 50))
+    reply_limit = max(1, min(limit, 25))
+    need_limit = max(1, min(limit, 25))
+    prepared = list_prepared_replies(db_path, {"status": "pending", "limit": reply_limit})
+    needs = list_open_needs(db_path, {"status": "new", "limit": need_limit})
+    items: list[dict[str, Any]] = []
+
+    for reply in prepared.get("replies", []):
+        items.append(
+            {
+                "id": f"prepared_reply:{reply['id']}",
+                "type": "prepared_outreach_reply",
+                "priority": "high",
+                "title": f"Send prepared reply to {reply['leadEmail']}",
+                "summary": compact_text(reply.get("positiveSignal") or reply.get("replyText") or "Prepared outreach reply waits for approval.", 220),
+                "approvalTool": "arcigy.send_approved_outreach_reply",
+                "approvalPayload": {
+                    "preparedEventId": reply["id"],
+                    "approval": {"approved": True},
+                },
+                "source": reply,
+            }
+        )
+
+    for alert in needs.get("alerts", []):
+        person = alert.get("person") or {}
+        need = alert.get("needSignal") or {}
+        name = person.get("displayName") or person.get("companyName") or person.get("primaryEmail") or "client"
+        items.append(
+            {
+                "id": f"client_need:{need.get('id')}",
+                "type": "client_need_status",
+                "priority": "normal",
+                "title": f"Resolve or ignore client request from {name}",
+                "summary": compact_text(need.get("summary") or "Open client request waits for operator decision.", 220),
+                "approvalTool": "arcigy.update_client_need_status",
+                "approvalPayload": {
+                    "needSignalId": need.get("id"),
+                    "status": "resolved",
+                    "approval": {"approved": True},
+                },
+                "alternateApprovalPayloads": [
+                    {
+                        "needSignalId": need.get("id"),
+                        "status": "ignored",
+                        "approval": {"approved": True},
+                    }
+                ],
+                "source": alert,
+            }
+        )
+
+    items = items[:limit]
+    return {
+        "count": len(items),
+        "items": items,
+        "summary": build_approval_queue_summary(items),
+    }
+
+
 def approve_prepared_reply(db_path: Path, payload: dict[str, Any]) -> dict[str, Any]:
     init_db(db_path)
     prepared_id = required(payload, "preparedEventId")
@@ -768,6 +830,20 @@ def build_prepared_replies_summary(replies: list[dict[str, Any]]) -> str:
     return f"Jarvis: Caka {prepared_reply_label(len(replies))} na schvalenie. Najnovsia je pre {first['leadEmail']}."
 
 
+def build_approval_queue_summary(items: list[dict[str, Any]]) -> str:
+    if not items:
+        return "Jarvis: Approval queue je prazdna. Nic necaka na tvoje potvrdenie."
+    reply_count = sum(1 for item in items if item.get("type") == "prepared_outreach_reply")
+    need_count = sum(1 for item in items if item.get("type") == "client_need_status")
+    parts = []
+    if reply_count:
+        parts.append(f"{prepared_reply_label(reply_count)} caka na odoslanie")
+    if need_count:
+        parts.append(f"{need_count} klientskych poziadaviek caka na rozhodnutie")
+    first = items[0]
+    return f"Jarvis: Na tvoje potvrdenie caka {len(items)} veci: {', '.join(parts)}. Najblizsie: {first['title']}."
+
+
 def build_prepared_reply_status_summary(lead_email: str, status: str) -> str:
     if status == "sent":
         return f"Jarvis: Odpoved pre {lead_email} uz bola odoslana."
@@ -1046,6 +1122,7 @@ def main() -> None:
             "ingest-message",
             "list-open-needs",
             "update-need-status",
+            "list-approval-queue",
             "add-audit-event",
             "list-audit-events",
         ],
@@ -1078,6 +1155,8 @@ def main() -> None:
             result = list_open_needs(args.db, load_payload(args.payload))
         elif args.command == "update-need-status":
             result = update_need_status(args.db, load_payload(args.payload))
+        elif args.command == "list-approval-queue":
+            result = list_approval_queue(args.db, load_payload(args.payload))
         elif args.command == "add-audit-event":
             result = add_audit_event(args.db, load_payload(args.payload))
         elif args.command == "list-audit-events":

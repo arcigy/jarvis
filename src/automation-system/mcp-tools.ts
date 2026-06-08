@@ -10,6 +10,7 @@ export type JarvisMcpToolName =
   | "arcigy.add_cold_outreach_event"
   | "arcigy.prepare_positive_outreach_reply"
   | "arcigy.get_prepared_outreach_replies"
+  | "arcigy.get_approval_queue"
   | "arcigy.approve_prepared_outreach_reply"
   | "arcigy.send_approved_outreach_reply"
   | "arcigy.upsert_local_person"
@@ -95,6 +96,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.get_prepared_outreach_replies",
       description: "Vrati pripravene cold outreach odpovede cakajuce na schvalenie.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.get_approval_queue",
+      description: "Vrati jednotny Jarvis approval inbox s pripravenymi odpovedami a klientskymi rozhodnutiami cakajucimi na potvrdenie.",
       requiresApproval: false,
     },
     {

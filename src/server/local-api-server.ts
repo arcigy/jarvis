@@ -118,6 +118,12 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
     return;
   }
 
+  if (request.method === "POST" && url.pathname === "/api/approval-queue") {
+    const payload = await readJson(request);
+    writeJson(response, 200, runDbTool("list-approval-queue", payload));
+    return;
+  }
+
   if (request.method === "POST" && url.pathname === "/api/approve-prepared-outreach-reply") {
     const payload = await readJson(request);
     if ((payload.approval as { approved?: unknown } | undefined)?.approved !== true) {
@@ -480,6 +486,10 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
   }
   if (name === "arcigy.get_prepared_outreach_replies") {
     writeJson(response, 200, { result: runDbTool("list-prepared-replies", payload) });
+    return;
+  }
+  if (name === "arcigy.get_approval_queue") {
+    writeJson(response, 200, { result: runDbTool("list-approval-queue", payload) });
     return;
   }
   if (name === "arcigy.prepare_positive_outreach_reply") {

@@ -131,6 +131,7 @@ app.whenReady().then(() => {
   ipcMain.handle("jarvis:remoteMcpPack", (_event, payload) => getRemoteMcpPack(payload));
   ipcMain.handle("jarvis:remoteMcpSmoke", (_event, payload) => runRemoteMcpSmoke(payload));
   ipcMain.handle("jarvis:getPreparedOutreachReplies", (_event, payload) => getPreparedOutreachReplies(payload));
+  ipcMain.handle("jarvis:getApprovalQueue", (_event, payload) => getApprovalQueue(payload));
   ipcMain.handle("jarvis:preparePositiveOutreachReply", (_event, payload) => preparePositiveOutreachReply(payload));
   ipcMain.handle("jarvis:approvePreparedOutreachReply", (_event, payload) => approvePreparedOutreachReply(payload));
   ipcMain.handle("jarvis:sendApprovedOutreachReply", (_event, payload) => sendApprovedOutreachReply(payload));
@@ -841,6 +842,14 @@ function buildRemoteMcpQuickStartCalls(baseUrl) {
       approvalRequired: false,
     },
     {
+      label: "List operator approval queue",
+      tool: "arcigy.get_approval_queue",
+      method: "POST",
+      url: toolUrl("arcigy.get_approval_queue"),
+      body: { limit: 20 },
+      approvalRequired: false,
+    },
+    {
       label: "Identify a client by email and open needs",
       tool: "arcigy.identify_email",
       method: "POST",
@@ -1364,6 +1373,7 @@ function listWebMcpTools() {
     { name: "arcigy.add_cold_outreach_event", requiresApproval: false },
     { name: "arcigy.prepare_positive_outreach_reply", requiresApproval: false },
     { name: "arcigy.get_prepared_outreach_replies", requiresApproval: false },
+    { name: "arcigy.get_approval_queue", requiresApproval: false },
     { name: "arcigy.approve_prepared_outreach_reply", requiresApproval: true },
     { name: "arcigy.send_approved_outreach_reply", requiresApproval: true },
     { name: "arcigy.identify_email", requiresApproval: false },
@@ -1725,6 +1735,20 @@ function getPreparedOutreachReplies(payload = {}) {
       since: payload?.since,
       until: payload?.until,
       limit: payload?.limit || 10,
+    }),
+  ]);
+  return JSON.parse(result.stdout);
+}
+
+function getApprovalQueue(payload = {}) {
+  const result = runPython([
+    "scripts/jarvis_local_db.py",
+    "list-approval-queue",
+    "--db",
+    payload?.dbPath || defaultDbPath,
+    "--payload",
+    JSON.stringify({
+      limit: payload?.limit || 20,
     }),
   ]);
   return JSON.parse(result.stdout);

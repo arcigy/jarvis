@@ -63,12 +63,14 @@ The desktop MCP panel now runs an automatic preflight watch every two minutes. I
 - `arcigy.get_cold_outreach_brief_from_db`: computes Slovak cold outreach summary from SQLite events.
 - `arcigy.prepare_positive_outreach_reply`: uses Gemini to draft a reply for a positive cold outreach lead and stores it as a local `prepared_reply` waiting for approval.
 - `arcigy.get_prepared_outreach_replies`: returns prepared cold outreach replies waiting for approval.
+- `arcigy.get_approval_queue`: returns one read-only Jarvis approval inbox with prepared replies and client decisions waiting for operator confirmation.
 - `arcigy.approve_prepared_outreach_reply`: marks one prepared outreach reply as approved after explicit confirmation.
 - `arcigy.send_approved_outreach_reply`: sends an already-approved prepared outreach reply through Gmail after explicit confirmation and records `approved_reply_sent`.
 - `arcigy.upsert_local_person`: local client/lead/contact upsert into SQLite.
 - `arcigy.add_client_need_signal`: stores that a client needs something.
 - `arcigy.ingest_client_message`: stores a received email/message, identifies the sender, and returns a Jarvis alert when the message contains a request.
 - `arcigy.get_client_need_alerts`: returns the persistent inbox of open client requests Jarvis should proactively mention.
+- `arcigy.update_client_need_status`: marks a client request as `seen`, `resolved`, or `ignored` after explicit confirmation.
 - `arcigy.identify_email`: exact email/domain identity lookup with open need signals.
 - `arcigy.get_system_health`: checks runtime configuration without exposing secrets.
 - `arcigy.run_integration_diagnostics`: runs configured checks or explicit live read-only probes, including Postgres TCP and Redis PING.

@@ -60,6 +60,7 @@ const elements = {
   simulateWake: document.querySelector("#simulateWake"),
   submitTranscript: document.querySelector("#submitTranscript"),
   coldBrief: document.querySelector("#coldBrief"),
+  approvalQueue: document.querySelector("#approvalQueue"),
   preparedReplies: document.querySelector("#preparedReplies"),
   preparePositiveReply: document.querySelector("#preparePositiveReply"),
   approvePreparedReply: document.querySelector("#approvePreparedReply"),
@@ -163,6 +164,7 @@ const arcigyApi = window.arcigyDesktop ?? {
   startSecureTunnel: async () => ({ started: false, reason: "desktop-only" }),
   stopSecureTunnel: async () => ({ stopped: false, reason: "desktop-only" }),
   getPreparedOutreachReplies: (payload) => postJson("/api/prepared-outreach-replies", payload),
+  getApprovalQueue: (payload) => postJson("/api/approval-queue", payload),
   preparePositiveOutreachReply: (payload) => postJson("/api/mcp/arcigy.prepare_positive_outreach_reply", payload).then((value) => value.result),
   approvePreparedOutreachReply: (payload) => postJson("/api/approve-prepared-outreach-reply", payload),
   sendApprovedOutreachReply: (payload) => postJson("/api/mcp/arcigy.send_approved_outreach_reply", payload).then((value) => value.result),
@@ -651,6 +653,24 @@ function renderPreparedReplies(result) {
       ]
         .filter(Boolean)
         .join("\n")
+    ),
+  ].join("\n");
+}
+
+function renderApprovalQueue(result) {
+  const items = result.items ?? [];
+  if (!items.length) return result.summary ?? "Approval queue is empty.";
+  return [
+    result.summary ?? `Approval queue: ${items.length}`,
+    "",
+    ...items.slice(0, 10).map((item, index) =>
+      [
+        `${index + 1}. ${item.title ?? item.type}`,
+        `   Type: ${item.type ?? "-"}`,
+        `   Summary: ${item.summary ?? "-"}`,
+        `   Approval tool: ${item.approvalTool ?? "-"}`,
+        `   Payload: ${JSON.stringify(item.approvalPayload ?? {})}`,
+      ].join("\n")
     ),
   ].join("\n");
 }
@@ -1450,6 +1470,16 @@ elements.simulateWake.addEventListener("click", () => void handleTranscript("Jar
 elements.submitTranscript.addEventListener("click", () => void handleTranscript(elements.transcript.value));
 elements.coldBrief.addEventListener("click", async () => {
   speak(await arcigyApi.coldOutreachBrief({ text: "cold outreach za poslednych 7 dni" }));
+});
+elements.approvalQueue.addEventListener("click", async () => {
+  try {
+    elements.preparedReplyResult.textContent = "Loading approval queue...";
+    const result = await arcigyApi.getApprovalQueue({ limit: 20 });
+    elements.preparedReplyResult.textContent = renderApprovalQueue(result);
+    if (result.count > 0 && result.summary) speak(result.summary);
+  } catch (error) {
+    elements.preparedReplyResult.textContent = safeUiErrorText(error);
+  }
 });
 elements.preparedReplies.addEventListener("click", async () => {
   try {

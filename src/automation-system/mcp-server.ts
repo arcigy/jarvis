@@ -167,6 +167,25 @@ export function createJarvisMcpServer(): McpServer {
   );
 
   server.registerTool(
+    "arcigy.get_approval_queue",
+    {
+      title: "Get Jarvis approval queue",
+      description: "Return a single read-only approval inbox with prepared replies and client decisions waiting for operator confirmation.",
+      inputSchema: {
+        dbPath: z.string().optional(),
+        limit: z.number().int().min(1).max(50).default(20),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async ({ dbPath, ...payload }) => jsonDbTool("list-approval-queue", payload, dbPath)
+  );
+
+  server.registerTool(
     "arcigy.prepare_positive_outreach_reply",
     {
       title: "Prepare positive outreach reply",
@@ -964,6 +983,7 @@ function jsonDbTool(
     | "add-cold-event"
     | "cold-brief"
     | "list-prepared-replies"
+    | "list-approval-queue"
     | "approve-prepared-reply"
     | "get-prepared-reply"
     | "ingest-message"
@@ -984,6 +1004,7 @@ function runDbCommand(
     | "add-cold-event"
     | "cold-brief"
     | "list-prepared-replies"
+    | "list-approval-queue"
     | "approve-prepared-reply"
     | "get-prepared-reply"
     | "ingest-message"

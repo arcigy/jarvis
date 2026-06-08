@@ -90,6 +90,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /healthGrid/);
   assert.doesNotMatch(html, /<li>generate_contract_documents<\/li>/);
   assert.match(html, /draftReply/);
+  assert.match(html, /approvalQueue/);
   assert.match(html, /preparedReplies/);
   assert.match(html, /preparePositiveReply/);
   assert.match(html, /positiveLeadEmail/);
@@ -348,6 +349,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /\/api\/production-readiness/);
   assert.match(renderer, /\/api\/operator-briefing/);
   assert.match(renderer, /\/api\/prepared-outreach-replies/);
+  assert.match(renderer, /\/api\/approval-queue/);
   assert.match(renderer, /\/api\/approve-prepared-outreach-reply/);
   assert.match(renderer, /\/api\/mcp\/arcigy\.send_approved_outreach_reply/);
   assert.match(renderer, /\/api\/system-health/);
@@ -509,6 +511,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /pack-handoff-proof/);
   assert.match(main, /pack-client-memory-quick-start/);
   assert.match(main, /pack-audit-quick-start/);
+  assert.match(main, /List operator approval queue/);
   assert.match(main, /Draft contract intake JSON without writing files/);
   assert.match(main, /hasUsableContractQuickStart/);
   assert.match(main, /hasDraftContractIntakeQuickStart/);
@@ -661,6 +664,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(preload, /remoteMcpPack/);
   assert.match(preload, /remoteMcpSmoke/);
   assert.match(preload, /getPreparedOutreachReplies/);
+  assert.match(preload, /getApprovalQueue/);
   assert.match(preload, /preparePositiveOutreachReply/);
   assert.match(preload, /approvePreparedOutreachReply/);
   assert.match(preload, /sendApprovedOutreachReply/);

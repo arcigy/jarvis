@@ -485,6 +485,16 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(clientAlertsBody.count, 1);
     assert.equal(clientAlertsBody.alerts[0].person.primaryEmail, "client@example.com");
 
+    const approvalQueue = await fetch(`${baseUrl}/api/approval-queue`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ dbPath, limit: 5 }),
+    });
+    assert.equal(approvalQueue.status, 200);
+    const approvalQueueBody = (await approvalQueue.json()) as { count: number; items: Array<{ approvalTool: string }> };
+    assert.equal(approvalQueueBody.count, 1);
+    assert.equal(approvalQueueBody.items[0].approvalTool, "arcigy.update_client_need_status");
+
     const memoryOperatorBriefing = await fetch(`${baseUrl}/api/operator-briefing`, {
       method: "POST",
       headers: { "content-type": "application/json" },

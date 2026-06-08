@@ -43,6 +43,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.add_cold_outreach_event",
     "arcigy.prepare_positive_outreach_reply",
     "arcigy.get_prepared_outreach_replies",
+    "arcigy.get_approval_queue",
     "arcigy.approve_prepared_outreach_reply",
     "arcigy.send_approved_outreach_reply",
     "arcigy.identify_email",
@@ -2184,6 +2185,58 @@ test("local SQLite CLI updates client need status", () => {
   assert.equal(updated.needSignal.data.statusUpdate.updatedBy, "test");
   assert.equal(open.count, 0);
   assert.equal(resolved.count, 1);
+});
+
+test("local SQLite CLI returns a unified approval queue", () => {
+  const dir = mkdtempSync(join(tmpdir(), "jarvis-approval-queue-db-"));
+  const dbPath = join(dir, "jarvis.db");
+  const python = process.env.JARVIS_PYTHON || "python";
+
+  runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "add-cold-event",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify({
+      leadEmail: "lead@example.com",
+      eventType: "prepared_reply",
+      occurredAt: "2026-06-07T10:00:00Z",
+      data: {
+        replyText: "Rad si dohodnem kratky call.",
+        positiveSignal: "Lead chce call.",
+      },
+    }),
+  ]);
+  runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "ingest-message",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify({
+      fromEmail: "client@example.com",
+      source: "email",
+      subject: "Request",
+      text: "Potrebujem upravit onboarding automatizaciu.",
+      occurredAt: "2026-06-07T10:05:00Z",
+    }),
+  ]);
+
+  const queue = runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "list-approval-queue",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify({ limit: 10 }),
+  ]);
+  const tools = queue.items.map((item: { approvalTool: string }) => item.approvalTool);
+
+  assert.equal(queue.count, 2);
+  assert.ok(tools.includes("arcigy.send_approved_outreach_reply"));
+  assert.ok(tools.includes("arcigy.update_client_need_status"));
+  assert.match(queue.summary, /Na tvoje potvrdenie/);
 });
 
 test("local SQLite CLI summarizes cold outreach events by period", () => {

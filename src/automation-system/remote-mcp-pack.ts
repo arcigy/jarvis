@@ -268,6 +268,14 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "List operator approval queue",
+      tool: "arcigy.get_approval_queue",
+      method: "POST",
+      url: toolUrl("arcigy.get_approval_queue"),
+      body: { limit: 20 },
+      approvalRequired: false,
+    },
+    {
       label: "Identify a client by email and open needs",
       tool: "arcigy.identify_email",
       method: "POST",
