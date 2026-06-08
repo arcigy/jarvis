@@ -113,6 +113,7 @@ test("remote MCP smoke checks every response for bearer token leaks", async () =
     if (url.includes("/api/remote-mcp-pack")) {
       return responseJson({
         auth: { tokenValueReturned: false },
+        limits: remoteSmokePackLimitsFixture(),
         agentCompatibility: remoteAgentCompatibilityFixture(),
         handoff: {
           connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
@@ -165,6 +166,7 @@ test("remote MCP smoke requires valid quick-start URLs", async () => {
     if (url.includes("/api/remote-mcp-pack")) {
       return responseJson({
         auth: { tokenValueReturned: false },
+        limits: remoteSmokePackLimitsFixture(),
         agentCompatibility: remoteAgentCompatibilityFixture(),
         handoff: {
           connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
@@ -217,6 +219,7 @@ test("remote MCP smoke requires quick-start approval policy parity", async () =>
     if (url.includes("/api/remote-mcp-pack")) {
       return responseJson({
         auth: { tokenValueReturned: false },
+        limits: remoteSmokePackLimitsFixture(),
         agentCompatibility: remoteAgentCompatibilityFixture(),
         handoff: {
           connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
@@ -290,6 +293,7 @@ test("remote MCP smoke blocks generic secret patterns in response bodies", async
     if (url.includes("/api/remote-mcp-pack")) {
       return responseJson({
         auth: { tokenValueReturned: false },
+        limits: remoteSmokePackLimitsFixture(),
         leakedGoogleKey,
         leakedDatabaseUrl,
         agentCompatibility: remoteAgentCompatibilityFixture(),
@@ -342,6 +346,7 @@ test("remote MCP smoke requires exact manifest and pack tool registries", async 
     if (url.includes("/api/remote-mcp-pack")) {
       return responseJson({
         auth: { tokenValueReturned: false },
+        limits: remoteSmokePackLimitsFixture(),
         agentCompatibility: remoteAgentCompatibilityFixture(),
         handoff: {
           connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
@@ -395,6 +400,7 @@ test("remote MCP smoke requires valid manifest tool metadata", async () => {
     if (url.includes("/api/remote-mcp-pack")) {
       return responseJson({
         auth: { tokenValueReturned: false },
+        limits: remoteSmokePackLimitsFixture(),
         agentCompatibility: remoteAgentCompatibilityFixture(),
         handoff: {
           connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
@@ -444,6 +450,7 @@ test("remote MCP smoke requires exact manifest and pack tool policies", async ()
     if (url.includes("/api/remote-mcp-pack")) {
       return responseJson({
         auth: { tokenValueReturned: false },
+        limits: remoteSmokePackLimitsFixture(),
         agentCompatibility: remoteAgentCompatibilityFixture(),
         handoff: {
           connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
@@ -477,6 +484,58 @@ test("remote MCP smoke requires exact manifest and pack tool policies", async ()
   assert.ok(report.checks.some((check) => check.key === "pack-local-write-policy" && check.status === "blocked"));
 });
 
+test("remote MCP smoke requires guarded connection pack limits", async () => {
+  const expectedNames = listJarvisMcpTools().map((tool) => tool.name);
+  const fetchImpl = async (target: string | URL) => {
+    const url = String(target);
+    if (url.endsWith("/.well-known/arcigy-jarvis.json")) {
+      return responseJson({
+        tools: remoteSmokeManifestToolsFixture(),
+        auth: { header: "Authorization: Bearer <JARVIS_WEB_TOKEN>" },
+        toolPolicy: {
+          approvalRequired: approvalRequiredToolNames(),
+          localStateWrite: localStateWriteToolNamesList(),
+          readOnlyOrDraft: readOnlyOrDraftToolNames(),
+        },
+      });
+    }
+    if (url.includes("/api/remote-mcp-pack")) {
+      return responseJson({
+        auth: { tokenValueReturned: false },
+        limits: { maxJsonBytes: 0, pathPolicy: "anywhere", writesRequireExplicitToolCall: false },
+        agentCompatibility: remoteAgentCompatibilityFixture(),
+        handoff: {
+          connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
+          requiredProof: [{ key: "manifest" }, { key: "connection-pack" }, { key: "remote-smoke" }],
+          agentFirstSteps: ["Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
+        },
+        tools: {
+          names: expectedNames,
+          approvalRequired: approvalRequiredToolNames(),
+          localStateWrite: localStateWriteToolNamesList(),
+          readOnlyOrDraft: readOnlyOrDraftToolNames(),
+        },
+        quickStartCalls: remoteSmokeQuickStartFixture(),
+      });
+    }
+    if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
+    if (
+      url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
+      url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
+    ) {
+      return responseJson({ error: "approval required" }, 409);
+    }
+    return responseJson({ error: "unexpected URL" }, 404);
+  };
+
+  const report = await runRemoteMcpSmoke({ baseUrl: "https://jarvis.example", fetchImpl: fetchImpl as typeof fetch });
+
+  assert.equal(report.status, "blocked");
+  assert.ok(report.checks.some((check) => check.key === "pack-limits" && check.status === "blocked"));
+  assert.ok(report.checks.some((check) => check.key === "pack-local-write-policy" && check.status === "ready"));
+});
+
 test("remote MCP smoke requires the handoff proof runbook", async () => {
   const tools = remoteSmokeManifestToolsFixture();
   const fetchImpl = async (target: string | URL) => {
@@ -494,6 +553,7 @@ test("remote MCP smoke requires the handoff proof runbook", async () => {
     if (url.includes("/api/remote-mcp-pack")) {
       return responseJson({
         auth: { tokenValueReturned: false },
+        limits: remoteSmokePackLimitsFixture(),
         agentCompatibility: remoteAgentCompatibilityFixture(),
         tools: {
           localStateWrite: ["arcigy.sync_gmail_recent_messages"],
@@ -558,6 +618,7 @@ test("remote MCP smoke requires the contract draft quick-start", async () => {
     if (url.includes("/api/remote-mcp-pack")) {
       return responseJson({
         auth: { tokenValueReturned: false },
+        limits: remoteSmokePackLimitsFixture(),
         agentCompatibility: remoteAgentCompatibilityFixture(),
         handoff: {
           connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
@@ -623,6 +684,7 @@ test("remote MCP smoke requires the audit trail quick-start", async () => {
     if (url.includes("/api/remote-mcp-pack")) {
       return responseJson({
         auth: { tokenValueReturned: false },
+        limits: remoteSmokePackLimitsFixture(),
         agentCompatibility: remoteAgentCompatibilityFixture(),
         handoff: {
           connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
@@ -2252,6 +2314,28 @@ function remoteAgentCompatibilityFixture() {
     requiredBeforeWork: ["Run smokeTestUrl and require status=ready before using MCP tools."],
     safetyRules: ["Do not call approvalRequired tools without approval.", "Keep outputs family-friendly and secret-redacted."],
   };
+}
+
+function remoteSmokePackLimitsFixture() {
+  return {
+    maxJsonBytes: 1_000_000,
+    pathPolicy: "repo-only",
+    writesRequireExplicitToolCall: true,
+  };
+}
+
+function approvalRequiredToolNames() {
+  return listJarvisMcpTools().filter((tool) => tool.requiresApproval).map((tool) => tool.name);
+}
+
+function localStateWriteToolNamesList() {
+  return listJarvisMcpTools().filter((tool) => localStateWriteToolNames.has(tool.name)).map((tool) => tool.name);
+}
+
+function readOnlyOrDraftToolNames() {
+  return listJarvisMcpTools()
+    .filter((tool) => !tool.requiresApproval && !localStateWriteToolNames.has(tool.name))
+    .map((tool) => tool.name);
 }
 
 function remoteSmokeManifestToolsFixture() {

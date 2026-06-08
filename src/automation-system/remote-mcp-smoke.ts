@@ -65,6 +65,13 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
   checks.push(check(pack.body?.auth?.tokenValueReturned === false, "pack-secret-policy", "Connection pack confirms tokenValueReturned=false."));
   checks.push(
     check(
+      hasGuardedPackLimits(pack.body?.limits),
+      "pack-limits",
+      "Connection pack limits require repo-only paths, bounded JSON, and explicit write tool calls."
+    )
+  );
+  checks.push(
+    check(
       hasExactToolPolicy(pack.body?.tools),
       "pack-local-write-policy",
       "Connection pack exposes exact approval, local-write, and read-only/draft tool policy."
@@ -195,6 +202,18 @@ function check(ok: boolean, key: string, message: string): RemoteMcpSmokeCheck {
     status: ok ? "ready" : "blocked",
     message,
   };
+}
+
+function hasGuardedPackLimits(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const limits = value as { maxJsonBytes?: unknown; pathPolicy?: unknown; writesRequireExplicitToolCall?: unknown };
+  return (
+    typeof limits.maxJsonBytes === "number" &&
+    Number.isFinite(limits.maxJsonBytes) &&
+    limits.maxJsonBytes > 0 &&
+    limits.pathPolicy === "repo-only" &&
+    limits.writesRequireExplicitToolCall === true
+  );
 }
 
 function hasExactToolPolicy(value: unknown): boolean {

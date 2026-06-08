@@ -346,6 +346,7 @@ test("local web bridge serves UI and API health", async () => {
       smokeTestUrl: string;
       mcpToolCallPattern: string;
       auth: { header: string; tokenStrong: boolean; tokenValueReturned: boolean };
+      limits: { maxJsonBytes: number; pathPolicy: string; writesRequireExplicitToolCall: boolean };
       tools: { count: number; approvalRequired: string[]; readOnlyOrDraft: string[]; localStateWrite: string[] };
       quickStartCalls: Array<{ tool: string; method: string; url: string; approvalRequired: boolean; body: Record<string, unknown> }>;
       handoff: { connectionPackUrl: string; requiredProof: Array<{ key: string; url: string; expected: string }>; agentFirstSteps: string[] };
@@ -358,6 +359,9 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(remotePackBody.auth.header, "Authorization: Bearer <JARVIS_WEB_TOKEN>");
     assert.equal(remotePackBody.auth.tokenStrong, false);
     assert.equal(remotePackBody.auth.tokenValueReturned, false);
+    assert.equal(remotePackBody.limits.pathPolicy, "repo-only");
+    assert.equal(remotePackBody.limits.maxJsonBytes > 0, true);
+    assert.equal(remotePackBody.limits.writesRequireExplicitToolCall, true);
     assert.equal(remotePackBody.tools.count, 28);
     assert.match(remotePackBody.handoff.connectionPackUrl, /\/api\/remote-mcp-pack\?includeReadiness=true&live=true$/);
     assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "connection-pack" && item.url.includes("includeReadiness=true")));
@@ -403,6 +407,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(smokeBody.checks.some((check) => check.key === "approval-gate" && check.status === "ready"));
     assert.ok(smokeBody.checks.some((check) => check.key === "manifest-local-write-policy" && check.status === "ready"));
     assert.ok(smokeBody.checks.some((check) => check.key === "pack-local-write-policy" && check.status === "ready"));
+    assert.ok(smokeBody.checks.some((check) => check.key === "pack-limits" && check.status === "ready"));
     assert.ok(smokeBody.checks.some((check) => check.key === "pack-contract-quick-start" && check.status === "ready"));
     assert.ok(smokeBody.checks.some((check) => check.key === "pack-contract-draft-quick-start" && check.status === "ready"));
 

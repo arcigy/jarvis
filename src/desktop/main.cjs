@@ -888,6 +888,13 @@ async function runRemoteMcpSmoke(payload = {}) {
   checks.push(smokeCheck(pack.body?.auth?.tokenValueReturned === false, "pack-secret-policy", "Connection pack confirms tokenValueReturned=false."));
   checks.push(
     smokeCheck(
+      hasGuardedPackLimits(pack.body?.limits),
+      "pack-limits",
+      "Connection pack limits require repo-only paths, bounded JSON, and explicit write tool calls."
+    )
+  );
+  checks.push(
+    smokeCheck(
       hasExactToolPolicy(pack.body?.tools),
       "pack-local-write-policy",
       "Connection pack exposes exact approval, local-write, and read-only/draft tool policy."
@@ -1021,6 +1028,17 @@ function hasExactToolPolicy(value) {
     sameStringArray(value.approvalRequired, approvalRequiredToolNames()) &&
     sameStringArray(value.localStateWrite, localStateWriteToolNamesList()) &&
     sameStringArray(value.readOnlyOrDraft, readOnlyOrDraftToolNames())
+  );
+}
+
+function hasGuardedPackLimits(value) {
+  if (!value || typeof value !== "object") return false;
+  return (
+    typeof value.maxJsonBytes === "number" &&
+    Number.isFinite(value.maxJsonBytes) &&
+    value.maxJsonBytes > 0 &&
+    value.pathPolicy === "repo-only" &&
+    value.writesRequireExplicitToolCall === true
   );
 }
 

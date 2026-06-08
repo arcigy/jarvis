@@ -126,6 +126,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
     manifestUrl: string;
     smokeTestUrl: string;
     auth: { header: string; tokenValueReturned: boolean };
+    limits: { maxJsonBytes: number; pathPolicy: string; writesRequireExplicitToolCall: boolean };
     tools: { count: number; approvalRequired: string[]; readOnlyOrDraft: string[]; localStateWrite: string[] };
     quickStartCalls: Array<{ tool: string; method: string; url: string; approvalRequired: boolean; body: Record<string, unknown> }>;
     handoff: { connectionPackUrl: string; requiredProof: Array<{ key: string; url: string; expected: string }>; agentFirstSteps: string[] };
@@ -136,6 +137,9 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.equal(pack.smokeTestUrl, "https://jarvis.example.ngrok-free.app/api/remote-mcp-smoke");
   assert.equal(pack.auth.header, "Authorization: Bearer <JARVIS_WEB_TOKEN>");
   assert.equal(pack.auth.tokenValueReturned, false);
+  assert.equal(pack.limits.pathPolicy, "repo-only");
+  assert.equal(pack.limits.maxJsonBytes > 0, true);
+  assert.equal(pack.limits.writesRequireExplicitToolCall, true);
   assert.equal(pack.tools.count, 28);
   assert.ok(pack.tools.approvalRequired.includes("arcigy.generate_contract_documents"));
   assert.ok(pack.tools.localStateWrite.includes("arcigy.sync_gmail_recent_messages"));
