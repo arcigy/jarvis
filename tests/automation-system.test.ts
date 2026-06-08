@@ -165,6 +165,26 @@ test("remote MCP smoke checks every response for bearer token leaks", async () =
   assert.ok(report.checks.some((check) => check.key === "secret-redaction" && check.status === "blocked"));
 });
 
+test("remote MCP smoke redacts secrets from fetch failures", async () => {
+  const googleKey = "AI" + "za" + "S" + "y" + "D".repeat(32);
+  const providerKey = ["aaaaaaaa", "bbbb", "cccc", "dddd", "eeeeeeeeeeee"].join("-") + "_ehpdn6s";
+  const databaseUrl = "postgresql://postgres:super-private@example.com:5432/db";
+  const fetchImpl = async () => {
+    throw new Error(`network failed with ${googleKey} ${providerKey} ${databaseUrl}`);
+  };
+
+  const report = await runRemoteMcpSmoke({ baseUrl: "https://jarvis.example", fetchImpl: fetchImpl as typeof fetch });
+  const text = JSON.stringify(report);
+
+  assert.equal(report.status, "blocked");
+  assert.equal(text.includes(googleKey), false);
+  assert.equal(text.includes(providerKey), false);
+  assert.equal(text.includes("super-private"), false);
+  assert.match(text, /\[redacted-google-api-key\]/);
+  assert.match(text, /\[redacted-provider-key\]/);
+  assert.match(text, /postgresql:\/\/postgres:\[redacted\]@example\.com/);
+});
+
 test("remote MCP smoke requires the handoff proof runbook", async () => {
   const tools = listJarvisMcpTools().map((tool) => ({ name: tool.name }));
   const fetchImpl = async (target: string | URL) => {

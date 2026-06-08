@@ -1,3 +1,4 @@
+import { redactSensitiveText } from "./ai-safety.ts";
 import { listJarvisMcpTools } from "./mcp-tools.ts";
 
 export type RemoteMcpSmokeStatus = "ready" | "blocked";
@@ -190,7 +191,7 @@ async function getJson(fetchImpl: typeof fetch, url: string, bearerToken?: strin
     const body = await response.json().catch(() => null);
     return { ok: response.ok, status: response.status, body, message: response.ok ? "OK" : `HTTP ${response.status}` };
   } catch (error) {
-    return { ok: false, status: 0, body: null, message: error instanceof Error ? error.message : String(error) };
+    return { ok: false, status: 0, body: null, message: safeErrorMessage(error) };
   }
 }
 
@@ -204,8 +205,12 @@ async function postJson(fetchImpl: typeof fetch, url: string, payload: unknown, 
     const body = await response.json().catch(() => null);
     return { ok: response.ok, status: response.status, body, message: response.ok ? "OK" : `HTTP ${response.status}` };
   } catch (error) {
-    return { ok: false, status: 0, body: null, message: error instanceof Error ? error.message : String(error) };
+    return { ok: false, status: 0, body: null, message: safeErrorMessage(error) };
   }
+}
+
+function safeErrorMessage(error: unknown): string {
+  return redactSensitiveText(error instanceof Error ? error.message : String(error));
 }
 
 function requestHeaders(bearerToken?: string): Record<string, string> {

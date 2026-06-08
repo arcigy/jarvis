@@ -991,7 +991,7 @@ async function fetchJson(url, token, payload = null) {
     const body = await response.json().catch(() => null);
     return { ok: response.ok, status: response.status, body, message: response.ok ? "OK" : `HTTP ${response.status}` };
   } catch (error) {
-    return { ok: false, status: 0, body: null, message: error instanceof Error ? error.message : String(error) };
+    return { ok: false, status: 0, body: null, message: redactSensitiveText(error instanceof Error ? error.message : String(error)) };
   }
 }
 
