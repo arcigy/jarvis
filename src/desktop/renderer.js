@@ -5,6 +5,8 @@ const state = {
   listening: false,
   lastLeads: [],
   lastPreparedReplies: [],
+  operatorBriefingTimer: null,
+  operatorBriefingPollMs: 300000,
   clientAlertWatchEnabled: true,
   clientAlertPollTimer: null,
   seenClientNeedAlertIds: new Set(),
@@ -231,6 +233,27 @@ function renderOperatorBriefing(briefing) {
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+async function refreshOperatorBriefing({ speakResult = false, loadingText = null } = {}) {
+  if (loadingText) elements.commandTimeline.textContent = loadingText;
+  const briefing = await arcigyApi.operatorBriefing({ periodLabel: "poslednych 7 dni" });
+  elements.commandTimeline.textContent = briefing.sections?.nextAction ?? briefing.summary;
+  elements.response.textContent = renderOperatorBriefing(briefing);
+  if (speakResult) speak(briefing.speechText ?? briefing.summary);
+  return briefing;
+}
+
+function startOperatorBriefingWatch() {
+  if (state.operatorBriefingTimer) window.clearInterval(state.operatorBriefingTimer);
+  void refreshOperatorBriefing().catch((error) => {
+    elements.response.textContent = error instanceof Error ? error.message : String(error);
+  });
+  state.operatorBriefingTimer = window.setInterval(() => {
+    void refreshOperatorBriefing().catch((error) => {
+      elements.commandTimeline.textContent = error instanceof Error ? error.message : String(error);
+    });
+  }, state.operatorBriefingPollMs);
 }
 
 async function refreshHealth() {
@@ -791,11 +814,7 @@ elements.readinessReport.addEventListener("click", async () => {
 });
 elements.operatorBriefing.addEventListener("click", async () => {
   try {
-    elements.commandTimeline.textContent = "Building operator briefing...";
-    const briefing = await arcigyApi.operatorBriefing({ periodLabel: "poslednych 7 dni" });
-    elements.commandTimeline.textContent = briefing.sections?.nextAction ?? briefing.summary;
-    elements.response.textContent = renderOperatorBriefing(briefing);
-    speak(briefing.speechText ?? briefing.summary);
+    await refreshOperatorBriefing({ speakResult: true, loadingText: "Building operator briefing..." });
   } catch (error) {
     elements.commandTimeline.textContent = error instanceof Error ? error.message : String(error);
   }
@@ -882,5 +901,6 @@ elements.clientMessage.value = "Potrebujem upravit onboarding automatizaciu do p
 elements.gmailQuery.value = "newer_than:7d";
 elements.leadQuery.value = "automation agency Bratislava";
 void refreshHealth();
+startOperatorBriefingWatch();
 startClientNeedWatch();
 setMode("idle");
