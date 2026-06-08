@@ -1254,6 +1254,7 @@ function setupContractFormDirtyTracking() {
   for (const element of contractFormElements()) {
     element.addEventListener("input", () => {
       state.contractFormDirty = true;
+      elements.contractResult.textContent = "Contract form changed. Apply form before generating DOCX files.";
     });
   }
 }
