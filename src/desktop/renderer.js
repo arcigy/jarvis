@@ -1339,10 +1339,14 @@ elements.copyRemotePack.addEventListener("click", async () => {
 elements.runRemoteSmoke.addEventListener("click", async () => {
   try {
     elements.remoteSmokeResult.textContent = "Running remote MCP smoke test...";
+    elements.handoffProofGates.textContent = "checking safety gates";
+    elements.handoffProofGates.dataset.state = "attention";
     const report = await arcigyApi.remoteMcpSmoke({ baseUrl: state.lastRemoteMcpPack?.baseUrl });
     renderRemoteMcpSmoke(report);
   } catch (error) {
     elements.remoteSmokeResult.textContent = safeUiErrorText(error);
+    elements.handoffProofGates.textContent = "blocked: smoke error";
+    elements.handoffProofGates.dataset.state = "attention";
   }
 });
 elements.readinessReport.addEventListener("click", async () => {

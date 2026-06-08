@@ -147,6 +147,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /summarizeRemoteProofGates/);
   assert.match(renderer, /ready: 4\/4 safety gates/);
   assert.match(renderer, /blocked: \$\{missing\.join\(", "\)\}/);
+  assert.match(renderer, /checking safety gates/);
+  assert.match(renderer, /blocked: smoke error/);
   assert.match(renderer, /Local memory writes:/);
   assert.match(renderer, /preview Gmail with dryRun: true first/);
   assert.match(renderer, /renderRemoteMcpSmoke/);
