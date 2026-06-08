@@ -226,6 +226,34 @@
             </div>
           </div>
           <div class="response compact" id="webBridgeResult">Ready to check tunnel readiness.</div>
+          <div class="handoffPanel" aria-label="Remote agent handoff">
+            <div class="handoffHead">
+              <div>
+                <span>Remote agent pack</span>
+                <strong id="handoffStatus">waiting</strong>
+              </div>
+              <button id="copyRemotePack">Copy pack</button>
+            </div>
+            <div class="handoffGrid">
+              <div>
+                <span>Manifest</span>
+                <code id="handoffManifestUrl">--</code>
+              </div>
+              <div>
+                <span>Tool call</span>
+                <code id="handoffToolPattern">--</code>
+              </div>
+              <div>
+                <span>Secure tunnel</span>
+                <code id="handoffTunnelCommand">--</code>
+              </div>
+              <div>
+                <span>Approval locks</span>
+                <code id="handoffApprovalTools">--</code>
+              </div>
+            </div>
+            <pre class="response compact handoffPrompt" id="remoteAgentPrompt">Remote pack not loaded.</pre>
+          </div>
           <ul>
             <li>generate_contract_documents</li>
             <li>get_cold_outreach_brief</li>
@@ -240,6 +268,7 @@
             <li>generate_ai_reply</li>
             <li>get_system_health</li>
             <li>get_production_readiness</li>
+            <li>get_remote_mcp_pack</li>
             <li>upsert_local_person</li>
             <li>add_client_need_signal</li>
             <li>ingest_client_message</li>

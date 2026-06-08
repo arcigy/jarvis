@@ -9,6 +9,7 @@ const state = {
   operatorBriefingPollMs: 300000,
   webBridgeTimer: null,
   webBridgePollMs: 120000,
+  lastRemoteMcpPack: null,
   clientAlertWatchEnabled: true,
   clientAlertPollTimer: null,
   seenClientNeedAlertIds: new Set(),
@@ -63,6 +64,13 @@ const elements = {
   bridgeManifestState: document.querySelector("#bridgeManifestState"),
   bridgeToolState: document.querySelector("#bridgeToolState"),
   webBridgeResult: document.querySelector("#webBridgeResult"),
+  handoffStatus: document.querySelector("#handoffStatus"),
+  handoffManifestUrl: document.querySelector("#handoffManifestUrl"),
+  handoffToolPattern: document.querySelector("#handoffToolPattern"),
+  handoffTunnelCommand: document.querySelector("#handoffTunnelCommand"),
+  handoffApprovalTools: document.querySelector("#handoffApprovalTools"),
+  remoteAgentPrompt: document.querySelector("#remoteAgentPrompt"),
+  copyRemotePack: document.querySelector("#copyRemotePack"),
   leadQuery: document.querySelector("#leadQuery"),
   discoverLeads: document.querySelector("#discoverLeads"),
   exportLeads: document.querySelector("#exportLeads"),
@@ -104,6 +112,8 @@ const arcigyApi = window.arcigyDesktop ?? {
   getClientNeedAlerts: (payload) => postJson("/api/client-need-alerts", payload),
   generateAiReply: (payload) => postJson("/api/generate-ai-reply", payload),
   webBridgePreflight: () => getJson("/api/web-bridge-preflight"),
+  remoteMcpPack: (payload) =>
+    payload ? postJson("/api/mcp/arcigy.get_remote_mcp_pack", payload).then((value) => value.result) : getJson("/api/remote-mcp-pack?includeReadiness=false"),
   syncGmailRecentMessages: (payload) => postJson("/api/sync-gmail-recent-messages", payload),
   getSmartleadCampaignStatus: (payload) => postJson("/api/smartlead-campaign-status", payload),
   discoverLeads: (payload) => postJson("/api/discover-leads", payload),
@@ -503,9 +513,67 @@ async function refreshWebBridge({ loadingText = null } = {}) {
   const result = await arcigyApi.webBridgePreflight();
   renderBridgeCockpit(result);
   elements.webBridgeResult.textContent = renderWebBridgePreflight(result);
+  const pack = await arcigyApi.remoteMcpPack({ includeReadiness: false });
+  renderRemoteMcpPack(pack);
   const health = await arcigyApi.systemHealth();
   renderCommandDeck(health, result);
   return result;
+}
+
+function renderRemoteMcpPack(pack) {
+  state.lastRemoteMcpPack = pack;
+  const approvalTools = pack.tools?.approvalRequired ?? [];
+  elements.handoffStatus.textContent = pack.auth?.tokenConfigured ? "armed" : "local only";
+  elements.handoffStatus.dataset.state = pack.auth?.tokenConfigured ? "ready" : "attention";
+  elements.handoffManifestUrl.textContent = pack.manifestUrl ?? "--";
+  elements.handoffToolPattern.textContent = pack.mcpToolCallPattern ?? "--";
+  elements.handoffTunnelCommand.textContent = pack.tunnel?.secureCommand ?? "npm run web:tunnel:secure";
+  elements.handoffApprovalTools.textContent = approvalTools.length ? `${approvalTools.length}: ${approvalTools.join(", ")}` : "none";
+  elements.remoteAgentPrompt.textContent = buildRemoteAgentPrompt(pack);
+}
+
+function buildRemoteAgentPrompt(pack) {
+  const approvalTools = pack.tools?.approvalRequired ?? [];
+  return [
+    "Arcigy Jarvis remote MCP connection pack",
+    `Manifest: ${pack.manifestUrl}`,
+    `Tool call pattern: ${pack.mcpToolCallPattern}`,
+    `Auth header: ${pack.auth?.header ?? "Authorization: Bearer <JARVIS_WEB_TOKEN>"}`,
+    `Tools: ${pack.tools?.count ?? 0}`,
+    `Approval required: ${approvalTools.join(", ") || "none"}`,
+    `Secure tunnel: ${pack.tunnel?.secureCommand ?? "npm run web:tunnel:secure"}`,
+    "Rule: never call approval-required tools without explicit operator confirmation.",
+    "Start with arcigy.get_operator_briefing, then use read-only tools before proposing any write action.",
+  ].join("\n");
+}
+
+async function copyRemotePack() {
+  if (!state.lastRemoteMcpPack) {
+    elements.remoteAgentPrompt.textContent = "Load the web bridge first.";
+    return;
+  }
+  const payload = `${buildRemoteAgentPrompt(state.lastRemoteMcpPack)}\n\n${JSON.stringify(state.lastRemoteMcpPack, null, 2)}`;
+  await writeClipboardText(payload);
+  elements.copyRemotePack.textContent = "Copied";
+  window.setTimeout(() => {
+    elements.copyRemotePack.textContent = "Copy pack";
+  }, 1400);
+}
+
+async function writeClipboardText(text) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand("copy");
+  textarea.remove();
 }
 
 function startWebBridgeWatch() {
@@ -845,6 +913,13 @@ elements.checkWebBridge.addEventListener("click", async () => {
     await refreshWebBridge({ loadingText: "Checking web bridge..." });
   } catch (error) {
     elements.webBridgeResult.textContent = error instanceof Error ? error.message : String(error);
+  }
+});
+elements.copyRemotePack.addEventListener("click", async () => {
+  try {
+    await copyRemotePack();
+  } catch (error) {
+    elements.remoteAgentPrompt.textContent = error instanceof Error ? error.message : String(error);
   }
 });
 elements.readinessReport.addEventListener("click", async () => {

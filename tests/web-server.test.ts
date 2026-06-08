@@ -20,6 +20,8 @@ test("local web bridge serves UI and API health", async () => {
     assert.match(html, /Arcigy Jarvis/);
     assert.match(html, /commandDeck/);
     assert.match(html, /readyIntegrations/);
+    assert.match(html, /remoteAgentPrompt/);
+    assert.match(html, /copyRemotePack/);
 
     const css = await fetch(`${baseUrl}/styles.css`);
     assert.equal(css.status, 200);
@@ -29,6 +31,8 @@ test("local web bridge serves UI and API health", async () => {
     assert.match(styles, /coreVisual/);
     assert.match(styles, /bridgeCockpit/);
     assert.match(styles, /bridgeSweep/);
+    assert.match(styles, /handoffPanel/);
+    assert.match(styles, /handoffGrid/);
 
     const visual = await fetch(`${baseUrl}/assets/jarvis-command-core.png`);
     assert.equal(visual.status, 200);
@@ -43,6 +47,8 @@ test("local web bridge serves UI and API health", async () => {
     assert.match(rendererText, /renderCommandDeck/);
     assert.match(rendererText, /buildCommandTimeline/);
     assert.match(rendererText, /startWebBridgeWatch/);
+    assert.match(rendererText, /renderRemoteMcpPack/);
+    assert.match(rendererText, /\/api\/remote-mcp-pack/);
 
     const health = await fetch(`${baseUrl}/api/system-health`);
     assert.equal(health.status, 200);

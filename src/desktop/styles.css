@@ -468,6 +468,74 @@ h2 {
   color: #ffd893;
 }
 
+.handoffPanel {
+  margin-top: 12px;
+  border: 1px solid #263634;
+  border-radius: 8px;
+  background: rgb(7 12 13 / 72%);
+  padding: 12px;
+}
+
+.handoffHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.handoffHead span,
+.handoffGrid span {
+  display: block;
+  color: #91a19d;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.handoffHead strong {
+  display: block;
+  margin-top: 4px;
+  color: #eef4f2;
+}
+
+.handoffHead strong[data-state="ready"] {
+  color: #9cf8ed;
+}
+
+.handoffHead strong[data-state="attention"] {
+  color: #ffd893;
+}
+
+.handoffGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.handoffGrid div {
+  min-width: 0;
+  border: 1px solid #1c2a29;
+  border-radius: 8px;
+  padding: 10px;
+  background: rgb(12 20 21 / 86%);
+}
+
+.handoffGrid code {
+  display: block;
+  margin-top: 6px;
+  color: #dffaf6;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.handoffPrompt {
+  margin-top: 10px;
+  max-height: 220px;
+  overflow: auto;
+}
+
 .orb {
   position: relative;
   width: 150px;
@@ -667,6 +735,7 @@ ul {
   .statusGrid,
   .commandDeck,
   .bridgeCockpit,
+  .handoffGrid,
   .grid {
     grid-template-columns: 1fr;
   }

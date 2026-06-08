@@ -53,6 +53,7 @@ app.whenReady().then(() => {
   ipcMain.handle("jarvis:productionReadiness", (_event, payload) => getProductionReadiness(payload));
   ipcMain.handle("jarvis:operatorBriefing", (_event, payload) => getOperatorBriefing(payload));
   ipcMain.handle("jarvis:webBridgePreflight", () => getWebBridgePreflight());
+  ipcMain.handle("jarvis:remoteMcpPack", (_event, payload) => getRemoteMcpPack(payload));
   ipcMain.handle("jarvis:getPreparedOutreachReplies", (_event, payload) => getPreparedOutreachReplies(payload));
   ipcMain.handle("jarvis:approvePreparedOutreachReply", (_event, payload) => approvePreparedOutreachReply(payload));
   ipcMain.handle("jarvis:identifyEmail", (_event, payload) => identifyEmail(payload));
@@ -440,6 +441,67 @@ function getWebBridgePreflight() {
     pathPolicy: "repo-only",
     readyForTunnel: tokenConfigured && riskyToolsRequiringApproval.length > 0,
     warnings,
+  };
+}
+
+async function getRemoteMcpPack(payload = {}) {
+  const bridge = getWebBridgePreflight();
+  const tools = listWebMcpTools();
+  const approvalRequired = tools.filter((tool) => tool.requiresApproval).map((tool) => tool.name);
+  const baseUrl = String(payload.baseUrl || bridge.manifestUrl.replace(/\/\.well-known\/arcigy-jarvis\.json$/, "")).replace(/\/+$/g, "");
+  const readiness = payload.includeReadiness === false ? null : await getProductionReadiness({ live: payload.live === true });
+  return {
+    mode: "remote-mcp-connection-pack",
+    source: "desktop",
+    generatedAt: new Date().toISOString(),
+    baseUrl,
+    manifestUrl: `${baseUrl}/.well-known/arcigy-jarvis.json`,
+    mcpBaseUrl: `${baseUrl}/api/mcp`,
+    mcpToolCallPattern: `${baseUrl}/api/mcp/{toolName}`,
+    auth: {
+      type: "bearer",
+      header: "Authorization: Bearer <JARVIS_WEB_TOKEN>",
+      tokenConfigured: bridge.tokenConfigured,
+      tokenValueReturned: false,
+      requiredForExternalHosts: true,
+      localhostBypass: bridge.localhostBypass,
+    },
+    tunnel: {
+      provider: "ngrok",
+      secureCommand: "npm run web:tunnel:secure",
+      standardCommand: "npm run web:tunnel",
+    },
+    tools: {
+      count: tools.length,
+      names: tools.map((tool) => tool.name),
+      approvalRequired,
+      readOnlyOrDraft: tools.filter((tool) => !tool.requiresApproval).map((tool) => tool.name),
+    },
+    approval: {
+      requiredPayload: { approval: { approved: true } },
+      rule: "Never call approval-required tools until the operator explicitly confirms the exact action.",
+    },
+    limits: {
+      maxJsonBytes: getMaxJsonBytes(),
+      pathPolicy: "repo-only",
+      writesRequireExplicitToolCall: true,
+    },
+    readiness: readiness
+      ? {
+          status: readiness.status,
+          summary: readiness.summary,
+          checkedAt: readiness.checkedAt,
+          blockers: readiness.blockers,
+          nextActions: readiness.nextActions,
+        }
+      : undefined,
+    agentInstructions: [
+      "Fetch the manifestUrl first to list live tools and schemas.",
+      "Call MCP tools with POST JSON to mcpToolCallPattern.",
+      "Use the bearer auth header placeholder; the real token must be supplied by the operator and is never returned by this pack.",
+      "Treat generate_contract_documents, approve_prepared_outreach_reply, and append_leads_to_google_sheet as approval-gated actions.",
+      "Use get_operator_briefing for a Jarvis-style daily status before making recommendations.",
+    ],
   };
 }
 

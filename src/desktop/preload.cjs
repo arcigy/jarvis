@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld("arcigyDesktop", {
   productionReadiness: (payload) => ipcRenderer.invoke("jarvis:productionReadiness", payload),
   operatorBriefing: (payload) => ipcRenderer.invoke("jarvis:operatorBriefing", payload),
   webBridgePreflight: () => ipcRenderer.invoke("jarvis:webBridgePreflight"),
+  remoteMcpPack: (payload) => ipcRenderer.invoke("jarvis:remoteMcpPack", payload),
   getPreparedOutreachReplies: (payload) => ipcRenderer.invoke("jarvis:getPreparedOutreachReplies", payload),
   approvePreparedOutreachReply: (payload) => ipcRenderer.invoke("jarvis:approvePreparedOutreachReply", payload),
   identifyEmail: (payload) => ipcRenderer.invoke("jarvis:identifyEmail", payload),
