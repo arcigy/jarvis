@@ -11,6 +11,7 @@ const state = {
   webBridgePollMs: 120000,
   lastRemoteMcpPack: null,
   lastRemoteMcpSmoke: null,
+  lastReadinessNoticeSignature: null,
   clientAlertWatchEnabled: true,
   clientAlertPollTimer: null,
   seenClientNeedAlertIds: new Set(),
@@ -291,11 +292,27 @@ function renderOperatorBriefing(briefing) {
     .join("\n");
 }
 
+function trackReadinessNoticeFromBriefing(briefing) {
+  const readiness = briefing.sections?.readiness ?? "";
+  const nextAction = briefing.sections?.nextAction ?? "";
+  const status = readiness.match(/^Readiness:\s*([a-z]+)/i)?.[1]?.toLowerCase() ?? "";
+  if (!["attention", "blocked"].includes(status)) {
+    state.lastReadinessNoticeSignature = null;
+    return;
+  }
+  const signature = `${status}:${readiness}:${nextAction}`;
+  if (state.lastReadinessNoticeSignature === signature) return;
+  state.lastReadinessNoticeSignature = signature;
+  const title = status === "blocked" ? "Jarvis production blocker" : "Jarvis production attention";
+  notifyOperator(title, `${readiness} ${nextAction}`.trim(), `arcigy-jarvis-readiness-${status}`);
+}
+
 async function refreshOperatorBriefing({ speakResult = false, loadingText = null, live = true } = {}) {
   if (loadingText) elements.commandTimeline.textContent = loadingText;
   const briefing = await arcigyApi.operatorBriefing({ periodLabel: "poslednych 7 dni", live });
   elements.commandTimeline.textContent = briefing.sections?.nextAction ?? briefing.summary;
   elements.response.textContent = renderOperatorBriefing(briefing);
+  trackReadinessNoticeFromBriefing(briefing);
   if (speakResult) speak(briefing.speechText ?? briefing.summary);
   return briefing;
 }
