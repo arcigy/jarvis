@@ -64,6 +64,13 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
   );
   checks.push(
     check(
+      hasDraftContractQuickStart(pack.body?.quickStartCalls),
+      "pack-contract-draft-quick-start",
+      "Connection pack includes a read-only Gemini contract intake draft quick-start call."
+    )
+  );
+  checks.push(
+    check(
       hasHandoffProof(pack.body?.handoff, baseUrl),
       "pack-handoff-proof",
       "Connection pack includes remote handoff proof URLs and first-step instructions."
@@ -94,7 +101,7 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
     baseUrl,
     summary:
       status === "ready"
-        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, local write policy, contract quick-start, client memory quick-start, handoff proof, read-only call, approval gate, and secret policy passed.`
+        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, local write policy, contract draft, contract quick-start, client memory quick-start, handoff proof, read-only call, approval gate, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((item) => item.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -133,6 +140,15 @@ function hasUsableContractQuickStart(value: unknown): boolean {
     Array.isArray(intake.project?.includedModules) &&
     Boolean(intake.pricing);
   return hasRequiredShape && !/dopln|todo|tbd|xxx|\?\?\?/i.test(JSON.stringify(call.body));
+}
+
+function hasDraftContractQuickStart(value: unknown): boolean {
+  if (!Array.isArray(value)) return false;
+  const call = value.find((item) => {
+    if (!item || typeof item !== "object") return false;
+    return (item as { tool?: unknown }).tool === "arcigy.draft_contract_intake";
+  }) as { approvalRequired?: unknown; body?: { brief?: unknown; outputDir?: unknown; approval?: unknown } } | undefined;
+  return call?.approvalRequired === false && typeof call.body?.brief === "string" && call.body.brief.length >= 40 && !("outputDir" in (call.body ?? {})) && !("approval" in (call.body ?? {}));
 }
 
 function hasHandoffProof(value: unknown, baseUrl: string): boolean {

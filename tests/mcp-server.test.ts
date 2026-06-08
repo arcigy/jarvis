@@ -134,6 +134,11 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_outreach_brief" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_outreach_brief" && !("campaignId" in call.body)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.sync_gmail_recent_messages" && call.body.dryRun === true));
+  assert.ok(
+    pack.quickStartCalls.some(
+      (call) => call.tool === "arcigy.draft_contract_intake" && call.approvalRequired === false && typeof call.body.brief === "string"
+    )
+  );
   const contractQuickStart = pack.quickStartCalls.find((call) => call.tool === "arcigy.generate_contract_documents");
   assert.equal(contractQuickStart?.approvalRequired, true);
   assert.equal((contractQuickStart?.body.approval as { approved?: boolean } | undefined)?.approved, true);

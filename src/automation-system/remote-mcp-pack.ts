@@ -246,6 +246,16 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Draft contract intake JSON without writing files",
+      tool: "arcigy.draft_contract_intake",
+      method: "POST",
+      url: toolUrl("arcigy.draft_contract_intake"),
+      body: {
+        brief: "Klient potrebuje webovu aplikaciu pre lead intake, klientsku evidenciu, reporty, Gemini drafty, 2 pouzivatelov, setup 2000 EUR, mesacne 200 EUR.",
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Discover leads without writing",
       tool: "arcigy.discover_leads",
       method: "POST",

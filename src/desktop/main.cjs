@@ -636,6 +636,16 @@ function buildRemoteMcpQuickStartCalls(baseUrl) {
       approvalRequired: false,
     },
     {
+      label: "Draft contract intake JSON without writing files",
+      tool: "arcigy.draft_contract_intake",
+      method: "POST",
+      url: toolUrl("arcigy.draft_contract_intake"),
+      body: {
+        brief: "Klient potrebuje webovu aplikaciu pre lead intake, klientsku evidenciu, reporty, Gemini drafty, 2 pouzivatelov, setup 2000 EUR, mesacne 200 EUR.",
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Discover leads without writing",
       tool: "arcigy.discover_leads",
       method: "POST",
@@ -750,6 +760,13 @@ async function runRemoteMcpSmoke(payload = {}) {
   );
   checks.push(
     smokeCheck(
+      hasDraftContractIntakeQuickStart(pack.body?.quickStartCalls),
+      "pack-contract-draft-quick-start",
+      "Connection pack includes a read-only Gemini contract intake draft quick-start call."
+    )
+  );
+  checks.push(
+    smokeCheck(
       hasHandoffProof(pack.body?.handoff, baseUrl),
       "pack-handoff-proof",
       "Connection pack includes remote handoff proof URLs and first-step instructions."
@@ -778,7 +795,7 @@ async function runRemoteMcpSmoke(payload = {}) {
     baseUrl,
     summary:
       status === "ready"
-        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, local write policy, contract quick-start, client memory quick-start, handoff proof, read-only call, approval gate, and secret policy passed.`
+        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, local write policy, contract draft, contract quick-start, client memory quick-start, handoff proof, read-only call, approval gate, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((check) => check.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -808,6 +825,18 @@ function hasUsableContractQuickStart(value) {
     Array.isArray(intake?.project?.includedModules) &&
     Boolean(intake?.pricing);
   return hasRequiredShape && !/dopln|todo|tbd|xxx|\?\?\?/i.test(JSON.stringify(call.body));
+}
+
+function hasDraftContractIntakeQuickStart(value) {
+  if (!Array.isArray(value)) return false;
+  const call = value.find((item) => item?.tool === "arcigy.draft_contract_intake");
+  return (
+    call?.approvalRequired === false &&
+    typeof call?.body?.brief === "string" &&
+    call.body.brief.length >= 40 &&
+    !("outputDir" in (call.body ?? {})) &&
+    !("approval" in (call.body ?? {}))
+  );
 }
 
 function hasHandoffProof(value, baseUrl) {
