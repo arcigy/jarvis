@@ -69,6 +69,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /Live MCP tool registry/);
   assert.match(html, /id="remoteAgentPrompt"/);
   assert.match(html, /id="copyTunnelCommand"/);
+  assert.match(html, /id="copyClaudePrompt"/);
+  assert.match(html, /id="copyChatGptPrompt"/);
   assert.match(html, /id="copyGrokPrompt"/);
   assert.match(html, /id="copyRemotePack"/);
   assert.match(html, /id="runRemoteSmoke"/);
@@ -191,12 +193,18 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /Supported agents:/);
   assert.match(renderer, /Agent-specific startup prompts/);
   assert.match(renderer, /agentPromptTemplates/);
+  assert.match(renderer, /function copyClaudePrompt/);
+  assert.match(renderer, /function copyChatGptPrompt/);
   assert.match(renderer, /function copyGrokPrompt/);
-  assert.match(renderer, /Grok startup prompt/);
+  assert.match(renderer, /function copyAgentPrompt/);
+  assert.match(renderer, /`\$\{agentLabel\} startup prompt:`/);
+  assert.match(renderer, /pack\.agentPromptTemplates\?\.\[agentKey\]/);
   assert.match(renderer, /function copyTunnelCommand/);
   assert.match(renderer, /npm run web:tunnel:secure/);
   assert.match(renderer, /Safety rules:/);
   assert.match(renderer, /copyRemotePack/);
+  assert.match(renderer, /copyClaudePrompt/);
+  assert.match(renderer, /copyChatGptPrompt/);
   assert.match(renderer, /copyGrokPrompt/);
   assert.match(renderer, /copyTunnelCommand/);
   assert.match(renderer, /writeClipboardText/);

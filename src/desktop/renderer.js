@@ -109,6 +109,8 @@ const elements = {
   mcpToolList: document.querySelector("#mcpToolList"),
   remoteAgentPrompt: document.querySelector("#remoteAgentPrompt"),
   copyTunnelCommand: document.querySelector("#copyTunnelCommand"),
+  copyClaudePrompt: document.querySelector("#copyClaudePrompt"),
+  copyChatGptPrompt: document.querySelector("#copyChatGptPrompt"),
   copyGrokPrompt: document.querySelector("#copyGrokPrompt"),
   copyRemotePack: document.querySelector("#copyRemotePack"),
   runRemoteSmoke: document.querySelector("#runRemoteSmoke"),
@@ -1039,17 +1041,31 @@ async function copyRemotePack() {
 }
 
 async function copyGrokPrompt() {
+  await copyAgentPrompt("grok", "Grok", elements.copyGrokPrompt);
+}
+
+async function copyClaudePrompt() {
+  await copyAgentPrompt("claude", "Claude", elements.copyClaudePrompt);
+}
+
+async function copyChatGptPrompt() {
+  await copyAgentPrompt("chatgpt", "ChatGPT", elements.copyChatGptPrompt);
+}
+
+async function copyAgentPrompt(agentKey, agentLabel, button) {
   if (!state.lastRemoteMcpPack) {
     elements.remoteAgentPrompt.textContent = "Load the web bridge first.";
     return;
   }
   const pack = state.lastRemoteMcpPack;
   const handoffStatus = buildCopiedHandoffStatus(state.lastRemoteMcpSmoke);
-  const prompt = pack.agentPromptTemplates?.grok ?? "Use the Arcigy Jarvis HTTP JSON MCP bridge. Run smoke first and never call approvalRequired tools without approval.";
+  const prompt =
+    pack.agentPromptTemplates?.[agentKey] ??
+    "Use the Arcigy Jarvis HTTP JSON MCP bridge. Run smoke first and never call approvalRequired tools without approval.";
   const payload = [
     handoffStatus.text,
     "",
-    "Grok startup prompt:",
+    `${agentLabel} startup prompt:`,
     prompt,
     "",
     `Manifest: ${pack.manifestUrl}`,
@@ -1059,9 +1075,9 @@ async function copyGrokPrompt() {
     `Auth header: ${pack.auth?.header ?? "Authorization: Bearer <JARVIS_WEB_TOKEN>"}`,
   ].join("\n");
   await writeClipboardText(payload);
-  elements.copyGrokPrompt.textContent = "Copied";
+  button.textContent = "Copied";
   window.setTimeout(() => {
-    elements.copyGrokPrompt.textContent = "Copy Grok";
+    button.textContent = `Copy ${agentLabel}`;
   }, 1400);
 }
 
@@ -1071,7 +1087,7 @@ async function copyTunnelCommand() {
     command,
     "",
     "Keep this terminal process open while Grok, Claude, or ChatGPT uses the remote MCP bridge.",
-    "After the tunnel URL appears, run remote smoke and copy the Grok prompt from Jarvis.",
+    "After the tunnel URL appears, run remote smoke and copy the right agent prompt from Jarvis.",
   ].join("\n");
   await writeClipboardText(payload);
   elements.copyTunnelCommand.textContent = "Copied";
@@ -1570,6 +1586,20 @@ elements.checkWebBridge.addEventListener("click", async () => {
 elements.copyRemotePack.addEventListener("click", async () => {
   try {
     await copyRemotePack();
+  } catch (error) {
+    elements.remoteAgentPrompt.textContent = safeUiErrorText(error);
+  }
+});
+elements.copyClaudePrompt.addEventListener("click", async () => {
+  try {
+    await copyClaudePrompt();
+  } catch (error) {
+    elements.remoteAgentPrompt.textContent = safeUiErrorText(error);
+  }
+});
+elements.copyChatGptPrompt.addEventListener("click", async () => {
+  try {
+    await copyChatGptPrompt();
   } catch (error) {
     elements.remoteAgentPrompt.textContent = safeUiErrorText(error);
   }
