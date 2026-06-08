@@ -64,6 +64,7 @@ The desktop MCP panel now runs an automatic preflight watch every two minutes. I
 - `arcigy.prepare_positive_outreach_reply`: uses Gemini to draft a reply for a positive cold outreach lead and stores it as a local `prepared_reply` waiting for approval.
 - `arcigy.get_prepared_outreach_replies`: returns prepared cold outreach replies waiting for approval.
 - `arcigy.approve_prepared_outreach_reply`: marks one prepared outreach reply as approved after explicit confirmation.
+- `arcigy.send_approved_outreach_reply`: sends an already-approved prepared outreach reply through Gmail after explicit confirmation and records `approved_reply_sent`.
 - `arcigy.upsert_local_person`: local client/lead/contact upsert into SQLite.
 - `arcigy.add_client_need_signal`: stores that a client needs something.
 - `arcigy.ingest_client_message`: stores a received email/message, identifies the sender, and returns a Jarvis alert when the message contains a request.

@@ -109,7 +109,12 @@ function checkMcpToolRegistry(): DoctorCheck {
   const duplicates = names.filter((name, index) => names.indexOf(name) !== index);
   const approvalTools = tools.filter((tool) => tool.requiresApproval).map((tool) => tool.name);
   const approvalToolSet = new Set<string>(approvalTools);
-  const requiredApprovalTools = ["arcigy.generate_contract_documents", "arcigy.approve_prepared_outreach_reply", "arcigy.append_leads_to_google_sheet"];
+  const requiredApprovalTools = [
+    "arcigy.generate_contract_documents",
+    "arcigy.approve_prepared_outreach_reply",
+    "arcigy.send_approved_outreach_reply",
+    "arcigy.append_leads_to_google_sheet",
+  ];
   const missingApproval = requiredApprovalTools.filter((name) => !approvalToolSet.has(name));
   const failed = duplicates.length > 0 || missingApproval.length > 0 || tools.length < 21;
 

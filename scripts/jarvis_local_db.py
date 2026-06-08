@@ -410,6 +410,49 @@ def approve_prepared_reply(db_path: Path, payload: dict[str, Any]) -> dict[str, 
     return result
 
 
+def get_prepared_reply(db_path: Path, payload: dict[str, Any]) -> dict[str, Any]:
+    init_db(db_path)
+    prepared_id = required(payload, "preparedEventId")
+    conn = connect(db_path)
+    row = conn.execute(
+        "select * from cold_outreach_events where id = ? and event_type = 'prepared_reply'",
+        (prepared_id,),
+    ).fetchone()
+    if row is None:
+        raise ValueError("Prepared reply was not found.")
+
+    approved = conn.execute(
+        """
+        select * from cold_outreach_events
+        where lead_email = ?
+          and event_type = 'approved_reply'
+          and occurred_at >= ?
+        order by occurred_at desc
+        limit 1
+        """,
+        (row["lead_email"], row["occurred_at"]),
+    ).fetchone()
+    sent = conn.execute(
+        """
+        select * from cold_outreach_events
+        where lead_email = ?
+          and event_type = 'approved_reply_sent'
+          and occurred_at >= ?
+        order by occurred_at desc
+        limit 1
+        """,
+        (row["lead_email"], row["occurred_at"]),
+    ).fetchone()
+    status = "sent" if sent is not None else "approved" if approved is not None else "pending"
+    return {
+        "status": status,
+        "preparedReply": prepared_reply_from_row(row),
+        "approvedEvent": row_to_cold_event(approved) if approved is not None else None,
+        "sentEvent": row_to_cold_event(sent) if sent is not None else None,
+        "summary": build_prepared_reply_status_summary(row["lead_email"], status),
+    }
+
+
 def identify(db_path: Path, email: str) -> dict[str, Any]:
     init_db(db_path)
     normalized = normalize_email(email)
@@ -690,6 +733,14 @@ def build_prepared_replies_summary(replies: list[dict[str, Any]]) -> str:
     return f"Jarvis: Caka {prepared_reply_label(len(replies))} na schvalenie. Najnovsia je pre {first['leadEmail']}."
 
 
+def build_prepared_reply_status_summary(lead_email: str, status: str) -> str:
+    if status == "sent":
+        return f"Jarvis: Odpoved pre {lead_email} uz bola odoslana."
+    if status == "approved":
+        return f"Jarvis: Odpoved pre {lead_email} je schvalena a pripravena na odoslanie."
+    return f"Jarvis: Odpoved pre {lead_email} este caka na schvalenie."
+
+
 def build_cold_outreach_summary(metrics: dict[str, Any]) -> str:
     contacted = int(metrics["contacted"])
     opened = int(metrics["opened"])
@@ -955,6 +1006,7 @@ def main() -> None:
             "cold-brief",
             "list-prepared-replies",
             "approve-prepared-reply",
+            "get-prepared-reply",
             "identify",
             "ingest-message",
             "list-open-needs",
@@ -982,6 +1034,8 @@ def main() -> None:
             result = list_prepared_replies(args.db, load_payload(args.payload))
         elif args.command == "approve-prepared-reply":
             result = approve_prepared_reply(args.db, load_payload(args.payload))
+        elif args.command == "get-prepared-reply":
+            result = get_prepared_reply(args.db, load_payload(args.payload))
         elif args.command == "ingest-message":
             result = ingest_message(args.db, load_payload(args.payload))
         elif args.command == "list-open-needs":

@@ -11,6 +11,7 @@ export type JarvisMcpToolName =
   | "arcigy.prepare_positive_outreach_reply"
   | "arcigy.get_prepared_outreach_replies"
   | "arcigy.approve_prepared_outreach_reply"
+  | "arcigy.send_approved_outreach_reply"
   | "arcigy.upsert_local_person"
   | "arcigy.add_client_need_signal"
   | "arcigy.ingest_client_message"
@@ -97,6 +98,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.approve_prepared_outreach_reply",
       description: "Oznaci pripravenu cold outreach odpoved ako schvalenu az po explicitnom potvrdeni.",
+      requiresApproval: true,
+    },
+    {
+      name: "arcigy.send_approved_outreach_reply",
+      description: "Odosle uz schvalenu prepared outreach odpoved cez Gmail az po explicitnom potvrdeni.",
       requiresApproval: true,
     },
     {

@@ -12,7 +12,7 @@ import { draftContractIntake, parseJsonObject } from "../src/automation-system/c
 import { runIntegrationDiagnostics } from "../src/automation-system/diagnostics.ts";
 import { getIntegrationHealth } from "../src/automation-system/env.ts";
 import { buildClientReplyPrompt, generateGeminiText } from "../src/automation-system/gemini.ts";
-import { defaultGmailSyncQuery, listRecentGmailMessageEvents, parseFromHeader, refreshGoogleAccessToken } from "../src/automation-system/gmail.ts";
+import { defaultGmailSyncQuery, encodeGmailRawMessage, listRecentGmailMessageEvents, parseFromHeader, refreshGoogleAccessToken, sendGmailTextMessage } from "../src/automation-system/gmail.ts";
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "../src/automation-system/lead-discovery.ts";
 import {
   buildContractGenerationCommand,
@@ -44,6 +44,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.prepare_positive_outreach_reply",
     "arcigy.get_prepared_outreach_replies",
     "arcigy.approve_prepared_outreach_reply",
+    "arcigy.send_approved_outreach_reply",
     "arcigy.identify_email",
     "arcigy.upsert_local_person",
     "arcigy.add_client_need_signal",
@@ -136,6 +137,7 @@ test("remote MCP smoke checks every response for bearer token leaks", async () =
     if (
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
     ) {
       return responseJson({ error: `token leaked ${token}` }, 409);
@@ -189,6 +191,7 @@ test("remote MCP smoke requires valid quick-start URLs", async () => {
     if (
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
     ) {
       return responseJson({ error: "approval required" }, 409);
@@ -242,6 +245,7 @@ test("remote MCP smoke requires quick-start approval policy parity", async () =>
     if (
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
     ) {
       return responseJson({ error: "approval required" }, 409);
@@ -315,6 +319,7 @@ test("remote MCP smoke blocks generic secret patterns in response bodies", async
     if (
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
     ) {
       return responseJson({ error: "approval required" }, 409);
@@ -367,6 +372,7 @@ test("remote MCP smoke requires exact manifest and pack tool registries", async 
     if (
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
     ) {
       return responseJson({ error: "approval required" }, 409);
@@ -421,6 +427,7 @@ test("remote MCP smoke requires valid manifest tool metadata", async () => {
     if (
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
     ) {
       return responseJson({ error: "approval required" }, 409);
@@ -472,6 +479,7 @@ test("remote MCP smoke requires exact manifest and pack tool policies", async ()
     if (
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
     ) {
       return responseJson({ error: "approval required" }, 409);
@@ -524,6 +532,7 @@ test("remote MCP smoke requires guarded connection pack limits", async () => {
     if (
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
     ) {
       return responseJson({ error: "approval required" }, 409);
@@ -705,6 +714,7 @@ test("remote MCP smoke requires the audit trail quick-start", async () => {
     if (
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
     ) {
       return responseJson({ error: "approval required" }, 409);
@@ -1146,6 +1156,38 @@ test("Gmail helper defaults to inbox sync query", async () => {
   const listUrl = calls.find((url) => url.includes("/messages?")) ?? "";
   assert.equal(defaultGmailSyncQuery, "in:inbox newer_than:7d");
   assert.equal(new URL(listUrl).searchParams.get("q"), defaultGmailSyncQuery);
+});
+
+test("Gmail helper sends raw text messages through Gmail API", async () => {
+  const calls: Array<{ url: string; body?: unknown; headers?: HeadersInit }> = [];
+  const fetchImpl = async (url: string | URL | Request, init?: RequestInit) => {
+    const target = String(url);
+    calls.push({
+      url: target,
+      body: init?.headers && JSON.stringify(init.headers).includes("application/json") && init?.body ? JSON.parse(String(init.body)) : init?.body,
+      headers: init?.headers,
+    });
+    if (target.includes("oauth2.googleapis.com")) return responseJson({ access_token: "access-token" });
+    if (target.includes("/messages/send")) return responseJson({ id: "gmail-message-1", threadId: "thread-1", labelIds: ["SENT"] });
+    throw new Error(`Unexpected URL: ${target}`);
+  };
+
+  const result = await sendGmailTextMessage(
+    { envKey: "GMAIL_REFRESH_TOKEN_TEST", label: "test", refreshToken: "refresh" },
+    { to: "lead@example.com", subject: "Re: automation", text: "Dakujem za reakciu.", threadId: "thread-1" },
+    { GOOGLE_CLIENT_ID: "client", GOOGLE_CLIENT_SECRET: "secret" },
+    fetchImpl as typeof fetch
+  );
+
+  assert.equal(result.id, "gmail-message-1");
+  const sendCall = calls.find((call) => call.url.includes("/messages/send"));
+  assert.equal(sendCall?.body && typeof sendCall.body === "object" && "threadId" in sendCall.body ? sendCall.body.threadId : undefined, "thread-1");
+  const raw = String(sendCall?.body && typeof sendCall.body === "object" && "raw" in sendCall.body ? sendCall.body.raw : "");
+  const decoded = Buffer.from(raw.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf-8");
+  assert.match(decoded, /To: lead@example\.com/);
+  assert.match(decoded, /Subject: Re: automation/);
+  assert.match(decoded, /Dakujem za reakciu\./);
+  assert.equal(encodeGmailRawMessage({ to: "lead@example.com", subject: "Hello\r\nBcc: bad@example.com", text: "Body" }).includes("\r"), false);
 });
 
 test("Gmail OAuth refresh falls back to the secondary Google token endpoint", async () => {
@@ -2146,6 +2188,17 @@ test("local SQLite CLI lists and approves prepared outreach replies", () => {
   ]);
   assert.equal(approved.status, "approved");
   assert.equal(approved.approvedEvent.eventType, "approved_reply");
+
+  const approvedStatus = runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "get-prepared-reply",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify({ preparedEventId: prepared.id }),
+  ]);
+  assert.equal(approvedStatus.status, "approved");
+  assert.equal(approvedStatus.preparedReply.id, prepared.id);
 
   const after = runPythonJson(python, [
     "scripts/jarvis_local_db.py",

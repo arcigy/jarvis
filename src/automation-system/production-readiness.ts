@@ -117,7 +117,12 @@ function buildLaunchChecklist(
   const warnings = blockers.filter((blocker) => blocker.severity === "warning");
   const blocking = blockers.filter((blocker) => blocker.severity === "blocking");
   const approvalTools = tools.filter((tool) => tool.requiresApproval).map((tool) => String(tool.name));
-  const requiredApprovalTools = ["arcigy.generate_contract_documents", "arcigy.approve_prepared_outreach_reply", "arcigy.append_leads_to_google_sheet"];
+  const requiredApprovalTools = [
+    "arcigy.generate_contract_documents",
+    "arcigy.approve_prepared_outreach_reply",
+    "arcigy.send_approved_outreach_reply",
+    "arcigy.append_leads_to_google_sheet",
+  ];
   const approvalReady = requiredApprovalTools.every((tool) => approvalTools.includes(tool));
   const liveChecks = diagnostics?.checks ?? [];
   const liveBlocking = liveChecks.filter((check) => check.status === "failed" && !["redis", "serper"].includes(check.key));
@@ -148,7 +153,7 @@ function buildLaunchChecklist(
       id: "approval-locks",
       title: "Approval locks",
       status: approvalReady ? "ready" : "blocked",
-      proof: approvalReady ? `${approvalTools.length} approval-gated tool(s), including contract, prepared reply, and Sheet writes.` : "One or more required approval gates are missing.",
+      proof: approvalReady ? `${approvalTools.length} approval-gated tool(s), including contract, prepared reply send, and Sheet writes.` : "One or more required approval gates are missing.",
       nextAction: approvalReady ? "Review exact payloads before approving write tools." : "Restore approval gates for write tools before live use.",
     },
     {

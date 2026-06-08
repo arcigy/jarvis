@@ -10,7 +10,7 @@ import { draftContractIntake } from "./contract-intake-draft.ts";
 import { runIntegrationDiagnostics } from "./diagnostics.ts";
 import { getIntegrationHealth, loadLocalEnv, summarizeIntegrationHealth } from "./env.ts";
 import { buildClientReplyPrompt, buildPositiveOutreachReplyPrompt, generateGeminiText } from "./gemini.ts";
-import { defaultGmailBriefingQuery, defaultGmailSyncQuery, listConfiguredGmailAccounts, listRecentGmailMessageEvents } from "./gmail.ts";
+import { defaultGmailBriefingQuery, defaultGmailSyncQuery, listConfiguredGmailAccounts, listRecentGmailMessageEvents, sendGmailTextMessage } from "./gmail.ts";
 import { handleJarvisVoiceEvent, type JarvisVoiceSession } from "./jarvis-voice.ts";
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "./lead-discovery.ts";
 import {
@@ -218,6 +218,34 @@ export function createJarvisMcpServer(): McpServer {
     async ({ dbPath, ...payload }) => {
       requireExplicitApproval("arcigy.approve_prepared_outreach_reply", payload);
       return jsonDbTool("approve-prepared-reply", payload, dbPath);
+    }
+  );
+
+  server.registerTool(
+    "arcigy.send_approved_outreach_reply",
+    {
+      title: "Send approved outreach reply",
+      description: "Send an already-approved prepared outreach reply through Gmail after explicit operator confirmation.",
+      inputSchema: {
+        dbPath: z.string().optional(),
+        preparedEventId: z.string().min(1),
+        accountEnvKey: z.string().optional(),
+        subject: z.string().optional(),
+        threadId: z.string().optional(),
+        approval: approvalSchema,
+        sentBy: z.string().optional(),
+        occurredAt: z.string().optional(),
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+    },
+    async ({ dbPath, ...payload }) => {
+      requireExplicitApproval("arcigy.send_approved_outreach_reply", payload);
+      return jsonResult(await sendApprovedOutreachReply(payload, dbPath));
     }
   );
 
@@ -911,6 +939,7 @@ function jsonDbTool(
     | "cold-brief"
     | "list-prepared-replies"
     | "approve-prepared-reply"
+    | "get-prepared-reply"
     | "ingest-message"
     | "list-open-needs"
     | "add-audit-event"
@@ -929,6 +958,7 @@ function runDbCommand(
     | "cold-brief"
     | "list-prepared-replies"
     | "approve-prepared-reply"
+    | "get-prepared-reply"
     | "ingest-message"
     | "list-open-needs"
     | "add-audit-event"
@@ -994,6 +1024,92 @@ async function preparePositiveOutreachReply(
     attempts: draft.attempts,
     summary: `Jarvis: Pripravil som odpoved pre ${payload.leadEmail}. Poslem ju az po tvojom schvaleni cez arcigy.approve_prepared_outreach_reply.`,
   };
+}
+
+async function sendApprovedOutreachReply(
+  payload: {
+    preparedEventId: string;
+    accountEnvKey?: string;
+    subject?: string;
+    threadId?: string;
+    sentBy?: string;
+    occurredAt?: string;
+  },
+  dbPath?: string
+) {
+  const status = runDbCommand("get-prepared-reply", { preparedEventId: payload.preparedEventId }, dbPath) as {
+    status: string;
+    preparedReply: {
+      leadEmail: string;
+      campaignId?: string | null;
+      campaignName?: string | null;
+      subject?: string | null;
+      replyText?: string | null;
+      data?: Record<string, unknown>;
+    };
+    sentEvent?: unknown;
+  };
+  if (status.status === "sent") {
+    return {
+      status: "already_sent",
+      preparedReply: status.preparedReply,
+      sentEvent: status.sentEvent,
+      summary: `Jarvis: Odpoved pre ${status.preparedReply.leadEmail} uz bola odoslana.`,
+    };
+  }
+  if (status.status !== "approved") {
+    throw new Error("Prepared reply must be approved before sending.");
+  }
+  const replyText = status.preparedReply.replyText?.trim();
+  if (!replyText) throw new Error("Prepared reply text is missing.");
+
+  const accounts = listConfiguredGmailAccounts().filter((account) => !payload.accountEnvKey || account.envKey === payload.accountEnvKey);
+  if (!accounts.length) {
+    throw new Error(payload.accountEnvKey ? `Configured Gmail account not found: ${payload.accountEnvKey}` : "No configured Gmail accounts found.");
+  }
+
+  let lastError: Error | null = null;
+  for (const account of accounts) {
+    try {
+      const gmail = await sendGmailTextMessage(account, {
+        to: status.preparedReply.leadEmail,
+        subject: payload.subject ?? status.preparedReply.subject ?? "Re: Arcigy",
+        text: replyText,
+        threadId: payload.threadId ?? (typeof status.preparedReply.data?.threadId === "string" ? status.preparedReply.data.threadId : undefined),
+      });
+      const sentEvent = runDbCommand(
+        "add-cold-event",
+        {
+          leadEmail: status.preparedReply.leadEmail,
+          campaignId: status.preparedReply.campaignId,
+          campaignName: status.preparedReply.campaignName,
+          eventType: "approved_reply_sent",
+          occurredAt: payload.occurredAt,
+          data: {
+            preparedEventId: payload.preparedEventId,
+            sentBy: payload.sentBy ?? "operator",
+            account: account.label,
+            accountEnvKey: account.envKey,
+            gmailMessageId: gmail.id,
+            gmailThreadId: gmail.threadId,
+            subject: payload.subject ?? status.preparedReply.subject ?? "Re: Arcigy",
+          },
+        },
+        dbPath
+      );
+      return {
+        status: "sent",
+        preparedReply: status.preparedReply,
+        sentEvent,
+        gmail,
+        summary: `Jarvis: Odpoved pre ${status.preparedReply.leadEmail} bola odoslana cez Gmail.`,
+      };
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      if (payload.accountEnvKey) break;
+    }
+  }
+  throw new Error(lastError?.message ?? "Gmail send failed.");
 }
 
 function requireExplicitApproval(name: string, payload: { approval?: { approved?: boolean } }) {

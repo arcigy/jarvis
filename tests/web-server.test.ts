@@ -76,12 +76,14 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(manifest.auth.requiredForExternalHosts, true);
     assert.match(manifest.endpoints.mcpToolCallPattern, /\/api\/mcp\/\{toolName\}$/);
     assert.ok(manifest.toolPolicy.approvalRequired.includes("arcigy.generate_contract_documents"));
+    assert.ok(manifest.toolPolicy.approvalRequired.includes("arcigy.send_approved_outreach_reply"));
     assert.ok(manifest.toolPolicy.localStateWrite.includes("arcigy.sync_gmail_recent_messages"));
     assert.ok(manifest.toolPolicy.localStateWrite.includes("arcigy.prepare_positive_outreach_reply"));
     assert.equal(manifest.toolPolicy.readOnlyOrDraft.includes("arcigy.ingest_client_message"), false);
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.draft_contract_intake" && tool.method === "POST"));
     assert.ok(manifest.tools.every((tool) => tool.method === "POST" && tool.url.endsWith(`/api/mcp/${tool.name}`)));
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.generate_contract_documents" && tool.approval.required === true && tool.approval.field === "approval.approved"));
+    assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.send_approved_outreach_reply" && tool.approval.required === true && tool.approval.field === "approval.approved"));
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.get_smartlead_outreach_brief" && tool.method === "POST"));
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.sync_gmail_recent_messages" && tool.localStateWrite === true && tool.readOnlyOrDraft === false));
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.prepare_positive_outreach_reply" && tool.localStateWrite === true && tool.readOnlyOrDraft === false));
@@ -382,12 +384,14 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_client_need_alerts" && call.body.status === "new"));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_audit_events" && call.body.limit === 20));
     assert.ok(remotePackBody.tools.approvalRequired.includes("arcigy.append_leads_to_google_sheet"));
+    assert.ok(remotePackBody.tools.approvalRequired.includes("arcigy.send_approved_outreach_reply"));
     assert.ok(remotePackBody.tools.localStateWrite.includes("arcigy.sync_gmail_recent_messages"));
     assert.ok(remotePackBody.tools.localStateWrite.includes("arcigy.prepare_positive_outreach_reply"));
     assert.equal(remotePackBody.tools.readOnlyOrDraft.includes("arcigy.ingest_client_message"), false);
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.run_remote_mcp_smoke" && call.approvalRequired === false));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_outreach_brief" && !("campaignId" in call.body)));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.prepare_positive_outreach_reply" && call.body.leadEmail === "lead@example.com"));
+    assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.send_approved_outreach_reply" && call.approvalRequired === true));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.sync_gmail_recent_messages" && call.body.dryRun === true));
     assert.ok(
       remotePackBody.quickStartCalls.some(
@@ -613,6 +617,7 @@ test("local web bridge preflight reports tunnel readiness without leaking secret
     assert.ok(body.mcpToolCount >= 28);
     assert.ok(body.riskyToolsRequiringApproval.includes("arcigy.generate_contract_documents"));
     assert.ok(body.riskyToolsRequiringApproval.includes("arcigy.approve_prepared_outreach_reply"));
+    assert.ok(body.riskyToolsRequiringApproval.includes("arcigy.send_approved_outreach_reply"));
     assert.ok(body.riskyToolsRequiringApproval.includes("arcigy.append_leads_to_google_sheet"));
     assert.equal(body.pathPolicy, "repo-only");
     assert.equal(body.maxJsonBytes > 0, true);
@@ -706,9 +711,16 @@ test("local web bridge MCP AI reply preserves prompt options", async () => {
 
 test("local web bridge prepares positive outreach replies with Gemini and stores approval draft", async () => {
   const previousGeminiKey = process.env.GEMINI_API_KEY;
+  const previousClientId = process.env.GOOGLE_CLIENT_ID;
+  const previousClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const previousRefresh = process.env.GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP;
   const originalFetch = globalThis.fetch.bind(globalThis);
   const geminiBodies: unknown[] = [];
+  const gmailBodies: unknown[] = [];
   process.env.GEMINI_API_KEY = "gemini";
+  process.env.GOOGLE_CLIENT_ID = "client";
+  process.env.GOOGLE_CLIENT_SECRET = "secret";
+  process.env.GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP = "refresh";
   globalThis.fetch = async (input: string | URL | Request, init?: RequestInit) => {
     const target = String(input);
     if (target.includes("generativelanguage.googleapis.com")) {
@@ -716,6 +728,13 @@ test("local web bridge prepares positive outreach replies with Gemini and stores
       return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "Dakujem za reakciu, navrhujem kratky 15-min call." }] } }] }), {
         headers: { "content-type": "application/json" },
       });
+    }
+    if (target.includes("oauth2.googleapis.com")) {
+      return new Response(JSON.stringify({ access_token: "access-token" }), { headers: { "content-type": "application/json" } });
+    }
+    if (target.includes("/messages/send")) {
+      gmailBodies.push(JSON.parse(String(init?.body)));
+      return new Response(JSON.stringify({ id: "gmail-web-sent-1", threadId: "thread-web-1" }), { headers: { "content-type": "application/json" } });
     }
     return originalFetch(input, init);
   };
@@ -754,10 +773,39 @@ test("local web bridge prepares positive outreach replies with Gemini and stores
     assert.equal(pending.result.count, 1);
     assert.equal(pending.result.replies[0].replyText, "Dakujem za reakciu, navrhujem kratky 15-min call.");
     assert.equal(pending.result.replies[0].positiveSignal, "Lead chce demo a navrhol call.");
+
+    const unapprovedSend = await fetch(`${baseUrl}/api/mcp/arcigy.send_approved_outreach_reply`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ dbPath, preparedEventId: prepared.result.preparedReply.id }),
+    });
+    assert.equal(unapprovedSend.status, 409);
+
+    await postJson(`${baseUrl}/api/mcp/arcigy.approve_prepared_outreach_reply`, {
+      dbPath,
+      preparedEventId: prepared.result.preparedReply.id,
+      approval: { approved: true },
+    });
+    const sent = await postJson(`${baseUrl}/api/mcp/arcigy.send_approved_outreach_reply`, {
+      dbPath,
+      preparedEventId: prepared.result.preparedReply.id,
+      approval: { approved: true },
+      subject: "Re: automatizacie",
+    });
+    assert.equal(sent.result.status, "sent");
+    assert.equal(sent.result.gmail.id, "gmail-web-sent-1");
+    assert.equal(sent.result.sentEvent.eventType, "approved_reply_sent");
+    assert.equal(gmailBodies.length, 1);
   } finally {
     globalThis.fetch = originalFetch;
     if (previousGeminiKey === undefined) delete process.env.GEMINI_API_KEY;
     else process.env.GEMINI_API_KEY = previousGeminiKey;
+    if (previousClientId === undefined) delete process.env.GOOGLE_CLIENT_ID;
+    else process.env.GOOGLE_CLIENT_ID = previousClientId;
+    if (previousClientSecret === undefined) delete process.env.GOOGLE_CLIENT_SECRET;
+    else process.env.GOOGLE_CLIENT_SECRET = previousClientSecret;
+    if (previousRefresh === undefined) delete process.env.GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP;
+    else process.env.GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP = previousRefresh;
     await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   }
 });

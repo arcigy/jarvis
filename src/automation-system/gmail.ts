@@ -38,6 +38,19 @@ type GmailMessageResponse = {
   };
 };
 
+export type GmailSendInput = {
+  to: string;
+  subject: string;
+  text: string;
+  threadId?: string;
+};
+
+export type GmailSendResult = {
+  id: string;
+  threadId?: string;
+  labelIds?: string[];
+};
+
 export function listConfiguredGmailAccounts(env: RuntimeEnv = process.env): GmailAccount[] {
   const accounts: GmailAccount[] = [];
   for (const envKey of gmailRefreshTokenEnv) {
@@ -133,6 +146,20 @@ export async function listRecentGmailMessageEvents(
   return events.filter((event) => event.fromEmail && event.text);
 }
 
+export async function sendGmailTextMessage(
+  account: GmailAccount,
+  input: GmailSendInput,
+  env: RuntimeEnv = process.env,
+  fetchImpl: FetchLike = fetch
+): Promise<GmailSendResult> {
+  const accessToken = await refreshGoogleAccessToken(account.refreshToken, env, fetchImpl);
+  const payload: { raw: string; threadId?: string } = {
+    raw: encodeGmailRawMessage(input),
+  };
+  if (input.threadId) payload.threadId = input.threadId;
+  return gmailPost<GmailSendResult>("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", accessToken, payload, fetchImpl);
+}
+
 async function gmailFetch<T>(url: string, accessToken: string, fetchImpl: FetchLike): Promise<T> {
   const response = await fetchImpl(url, {
     headers: { authorization: `Bearer ${accessToken}` },
@@ -141,6 +168,40 @@ async function gmailFetch<T>(url: string, accessToken: string, fetchImpl: FetchL
     throw new Error(`Gmail request failed: ${response.status}`);
   }
   return (await response.json()) as T;
+}
+
+async function gmailPost<T>(url: string, accessToken: string, payload: unknown, fetchImpl: FetchLike): Promise<T> {
+  const response = await fetchImpl(url, {
+    method: "POST",
+    headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw new Error(`Gmail request failed: ${response.status}`);
+  }
+  return (await response.json()) as T;
+}
+
+export function encodeGmailRawMessage(input: GmailSendInput): string {
+  const subject = input.subject.trim() || "Re: Arcigy";
+  const lines = [
+    `To: ${input.to}`,
+    `Subject: ${sanitizeHeader(subject)}`,
+    "MIME-Version: 1.0",
+    'Content-Type: text/plain; charset="UTF-8"',
+    "Content-Transfer-Encoding: 8bit",
+    "",
+    input.text,
+  ];
+  return Buffer.from(lines.join("\r\n"), "utf-8")
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
+
+function sanitizeHeader(value: string): string {
+  return value.replace(/[\r\n]+/g, " ").trim();
 }
 
 export function parseFromHeader(header: string): { email: string; displayName?: string } {

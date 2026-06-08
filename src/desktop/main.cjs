@@ -372,7 +372,12 @@ function buildReadinessLaunchChecklist(integrations, bridge, blockers, diagnosti
   const warnings = blockers.filter((blocker) => blocker.severity === "warning");
   const blocking = blockers.filter((blocker) => blocker.severity === "blocking");
   const approvalTools = bridge.riskyToolsRequiringApproval || [];
-  const requiredApprovalTools = ["arcigy.generate_contract_documents", "arcigy.approve_prepared_outreach_reply", "arcigy.append_leads_to_google_sheet"];
+  const requiredApprovalTools = [
+    "arcigy.generate_contract_documents",
+    "arcigy.approve_prepared_outreach_reply",
+    "arcigy.send_approved_outreach_reply",
+    "arcigy.append_leads_to_google_sheet",
+  ];
   const approvalReady = requiredApprovalTools.every((tool) => approvalTools.includes(tool));
   const liveChecks = diagnostics?.checks || [];
   const liveBlocking = liveChecks.filter((check) => check.status === "failed" && !["redis", "serper"].includes(check.key));
@@ -403,7 +408,7 @@ function buildReadinessLaunchChecklist(integrations, bridge, blockers, diagnosti
       id: "approval-locks",
       title: "Approval locks",
       status: approvalReady ? "ready" : "blocked",
-      proof: approvalReady ? `${approvalTools.length} approval-gated tool(s), including contract, prepared reply, and Sheet writes.` : "One or more required approval gates are missing.",
+      proof: approvalReady ? `${approvalTools.length} approval-gated tool(s), including contract, prepared reply send, and Sheet writes.` : "One or more required approval gates are missing.",
       nextAction: approvalReady ? "Review exact payloads before approving write tools." : "Restore approval gates for write tools before live use.",
     },
     {
@@ -636,7 +641,7 @@ async function getRemoteMcpPack(payload = {}) {
       "Run the smokeTestUrl before handoff and require ready checks for pack-limits, approval-gate, approval-shape-gate, and secret-redaction.",
       "Call MCP tools with POST JSON to mcpToolCallPattern.",
       "Use the bearer auth header placeholder; the real token must be supplied by the operator and is never returned by this pack.",
-      "Treat generate_contract_documents, approve_prepared_outreach_reply, and append_leads_to_google_sheet as approval-gated actions.",
+      "Treat generate_contract_documents, approve_prepared_outreach_reply, send_approved_outreach_reply, and append_leads_to_google_sheet as approval-gated actions.",
       "Treat localStateWrite tools as local memory writes. Prefer dryRun: true for sync_gmail_recent_messages before ingesting messages.",
       "Use get_operator_briefing for a Jarvis-style daily status before making recommendations.",
     ],
@@ -781,6 +786,14 @@ function buildRemoteMcpQuickStartCalls(baseUrl) {
         tone: "executive",
       },
       approvalRequired: false,
+    },
+    {
+      label: "Send an approved outreach reply after approval",
+      tool: "arcigy.send_approved_outreach_reply",
+      method: "POST",
+      url: toolUrl("arcigy.send_approved_outreach_reply"),
+      body: { preparedEventId: "prepared_reply_event_id", approval: { approved: true } },
+      approvalRequired: true,
     },
     {
       label: "Draft contract intake JSON without writing files",
@@ -1027,6 +1040,7 @@ async function checkApprovalGates(baseUrl, token, topLevelApproved) {
   const payloads = [
     ["arcigy.generate_contract_documents", { intake: {} }],
     ["arcigy.approve_prepared_outreach_reply", { preparedEventId: "smoke-prepared-reply" }],
+    ["arcigy.send_approved_outreach_reply", { preparedEventId: "smoke-prepared-reply" }],
     ["arcigy.append_leads_to_google_sheet", { rows: [["Smoke", "https://example.com"]] }],
   ];
   const bodies = [];
@@ -1235,6 +1249,7 @@ function listWebMcpTools() {
     { name: "arcigy.prepare_positive_outreach_reply", requiresApproval: false },
     { name: "arcigy.get_prepared_outreach_replies", requiresApproval: false },
     { name: "arcigy.approve_prepared_outreach_reply", requiresApproval: true },
+    { name: "arcigy.send_approved_outreach_reply", requiresApproval: true },
     { name: "arcigy.identify_email", requiresApproval: false },
     { name: "arcigy.upsert_local_person", requiresApproval: false },
     { name: "arcigy.add_client_need_signal", requiresApproval: false },

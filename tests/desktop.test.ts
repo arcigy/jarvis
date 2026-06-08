@@ -441,6 +441,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /ipcMain\.handle\("jarvis:discoverLeads"/);
   assert.match(main, /ipcMain\.handle\("jarvis:appendLeadsToGoogleSheet"/);
   assert.match(main, /arcigy\.append_leads_to_google_sheet requires explicit approval/);
+  assert.match(main, /arcigy\.send_approved_outreach_reply/);
   assert.doesNotMatch(main, /payload\?\.approved !== true && payload\?\.approval\?\.approved !== true/);
   assert.match(main, /listRecentGmailMessageEvents/);
   assert.match(main, /defaultGmailSyncQuery/);

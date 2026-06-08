@@ -33,6 +33,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(names.includes("arcigy.get_prepared_outreach_replies"));
   assert.ok(names.includes("arcigy.prepare_positive_outreach_reply"));
   assert.ok(names.includes("arcigy.approve_prepared_outreach_reply"));
+  assert.ok(names.includes("arcigy.send_approved_outreach_reply"));
   assert.ok(names.includes("arcigy.identify_email"));
   assert.ok(names.includes("arcigy.ingest_client_message"));
   assert.ok(names.includes("arcigy.get_client_need_alerts"));
@@ -144,6 +145,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.equal(pack.limits.writesRequireExplicitToolCall, true);
   assert.equal(pack.tools.count, listJarvisMcpTools().length);
   assert.ok(pack.tools.approvalRequired.includes("arcigy.generate_contract_documents"));
+  assert.ok(pack.tools.approvalRequired.includes("arcigy.send_approved_outreach_reply"));
   assert.ok(pack.tools.localStateWrite.includes("arcigy.sync_gmail_recent_messages"));
   assert.ok(pack.tools.localStateWrite.includes("arcigy.prepare_positive_outreach_reply"));
   assert.ok(pack.tools.localStateWrite.includes("arcigy.ingest_client_message"));
@@ -169,6 +171,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_outreach_brief" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_outreach_brief" && !("campaignId" in call.body)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.sync_gmail_recent_messages" && call.body.dryRun === true));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.send_approved_outreach_reply" && call.approvalRequired === true));
   assert.ok(
     pack.quickStartCalls.some(
       (call) => call.tool === "arcigy.draft_contract_intake" && call.approvalRequired === false && typeof call.body.brief === "string"
@@ -455,6 +458,107 @@ test("Jarvis MCP server prepares positive outreach replies with Gemini", async (
     globalThis.fetch = originalFetch;
     if (previousGeminiKey === undefined) delete process.env.GEMINI_API_KEY;
     else process.env.GEMINI_API_KEY = previousGeminiKey;
+    await client.close();
+    await server.close();
+  }
+});
+
+test("Jarvis MCP server sends approved outreach replies through Gmail", async () => {
+  const previousGeminiKey = process.env.GEMINI_API_KEY;
+  const previousClientId = process.env.GOOGLE_CLIENT_ID;
+  const previousClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const previousRefresh = process.env.GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP;
+  const originalFetch = globalThis.fetch.bind(globalThis);
+  process.env.GEMINI_API_KEY = "gemini";
+  process.env.GOOGLE_CLIENT_ID = "client";
+  process.env.GOOGLE_CLIENT_SECRET = "secret";
+  process.env.GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP = "refresh";
+  const gmailBodies: unknown[] = [];
+  globalThis.fetch = async (input: string | URL | Request, init?: RequestInit) => {
+    const target = String(input);
+    if (target.includes("generativelanguage.googleapis.com")) {
+      return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "Dakujem, posielam termin na kratky call." }] } }] }), {
+        headers: { "content-type": "application/json" },
+      });
+    }
+    if (target.includes("oauth2.googleapis.com")) {
+      return new Response(JSON.stringify({ access_token: "access-token" }), { headers: { "content-type": "application/json" } });
+    }
+    if (target.includes("/messages/send")) {
+      gmailBodies.push(JSON.parse(String(init?.body)));
+      return new Response(JSON.stringify({ id: "gmail-sent-1", threadId: "thread-1" }), { headers: { "content-type": "application/json" } });
+    }
+    return originalFetch(input, init);
+  };
+
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  const server = createJarvisMcpServer();
+  const client = new Client({ name: "test-client", version: "0.1.0" });
+  const dbPath = join(makeRepoTempDir("jarvis-mcp-send-"), "jarvis.db");
+
+  await server.connect(serverTransport);
+  await client.connect(clientTransport);
+
+  try {
+    const prepared = await client.callTool({
+      name: "arcigy.prepare_positive_outreach_reply",
+      arguments: {
+        dbPath,
+        leadEmail: "lead@example.com",
+        positiveSignal: "Lead chce demo.",
+        subject: "Re: demo",
+      },
+    });
+    const preparedBody = getStructuredResult(prepared) as { preparedReply: { id: string } };
+
+    assertToolError(
+      await client.callTool({
+        name: "arcigy.send_approved_outreach_reply",
+        arguments: { dbPath, preparedEventId: preparedBody.preparedReply.id, approval: { approved: true } },
+      }),
+      /must be approved before sending/
+    );
+
+    await client.callTool({
+      name: "arcigy.approve_prepared_outreach_reply",
+      arguments: { dbPath, preparedEventId: preparedBody.preparedReply.id, approval: { approved: true } },
+    });
+
+    assertToolError(
+      await client.callTool({
+        name: "arcigy.send_approved_outreach_reply",
+        arguments: { dbPath, preparedEventId: preparedBody.preparedReply.id },
+      }),
+      /requires explicit approval/
+    );
+
+    const sent = await client.callTool({
+      name: "arcigy.send_approved_outreach_reply",
+      arguments: { dbPath, preparedEventId: preparedBody.preparedReply.id, approval: { approved: true }, subject: "Re: demo" },
+    });
+    const sentBody = getStructuredResult(sent) as { status: string; gmail: { id: string }; sentEvent: { eventType: string } };
+    assert.equal(sentBody.status, "sent");
+    assert.equal(sentBody.gmail.id, "gmail-sent-1");
+    assert.equal(sentBody.sentEvent.eventType, "approved_reply_sent");
+    assert.equal(gmailBodies.length, 1);
+
+    const alreadySent = await client.callTool({
+      name: "arcigy.send_approved_outreach_reply",
+      arguments: { dbPath, preparedEventId: preparedBody.preparedReply.id, approval: { approved: true }, subject: "Re: demo" },
+    });
+    const alreadySentBody = getStructuredResult(alreadySent) as { status: string };
+    assert.equal(alreadySentBody.status, "already_sent");
+    assert.equal(gmailBodies.length, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (previousGeminiKey === undefined) delete process.env.GEMINI_API_KEY;
+    else process.env.GEMINI_API_KEY = previousGeminiKey;
+    if (previousClientId === undefined) delete process.env.GOOGLE_CLIENT_ID;
+    else process.env.GOOGLE_CLIENT_ID = previousClientId;
+    if (previousClientSecret === undefined) delete process.env.GOOGLE_CLIENT_SECRET;
+    else process.env.GOOGLE_CLIENT_SECRET = previousClientSecret;
+    if (previousRefresh === undefined) delete process.env.GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP;
+    else process.env.GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP = previousRefresh;
     await client.close();
     await server.close();
   }

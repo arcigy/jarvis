@@ -172,6 +172,7 @@ async function checkApprovalGates(fetchImpl: typeof fetch, baseUrl: string, bear
   const payloads: Array<[string, Record<string, unknown>]> = [
     ["arcigy.generate_contract_documents", { intake: {} }],
     ["arcigy.approve_prepared_outreach_reply", { preparedEventId: "smoke-prepared-reply" }],
+    ["arcigy.send_approved_outreach_reply", { preparedEventId: "smoke-prepared-reply" }],
     ["arcigy.append_leads_to_google_sheet", { rows: [["Smoke", "https://example.com"]] }],
   ];
   const bodies = [];
