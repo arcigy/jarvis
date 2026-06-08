@@ -393,6 +393,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /ipcMain\.handle\("jarvis:discoverLeads"/);
   assert.match(main, /ipcMain\.handle\("jarvis:appendLeadsToGoogleSheet"/);
   assert.match(main, /arcigy\.append_leads_to_google_sheet requires explicit approval/);
+  assert.doesNotMatch(main, /payload\?\.approved !== true && payload\?\.approval\?\.approved !== true/);
   assert.match(main, /listRecentGmailMessageEvents/);
   assert.match(main, /defaultGmailSyncQuery/);
   assert.match(main, /defaultGmailBriefingQuery/);
@@ -408,6 +409,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /leadProviderStatus/);
   assert.match(main, /ipcMain\.handle\("contracts:generate"/);
   assert.match(main, /arcigy\.generate_contract_documents requires explicit approval/);
+  assert.match(main, /approval-shape-gate/);
+  assert.match(main, /top-level \{"approved":true\}/);
   assert.match(main, /cleanPythonErrorMessage/);
   assert.match(main, /ValueError\|FileNotFoundError\|TypeError\|Error/);
   assert.match(main, /return redactSensitiveText\(valueError\.replace/);

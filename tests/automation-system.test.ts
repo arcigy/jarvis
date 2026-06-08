@@ -167,6 +167,7 @@ test("remote MCP smoke checks every response for bearer token leaks", async () =
   const report = await runRemoteMcpSmoke({ baseUrl: "https://jarvis.example", bearerToken: token, fetchImpl: fetchImpl as typeof fetch });
 
   assert.equal(report.status, "blocked");
+  assert.ok(report.checks.some((check) => check.key === "approval-shape-gate" && check.status === "ready"));
   assert.ok(report.checks.some((check) => check.key === "secret-redaction" && check.status === "blocked"));
 });
 

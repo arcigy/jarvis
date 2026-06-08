@@ -918,6 +918,8 @@ async function runRemoteMcpSmoke(payload = {}) {
   checks.push(smokeCheck(health.ok && Array.isArray(health.body?.result?.integrations), "read-only-tool-call", "Read-only MCP tool call returned integration health."));
   const approvalGate = await fetchJson(`${baseUrl}/api/mcp/arcigy.generate_contract_documents`, token, { intake: {} });
   checks.push(smokeCheck(approvalGate.status === 409, "approval-gate", "Approval-required write tool rejected an unapproved call."));
+  const topLevelApprovalGate = await fetchJson(`${baseUrl}/api/mcp/arcigy.generate_contract_documents`, token, { approved: true, intake: {} });
+  checks.push(smokeCheck(topLevelApprovalGate.status === 409, "approval-shape-gate", 'Approval-required write tool rejected top-level {"approved":true}.'));
   const leakedToken = token
     ? JSON.stringify({ manifest: manifest.body, pack: pack.body, health: health.body, approvalGate: approvalGate.body }).includes(token)
     : false;
@@ -930,7 +932,7 @@ async function runRemoteMcpSmoke(payload = {}) {
     baseUrl,
     summary:
       status === "ready"
-        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, local write policy, contract draft, contract quick-start, client memory quick-start, agent compatibility, handoff proof, read-only call, approval gate, and secret policy passed.`
+        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, local write policy, contract draft, contract quick-start, client memory quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((check) => check.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -2149,7 +2151,7 @@ function getGoogleMapsApiKeys() {
 }
 
 async function appendLeadsToGoogleSheet(payload) {
-  if (payload?.approved !== true && payload?.approval?.approved !== true) {
+  if (payload?.approval?.approved !== true) {
     throw new Error('arcigy.append_leads_to_google_sheet requires explicit approval. Send {"approval":{"approved":true}} after user confirmation.');
   }
   const rows = Array.isArray(payload?.rows) ? payload.rows : [];
@@ -2355,7 +2357,7 @@ function parseJsonObject(text) {
 }
 
 function generateContracts(payload) {
-  if (payload?.approved !== true && payload?.approval?.approved !== true) {
+  if (payload?.approval?.approved !== true) {
     throw new Error('arcigy.generate_contract_documents requires explicit approval. Send {"approval":{"approved":true}} after user confirmation.');
   }
   const outputDir = payload?.outputDir || path.join(repoRoot, "generated", "contracts");
