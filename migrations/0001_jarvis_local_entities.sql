@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS cold_outreach_events (
   lead_email TEXT NOT NULL,
   campaign_id TEXT,
   campaign_name TEXT,
-  event_type TEXT NOT NULL CHECK (event_type IN ('sent', 'opened', 'replied', 'positive_reply', 'prepared_reply', 'approved_reply_sent')),
+  event_type TEXT NOT NULL CHECK (event_type IN ('sent', 'opened', 'replied', 'positive_reply', 'prepared_reply', 'approved_reply', 'approved_reply_sent')),
   occurred_at TEXT NOT NULL,
   data_json TEXT NOT NULL DEFAULT '{}',
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP

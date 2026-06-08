@@ -38,7 +38,7 @@ Ak sú cold outreach eventy uložené lokálne v SQLite, MCP môže použiť:
 - `arcigy.get_prepared_outreach_replies`
 - `arcigy.approve_prepared_outreach_reply`
 
-Eventy používajú typy `sent`, `opened`, `replied`, `positive_reply`, `prepared_reply`, `approved_reply_sent`. Brief sa počíta za obdobie podľa `since`, `until` a `periodLabel`.
+Eventy používajú typy `sent`, `opened`, `replied`, `positive_reply`, `prepared_reply`, `approved_reply`. Staršie záznamy `approved_reply_sent` sa stále čítajú ako schválené kvôli spätnej kompatibilite. Brief sa počíta za obdobie podľa `since`, `until` a `periodLabel`.
 
 ## Lokálni klienti a leads
 
@@ -60,7 +60,7 @@ MCP nástroje:
 
 Desktop UI tento inbox sleduje kazdu minutu a cez TTS oznami iba novo zachytene poziadavky.
 
-Pripravene odpovede su ulozene ako `prepared_reply` eventy s textom v `data_json.replyText`. Schvalenie vytvori nadvazny `approved_reply_sent` event az po explicitnom potvrdeni.
+Pripravene odpovede su ulozene ako `prepared_reply` eventy s textom v `data_json.replyText`. Schvalenie vytvori nadvazny `approved_reply` event az po explicitnom potvrdeni. Tento krok oznaci odpoved ako pripravenu na odoslanie; netvrdi, ze email bol odoslany.
 
 ## Jarvis hlas
 

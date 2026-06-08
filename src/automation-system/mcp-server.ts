@@ -130,7 +130,7 @@ export function createJarvisMcpServer(): McpServer {
         leadEmail: z.string().email(),
         campaignId: z.string().optional(),
         campaignName: z.string().optional(),
-        eventType: z.enum(["sent", "opened", "replied", "positive_reply", "prepared_reply", "approved_reply_sent"]),
+        eventType: z.enum(["sent", "opened", "replied", "positive_reply", "prepared_reply", "approved_reply", "approved_reply_sent"]),
         occurredAt: z.string().optional(),
         data: z.record(z.string(), z.unknown()).optional(),
       },

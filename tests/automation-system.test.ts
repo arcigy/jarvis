@@ -1537,7 +1537,7 @@ test("local SQLite CLI lists and approves prepared outreach replies", () => {
     JSON.stringify({ preparedEventId: prepared.id, approvedBy: "test" }),
   ]);
   assert.equal(approved.status, "approved");
-  assert.equal(approved.approvedEvent.eventType, "approved_reply_sent");
+  assert.equal(approved.approvedEvent.eventType, "approved_reply");
 
   const after = runPythonJson(python, [
     "scripts/jarvis_local_db.py",
@@ -1548,6 +1548,42 @@ test("local SQLite CLI lists and approves prepared outreach replies", () => {
     JSON.stringify({ status: "pending", limit: 5 }),
   ]);
   assert.equal(after.count, 0);
+
+  const legacy = runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "add-cold-event",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify({
+      leadEmail: "legacy@example.com",
+      eventType: "prepared_reply",
+      occurredAt: "2026-06-07T11:00:00Z",
+      data: { replyText: "Legacy prepared reply." },
+    }),
+  ]);
+  runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "add-cold-event",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify({
+      leadEmail: "legacy@example.com",
+      eventType: "approved_reply_sent",
+      occurredAt: "2026-06-07T12:00:00Z",
+    }),
+  ]);
+  const legacyPending = runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "list-prepared-replies",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify({ status: "pending", limit: 5 }),
+  ]);
+  assert.equal(legacy.id.length > 0, true);
+  assert.equal(legacyPending.replies.some((reply: { id: string }) => reply.id === legacy.id), false);
 });
 
 test("local SQLite CLI records secret-safe audit events", () => {

@@ -217,7 +217,7 @@ def cold_brief(db_path: Path, payload: dict[str, Any]) -> dict[str, Any]:
           and not exists (
             select 1 from cold_outreach_events a
             where a.lead_email = p.lead_email
-              and a.event_type = 'approved_reply_sent'
+              and a.event_type in ('approved_reply', 'approved_reply_sent')
               and a.occurred_at >= p.occurred_at
           )
         """,
@@ -259,7 +259,7 @@ def list_prepared_replies(db_path: Path, payload: dict[str, Any]) -> dict[str, A
             not exists (
               select 1 from cold_outreach_events a
               where a.lead_email = p.lead_email
-                and a.event_type = 'approved_reply_sent'
+                and a.event_type in ('approved_reply', 'approved_reply_sent')
                 and a.occurred_at >= p.occurred_at
             )
             """
@@ -270,7 +270,7 @@ def list_prepared_replies(db_path: Path, payload: dict[str, Any]) -> dict[str, A
             exists (
               select 1 from cold_outreach_events a
               where a.lead_email = p.lead_email
-                and a.event_type = 'approved_reply_sent'
+                and a.event_type in ('approved_reply', 'approved_reply_sent')
                 and a.occurred_at >= p.occurred_at
             )
             """
@@ -316,7 +316,7 @@ def approve_prepared_reply(db_path: Path, payload: dict[str, Any]) -> dict[str, 
         """
         select * from cold_outreach_events
         where lead_email = ?
-          and event_type = 'approved_reply_sent'
+          and event_type in ('approved_reply', 'approved_reply_sent')
           and occurred_at >= ?
         order by occurred_at desc
         limit 1
@@ -352,7 +352,7 @@ def approve_prepared_reply(db_path: Path, payload: dict[str, Any]) -> dict[str, 
             "leadEmail": row["lead_email"],
             "campaignId": row["campaign_id"],
             "campaignName": row["campaign_name"],
-            "eventType": "approved_reply_sent",
+            "eventType": "approved_reply",
             "occurredAt": payload.get("occurredAt") or datetime.now(timezone.utc).isoformat(),
             "data": {
                 **prepared_data,

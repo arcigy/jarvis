@@ -445,7 +445,7 @@ test("Jarvis MCP server summarizes cold outreach from local SQLite events", asyn
   });
   const approvedBody = getStructuredResult(approvedReply) as { status: string; approvedEvent: { eventType: string } };
   assert.equal(approvedBody.status, "approved");
-  assert.equal(approvedBody.approvedEvent.eventType, "approved_reply_sent");
+  assert.equal(approvedBody.approvedEvent.eventType, "approved_reply");
 
   await client.callTool({
     name: "arcigy.ingest_client_message",
