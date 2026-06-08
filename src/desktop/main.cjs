@@ -861,6 +861,13 @@ async function runRemoteMcpSmoke(payload = {}) {
   checks.push(smokeCheck(manifest.ok, "manifest", manifest.ok ? "Manifest is reachable." : manifest.message));
   const manifestTools = Array.isArray(manifest.body?.tools) ? manifest.body.tools : [];
   checks.push(smokeCheck(manifestTools.length === expectedToolCount, "tool-count", `Manifest exposes ${manifestTools.length}/${expectedToolCount} MCP tools.`));
+  checks.push(
+    smokeCheck(
+      hasExactManifestRegistry(manifestTools),
+      "manifest-tool-registry",
+      "Manifest exposes the exact Jarvis MCP tool registry."
+    )
+  );
   checks.push(smokeCheck(manifest.body?.auth?.header === "Authorization: Bearer <JARVIS_WEB_TOKEN>", "auth-placeholder", "Manifest returns auth placeholder, not the token value."));
   checks.push(
     smokeCheck(
@@ -877,6 +884,13 @@ async function runRemoteMcpSmoke(payload = {}) {
       hasLocalWritePolicy(pack.body?.tools),
       "pack-local-write-policy",
       "Connection pack identifies local write tools separately from read-only/draft tools."
+    )
+  );
+  checks.push(
+    smokeCheck(
+      hasExactPackRegistry(pack.body?.tools),
+      "pack-tool-registry",
+      "Connection pack exposes the exact Jarvis MCP tool registry."
     )
   );
   checks.push(
@@ -975,6 +989,28 @@ function hasLocalWritePolicy(value) {
   const localStateWrite = Array.isArray(value.localStateWrite) ? value.localStateWrite : [];
   const readOnlyOrDraft = Array.isArray(value.readOnlyOrDraft) ? value.readOnlyOrDraft : [];
   return localStateWrite.includes("arcigy.sync_gmail_recent_messages") && !readOnlyOrDraft.includes("arcigy.sync_gmail_recent_messages");
+}
+
+function hasExactManifestRegistry(value) {
+  if (!Array.isArray(value)) return false;
+  return sameStringArray(
+    value.map((item) => (item && typeof item === "object" ? item.name : null)),
+    expectedToolNames()
+  );
+}
+
+function hasExactPackRegistry(value) {
+  if (!value || typeof value !== "object") return false;
+  const names = value.names;
+  return Array.isArray(names) && sameStringArray(names, expectedToolNames());
+}
+
+function expectedToolNames() {
+  return listWebMcpTools().map((tool) => tool.name);
+}
+
+function sameStringArray(actual, expected) {
+  return actual.length === expected.length && actual.every((item, index) => item === expected[index]);
 }
 
 function hasUsableContractQuickStart(value) {

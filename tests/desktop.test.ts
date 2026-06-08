@@ -324,8 +324,13 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /maxCampaigns: 10/);
   assert.match(main, /runRemoteMcpSmoke/);
   assert.match(main, /manifest-local-write-policy/);
+  assert.match(main, /manifest-tool-registry/);
   assert.match(main, /pack-local-write-policy/);
+  assert.match(main, /pack-tool-registry/);
   assert.match(main, /hasLocalWritePolicy/);
+  assert.match(main, /hasExactManifestRegistry/);
+  assert.match(main, /hasExactPackRegistry/);
+  assert.match(main, /sameStringArray/);
   assert.match(main, /pack-contract-quick-start/);
   assert.match(main, /pack-contract-draft-quick-start/);
   assert.match(main, /pack-handoff-proof/);
