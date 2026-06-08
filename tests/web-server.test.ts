@@ -650,6 +650,45 @@ test("local web bridge MCP AI reply preserves prompt options", async () => {
   }
 });
 
+test("local web bridge rejects empty MCP AI reply messages before Gemini", async () => {
+  const previousGeminiKey = process.env.GEMINI_API_KEY;
+  const originalFetch = globalThis.fetch.bind(globalThis);
+  let geminiCalls = 0;
+  process.env.GEMINI_API_KEY = "gemini";
+  globalThis.fetch = async (input: string | URL | Request, init?: RequestInit) => {
+    const target = String(input);
+    if (target.includes("generativelanguage.googleapis.com")) {
+      geminiCalls += 1;
+      return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "Should not happen." }] } }] }), {
+        headers: { "content-type": "application/json" },
+      });
+    }
+    return originalFetch(input, init);
+  };
+
+  const server = createLocalApiServer();
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  const baseUrl = `http://127.0.0.1:${address.port}`;
+
+  try {
+    const response = await fetch(`${baseUrl}/api/mcp/arcigy.generate_ai_reply`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ message: "   ", tone: "warm" }),
+    });
+    assert.equal(response.status, 400);
+    assert.match(await response.text(), /Client reply message is required/);
+    assert.equal(geminiCalls, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (previousGeminiKey === undefined) delete process.env.GEMINI_API_KEY;
+    else process.env.GEMINI_API_KEY = previousGeminiKey;
+    await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
 test("local web bridge redacts secrets from API error responses", async () => {
   const googleKey = "AI" + "za" + "S" + "y" + "C".repeat(32);
   const providerKey = ["aaaaaaaa", "bbbb", "cccc", "dddd", "eeeeeeeeeeee"].join("-") + "_ehpdn6s";

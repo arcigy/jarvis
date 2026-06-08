@@ -1156,9 +1156,11 @@ function optionalString(value: unknown): string | undefined {
 }
 
 function toClientReplyDraftInput(payload: Record<string, unknown>) {
+  const message = optionalString(payload.message);
+  if (!message) throw httpError(400, "Client reply message is required.");
   return {
     clientName: optionalString(payload.clientName),
-    message: String(payload.message ?? ""),
+    message,
     context: optionalString(payload.context),
     language: payload.language === "en" ? "en" : "sk",
     tone: payload.tone === "direct" || payload.tone === "warm" ? payload.tone : "executive",
