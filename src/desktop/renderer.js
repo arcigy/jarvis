@@ -204,6 +204,12 @@ function safeUiErrorText(error) {
   return redactSensitiveText(error instanceof Error ? error.message : String(error));
 }
 
+function requiredInputValue(element, message) {
+  const value = String(element?.value ?? "").trim();
+  if (!value) throw new Error(message);
+  return value;
+}
+
 function setMode(mode) {
   state.mode = mode;
   elements.statusBadge.textContent = mode === "idle" ? "Idle" : mode === "awake" ? "Awake" : "Listening";
@@ -1189,9 +1195,10 @@ elements.toggleClientNeedWatch.addEventListener("click", () => {
 });
 elements.draftReply.addEventListener("click", async () => {
   try {
+    const message = requiredInputValue(elements.clientMessage, "Client message is required before drafting.");
     elements.draftResult.textContent = "Drafting...";
     const result = await arcigyApi.generateAiReply({
-      message: elements.clientMessage.value,
+      message,
       context: "Client communication inside Arcigy Jarvis.",
     });
     elements.draftResult.textContent = result.text;
@@ -1348,10 +1355,11 @@ elements.exportLeads.addEventListener("click", async () => {
 });
 elements.draftContractIntake.addEventListener("click", async () => {
   try {
+    const brief = requiredInputValue(elements.contractBrief, "Contract brief is required before AI drafting.");
     elements.contractResult.textContent = "Drafting contract intake with Gemini...";
     const baseIntake = safeParseContractIntake();
     const intake = await arcigyApi.draftContractIntake({
-      brief: elements.contractBrief.value,
+      brief,
       baseIntake,
     });
     fillContractForm(intake);
