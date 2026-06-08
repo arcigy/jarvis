@@ -11,6 +11,7 @@
     "doctor": "node scripts/jarvis_doctor.ts",
     "readiness": "node scripts/jarvis_readiness.ts",
     "remote:mcp:smoke": "node scripts/remote_mcp_smoke.ts",
+    "ui:smoke": "electron scripts/jarvis_ui_smoke.cjs",
     "typecheck": "tsc --noEmit",
     "test": "node --test tests/*.test.ts"
   },

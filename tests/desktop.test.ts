@@ -10,9 +10,13 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   const styles = readFileSync("src/desktop/styles.css", "utf-8");
   const main = readFileSync("src/desktop/main.cjs", "utf-8");
   const preload = readFileSync("src/desktop/preload.cjs", "utf-8");
+  const packageJson = JSON.parse(readFileSync("package.json", "utf-8")) as { scripts: Record<string, string> };
+  const uiSmoke = readFileSync("scripts/jarvis_ui_smoke.cjs", "utf-8");
   const visualAsset = readFileSync("src/desktop/assets/jarvis-command-core.png");
 
   assert.match(html, /Arcigy Jarvis/);
+  assert.match(html, /Content-Security-Policy/);
+  assert.match(html, /object-src 'none'/);
   assert.match(html, /assets\/jarvis-command-core\.png/);
   assert.match(html, /Enable/);
   assert.match(html, /data-target="jarvisPanel"/);
@@ -228,6 +232,11 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(styles, /\.missionSignal\[data-state="ready"\]/);
   assert.match(styles, /@keyframes signalSweep/);
   assert.match(styles, /prefers-reduced-motion/);
+  assert.equal(packageJson.scripts["ui:smoke"], "electron scripts/jarvis_ui_smoke.cjs");
+  assert.match(uiSmoke, /capturePage/);
+  assert.match(uiSmoke, /JARVIS_UI_SMOKE_URL/);
+  assert.match(uiSmoke, /#missionRail/);
+  assert.match(uiSmoke, /Command core image did not load/);
   assert.equal(existsSync("src/desktop/assets/jarvis-command-core.png"), true);
   assert.equal(visualAsset.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
   assert.equal(statSync("src/desktop/assets/jarvis-command-core.png").size > 200000, true);

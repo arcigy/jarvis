@@ -90,6 +90,7 @@ function checkRequiredFiles(): DoctorCheck {
     "scripts/jarvis_local_db.py",
     "scripts/start_web_tunnel.ts",
     "scripts/jarvis_readiness.ts",
+    "scripts/jarvis_ui_smoke.cjs",
   ];
   const missing = requiredFiles.filter((file) => !existsSync(join(repoRoot, file)));
   return {
