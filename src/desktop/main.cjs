@@ -63,6 +63,7 @@ app.whenReady().then(() => {
   ipcMain.handle("jarvis:identifyEmail", (_event, payload) => identifyEmail(payload));
   ipcMain.handle("jarvis:ingestClientMessage", (_event, payload) => ingestClientMessage(payload));
   ipcMain.handle("jarvis:getClientNeedAlerts", (_event, payload) => getClientNeedAlerts(payload));
+  ipcMain.handle("jarvis:getAuditEvents", (_event, payload) => getAuditEvents(payload));
   ipcMain.handle("jarvis:generateAiReply", (_event, payload) => generateAiReply(payload));
   ipcMain.handle("jarvis:syncGmailRecentMessages", (_event, payload) => syncGmailRecentMessages(payload));
   ipcMain.handle("jarvis:getSmartleadCampaignStatus", (_event, payload) => getSmartleadCampaignStatus(payload));
@@ -389,9 +390,9 @@ function buildReadinessLaunchChecklist(integrations, bridge, blockers, diagnosti
     {
       id: "mcp-registry",
       title: "MCP tool registry",
-      status: bridge.mcpToolCount >= 27 ? "ready" : "blocked",
+      status: bridge.mcpToolCount >= 28 ? "ready" : "blocked",
       proof: `${bridge.mcpToolCount} MCP tool(s) registered.`,
-      nextAction: bridge.mcpToolCount >= 27 ? "Run npm run remote:mcp:smoke before remote agent handoff." : "Restore missing MCP tools, then rerun npm test.",
+      nextAction: bridge.mcpToolCount >= 28 ? "Run npm run remote:mcp:smoke before remote agent handoff." : "Restore missing MCP tools, then rerun npm test.",
     },
     {
       id: "approval-locks",
@@ -712,6 +713,14 @@ function buildRemoteMcpQuickStartCalls(baseUrl) {
       approvalRequired: false,
     },
     {
+      label: "Review recent Jarvis audit events",
+      tool: "arcigy.get_audit_events",
+      method: "POST",
+      url: toolUrl("arcigy.get_audit_events"),
+      body: { limit: 20 },
+      approvalRequired: false,
+    },
+    {
       label: "Get Smartlead outreach brief",
       tool: "arcigy.get_smartlead_outreach_brief",
       method: "POST",
@@ -990,6 +999,7 @@ function listWebMcpTools() {
     { name: "arcigy.add_client_need_signal", requiresApproval: false },
     { name: "arcigy.ingest_client_message", requiresApproval: false },
     { name: "arcigy.get_client_need_alerts", requiresApproval: false },
+    { name: "arcigy.get_audit_events", requiresApproval: false },
     { name: "arcigy.jarvis_voice_event", requiresApproval: false },
     { name: "arcigy.get_system_health", requiresApproval: false },
     { name: "arcigy.run_integration_diagnostics", requiresApproval: false },
@@ -2094,7 +2104,9 @@ async function appendLeadsToGoogleSheet(payload) {
     }
   );
   if (!response.ok) throw new Error(`Google Sheets append failed: ${response.status}`);
-  return response.json();
+  const result = await response.json();
+  addAuditEvent("arcigy.append_leads_to_google_sheet", "appended", payload, result, true);
+  return result;
 }
 
 async function draftContractIntake(payload) {
@@ -2265,12 +2277,52 @@ function generateContracts(payload) {
   ]);
   const manifestPath = path.join(outputDir, "generation-manifest.json");
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
-  return {
+  const response = {
     outputDir,
     manifestPath,
     generatedFiles: manifest.generatedFiles,
     stdout: result.stdout,
   };
+  addAuditEvent("arcigy.generate_contract_documents", "generated", payload, response, true);
+  return response;
+}
+
+function getAuditEvents(payload = {}) {
+  const result = runPython([
+    "scripts/jarvis_local_db.py",
+    "list-audit-events",
+    "--db",
+    payload?.dbPath || defaultDbPath,
+    "--payload",
+    JSON.stringify({
+      automationKey: payload?.automationKey,
+      status: payload?.status,
+      limit: payload?.limit || 20,
+    }),
+  ]);
+  return JSON.parse(result.stdout);
+}
+
+function addAuditEvent(automationKey, status, input, output, requiresApproval) {
+  try {
+    runPython([
+      "scripts/jarvis_local_db.py",
+      "add-audit-event",
+      "--db",
+      defaultDbPath,
+      "--payload",
+      JSON.stringify({
+        automationKey,
+        status,
+        input,
+        output,
+        requiresApproval,
+        approvedAt: requiresApproval ? new Date().toISOString() : undefined,
+      }),
+    ]);
+  } catch {
+    return;
+  }
 }
 
 function runPython(args) {

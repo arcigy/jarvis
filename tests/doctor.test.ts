@@ -47,7 +47,7 @@ test("Jarvis doctor reports local readiness without leaking secrets", () => {
     deniedContractStatus?: number;
     webContractOutputDir?: string;
   };
-  assert.equal(webBridgeDetails?.expectedToolCount, 27);
+  assert.equal(webBridgeDetails?.expectedToolCount, 28);
   assert.equal(webBridgeDetails?.uiAssetsReady, true);
   assert.equal(webBridgeDetails?.commandDeckReady, true);
   assert.equal(webBridgeDetails?.mcpToolCallReady, true);

@@ -232,6 +232,14 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Review recent Jarvis audit events",
+      tool: "arcigy.get_audit_events",
+      method: "POST",
+      url: toolUrl("arcigy.get_audit_events"),
+      body: { limit: 20 },
+      approvalRequired: false,
+    },
+    {
       label: "Get Smartlead outreach brief",
       tool: "arcigy.get_smartlead_outreach_brief",
       method: "POST",

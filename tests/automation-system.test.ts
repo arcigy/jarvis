@@ -48,6 +48,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.add_client_need_signal",
     "arcigy.ingest_client_message",
     "arcigy.get_client_need_alerts",
+    "arcigy.get_audit_events",
     "arcigy.jarvis_voice_event",
     "arcigy.get_system_health",
     "arcigy.run_integration_diagnostics",
@@ -78,7 +79,7 @@ test("production readiness report returns blockers and next actions without secr
   });
 
   assert.equal(report.status, "blocked");
-  assert.equal(report.mcp.toolCount, 27);
+  assert.equal(report.mcp.toolCount, 28);
   assert.ok(report.blockers.some((blocker) => blocker.key === "redis" && blocker.severity === "warning"));
   assert.ok(report.nextActions.some((action) => action.includes("REDIS_URL")));
   assert.ok(report.fixGuide.some((step) => step.id === "redis-real-password" && step.envKeys.includes("REDIS_URL")));
@@ -1461,6 +1462,43 @@ test("local SQLite CLI lists and approves prepared outreach replies", () => {
     JSON.stringify({ status: "pending", limit: 5 }),
   ]);
   assert.equal(after.count, 0);
+});
+
+test("local SQLite CLI records secret-safe audit events", () => {
+  const dir = mkdtempSync(join(tmpdir(), "jarvis-audit-db-"));
+  const dbPath = join(dir, "jarvis.db");
+  const python = process.env.JARVIS_PYTHON || "python";
+  const googleKey = "AI" + "za" + "S" + "y" + "A".repeat(32);
+
+  runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "add-audit-event",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify({
+      automationKey: "arcigy.generate_contract_documents",
+      status: "generated",
+      requiresApproval: true,
+      input: { secret: googleKey },
+      output: { manifestPath: "generated/contracts/generation-manifest.json" },
+    }),
+  ]);
+
+  const events = runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "list-audit-events",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify({ limit: 5 }),
+  ]);
+
+  assert.equal(events.count, 1);
+  assert.equal(events.events[0].automationKey, "arcigy.generate_contract_documents");
+  assert.equal(events.events[0].requiresApproval, true);
+  assert.equal(JSON.stringify(events).includes(googleKey), false);
+  assert.match(JSON.stringify(events), /\[redacted-google-api-key\]/);
 });
 
 function runPythonJson(python: string, args: string[]) {

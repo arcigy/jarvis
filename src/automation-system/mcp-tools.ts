@@ -14,6 +14,7 @@ export type JarvisMcpToolName =
   | "arcigy.add_client_need_signal"
   | "arcigy.ingest_client_message"
   | "arcigy.get_client_need_alerts"
+  | "arcigy.get_audit_events"
   | "arcigy.identify_email"
   | "arcigy.get_system_health"
   | "arcigy.run_integration_diagnostics"
@@ -114,6 +115,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.get_client_need_alerts",
       description: "Vrati persistentny inbox otvorenych klientskych poziadaviek, ktore ma Jarvis pripomenut.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.get_audit_events",
+      description: "Vrati lokalny audit trail Jarvis operacii, approval-gated akcii a citlivych workflow krokov.",
       requiresApproval: false,
     },
     {

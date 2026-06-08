@@ -145,6 +145,12 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
     return;
   }
 
+  if (request.method === "POST" && url.pathname === "/api/audit-events") {
+    const payload = await readJson(request);
+    writeJson(response, 200, runDbTool("list-audit-events", payload));
+    return;
+  }
+
   if (request.method === "POST" && url.pathname === "/api/generate-ai-reply") {
     const payload = await readJson(request);
     const result = await generateGeminiText(
@@ -182,12 +188,14 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
     ]);
     const manifestPath = join(outputDir, "generation-manifest.json");
     const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
-    writeJson(response, 200, {
+    const responseBody = {
       outputDir,
       manifestPath,
       generatedFiles: manifest.generatedFiles,
       stdout: result.stdout,
-    });
+    };
+    addAuditEvent("arcigy.generate_contract_documents", "generated", payload, responseBody, true);
+    writeJson(response, 200, responseBody);
     return;
   }
 
@@ -273,16 +281,14 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
       writeJson(response, 409, { error: approvalError });
       return;
     }
-    writeJson(
-      response,
-      200,
-      await appendRowsToGoogleSheet({
+    const result = await appendRowsToGoogleSheet({
         spreadsheetId: optionalString(payload.spreadsheetId),
         range: optionalString(payload.range),
         accountEnvKey: optionalString(payload.accountEnvKey),
         rows: (payload.rows ?? []) as Array<Array<string | number | boolean | null>>,
-      })
-    );
+      });
+    addAuditEvent("arcigy.append_leads_to_google_sheet", "appended", payload, result, true);
+    writeJson(response, 200, result);
     return;
   }
 
@@ -435,7 +441,9 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
       ? buildContractGenerationCommand(resolveRepoPath(payload.inputJsonPath, "", "inputJsonPath"), safeOutputDir).args
       : ["scripts/generate_contract_documents.py", "--payload", JSON.stringify(payload.intake), "--output-dir", safeOutputDir];
     const result = runPython(args);
-    writeJson(response, 200, { result: result.stdout.trim() || "Contract documents generated." });
+    const responseBody = { result: result.stdout.trim() || "Contract documents generated." };
+    addAuditEvent("arcigy.generate_contract_documents", "generated", payload, responseBody, true);
+    writeJson(response, 200, responseBody);
     return;
   }
   if (name === "arcigy.get_cold_outreach_brief") {
@@ -474,6 +482,10 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
   }
   if (name === "arcigy.get_client_need_alerts") {
     writeJson(response, 200, { result: getClientNeedAlerts(payload) });
+    return;
+  }
+  if (name === "arcigy.get_audit_events") {
+    writeJson(response, 200, { result: runDbTool("list-audit-events", payload) });
     return;
   }
   if (name === "arcigy.jarvis_voice_event") {
@@ -593,14 +605,15 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
     return;
   }
   if (name === "arcigy.append_leads_to_google_sheet") {
-    writeJson(response, 200, {
-      result: await appendRowsToGoogleSheet({
+    const result = await appendRowsToGoogleSheet({
         spreadsheetId: optionalString(payload.spreadsheetId),
         range: optionalString(payload.range),
         accountEnvKey: optionalString(payload.accountEnvKey),
         rows: (payload.rows ?? []) as Array<Array<string | number | boolean | null>>,
-      }),
-    });
+      });
+    const responseBody = { result };
+    addAuditEvent("arcigy.append_leads_to_google_sheet", "appended", payload, responseBody, true);
+    writeJson(response, 200, responseBody);
     return;
   }
   writeJson(response, 404, { error: `Unsupported web MCP bridge tool: ${name}` });
@@ -648,6 +661,27 @@ function runDbTool(command: string, payload: Record<string, unknown>) {
     JSON.stringify(body),
   ]);
   return JSON.parse(result.stdout);
+}
+
+function addAuditEvent(
+  automationKey: string,
+  status: string,
+  input: Record<string, unknown>,
+  output: unknown,
+  requiresApproval: boolean
+) {
+  try {
+    runDbTool("add-audit-event", {
+      automationKey,
+      status,
+      input,
+      output,
+      requiresApproval,
+      approvedAt: requiresApproval ? new Date().toISOString() : undefined,
+    });
+  } catch {
+    return;
+  }
 }
 
 async function syncGmailRecentMessages(payload: Record<string, unknown>) {

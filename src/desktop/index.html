@@ -169,9 +169,13 @@
               <h2>Operations sync</h2>
               <p>Pull recent Gmail signals into local memory and inspect Smartlead campaigns.</p>
             </div>
-            <button id="runDiagnostics">Diagnostics</button>
+            <div class="buttonGroup">
+              <button id="runDiagnostics">Diagnostics</button>
+              <button id="auditEvents">Audit</button>
+            </div>
           </div>
           <div class="response compact" id="diagnosticsResult">Ready for live integration diagnostics.</div>
+          <div class="response compact" id="auditResult">Audit trail is ready.</div>
           <div class="splitControls">
             <label>
               Gmail query

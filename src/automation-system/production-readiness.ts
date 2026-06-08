@@ -140,9 +140,9 @@ function buildLaunchChecklist(
     {
       id: "mcp-registry",
       title: "MCP tool registry",
-      status: tools.length >= 27 ? "ready" : "blocked",
+      status: tools.length >= 28 ? "ready" : "blocked",
       proof: `${tools.length} MCP tool(s) registered.`,
-      nextAction: tools.length >= 27 ? "Run npm run remote:mcp:smoke before remote agent handoff." : "Restore missing MCP tools, then rerun npm test.",
+      nextAction: tools.length >= 28 ? "Run npm run remote:mcp:smoke before remote agent handoff." : "Restore missing MCP tools, then rerun npm test.",
     },
     {
       id: "approval-locks",

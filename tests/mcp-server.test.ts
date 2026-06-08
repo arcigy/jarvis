@@ -27,6 +27,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(names.includes("arcigy.identify_email"));
   assert.ok(names.includes("arcigy.ingest_client_message"));
   assert.ok(names.includes("arcigy.get_client_need_alerts"));
+  assert.ok(names.includes("arcigy.get_audit_events"));
   assert.ok(names.includes("arcigy.jarvis_voice_event"));
   assert.ok(names.includes("arcigy.get_system_health"));
   assert.ok(names.includes("arcigy.run_integration_diagnostics"));
@@ -97,7 +98,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
     launchChecklist: Array<{ id: string; status: string }>;
   };
   assert.ok(["ready", "attention", "blocked"].includes(readiness.status));
-  assert.equal(readiness.mcp.toolCount, 27);
+  assert.equal(readiness.mcp.toolCount, 28);
   assert.ok(Array.isArray(readiness.nextActions));
   assert.ok(Array.isArray(readiness.fixGuide));
   assert.ok(Array.isArray(readiness.attentionQueue));
@@ -127,7 +128,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.equal(pack.smokeTestUrl, "https://jarvis.example.ngrok-free.app/api/remote-mcp-smoke");
   assert.equal(pack.auth.header, "Authorization: Bearer <JARVIS_WEB_TOKEN>");
   assert.equal(pack.auth.tokenValueReturned, false);
-  assert.equal(pack.tools.count, 27);
+  assert.equal(pack.tools.count, 28);
   assert.ok(pack.tools.approvalRequired.includes("arcigy.generate_contract_documents"));
   assert.ok(pack.tools.localStateWrite.includes("arcigy.sync_gmail_recent_messages"));
   assert.ok(pack.tools.localStateWrite.includes("arcigy.ingest_client_message"));

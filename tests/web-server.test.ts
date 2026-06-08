@@ -286,14 +286,14 @@ test("local web bridge serves UI and API health", async () => {
       launchChecklist: Array<{ id: string; status: string }>;
     };
     assert.ok(["ready", "attention", "blocked"].includes(readinessBody.status));
-    assert.equal(readinessBody.mcp.toolCount, 27);
+    assert.equal(readinessBody.mcp.toolCount, 28);
     assert.ok(Array.isArray(readinessBody.nextActions));
     assert.ok(Array.isArray(readinessBody.fixGuide));
     assert.ok(Array.isArray(readinessBody.attentionQueue));
     assert.ok(readinessBody.launchChecklist.some((item) => item.id === "approval-locks" && item.status === "ready"));
 
     const mcpReadiness = await postJson(`${baseUrl}/api/mcp/arcigy.get_production_readiness`, { live: false });
-    assert.equal(mcpReadiness.result.mcp.toolCount, 27);
+    assert.equal(mcpReadiness.result.mcp.toolCount, 28);
     assert.ok(Array.isArray(mcpReadiness.result.fixGuide));
     assert.ok(Array.isArray(mcpReadiness.result.attentionQueue));
     assert.ok(mcpReadiness.result.launchChecklist.some((item: { id: string }) => item.id === "mcp-registry"));
@@ -317,12 +317,13 @@ test("local web bridge serves UI and API health", async () => {
     assert.match(remotePackBody.mcpToolCallPattern, /\/api\/mcp\/\{toolName\}$/);
     assert.equal(remotePackBody.auth.header, "Authorization: Bearer <JARVIS_WEB_TOKEN>");
     assert.equal(remotePackBody.auth.tokenValueReturned, false);
-    assert.equal(remotePackBody.tools.count, 27);
+    assert.equal(remotePackBody.tools.count, 28);
     assert.match(remotePackBody.handoff.connectionPackUrl, /\/api\/remote-mcp-pack\?includeReadiness=true&live=true$/);
     assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "connection-pack" && item.url.includes("includeReadiness=true")));
     assert.ok(remotePackBody.handoff.agentFirstSteps.some((step) => step.includes("status=ready")));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.identify_email" && typeof call.body.email === "string"));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_client_need_alerts" && call.body.status === "new"));
+    assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_audit_events" && call.body.limit === 20));
     assert.ok(remotePackBody.tools.approvalRequired.includes("arcigy.append_leads_to_google_sheet"));
     assert.ok(remotePackBody.tools.localStateWrite.includes("arcigy.sync_gmail_recent_messages"));
     assert.equal(remotePackBody.tools.readOnlyOrDraft.includes("arcigy.ingest_client_message"), false);
@@ -345,13 +346,13 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(remotePackBody.tunnel.secureCommand, "npm run web:tunnel:secure");
 
     const mcpRemotePack = await postJson(`${baseUrl}/api/mcp/arcigy.get_remote_mcp_pack`, { includeReadiness: false });
-    assert.equal(mcpRemotePack.result.tools.count, 27);
+    assert.equal(mcpRemotePack.result.tools.count, 28);
 
     const smoke = await fetch(`${baseUrl}/api/remote-mcp-smoke`);
     assert.equal(smoke.status, 200);
     const smokeBody = (await smoke.json()) as { status: string; expectedToolCount: number; checks: Array<{ key: string; status: string }> };
     assert.equal(smokeBody.status, "ready");
-    assert.equal(smokeBody.expectedToolCount, 27);
+    assert.equal(smokeBody.expectedToolCount, 28);
     assert.ok(smokeBody.checks.some((check) => check.key === "approval-gate" && check.status === "ready"));
     assert.ok(smokeBody.checks.some((check) => check.key === "manifest-local-write-policy" && check.status === "ready"));
     assert.ok(smokeBody.checks.some((check) => check.key === "pack-local-write-policy" && check.status === "ready"));
@@ -360,7 +361,7 @@ test("local web bridge serves UI and API health", async () => {
 
     const mcpSmoke = await postJson(`${baseUrl}/api/mcp/arcigy.run_remote_mcp_smoke`, {});
     assert.equal(mcpSmoke.result.status, "ready");
-    assert.equal(mcpSmoke.result.expectedToolCount, 27);
+    assert.equal(mcpSmoke.result.expectedToolCount, 28);
 
     const voice = await fetch(`${baseUrl}/api/jarvis/voice-event`, {
       method: "POST",
@@ -535,7 +536,7 @@ test("local web bridge preflight reports tunnel readiness without leaking secret
     assert.match(body.manifestUrl, /\/\.well-known\/arcigy-jarvis\.json$/);
     assert.equal(body.tunnelCommand, "npm run web:tunnel");
     assert.equal(body.tunnelProvider, "ngrok");
-    assert.ok(body.mcpToolCount >= 27);
+    assert.ok(body.mcpToolCount >= 28);
     assert.ok(body.riskyToolsRequiringApproval.includes("arcigy.generate_contract_documents"));
     assert.ok(body.riskyToolsRequiringApproval.includes("arcigy.approve_prepared_outreach_reply"));
     assert.ok(body.riskyToolsRequiringApproval.includes("arcigy.append_leads_to_google_sheet"));

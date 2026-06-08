@@ -68,6 +68,8 @@ const elements = {
   draftResult: document.querySelector("#draftResult"),
   runDiagnostics: document.querySelector("#runDiagnostics"),
   diagnosticsResult: document.querySelector("#diagnosticsResult"),
+  auditEvents: document.querySelector("#auditEvents"),
+  auditResult: document.querySelector("#auditResult"),
   gmailQuery: document.querySelector("#gmailQuery"),
   previewGmail: document.querySelector("#previewGmail"),
   syncGmail: document.querySelector("#syncGmail"),
@@ -134,6 +136,7 @@ const arcigyApi = window.arcigyDesktop ?? {
   identifyEmail: (payload) => postJson("/api/identify-email", payload),
   ingestClientMessage: (payload) => postJson("/api/ingest-client-message", payload),
   getClientNeedAlerts: (payload) => postJson("/api/client-need-alerts", payload),
+  getAuditEvents: (payload) => postJson("/api/audit-events", payload),
   generateAiReply: (payload) => postJson("/api/generate-ai-reply", payload),
   webBridgePreflight: () => getJson("/api/web-bridge-preflight"),
   remoteMcpPack: (payload) =>
@@ -498,6 +501,22 @@ function renderDiagnostics(result) {
     `${result.live ? "Live" : "Configured"} diagnostics at ${result.checkedAt ?? "now"}`,
     "",
     ...checks.map((check) => `${check.status.toUpperCase()} ${check.key}: ${check.message}`),
+  ].join("\n");
+}
+
+function renderAuditEvents(result) {
+  const events = result.events ?? [];
+  if (!events.length) return result.summary ?? "No audit events yet.";
+  return [
+    result.summary ?? `Audit events: ${events.length}`,
+    "",
+    ...events.slice(0, 12).map((event, index) =>
+      [
+        `${index + 1}. ${event.automationKey} / ${event.status}`,
+        `   Created: ${event.createdAt ?? "-"}`,
+        `   Approval: ${event.requiresApproval ? event.approvedAt ?? "required" : "not required"}`,
+      ].join("\n")
+    ),
   ].join("\n");
 }
 
@@ -1143,6 +1162,15 @@ elements.runDiagnostics.addEventListener("click", async () => {
     elements.diagnosticsResult.textContent = renderDiagnostics(result);
   } catch (error) {
     elements.diagnosticsResult.textContent = error instanceof Error ? error.message : String(error);
+  }
+});
+elements.auditEvents.addEventListener("click", async () => {
+  try {
+    elements.auditResult.textContent = "Loading audit trail...";
+    const result = await arcigyApi.getAuditEvents({ limit: 20 });
+    elements.auditResult.textContent = renderAuditEvents(result);
+  } catch (error) {
+    elements.auditResult.textContent = error instanceof Error ? error.message : String(error);
   }
 });
 elements.previewGmail.addEventListener("click", async () => {

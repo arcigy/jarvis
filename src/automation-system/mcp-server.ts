@@ -390,6 +390,27 @@ export function createJarvisMcpServer(): McpServer {
   );
 
   server.registerTool(
+    "arcigy.get_audit_events",
+    {
+      title: "Get audit events",
+      description: "Return the local Jarvis audit trail for sensitive operations and approval-gated actions.",
+      inputSchema: {
+        dbPath: z.string().optional(),
+        automationKey: z.string().optional(),
+        status: z.string().optional(),
+        limit: z.number().int().min(1).max(100).default(20),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async ({ dbPath, ...payload }) => jsonDbTool("list-audit-events", payload, dbPath)
+  );
+
+  server.registerTool(
     "arcigy.jarvis_voice_event",
     {
       title: "Jarvis voice event",
@@ -862,7 +883,9 @@ function jsonDbTool(
     | "list-prepared-replies"
     | "approve-prepared-reply"
     | "ingest-message"
-    | "list-open-needs",
+    | "list-open-needs"
+    | "add-audit-event"
+    | "list-audit-events",
   payload: Record<string, unknown>,
   dbPath?: string
 ) {
@@ -878,7 +901,9 @@ function runDbCommand(
     | "list-prepared-replies"
     | "approve-prepared-reply"
     | "ingest-message"
-    | "list-open-needs",
+    | "list-open-needs"
+    | "add-audit-event"
+    | "list-audit-events",
   payload: Record<string, unknown>,
   dbPath?: string
 ) {

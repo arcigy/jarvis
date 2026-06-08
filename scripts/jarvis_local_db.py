@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sqlite3
 import sys
 import uuid
@@ -30,6 +31,69 @@ def init_db(db_path: Path) -> dict[str, Any]:
         for row in conn.execute("select name from sqlite_master where type='table' order by name")
     ]
     return {"dbPath": str(db_path), "tables": tables}
+
+
+def add_audit_event(db_path: Path, payload: dict[str, Any]) -> dict[str, Any]:
+    init_db(db_path)
+    event_id = payload.get("id") or f"audit_{uuid.uuid4().hex}"
+    automation_key = required(payload, "automationKey")
+    status = payload.get("status", "completed")
+    conn = connect(db_path)
+    conn.execute(
+        """
+        insert into jarvis_automation_events
+          (id, automation_key, status, input_json, output_json, requires_approval, approved_at, created_at)
+        values (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            event_id,
+            automation_key,
+            status,
+            json.dumps(redact_secrets(payload.get("input") or {}), ensure_ascii=False),
+            json.dumps(redact_secrets(payload.get("output") or {}), ensure_ascii=False),
+            1 if payload.get("requiresApproval") else 0,
+            payload.get("approvedAt"),
+            payload.get("createdAt") or datetime.now(timezone.utc).isoformat(),
+        ),
+    )
+    conn.commit()
+    row = conn.execute("select * from jarvis_automation_events where id = ?", (event_id,)).fetchone()
+    return row_to_audit_event(row)
+
+
+def list_audit_events(db_path: Path, payload: dict[str, Any]) -> dict[str, Any]:
+    init_db(db_path)
+    limit = max(1, min(int(payload.get("limit", 20)), 100))
+    automation_key = payload.get("automationKey")
+    status = payload.get("status")
+    filters: list[str] = []
+    params: list[Any] = []
+    if automation_key:
+        filters.append("automation_key = ?")
+        params.append(str(automation_key))
+    if status:
+        filters.append("status = ?")
+        params.append(str(status))
+    where = f"where {' and '.join(filters)}" if filters else ""
+    conn = connect(db_path)
+    rows = [
+        row
+        for row in conn.execute(
+            f"""
+            select * from jarvis_automation_events
+            {where}
+            order by created_at desc
+            limit ?
+            """,
+            (*params, limit),
+        )
+    ]
+    events = [row_to_audit_event(row) for row in rows]
+    return {
+        "count": len(events),
+        "events": events,
+        "summary": build_audit_summary(events),
+    }
 
 
 def normalize_email(email: str) -> str:
@@ -260,11 +324,25 @@ def approve_prepared_reply(db_path: Path, payload: dict[str, Any]) -> dict[str, 
         (row["lead_email"], row["occurred_at"]),
     ).fetchone()
     if existing is not None:
-        return {
+        result = {
             "status": "already_approved",
             "preparedReply": prepared_reply_from_row(row),
             "approvedEvent": row_to_cold_event(existing),
             "summary": "Jarvis: Tato odpoved uz bola schvalena.",
+        }
+        add_audit_event(
+            db_path,
+            {
+                "automationKey": "arcigy.approve_prepared_outreach_reply",
+                "status": "already_approved",
+                "requiresApproval": True,
+                "approvedAt": datetime.now(timezone.utc).isoformat(),
+                "input": {"preparedEventId": prepared_id, "approvedBy": payload.get("approvedBy", "operator")},
+                "output": result,
+            },
+        )
+        return {
+            **result,
         }
 
     prepared_data = json.loads(row["data_json"] or "{}")
@@ -285,12 +363,24 @@ def approve_prepared_reply(db_path: Path, payload: dict[str, Any]) -> dict[str, 
             },
         },
     )
-    return {
+    result = {
         "status": "approved",
         "preparedReply": prepared_reply_from_row(row),
         "approvedEvent": approved_event,
         "summary": f"Jarvis: Odpoved pre {row['lead_email']} je schvalena a oznacena ako pripravena na odoslanie.",
     }
+    add_audit_event(
+        db_path,
+        {
+            "automationKey": "arcigy.approve_prepared_outreach_reply",
+            "status": "approved",
+            "requiresApproval": True,
+            "approvedAt": datetime.now(timezone.utc).isoformat(),
+            "input": {"preparedEventId": prepared_id, "approvedBy": payload.get("approvedBy", "operator")},
+            "output": result,
+        },
+    )
+    return result
 
 
 def identify(db_path: Path, email: str) -> dict[str, Any]:
@@ -694,6 +784,19 @@ def prepared_reply_from_row(row: sqlite3.Row) -> dict[str, Any]:
     }
 
 
+def row_to_audit_event(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "id": row["id"],
+        "automationKey": row["automation_key"],
+        "status": row["status"],
+        "input": json.loads(row["input_json"] or "{}"),
+        "output": json.loads(row["output_json"] or "{}"),
+        "requiresApproval": bool(row["requires_approval"]),
+        "approvedAt": row["approved_at"],
+        "createdAt": row["created_at"],
+    }
+
+
 def row_to_email_activity(row: sqlite3.Row) -> dict[str, Any]:
     return {
         "id": row["id"],
@@ -711,6 +814,32 @@ def required(payload: dict[str, Any], key: str) -> str:
     if value in (None, ""):
         raise ValueError(f"Missing required field: {key}")
     return str(value)
+
+
+def redact_secrets(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {str(key): redact_secrets(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [redact_secrets(item) for item in value]
+    if not isinstance(value, str):
+        return value
+    text = value
+    text = re.sub(r"(postgres(?:ql)?|redis)://([^:\s/@]+):([^@\s]+)@", r"\1://\2:[redacted]@", text, flags=re.I)
+    text = re.sub(r"Bearer\s+[A-Za-z0-9._~+/=-]{16,}", "Bearer [redacted]", text, flags=re.I)
+    text = re.sub(r"AIza[0-9A-Za-z_-]{20,}", "[redacted-google-api-key]", text)
+    text = re.sub(r"GOCSPX-[0-9A-Za-z_-]{10,}", "[redacted-google-client-secret]", text)
+    text = re.sub(r"1//[0-9A-Za-z_-]{20,}", "[redacted-google-refresh-token]", text)
+    text = re.sub(r"\b[0-9a-f]{32,}\b", "[redacted-hex-secret]", text, flags=re.I)
+    text = re.sub(r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_[A-Za-z0-9_-]{8,}\b", "[redacted-provider-key]", text, flags=re.I)
+    return text
+
+
+def build_audit_summary(events: list[dict[str, Any]]) -> str:
+    if not events:
+        return "Jarvis audit: ziadne audit eventy."
+    approval_count = sum(1 for event in events if event.get("requiresApproval"))
+    latest = events[0]
+    return f"Jarvis audit: {len(events)} eventov, {approval_count} approval-gated. Najnovsie: {latest['automationKey']} / {latest['status']}."
 
 
 def load_payload(raw: str | None) -> dict[str, Any]:
@@ -737,6 +866,8 @@ def main() -> None:
             "identify",
             "ingest-message",
             "list-open-needs",
+            "add-audit-event",
+            "list-audit-events",
         ],
     )
     parser.add_argument("--db", type=Path, default=ROOT / "data" / "jarvis-local.db")
@@ -763,6 +894,10 @@ def main() -> None:
             result = ingest_message(args.db, load_payload(args.payload))
         elif args.command == "list-open-needs":
             result = list_open_needs(args.db, load_payload(args.payload))
+        elif args.command == "add-audit-event":
+            result = add_audit_event(args.db, load_payload(args.payload))
+        elif args.command == "list-audit-events":
+            result = list_audit_events(args.db, load_payload(args.payload))
         else:
             if not args.email:
                 raise ValueError("--email is required for identify")
