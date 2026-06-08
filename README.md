@@ -203,6 +203,14 @@ External agent setup flow:
 7. Run `arcigy.run_remote_mcp_smoke` or `GET /api/remote-mcp-smoke` before handoff when you need proof that manifest, read-only calls, approval gates, and token redaction work.
 8. For manifest tools with `requiresApproval: true`, include `"approval": { "approved": true }` only after explicit user confirmation.
 
+Remote smoke can also be run without opening the UI:
+
+```powershell
+npm run remote:mcp:smoke
+npm run remote:mcp:smoke -- --url https://your-ngrok-url.ngrok-free.app --token-env JARVIS_WEB_TOKEN
+npm run remote:mcp:smoke -- --json
+```
+
 Advanced/manual flow:
 
 ```powershell

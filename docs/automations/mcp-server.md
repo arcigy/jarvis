@@ -31,6 +31,13 @@ npm run web:tunnel:secure
 
 That command generates a one-time bearer token, starts the protected local bridge when needed, verifies the external manifest, and prints the token once for the remote MCP client. If another `npm run web` process is already running without that token, stop it first so the secure tunnel runner can own the protected bridge.
 
+Run the same smoke proof from CLI when checking a local or external bridge:
+
+```powershell
+npm run remote:mcp:smoke
+npm run remote:mcp:smoke -- --url https://your-ngrok-url.ngrok-free.app --token-env JARVIS_WEB_TOKEN
+```
+
 `npm run readiness` prints the same secret-safe blockers and fix guide exposed by `arcigy.get_production_readiness`. The tunnel runner starts the local web bridge if needed, checks `/api/web-bridge-preflight`, starts ngrok, finds the public HTTPS URL, and verifies the protected manifest before printing remote MCP URLs.
 
 Redis is currently treated as a non-blocking infrastructure advisory because no shipped Jarvis workflow depends on Redis for state. Local memory, cold outreach, client requests, and approvals use SQLite; live API work uses the configured Google, Gemini, Smartlead, Serper, and Google Maps credentials. If a Redis-backed queue/cache is added later, move Redis back into the blocking production gate before enabling that feature.

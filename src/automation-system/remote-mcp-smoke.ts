@@ -100,5 +100,8 @@ async function postJson(fetchImpl: typeof fetch, url: string, payload: unknown, 
 }
 
 function requestHeaders(bearerToken?: string): Record<string, string> {
-  return bearerToken ? { authorization: `Bearer ${bearerToken}` } : {};
+  return {
+    connection: "close",
+    ...(bearerToken ? { authorization: `Bearer ${bearerToken}` } : {}),
+  };
 }
