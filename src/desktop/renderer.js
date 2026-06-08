@@ -889,11 +889,15 @@ async function copyRemotePack() {
     elements.remoteAgentPrompt.textContent = "Load the web bridge first.";
     return;
   }
+  const handoffStatus = buildCopiedHandoffStatus(state.lastRemoteMcpSmoke);
   const payload = [
+    handoffStatus.text,
+    "",
     buildRemoteAgentPrompt(state.lastRemoteMcpPack),
     "",
     JSON.stringify(
       {
+        handoffStatus,
         connectionPack: state.lastRemoteMcpPack,
         smokeTest: state.lastRemoteMcpSmoke,
       },
@@ -906,6 +910,22 @@ async function copyRemotePack() {
   window.setTimeout(() => {
     elements.copyRemotePack.textContent = "Copy pack";
   }, 1400);
+}
+
+function buildCopiedHandoffStatus(smokeReport) {
+  if (!smokeReport) {
+    return {
+      ready: false,
+      text: "HANDOFF STATUS: BLOCKED. Run remote MCP smoke and require ready proof gates before the remote agent starts work.",
+    };
+  }
+  const proof = summarizeRemoteProofGates(smokeReport);
+  return {
+    ready: proof.ready,
+    text: proof.ready
+      ? "HANDOFF STATUS: READY. Remote smoke and required proof gates passed."
+      : `HANDOFF STATUS: BLOCKED. ${proof.text}`,
+  };
 }
 
 async function writeClipboardText(text) {

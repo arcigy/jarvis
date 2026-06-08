@@ -150,6 +150,10 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /blocked: smoke status \$\{report\.status \?\? "unknown"\}/);
   assert.match(renderer, /checking safety gates/);
   assert.match(renderer, /blocked: smoke error/);
+  assert.match(renderer, /buildCopiedHandoffStatus/);
+  assert.match(renderer, /HANDOFF STATUS: BLOCKED/);
+  assert.match(renderer, /HANDOFF STATUS: READY/);
+  assert.match(renderer, /handoffStatus,/);
   assert.match(renderer, /Local memory writes:/);
   assert.match(renderer, /preview Gmail with dryRun: true first/);
   assert.match(renderer, /renderRemoteMcpSmoke/);
