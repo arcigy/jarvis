@@ -23,6 +23,14 @@ npm run readiness
 npm run web:tunnel
 ```
 
+If you do not want to store a persistent web token yet, run:
+
+```powershell
+npm run web:tunnel:secure
+```
+
+That command generates a one-time bearer token, starts the protected local bridge when needed, verifies the external manifest, and prints the token once for the remote MCP client. If another `npm run web` process is already running without that token, stop it first so the secure tunnel runner can own the protected bridge.
+
 `npm run readiness` prints the same secret-safe blockers and fix guide exposed by `arcigy.get_production_readiness`. The tunnel runner starts the local web bridge if needed, checks `/api/web-bridge-preflight`, starts ngrok, finds the public HTTPS URL, and verifies the protected manifest before printing remote MCP URLs.
 
 The web bridge publishes its protected manifest at:

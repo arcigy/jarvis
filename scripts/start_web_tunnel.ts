@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 
@@ -18,6 +19,8 @@ type Preflight = {
   warnings?: string[];
 };
 
+class TunnelExit extends Error {}
+
 const repoRoot = fileURLToPath(new URL("../", import.meta.url));
 const args = process.argv.slice(2);
 
@@ -29,6 +32,7 @@ const origin = `http://${host}:${port}`;
 const ngrokApi = getArg("ngrok-api", "http://127.0.0.1:4040");
 const noStartWeb = args.includes("--no-start-web");
 const allowMissingToken = args.includes("--allow-missing-token");
+const generateToken = args.includes("--generate-token");
 
 if (args.includes("--help") || args.includes("-h")) {
   process.stdout.write(
@@ -45,22 +49,35 @@ if (args.includes("--help") || args.includes("-h")) {
       "  --ngrok-api <url>       Local ngrok API URL. Default: http://127.0.0.1:4040",
       "  --no-start-web          Require an already running npm run web process.",
       "  --allow-missing-token   Development only; do not use for external access.",
+      "  --generate-token        Generate a one-time bearer token for this tunnel process.",
       "",
       "Requires JARVIS_WEB_TOKEN in .env.local before exposing remote MCP tools.",
+      "Alternatively use --generate-token for an ephemeral token that is printed once.",
       "",
     ].join("\n")
   );
   process.exit(0);
 }
 
-await main();
+try {
+  await main();
+} catch (error) {
+  if (error instanceof TunnelExit) {
+    process.stderr.write(`${error.message}\n`);
+    process.exitCode = 1;
+  } else {
+    throw error;
+  }
+}
 
 async function main() {
   if (!Number.isInteger(port) || port <= 0) exitWithMessage(`Invalid --port value: ${String(port)}`);
 
+  const generatedToken = !getWebToken() && generateToken ? randomBytes(32).toString("base64url") : null;
+  if (generatedToken) process.env.JARVIS_WEB_TOKEN = generatedToken;
   const token = getWebToken();
   if (!token && !allowMissingToken) {
-    exitWithMessage("Set JARVIS_WEB_TOKEN in .env.local before exposing Jarvis through a tunnel.");
+    exitWithMessage("Set JARVIS_WEB_TOKEN in .env.local or run npm run web:tunnel:secure before exposing Jarvis through a tunnel.");
   }
 
   let webChild: ChildProcess | null = null;
@@ -75,6 +92,11 @@ async function main() {
 
     const preflight = await fetchJson<Preflight>(`${origin}/api/web-bridge-preflight`);
     if (!preflight.readyForTunnel && !allowMissingToken) {
+      if (generatedToken && preflight.tokenConfigured === false) {
+        exitWithMessage(
+          "A web bridge is already running without this generated token. Stop the existing web process, then rerun npm run web:tunnel:secure so the tunnel runner can start the protected bridge."
+        );
+      }
       exitWithMessage(`Web bridge is not ready for tunnel: ${(preflight.warnings ?? []).join(" ") || "unknown preflight failure"}`);
     }
 
@@ -91,6 +113,8 @@ async function main() {
         `External MCP tools: ${publicUrl}/api/mcp`,
         `MCP tool count: ${preflight.mcpToolCount ?? "unknown"}`,
         "Auth header: Authorization: Bearer <JARVIS_WEB_TOKEN>",
+        generatedToken ? `One-time token: ${generatedToken}` : "Token source: JARVIS_WEB_TOKEN",
+        generatedToken ? "This token exists only for this running tunnel session." : "Keep the token only in local secrets.",
         "",
         "Keep this process running while Claude, ChatGPT, or another remote agent uses the tunnel.",
         "Press Ctrl+C to stop Jarvis web bridge and ngrok.",
@@ -242,6 +266,5 @@ function stopChild(child: ChildProcess | null) {
 }
 
 function exitWithMessage(message: string): never {
-  process.stderr.write(`${message}\n`);
-  process.exit(1);
+  throw new TunnelExit(message);
 }

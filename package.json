@@ -6,6 +6,7 @@
     "desktop": "electron src/desktop/main.cjs",
     "web": "node src/server/local-api-server.ts",
     "web:tunnel": "node scripts/start_web_tunnel.ts",
+    "web:tunnel:secure": "node scripts/start_web_tunnel.ts --generate-token",
     "mcp": "node src/automation-system/mcp-server.ts",
     "doctor": "node scripts/jarvis_doctor.ts",
     "readiness": "node scripts/jarvis_readiness.ts",
