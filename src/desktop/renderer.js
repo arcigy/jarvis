@@ -41,6 +41,11 @@ const elements = {
   approvalLockCount: document.querySelector("#approvalLockCount"),
   liveBlockerCount: document.querySelector("#liveBlockerCount"),
   commandTimeline: document.querySelector("#commandTimeline"),
+  launchQueue: document.querySelector("#launchQueue"),
+  launchStatus: document.querySelector("#launchStatus"),
+  launchNextAction: document.querySelector("#launchNextAction"),
+  launchAttention: document.querySelector("#launchAttention"),
+  launchChecklist: document.querySelector("#launchChecklist"),
   readinessReport: document.querySelector("#readinessReport"),
   operatorBriefing: document.querySelector("#operatorBriefing"),
   listenButton: document.querySelector("#listenButton"),
@@ -330,6 +335,29 @@ function renderCommandDeck(health, bridge = null) {
   renderMissionSignals(health, bridge);
 }
 
+function renderLaunchQueue(report) {
+  const status = report.status ?? "unknown";
+  const attentionQueue = report.attentionQueue ?? [];
+  const launchChecklist = report.launchChecklist ?? [];
+  const nextAction = report.nextActions?.[0] ?? "No action needed. Keep running production verification before changes.";
+  const attention = attentionQueue[0];
+  elements.launchQueue?.setAttribute("data-state", status === "ready" ? "ready" : "attention");
+  elements.launchStatus.textContent = status;
+  elements.launchNextAction.textContent = nextAction;
+  elements.launchAttention.textContent = attention ? `${attention.severity}: ${attention.title}` : "clear";
+  elements.launchChecklist.replaceChildren();
+  for (const item of launchChecklist.slice(0, 3)) {
+    const node = document.createElement("li");
+    const statusNode = document.createElement("span");
+    const titleNode = document.createElement("strong");
+    statusNode.textContent = item.status;
+    titleNode.textContent = item.title;
+    node.setAttribute("data-state", item.status);
+    node.append(statusNode, titleNode);
+    elements.launchChecklist.appendChild(node);
+  }
+}
+
 function buildCommandTimeline(blockers, bridge, advisories = []) {
   const bridgeState = bridge ? (bridge.readyForTunnel ? "MCP bridge ready for tunnel." : "MCP bridge needs attention.") : "MCP bridge preflight not loaded.";
   if (!blockers.length) {
@@ -468,6 +496,14 @@ async function refreshHealth() {
       renderCommandDeck(health, await arcigyApi.webBridgePreflight());
     } catch {
       renderCommandDeck(health, null);
+    }
+    try {
+      renderLaunchQueue(await arcigyApi.productionReadiness({ live: false }));
+    } catch (error) {
+      elements.launchStatus.textContent = "attention";
+      elements.launchNextAction.textContent = safeUiErrorText(error);
+      elements.launchAttention.textContent = "readiness unavailable";
+      elements.launchChecklist.replaceChildren();
     }
   } catch (error) {
     elements.healthGrid.textContent = safeUiErrorText(error);
@@ -1441,6 +1477,7 @@ elements.readinessReport.addEventListener("click", async () => {
   try {
     elements.commandTimeline.textContent = "Building live production readiness report...";
     const report = await arcigyApi.productionReadiness({ live: true });
+    renderLaunchQueue(report);
     elements.commandTimeline.textContent = report.summary;
     elements.response.textContent = renderReadinessReport(report);
   } catch (error) {

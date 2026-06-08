@@ -37,6 +37,11 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /id="approvalLockCount"/);
   assert.match(html, /id="liveBlockerCount"/);
   assert.match(html, /id="commandTimeline"/);
+  assert.match(html, /id="launchQueue"/);
+  assert.match(html, /id="launchStatus"/);
+  assert.match(html, /id="launchNextAction"/);
+  assert.match(html, /id="launchAttention"/);
+  assert.match(html, /id="launchChecklist"/);
   assert.match(html, /id="missionRail"/);
   assert.match(html, /id="missionReadiness"/);
   assert.match(html, /id="missionVoice"/);
@@ -141,6 +146,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.doesNotMatch(renderer, /textContent = error instanceof Error \? error\.message : String\(error\)/);
   assert.match(renderer, /elements\.healthGrid\.replaceChildren\(\)/);
   assert.doesNotMatch(renderer, /node\.innerHTML/);
+  assert.match(renderer, /function renderLaunchQueue/);
+  assert.match(renderer, /elements\.launchChecklist\.replaceChildren\(\)/);
+  assert.match(renderer, /arcigyApi\.productionReadiness\(\{ live: false \}\)/);
   assert.match(renderer, /renderBridgeCockpit/);
   assert.match(renderer, /renderRemoteMcpPack/);
   assert.match(renderer, /renderMcpToolList/);
@@ -307,6 +315,10 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /announceNew/);
   assert.match(styles, /\.missionRail/);
   assert.match(styles, /\.missionSignal\[data-state="ready"\]/);
+  assert.match(styles, /\.launchQueue/);
+  assert.match(styles, /\.launchQueue\[data-state="ready"\]/);
+  assert.match(styles, /\.launchQueue li\[data-state="blocked"\]/);
+  assert.match(styles, /\.launchQueue,\s+\.cortexMap/s);
   assert.match(styles, /\.cortexMap/);
   assert.match(styles, /\.cortexNode\[data-state="ready"\]/);
   assert.match(styles, /@keyframes cortexSweep/);

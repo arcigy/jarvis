@@ -94,6 +94,25 @@
         <button class="deckAction" id="readinessReport">Readiness report</button>
       </section>
 
+      <section class="launchQueue" id="launchQueue" aria-label="Production launch queue">
+        <div>
+          <span>Launch state</span>
+          <strong id="launchStatus">checking</strong>
+        </div>
+        <div>
+          <span>Next action</span>
+          <strong id="launchNextAction">Loading readiness...</strong>
+        </div>
+        <div>
+          <span>Attention</span>
+          <strong id="launchAttention">checking</strong>
+        </div>
+        <div>
+          <span>Checklist</span>
+          <ul id="launchChecklist"></ul>
+        </div>
+      </section>
+
       <section class="cortexMap" id="cortexMap" aria-label="Jarvis operational cortex">
         <div class="cortexNode" data-target="jarvisPanel" data-state="ready" role="button" tabindex="0">
           <span>Voice</span>
