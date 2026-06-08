@@ -38,6 +38,14 @@ export type JarvisMcpTool = {
   requiresApproval: boolean;
 };
 
+export const localStateWriteToolNames = new Set<JarvisMcpToolName>([
+  "arcigy.add_cold_outreach_event",
+  "arcigy.upsert_local_person",
+  "arcigy.add_client_need_signal",
+  "arcigy.ingest_client_message",
+  "arcigy.sync_gmail_recent_messages",
+]);
+
 export type ContractGenerationCommand = {
   command: "python";
   args: string[];

@@ -63,13 +63,19 @@ test("local web bridge serves UI and API health", async () => {
     const manifest = (await manifestResponse.json()) as {
       auth: { type: string; requiredForExternalHosts: boolean };
       endpoints: { mcpToolCallPattern: string };
-      tools: Array<{ name: string; method: string; url: string }>;
+      toolPolicy: { approvalRequired: string[]; localStateWrite: string[]; readOnlyOrDraft: string[] };
+      tools: Array<{ name: string; method: string; url: string; localStateWrite: boolean; readOnlyOrDraft: boolean }>;
     };
     assert.equal(manifest.auth.type, "bearer");
     assert.equal(manifest.auth.requiredForExternalHosts, true);
     assert.match(manifest.endpoints.mcpToolCallPattern, /\/api\/mcp\/\{toolName\}$/);
+    assert.ok(manifest.toolPolicy.approvalRequired.includes("arcigy.generate_contract_documents"));
+    assert.ok(manifest.toolPolicy.localStateWrite.includes("arcigy.sync_gmail_recent_messages"));
+    assert.equal(manifest.toolPolicy.readOnlyOrDraft.includes("arcigy.ingest_client_message"), false);
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.draft_contract_intake" && tool.method === "POST"));
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.get_smartlead_outreach_brief" && tool.method === "POST"));
+    assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.sync_gmail_recent_messages" && tool.localStateWrite === true && tool.readOnlyOrDraft === false));
+    assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.generate_ai_reply" && tool.localStateWrite === false && tool.readOnlyOrDraft === true));
 
     const mcpBrief = await postJson(`${baseUrl}/api/mcp/arcigy.get_cold_outreach_brief`, {
       periodLabel: "dnes",

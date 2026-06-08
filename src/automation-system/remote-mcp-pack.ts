@@ -1,4 +1,4 @@
-import { listJarvisMcpTools, type JarvisMcpToolName } from "./mcp-tools.ts";
+import { listJarvisMcpTools, localStateWriteToolNames } from "./mcp-tools.ts";
 import { buildProductionReadinessReport, type ProductionReadinessReport } from "./production-readiness.ts";
 
 export type RemoteMcpConnectionPackInput = {
@@ -74,7 +74,7 @@ export async function buildRemoteMcpConnectionPack(
   const baseUrl = (input.baseUrl || "http://127.0.0.1:8765").replace(/\/+$/g, "");
   const tools = listJarvisMcpTools();
   const approvalRequired = tools.filter((tool) => tool.requiresApproval).map((tool) => tool.name);
-  const localStateWrite = tools.filter((tool) => localStateWriteTools.has(tool.name)).map((tool) => tool.name);
+  const localStateWrite = tools.filter((tool) => localStateWriteToolNames.has(tool.name)).map((tool) => tool.name);
   const readiness = input.includeReadiness === false ? undefined : await buildProductionReadinessReport({ live: input.live === true, dbPath: input.dbPath });
 
   return {
@@ -103,7 +103,7 @@ export async function buildRemoteMcpConnectionPack(
       count: tools.length,
       names: tools.map((tool) => tool.name),
       approvalRequired,
-      readOnlyOrDraft: tools.filter((tool) => !tool.requiresApproval && !localStateWriteTools.has(tool.name)).map((tool) => tool.name),
+      readOnlyOrDraft: tools.filter((tool) => !tool.requiresApproval && !localStateWriteToolNames.has(tool.name)).map((tool) => tool.name),
       localStateWrite,
     },
     quickStartCalls: buildQuickStartCalls(baseUrl),
@@ -136,14 +136,6 @@ export async function buildRemoteMcpConnectionPack(
     ],
   };
 }
-
-const localStateWriteTools = new Set<JarvisMcpToolName>([
-  "arcigy.add_cold_outreach_event",
-  "arcigy.upsert_local_person",
-  "arcigy.add_client_need_signal",
-  "arcigy.ingest_client_message",
-  "arcigy.sync_gmail_recent_messages",
-]);
 
 function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickStartCalls"] {
   const toolUrl = (name: string) => `${baseUrl}/api/mcp/${name}`;

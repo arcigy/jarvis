@@ -18,6 +18,7 @@ import {
   getColdOutreachMcpAnswer,
   identifyEmailMcpAnswer,
   listJarvisMcpTools,
+  localStateWriteToolNames,
 } from "../src/automation-system/mcp-tools.ts";
 import { buildSmartleadOutreachBrief, getSmartleadCampaignStatus, getSmartleadOutreachBrief } from "../src/automation-system/smartlead.ts";
 import {
@@ -59,6 +60,9 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.discover_leads",
     "arcigy.append_leads_to_google_sheet",
   ]);
+  assert.ok(localStateWriteToolNames.has("arcigy.sync_gmail_recent_messages"));
+  assert.ok(localStateWriteToolNames.has("arcigy.ingest_client_message"));
+  assert.equal(localStateWriteToolNames.has("arcigy.generate_contract_documents"), false);
 });
 
 test("production readiness report returns blockers and next actions without secrets", async () => {

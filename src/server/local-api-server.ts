@@ -11,7 +11,7 @@ import { buildClientReplyPrompt, generateGeminiText } from "../automation-system
 import { defaultGmailBriefingQuery, defaultGmailSyncQuery, listConfiguredGmailAccounts, listRecentGmailMessageEvents } from "../automation-system/gmail.ts";
 import { containsWakeWord, type JarvisVoiceSession } from "../automation-system/jarvis-voice.ts";
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "../automation-system/lead-discovery.ts";
-import { buildContractGenerationCommand, getColdOutreachMcpAnswer, listJarvisMcpTools } from "../automation-system/mcp-tools.ts";
+import { buildContractGenerationCommand, getColdOutreachMcpAnswer, listJarvisMcpTools, localStateWriteToolNames } from "../automation-system/mcp-tools.ts";
 import { buildOperatorBriefing } from "../automation-system/operator-briefing.ts";
 import { buildProductionReadinessReport } from "../automation-system/production-readiness.ts";
 import { buildRemoteMcpConnectionPack } from "../automation-system/remote-mcp-pack.ts";
@@ -334,6 +334,9 @@ function buildWebBridgeManifest(request: IncomingMessage) {
   const origin = getRequestOrigin(request);
   const mcpBaseUrl = `${origin}/api/mcp`;
   const localhostBypass = process.env.JARVIS_WEB_REQUIRE_AUTH !== "true";
+  const tools = listJarvisMcpTools();
+  const approvalRequired = tools.filter((tool) => tool.requiresApproval).map((tool) => tool.name);
+  const localStateWrite = tools.filter((tool) => localStateWriteToolNames.has(tool.name)).map((tool) => tool.name);
   return {
     name: "Arcigy Jarvis local web bridge",
     version: "0.1.0",
@@ -357,9 +360,16 @@ function buildWebBridgeManifest(request: IncomingMessage) {
       requiredPayload: { approval: { approved: true } },
       appliesToToolsWithRequiresApproval: true,
     },
-    tools: listJarvisMcpTools().map((tool) => ({
+    toolPolicy: {
+      approvalRequired,
+      localStateWrite,
+      readOnlyOrDraft: tools.filter((tool) => !tool.requiresApproval && !localStateWriteToolNames.has(tool.name)).map((tool) => tool.name),
+    },
+    tools: tools.map((tool) => ({
       ...tool,
       approval: tool.requiresApproval ? { required: true, field: "approval.approved" } : { required: false },
+      localStateWrite: localStateWriteToolNames.has(tool.name),
+      readOnlyOrDraft: !tool.requiresApproval && !localStateWriteToolNames.has(tool.name),
       method: "POST",
       url: `${mcpBaseUrl}/${tool.name}`,
     })),
