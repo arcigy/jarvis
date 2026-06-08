@@ -123,6 +123,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /function safeUiErrorText/);
   assert.match(renderer, /return redactSensitiveText\(error instanceof Error \? error\.message : String\(error\)\)/);
   assert.doesNotMatch(renderer, /textContent = error instanceof Error \? error\.message : String\(error\)/);
+  assert.match(renderer, /elements\.healthGrid\.replaceChildren\(\)/);
+  assert.doesNotMatch(renderer, /node\.innerHTML/);
   assert.match(renderer, /renderBridgeCockpit/);
   assert.match(renderer, /renderRemoteMcpPack/);
   assert.match(renderer, /renderMcpToolList/);

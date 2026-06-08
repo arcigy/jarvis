@@ -263,11 +263,15 @@ function notifyOperator(title, body, tag = "arcigy-jarvis") {
 }
 
 function renderHealth(health) {
-  elements.healthGrid.innerHTML = "";
+  elements.healthGrid.replaceChildren();
   for (const item of health.integrations ?? []) {
     const node = document.createElement("div");
+    const key = document.createElement("strong");
+    const status = document.createElement("span");
     node.className = `health ${item.configured ? "ready" : "missing"}`;
-    node.innerHTML = `<strong>${item.key}</strong><span>${item.configured ? "ready" : `missing ${item.missing.length}`}</span>`;
+    key.textContent = item.key;
+    status.textContent = item.configured ? "ready" : `missing ${item.missing.length}`;
+    node.append(key, status);
     elements.healthGrid.appendChild(node);
   }
 }
@@ -764,7 +768,7 @@ function renderMcpToolList(pack) {
   const localWriteTools = new Set(pack.tools?.localStateWrite ?? []);
   const readOnlyTools = new Set(pack.tools?.readOnlyOrDraft ?? []);
   elements.mcpToolListStatus.textContent = tools.length ? `Live registry: ${tools.length} tools loaded.` : "No MCP tools loaded.";
-  elements.mcpToolList.innerHTML = "";
+  elements.mcpToolList.replaceChildren();
   for (const name of tools) {
     const badges = [];
     if (approvalTools.has(name)) badges.push("approval");
