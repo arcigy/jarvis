@@ -57,6 +57,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /id="handoffSmokeUrl"/);
   assert.match(html, /id="handoffApprovalTools"/);
   assert.match(html, /id="handoffLocalWriteTools"/);
+  assert.match(html, /id="handoffProofGates"/);
   assert.match(html, /id="mcpToolListStatus"/);
   assert.match(html, /id="mcpToolList"/);
   assert.match(html, /Live MCP tool registry/);
@@ -142,6 +143,10 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /read-only\/draft/);
   assert.match(renderer, /textContent = name/);
   assert.match(renderer, /handoffLocalWriteTools/);
+  assert.match(renderer, /handoffProofGates/);
+  assert.match(renderer, /summarizeRemoteProofGates/);
+  assert.match(renderer, /ready: 4\/4 safety gates/);
+  assert.match(renderer, /blocked: \$\{missing\.join\(", "\)\}/);
   assert.match(renderer, /Local memory writes:/);
   assert.match(renderer, /preview Gmail with dryRun: true first/);
   assert.match(renderer, /renderRemoteMcpSmoke/);
@@ -290,6 +295,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(uiSmoke, /#cortexMap/);
   assert.match(uiSmoke, /visibleCortexNodes/);
   assert.match(uiSmoke, /Command core image did not load/);
+  assert.match(uiSmoke, /handoffProofGatesText/);
+  assert.match(uiSmoke, /Remote proof gates are not rendered/);
   assert.equal(existsSync("src/desktop/assets/jarvis-command-core.png"), true);
   assert.equal(visualAsset.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
   assert.equal(statSync("src/desktop/assets/jarvis-command-core.png").size > 200000, true);

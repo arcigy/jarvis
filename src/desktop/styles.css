@@ -719,6 +719,14 @@ h2 {
   white-space: pre-wrap;
 }
 
+.handoffGrid code[data-state="ready"] {
+  color: #9cf8ed;
+}
+
+.handoffGrid code[data-state="attention"] {
+  color: #ffd893;
+}
+
 .handoffPrompt {
   margin-top: 10px;
   max-height: 220px;

@@ -91,6 +91,7 @@ const elements = {
   handoffSmokeUrl: document.querySelector("#handoffSmokeUrl"),
   handoffApprovalTools: document.querySelector("#handoffApprovalTools"),
   handoffLocalWriteTools: document.querySelector("#handoffLocalWriteTools"),
+  handoffProofGates: document.querySelector("#handoffProofGates"),
   mcpToolListStatus: document.querySelector("#mcpToolListStatus"),
   mcpToolList: document.querySelector("#mcpToolList"),
   remoteAgentPrompt: document.querySelector("#remoteAgentPrompt"),
@@ -790,6 +791,8 @@ function renderRemoteMcpPack(pack) {
   elements.handoffSmokeUrl.textContent = pack.smokeTestUrl ?? "--";
   elements.handoffApprovalTools.textContent = approvalTools.length ? `${approvalTools.length}: ${approvalTools.join(", ")}` : "none";
   elements.handoffLocalWriteTools.textContent = localWriteTools.length ? `${localWriteTools.length}: ${localWriteTools.join(", ")}` : "none";
+  elements.handoffProofGates.textContent = "smoke not run";
+  elements.handoffProofGates.dataset.state = "attention";
   renderMcpToolList(pack);
   elements.remoteAgentPrompt.textContent = buildRemoteAgentPrompt(pack);
 }
@@ -862,11 +865,23 @@ function renderRemoteMcpSmoke(report) {
   elements.remoteSmokeResult.dataset.state = report.status === "ready" ? "ready" : "attention";
   setMissionSignal(elements.missionRemote, report.status === "ready" ? "smoke ready" : "smoke blocked", report.status === "ready" ? "ready" : "attention");
   setCortexSignal(elements.cortexRemote, report.status === "ready" ? "smoke ready" : "smoke blocked", report.status === "ready" ? "ready" : "attention");
+  const proof = summarizeRemoteProofGates(report);
+  elements.handoffProofGates.textContent = proof.text;
+  elements.handoffProofGates.dataset.state = proof.ready ? "ready" : "attention";
   elements.remoteSmokeResult.textContent = [
     report.summary ?? `Remote MCP smoke: ${report.status}`,
     "",
     ...(report.checks ?? []).map((check) => `${check.status.toUpperCase()} ${check.key}: ${check.message}`),
   ].join("\n");
+}
+
+function summarizeRemoteProofGates(report) {
+  const required = ["pack-limits", "approval-gate", "approval-shape-gate", "secret-redaction"];
+  const checks = new Map((report.checks ?? []).map((check) => [check.key, check.status]));
+  const missing = required.filter((key) => checks.get(key) !== "ready");
+  return missing.length
+    ? { ready: false, text: `blocked: ${missing.join(", ")}` }
+    : { ready: report.status === "ready", text: "ready: 4/4 safety gates" };
 }
 
 async function copyRemotePack() {
