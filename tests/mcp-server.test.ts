@@ -154,10 +154,14 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_audit_events" && call.approvalRequired === false && call.body.limit === 20));
   assert.equal(pack.handoff.connectionPackUrl, "https://jarvis.example.ngrok-free.app/api/remote-mcp-pack?includeReadiness=true&live=true");
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.url.endsWith("/api/remote-mcp-smoke")));
-  assert.ok(pack.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes('top-level {"approved":true}')));
+  assert.ok(pack.handoff.requiredProof.some((item) => item.key === "connection-pack" && item.expected.includes("repo-only limits")));
+  assert.ok(pack.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("pack-limits")));
+  assert.ok(pack.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("approval-shape-gate")));
   assert.ok(pack.handoff.agentFirstSteps.some((step) => step.includes("arcigy.get_operator_briefing")));
+  assert.ok(pack.handoff.agentFirstSteps.some((step) => step.includes("secret-redaction")));
   assert.deepEqual(pack.agentCompatibility.supportedAgents.slice(0, 3), ["Claude", "ChatGPT", "Grok"]);
-  assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("status=ready")));
+  assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("repo-only limits")));
+  assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("pack-limits")));
   assert.ok(pack.agentCompatibility.safetyRules.some((rule) => rule.includes("family-friendly")));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_outreach_brief" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_outreach_brief" && !("campaignId" in call.body)));

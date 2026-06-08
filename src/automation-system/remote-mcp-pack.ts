@@ -160,7 +160,7 @@ export async function buildRemoteMcpConnectionPack(
       : undefined,
     agentInstructions: [
       "Fetch the manifestUrl first to list live tools and schemas.",
-      "Run the smokeTestUrl before handoff if you need proof that the bridge, read-only MCP calls, approval gates, and secret policy are working.",
+      "Run the smokeTestUrl before handoff and require ready checks for pack-limits, approval-gate, approval-shape-gate, and secret-redaction.",
       "Call MCP tools with POST JSON to mcpToolCallPattern.",
       "Use the bearer auth header placeholder; the real token must be supplied by the operator and is never returned by this pack.",
       "Treat generate_contract_documents, approve_prepared_outreach_reply, and append_leads_to_google_sheet as approval-gated actions.",
@@ -175,7 +175,11 @@ function buildAgentCompatibility(): RemoteMcpConnectionPack["agentCompatibility"
     supportedAgents: ["Claude", "ChatGPT", "Grok", "xAI-compatible HTTP agents", "generic MCP-capable HTTP agents"],
     protocol: "HTTP JSON MCP bridge",
     authentication: "Authorization bearer header",
-    requiredBeforeWork: ["Fetch manifestUrl.", "Fetch handoff.connectionPackUrl.", "Run smokeTestUrl and require status=ready."],
+    requiredBeforeWork: [
+      "Fetch manifestUrl.",
+      "Fetch handoff.connectionPackUrl and confirm tokenValueReturned=false plus repo-only limits.",
+      "Run smokeTestUrl and require status=ready with pack-limits, approval-gate, approval-shape-gate, and secret-redaction ready.",
+    ],
     safetyRules: [
       "Never request, print, store, or infer the real bearer token from this pack.",
       "Start with read-only or draft tools before proposing any write action.",
@@ -197,7 +201,7 @@ function buildHandoffRunbook(baseUrl: string): RemoteMcpConnectionPack["handoff"
     ],
     agentFirstSteps: [
       "Fetch connectionPackUrl with Authorization: Bearer <JARVIS_WEB_TOKEN>.",
-      "Run smokeTestUrl and require status=ready before using MCP tools.",
+      "Run smokeTestUrl and require status=ready with pack-limits, approval-gate, approval-shape-gate, and secret-redaction ready before using MCP tools.",
       "Call arcigy.get_operator_briefing before proposing work.",
       "Use read-only or draft tools first; use dryRun: true before Gmail sync writes.",
       "Never call approvalRequired tools until the operator confirms the exact action.",
@@ -211,12 +215,12 @@ function buildHandoffRunbook(baseUrl: string): RemoteMcpConnectionPack["handoff"
       {
         key: "connection-pack",
         url: `${baseUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`,
-        expected: "HTTP 200, tokenValueReturned=false, handoff runbook present.",
+        expected: "HTTP 200, tokenValueReturned=false, repo-only limits, bounded JSON, explicit write tool calls, handoff runbook present.",
       },
       {
         key: "remote-smoke",
         url: `${baseUrl}/api/remote-mcp-smoke`,
-        expected: 'status=ready, including all approval-required write tools rejecting unapproved and top-level {"approved":true} payloads.',
+        expected: 'status=ready, including pack-limits, secret-redaction, approval-gate, and approval-shape-gate for top-level {"approved":true} payload rejection.',
       },
     ],
   };
