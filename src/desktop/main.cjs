@@ -621,6 +621,7 @@ async function getRemoteMcpPack(payload = {}) {
       rule: "Never call approval-required tools until the operator explicitly confirms the exact action.",
     },
     agentCompatibility: buildRemoteMcpAgentCompatibility(),
+    agentPromptTemplates: buildRemoteMcpAgentPromptTemplates(baseUrl),
     limits: {
       maxJsonBytes: getMaxJsonBytes(),
       pathPolicy: "repo-only",
@@ -647,6 +648,20 @@ async function getRemoteMcpPack(payload = {}) {
       "Treat localStateWrite tools as local memory writes. Prefer dryRun: true for sync_gmail_recent_messages before ingesting messages.",
       "Use get_operator_briefing for a Jarvis-style daily status before making recommendations.",
     ],
+  };
+}
+
+function buildRemoteMcpAgentPromptTemplates(baseUrl) {
+  const shared =
+    `Use Arcigy Jarvis remote MCP at ${baseUrl}. ` +
+    "First fetch the connection pack and manifest with Authorization: Bearer <JARVIS_WEB_TOKEN>, then run remote smoke. " +
+    "Do not ask for or reveal secrets. Start with arcigy.get_operator_briefing. Use read-only/draft tools first. " +
+    "Never call approvalRequired tools until the operator confirms the exact payload.";
+  return {
+    claude: `${shared} In Claude, treat this as an external HTTP MCP bridge and cite the smoke status before any write proposal.`,
+    chatgpt: `${shared} In ChatGPT, use custom actions/tool calls only through POST ${baseUrl}/api/mcp/{toolName} and keep outputs family-friendly.`,
+    grok: `${shared} In Grok or xAI-compatible agents, call the HTTP JSON endpoints directly and return the required proof gates before using local write tools.`,
+    generic: `${shared} For any generic agent, POST JSON to ${baseUrl}/api/mcp/{toolName} and include the bearer auth header placeholder in setup docs only.`,
   };
 }
 

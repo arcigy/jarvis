@@ -173,6 +173,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /buildRemoteAgentPrompt/);
   assert.match(renderer, /Quick-start calls/);
   assert.match(renderer, /Supported agents:/);
+  assert.match(renderer, /Agent-specific startup prompts/);
+  assert.match(renderer, /agentPromptTemplates/);
   assert.match(renderer, /Safety rules:/);
   assert.match(renderer, /copyRemotePack/);
   assert.match(renderer, /writeClipboardText/);
@@ -353,6 +355,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /dryRun: true/);
   assert.match(main, /buildRemoteMcpQuickStartCalls/);
   assert.match(main, /buildRemoteMcpAgentCompatibility/);
+  assert.match(main, /buildRemoteMcpAgentPromptTemplates/);
+  assert.match(main, /Grok or xAI-compatible agents/);
   assert.match(main, /"Claude", "ChatGPT", "Grok"/);
   assert.match(main, /family-friendly, client-safe, and secret-redacted/);
   assert.match(main, /buildRemoteMcpHandoffRunbook/);

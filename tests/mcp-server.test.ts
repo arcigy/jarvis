@@ -134,6 +134,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
     quickStartCalls: Array<{ tool: string; method: string; url: string; approvalRequired: boolean; body: Record<string, unknown> }>;
     handoff: { connectionPackUrl: string; requiredProof: Array<{ key: string; url: string; expected: string }>; agentFirstSteps: string[] };
     agentCompatibility: { supportedAgents: string[]; safetyRules: string[]; requiredBeforeWork: string[] };
+    agentPromptTemplates: { claude: string; chatgpt: string; grok: string; generic: string };
     tunnel: { secureCommand: string };
   };
   assert.equal(pack.manifestUrl, "https://jarvis.example.ngrok-free.app/.well-known/arcigy-jarvis.json");
@@ -168,6 +169,8 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("repo-only limits")));
   assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("pack-limits")));
   assert.ok(pack.agentCompatibility.safetyRules.some((rule) => rule.includes("family-friendly")));
+  assert.match(pack.agentPromptTemplates.grok, /Grok or xAI-compatible agents/);
+  assert.match(pack.agentPromptTemplates.generic, /POST JSON/);
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_outreach_brief" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_outreach_brief" && !("campaignId" in call.body)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.sync_gmail_recent_messages" && call.body.dryRun === true));

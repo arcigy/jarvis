@@ -774,6 +774,10 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("status=ready")));
   assert.ok(pack.agentCompatibility.safetyRules.some((rule) => rule.includes("family-friendly")));
   assert.ok(pack.agentCompatibility.safetyRules.some((rule) => rule.includes("approvalRequired")));
+  assert.match(pack.agentPromptTemplates.grok, /xAI-compatible agents/);
+  assert.match(pack.agentPromptTemplates.grok, /remote smoke/);
+  assert.match(pack.agentPromptTemplates.chatgpt, /POST https:\/\/jarvis\.example\/api\/mcp\/\{toolName\}/);
+  assert.match(pack.agentPromptTemplates.claude, /external HTTP MCP bridge/);
   assert.equal(JSON.stringify(pack).includes("PASSWORD"), false);
 });
 
@@ -1884,6 +1888,7 @@ test("Jarvis voice flow wakes, answers, then returns idle", () => {
 test("Jarvis voice resolves production, remote MCP, contracts, Gmail, and client memory prompts", () => {
   assert.equal(resolveJarvisIntentFromTranscript("Jarvis skontroluj production readiness")?.kind, "voice_capability");
   assert.equal(resolveJarvisIntentFromTranscript("Jarvis priprav remote MCP handoff pre Claude")?.kind, "voice_capability");
+  assert.equal(resolveJarvisIntentFromTranscript("Jarvis priprav MCP handoff pre Grok")?.kind, "voice_capability");
   assert.equal(resolveJarvisIntentFromTranscript("Jarvis priprav zmluvny intake")?.kind, "voice_capability");
   assert.equal(resolveJarvisIntentFromTranscript("Jarvis skontroluj Gmail inbox")?.kind, "voice_capability");
   assert.equal(resolveJarvisIntentFromTranscript("Jarvis ake su klientske poziadavky?")?.kind, "voice_capability");

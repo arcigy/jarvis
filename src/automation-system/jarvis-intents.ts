@@ -62,7 +62,7 @@ function resolveVoiceCapability(text: string): JarvisVoiceCapability | null {
   if (hasAny(text, ["cold outreach", "outreach", "smartlead", "pozitivne odpovede"])) return "cold_outreach_brief";
   if (hasAny(text, ["briefing", "prehlad", "co sa deje", "co sa dialo", "operator"])) return "operator_briefing";
   if (hasAny(text, ["production", "produkcia", "readiness", "launch", "checklist", "nasadenie"])) return "production_readiness";
-  if (hasAny(text, ["remote mcp", "mcp", "tunel", "tunnel", "handoff", "claude", "chatgpt"])) return "remote_mcp";
+  if (hasAny(text, ["remote mcp", "mcp", "tunel", "tunnel", "handoff", "claude", "chatgpt", "grok", "xai", "x.ai"])) return "remote_mcp";
   if (hasAny(text, ["zmluva", "zmluvy", "contract", "priloha", "docx", "intake"])) return "contract_generation";
   if (hasAny(text, ["klient", "klientske", "poziadavky", "kto je", "email", "lokalna pamat"])) return "client_memory";
   if (hasAny(text, ["gmail", "mail", "inbox", "posta", "sync"])) return "gmail_sync";
@@ -81,7 +81,7 @@ function answerVoiceCapability(capability: JarvisVoiceCapability): string {
     production_readiness:
       "Viem skontrolovať produkčný stav: integrácie, live diagnostiku, MCP registry, approval locks a launch checklist.",
     remote_mcp:
-      "Viem pripraviť remote MCP handoff pre Claude alebo ChatGPT: manifest, connection pack, smoke test, bearer auth placeholder a quick-start volania.",
+      "Viem pripraviť remote MCP handoff pre Claude, ChatGPT alebo Grok: manifest, connection pack, smoke test, bearer auth placeholder, agent prompt a quick-start volania.",
     contract_generation:
       "Viem pripraviť zmluvný intake a po tvojom schválení vygenerovať DOCX rámcovú zmluvu aj prílohy. Bez schválenia iba draftujem dáta.",
     client_memory:

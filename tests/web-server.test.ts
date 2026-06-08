@@ -356,6 +356,7 @@ test("local web bridge serves UI and API health", async () => {
       quickStartCalls: Array<{ tool: string; method: string; url: string; approvalRequired: boolean; body: Record<string, unknown> }>;
       handoff: { connectionPackUrl: string; requiredProof: Array<{ key: string; url: string; expected: string }>; agentFirstSteps: string[] };
       agentCompatibility: { supportedAgents: string[]; safetyRules: string[]; requiredBeforeWork: string[] };
+      agentPromptTemplates: { claude: string; chatgpt: string; grok: string; generic: string };
       tunnel: { secureCommand: string };
     };
     assert.match(remotePackBody.manifestUrl, /\/\.well-known\/arcigy-jarvis\.json$/);
@@ -378,6 +379,9 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(remotePackBody.agentCompatibility.requiredBeforeWork.some((step) => step.includes("repo-only limits")));
     assert.ok(remotePackBody.agentCompatibility.requiredBeforeWork.some((step) => step.includes("pack-limits")));
     assert.ok(remotePackBody.agentCompatibility.safetyRules.some((rule) => rule.includes("family-friendly")));
+    assert.match(remotePackBody.agentPromptTemplates.grok, /xAI-compatible agents/);
+    assert.match(remotePackBody.agentPromptTemplates.grok, /approvalRequired tools/);
+    assert.match(remotePackBody.agentPromptTemplates.chatgpt, /POST http:\/\/127\.0\.0\.1:\d+\/api\/mcp\/\{toolName\}/);
     assert.ok(remotePackBody.quickStartCalls.every((call) => call.method === "POST" && call.url.endsWith(`/api/mcp/${call.tool}`)));
     assert.ok(remotePackBody.quickStartCalls.every((call) => call.approvalRequired === remotePackBody.tools.approvalRequired.includes(call.tool)));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.identify_email" && typeof call.body.email === "string"));

@@ -841,6 +841,11 @@ function buildRemoteAgentPrompt(pack, smokeReport = null) {
   const compatibility = pack.agentCompatibility;
   const supportedAgents = (compatibility?.supportedAgents ?? []).join(", ");
   const safetyRules = (compatibility?.safetyRules ?? []).map((rule) => `- ${rule}`).join("\n");
+  const agentPrompts = pack.agentPromptTemplates
+    ? Object.entries(pack.agentPromptTemplates)
+        .map(([agent, prompt]) => `- ${agent}: ${prompt}`)
+        .join("\n")
+    : "";
   const limits = pack.limits
     ? `Limits: pathPolicy=${pack.limits.pathPolicy}, maxJsonBytes=${pack.limits.maxJsonBytes}, writesRequireExplicitToolCall=${pack.limits.writesRequireExplicitToolCall}`
     : "";
@@ -865,6 +870,7 @@ function buildRemoteAgentPrompt(pack, smokeReport = null) {
     `Smoke test: ${pack.smokeTestUrl ?? "--"}`,
     proof ? `Required proof:\n${proof}` : "",
     agentFirstSteps ? `Agent first steps:\n${agentFirstSteps}` : "",
+    agentPrompts ? `Agent-specific startup prompts:\n${agentPrompts}` : "",
     safetyRules ? `Safety rules:\n${safetyRules}` : "",
     "Rule: never call approval-required tools without explicit operator confirmation.",
     "Rule: treat local memory write tools as persistent local state changes; preview Gmail with dryRun: true first.",
