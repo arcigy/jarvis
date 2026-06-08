@@ -1761,7 +1761,7 @@ async function refreshGoogleAccessToken(refreshToken) {
       if (!data.access_token) throw new Error("missing access token");
       return data.access_token;
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = redactSensitiveText(error instanceof Error ? error.message : String(error));
       lastError = `${new URL(url).hostname}: ${message}`;
     }
   }

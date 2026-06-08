@@ -1,4 +1,5 @@
 import { gmailRefreshTokenEnv, getEnv, requireEnv, type RuntimeEnv } from "./env.ts";
+import { redactSensitiveText } from "./ai-safety.ts";
 import type { FetchLike } from "./gemini.ts";
 
 export const defaultGmailSyncQuery = "in:inbox newer_than:7d";
@@ -81,7 +82,7 @@ export async function refreshGoogleAccessToken(
       }
       return data.access_token;
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = redactSensitiveText(error instanceof Error ? error.message : String(error));
       lastError = new Error(`${new URL(url).hostname}: ${message}`);
     }
   }

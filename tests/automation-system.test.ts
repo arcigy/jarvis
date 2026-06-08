@@ -728,6 +728,34 @@ test("Gmail OAuth refresh falls back to the secondary Google token endpoint", as
   assert.deepEqual(calls, ["https://oauth2.googleapis.com/token", "https://www.googleapis.com/oauth2/v4/token"]);
 });
 
+test("Gmail OAuth refresh redacts secrets from endpoint errors", async () => {
+  const googleApiKey = `AI${"za"}Sy${"F".repeat(32)}`;
+  const providerKey = `${"a".repeat(8)}-${"b".repeat(4)}-${"c".repeat(4)}-${"d".repeat(4)}-${"e".repeat(12)}_ehpdn6s`;
+  const databaseUrl = "postgresql://postgres:super-private@example.com:5432/jarvis";
+  const fetchImpl = async () => {
+    throw new Error(`oauth failed ${googleApiKey} ${providerKey} ${databaseUrl}`);
+  };
+
+  await assert.rejects(
+    () =>
+      refreshGoogleAccessToken(
+        "refresh",
+        { GOOGLE_CLIENT_ID: "client", GOOGLE_CLIENT_SECRET: "secret" },
+        fetchImpl as typeof fetch
+      ),
+    (error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      assert.equal(message.includes(googleApiKey), false);
+      assert.equal(message.includes(providerKey), false);
+      assert.equal(message.includes("super-private"), false);
+      assert.match(message, /\[redacted-google-api-key\]/);
+      assert.match(message, /\[redacted-provider-key\]/);
+      assert.match(message, /postgresql:\/\/postgres:\[redacted\]@example\.com/);
+      return true;
+    }
+  );
+});
+
 test("Smartlead helper fetches campaign statistics", async () => {
   const seenUrls: string[] = [];
   const fetchImpl = async (url: string | URL | Request) => {
