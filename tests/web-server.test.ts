@@ -191,6 +191,32 @@ test("local web bridge serves UI and API health", async () => {
     });
     assert.match(String(contractTool.result), /generation-manifest\.json/);
 
+    const unfinishedIntake = JSON.parse(readFileSync("docs/contracts/examples/sample-intake.json", "utf-8"));
+    unfinishedIntake.client.businessName = "[doplnit]";
+    const unfinishedDirectContract = await fetch(`${baseUrl}/api/generate-contracts`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        approval: { approved: true },
+        intake: unfinishedIntake,
+        outputDir: makeRepoTempDir("jarvis-web-unfinished-direct-contract-"),
+      }),
+    });
+    assert.equal(unfinishedDirectContract.status, 400);
+    assert.match(((await unfinishedDirectContract.json()) as { error: string }).error, /Unresolved contract intake placeholder/);
+
+    const unfinishedMcpContract = await fetch(`${baseUrl}/api/mcp/arcigy.generate_contract_documents`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        approval: { approved: true },
+        intake: unfinishedIntake,
+        outputDir: makeRepoTempDir("jarvis-web-unfinished-mcp-contract-"),
+      }),
+    });
+    assert.equal(unfinishedMcpContract.status, 400);
+    assert.match(((await unfinishedMcpContract.json()) as { error: string }).error, /Unresolved contract intake placeholder/);
+
     const rejectedPath = await fetch(`${baseUrl}/api/mcp/arcigy.generate_contract_documents`, {
       method: "POST",
       headers: { "content-type": "application/json" },

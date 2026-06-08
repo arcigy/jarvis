@@ -1078,8 +1078,15 @@ function runPython(args: string[]): { stdout: string; stderr: string } {
     env: { ...process.env, PYTHONIOENCODING: "utf-8" },
   });
   if (result.error) throw result.error;
-  if (result.status !== 0) throw new Error(result.stderr || `Python command failed with status ${result.status}`);
+  if (result.status !== 0) throw pythonToolError(result.stderr || `Python command failed with status ${result.status}`);
   return { stdout: result.stdout ?? "", stderr: result.stderr ?? "" };
+}
+
+function pythonToolError(message: string): Error {
+  const statusCode = /Unresolved contract intake placeholder|Generated DOCX still contains unresolved placeholder|Missing required field|Contract intake JSON is required/i.test(message)
+    ? 400
+    : 500;
+  return Object.assign(new Error(message), { statusCode });
 }
 
 function optionalString(value: unknown): string | undefined {
