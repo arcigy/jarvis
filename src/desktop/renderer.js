@@ -879,9 +879,9 @@ function summarizeRemoteProofGates(report) {
   const required = ["pack-limits", "approval-gate", "approval-shape-gate", "secret-redaction"];
   const checks = new Map((report.checks ?? []).map((check) => [check.key, check.status]));
   const missing = required.filter((key) => checks.get(key) !== "ready");
-  return missing.length
-    ? { ready: false, text: `blocked: ${missing.join(", ")}` }
-    : { ready: report.status === "ready", text: "ready: 4/4 safety gates" };
+  if (missing.length) return { ready: false, text: `blocked: ${missing.join(", ")}` };
+  if (report.status !== "ready") return { ready: false, text: `blocked: smoke status ${report.status ?? "unknown"}` };
+  return { ready: true, text: "ready: 4/4 safety gates" };
 }
 
 async function copyRemotePack() {
