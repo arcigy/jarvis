@@ -1005,7 +1005,7 @@ async function handleWebVoiceEvent(payload: Record<string, unknown>) {
     };
   }
 
-  if (lowered.includes("briefing") || lowered.includes("prehlad") || lowered.includes("prehľad") || lowered.includes("co sa deje") || lowered.includes("čo sa deje")) {
+  if (lowered.includes("briefing") || lowered.includes("prehlad") || lowered.includes("co sa deje")) {
     const briefing = await getOperatorBriefing({ ...payload, text });
     return voiceDone(session, text, briefing.speechText);
   }
@@ -1108,7 +1108,7 @@ function resolveColdOutreachPeriod(text: string) {
     return { since: start.toISOString(), until, periodLabel: "dnes" };
   }
   const since = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  return { since: since.toISOString(), until, periodLabel: "posledných 7 dní" };
+  return { since: since.toISOString(), until, periodLabel: "poslednych 7 dni" };
 }
 
 function normalizeTranscript(text: string) {

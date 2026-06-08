@@ -130,18 +130,18 @@ function delay(ms: number): Promise<void> {
 export function buildClientReplyPrompt(input: ClientReplyDraftInput): GeminiTextInput {
   const language = input.language ?? "sk";
   const tone = input.tone ?? "executive";
-  const client = input.clientName ? `Klient: ${input.clientName}` : "Klient: neznámy";
+  const client = input.clientName ? `Klient: ${input.clientName}` : "Klient: neznamy";
   return {
     systemInstruction:
-      "Si Arcigy Jarvis. Pripravuješ profesionálne, vecné a family-friendly odpovede klientom. Nikdy nesľubuj odoslanie bez schválenia používateľom. Ak správa obsahuje citlivé údaje, nereprodukuj ich.",
+      "Si Arcigy Jarvis. Pripravuj profesionalne, vecne a family-friendly odpovede klientom. Nikdy neslubuj odoslanie bez schvalenia pouzivatelom. Ak sprava obsahuje citlive udaje, nereprodukuj ich.",
     prompt: [
       client,
       `Jazyk odpovede: ${language}.`,
-      `Tón: ${tone}.`,
+      `Ton: ${tone}.`,
       input.context ? `Kontext: ${safeAiPromptPart(input.context)}` : null,
-      "Správa klienta:",
+      "Sprava klienta:",
       safeAiPromptPart(input.message),
-      "Vytvor krátky návrh odpovede. Uveď aj 1 vetu, čo má používateľ schváliť pred odoslaním.",
+      "Vytvor kratky navrh odpovede. Uved aj 1 vetu, co ma pouzivatel schvalit pred odoslanim.",
     ]
       .filter(Boolean)
       .join("\n"),

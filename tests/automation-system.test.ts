@@ -599,6 +599,10 @@ test("Gemini reply helper calls generateContent and extracts text", async () => 
   assert.equal(result.model, "gemini-2.5-flash");
   assert.equal(result.text, "Návrh odpovede");
   assert.match(calls[0].url, /generateContent/);
+  const requestText = JSON.stringify(calls[0].body);
+  assert.match(requestText, /Arcigy Jarvis AI safety rules/);
+  assert.match(requestText, /Sprava klienta/);
+  assert.doesNotMatch(requestText, /[\u0102\u00c4\u0139\u00e2]/);
 });
 
 test("AI safety redacts secrets before Gemini prompts and after model output", async () => {
