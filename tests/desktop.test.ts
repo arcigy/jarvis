@@ -133,6 +133,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /arcigyApi\.jarvisVoiceEvent/);
   assert.match(renderer, /arcigyApi\.runDiagnostics/);
   assert.match(renderer, /arcigyApi\.productionReadiness/);
+  assert.match(renderer, /arcigyApi\.notifyOperator/);
   assert.match(renderer, /arcigyApi\.operatorBriefing/);
   assert.match(renderer, /arcigyApi\.webBridgePreflight/);
   assert.match(renderer, /arcigyApi\.remoteMcpPack/);
@@ -142,6 +143,10 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.doesNotMatch(renderer, /window\.localStorage\.setItem\("arcigyJarvisToken"/);
   assert.match(renderer, /function redactSensitiveText/);
   assert.match(renderer, /function safeUiErrorText/);
+  assert.match(renderer, /async function notifyOperator/);
+  assert.match(renderer, /const safeTitle = redactSensitiveText\(title\)/);
+  assert.match(renderer, /const safeBody = redactSensitiveText\(body\)/);
+  assert.match(renderer, /arcigyApi\.notifyOperator\?\.\(\{ title: safeTitle, body: safeBody, tag \}\)/);
   assert.match(renderer, /async function readJsonResponse/);
   assert.match(renderer, /function responseErrorMessage/);
   assert.match(renderer, /redactSensitiveText\(text\)\.trim\(\)\.slice\(0, 240\)/);
@@ -359,6 +364,11 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /seenClientNeedAlertIds/);
   assert.match(renderer, /notifyClientNeedAlert/);
   assert.match(renderer, /new Notification/);
+  assert.match(main, /Notification/);
+  assert.match(main, /ipcMain\.handle\("jarvis:notifyOperator"/);
+  assert.match(main, /function showOperatorNotification/);
+  assert.match(main, /limitNotificationText\(payload\.body/);
+  assert.match(preload, /notifyOperator: \(payload\) => ipcRenderer\.invoke\("jarvis:notifyOperator", payload\)/);
   assert.match(renderer, /window\.setInterval/);
   assert.match(renderer, /announceNew/);
   assert.match(styles, /\.missionRail/);

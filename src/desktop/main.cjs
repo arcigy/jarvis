@@ -1,4 +1,4 @@
-﻿const { app, BrowserWindow, ipcMain, shell, Tray, Menu, nativeImage } = require("electron");
+﻿const { app, BrowserWindow, ipcMain, shell, Tray, Menu, nativeImage, Notification } = require("electron");
 const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const net = require("node:net");
@@ -54,6 +54,7 @@ app.whenReady().then(() => {
   ipcMain.handle("jarvis:systemHealth", () => getSystemHealth());
   ipcMain.handle("jarvis:runDiagnostics", (_event, payload) => runDiagnostics(payload));
   ipcMain.handle("jarvis:productionReadiness", (_event, payload) => getProductionReadiness(payload));
+  ipcMain.handle("jarvis:notifyOperator", (_event, payload) => showOperatorNotification(payload));
   ipcMain.handle("jarvis:operatorBriefing", (_event, payload) => getOperatorBriefing(payload));
   ipcMain.handle("jarvis:webBridgePreflight", () => getWebBridgePreflight());
   ipcMain.handle("jarvis:remoteMcpPack", (_event, payload) => getRemoteMcpPack(payload));
@@ -245,6 +246,22 @@ function hasPlaceholderUrlCredential(value) {
   } catch {
     return false;
   }
+}
+
+function showOperatorNotification(payload = {}) {
+  if (Notification.isSupported && !Notification.isSupported()) {
+    return { delivered: false, reason: "unsupported" };
+  }
+  const title = limitNotificationText(payload.title || "Arcigy Jarvis", 90) || "Arcigy Jarvis";
+  const body = limitNotificationText(payload.body || "Jarvis has a new operator signal.", 240);
+  const tag = limitNotificationText(payload.tag || "arcigy-jarvis", 64).replace(/[^a-z0-9_.:-]/gi, "-") || "arcigy-jarvis";
+  const notification = new Notification({ title, body, tag, silent: payload.silent === true });
+  notification.show();
+  return { delivered: true, tag };
+}
+
+function limitNotificationText(value, maxLength) {
+  return redactSensitiveText(value).replace(/\s+/g, " ").trim().slice(0, maxLength);
 }
 
 async function runDiagnostics(payload) {

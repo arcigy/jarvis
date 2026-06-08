@@ -150,6 +150,7 @@ const arcigyApi = window.arcigyDesktop ?? {
   jarvisVoiceEvent: (payload) => postJson("/api/jarvis/voice-event", payload),
   runDiagnostics: (payload) => postJson("/api/run-diagnostics", payload),
   productionReadiness: (payload) => postJson("/api/production-readiness", payload),
+  notifyOperator: async () => ({ delivered: false }),
   operatorBriefing: (payload) => postJson("/api/operator-briefing", payload),
   getPreparedOutreachReplies: (payload) => postJson("/api/prepared-outreach-replies", payload),
   preparePositiveOutreachReply: (payload) => postJson("/api/mcp/arcigy.prepare_positive_outreach_reply", payload).then((value) => value.result),
@@ -296,11 +297,19 @@ function speak(text) {
   }
 }
 
-function notifyOperator(title, body, tag = "arcigy-jarvis") {
+async function notifyOperator(title, body, tag = "arcigy-jarvis") {
+  const safeTitle = redactSensitiveText(title).replace(/\s+/g, " ").trim().slice(0, 90) || "Arcigy Jarvis";
+  const safeBody = redactSensitiveText(body).replace(/\s+/g, " ").trim().slice(0, 240);
+  try {
+    const result = await arcigyApi.notifyOperator?.({ title: safeTitle, body: safeBody, tag });
+    if (result?.delivered) return;
+  } catch {
+    // Browser notification fallback below.
+  }
   if (!("Notification" in window)) return;
   const show = () => {
     try {
-      new Notification(title, { body, tag, renotify: true });
+      new Notification(safeTitle, { body: safeBody, tag, renotify: true });
     } catch {
       return;
     }
