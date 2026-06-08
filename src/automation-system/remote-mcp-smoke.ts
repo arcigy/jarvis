@@ -60,6 +60,15 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
     )
   );
 
+  const openApi = await getJson(fetchImpl, `${baseUrl}/api/openapi.json`, input.bearerToken);
+  checks.push(
+    check(
+      openApi.ok && hasValidOpenApiSchema(openApi.body, baseUrl),
+      "openapi-schema",
+      "OpenAPI action schema is reachable and maps every MCP tool to bearer-protected POST operations."
+    )
+  );
+
   const pack = await getJson(fetchImpl, `${baseUrl}/api/remote-mcp-pack?includeReadiness=false`, input.bearerToken);
   checks.push(check(pack.ok, "connection-pack", pack.ok ? "Remote MCP connection pack is reachable." : pack.message));
   checks.push(check(pack.body?.auth?.tokenValueReturned === false, "pack-secret-policy", "Connection pack confirms tokenValueReturned=false."));
@@ -165,7 +174,7 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
   checks.push(check(topLevelApprovalGate.ok, "approval-shape-gate", 'All approval-required write tools rejected top-level {"approved":true}.'));
 
   const leakedSecret = hasSensitiveLeak(
-    { manifest: manifest.body, pack: pack.body, tunnelStatus: tunnelStatus.body, health: health.body, approvalGate: approvalGate.bodies, topLevelApprovalGate: topLevelApprovalGate.bodies },
+    { manifest: manifest.body, openApi: openApi.body, pack: pack.body, tunnelStatus: tunnelStatus.body, health: health.body, approvalGate: approvalGate.bodies, topLevelApprovalGate: topLevelApprovalGate.bodies },
     input.bearerToken
   );
   checks.push(check(!leakedSecret, "secret-redaction", "Smoke responses did not echo bearer tokens, API keys, OAuth tokens, or database URLs."));
@@ -178,7 +187,7 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
     baseUrl,
     summary:
       status === "ready"
-        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
+        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, OpenAPI action schema, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((item) => item.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -288,6 +297,39 @@ function hasExactManifestRegistry(value: unknown): boolean {
     value.map((item) => (item && typeof item === "object" ? (item as { name?: unknown }).name : null)),
     expectedToolNames()
   );
+}
+
+function hasValidOpenApiSchema(value: unknown, baseUrl: string): boolean {
+  if (!value || typeof value !== "object") return false;
+  const document = value as {
+    openapi?: unknown;
+    servers?: unknown;
+    paths?: unknown;
+    components?: { securitySchemes?: { bearerAuth?: { type?: unknown; scheme?: unknown; bearerFormat?: unknown } } };
+    "x-arcigy-policy"?: { tokenValueReturned?: unknown; familyFriendly?: unknown };
+  };
+  const server = Array.isArray(document.servers) ? document.servers[0] as { url?: unknown } | undefined : undefined;
+  const paths = document.paths && typeof document.paths === "object" ? document.paths as Record<string, unknown> : null;
+  if (document.openapi !== "3.1.0" || server?.url !== baseUrl || !paths) return false;
+  if (document.components?.securitySchemes?.bearerAuth?.type !== "http") return false;
+  if (document.components.securitySchemes.bearerAuth.scheme !== "bearer") return false;
+  if (document.components.securitySchemes.bearerAuth.bearerFormat !== "JARVIS_WEB_TOKEN") return false;
+  if (document["x-arcigy-policy"]?.tokenValueReturned !== false || document["x-arcigy-policy"]?.familyFriendly !== true) return false;
+  const names = expectedToolNames();
+  const pathKeys = Object.keys(paths);
+  if (!sameStringArray(pathKeys, names.map((name) => `/api/mcp/${name}`))) return false;
+  const approvalPolicy = new Map<string, boolean>(listJarvisMcpTools().map((tool) => [tool.name, tool.requiresApproval]));
+  return names.every((name) => {
+    const entry = paths[`/api/mcp/${name}`];
+    if (!entry || typeof entry !== "object") return false;
+    const post = (entry as { post?: unknown }).post as { security?: unknown; requestBody?: { content?: { "application/json"?: { schema?: { $ref?: unknown } } } } } | undefined;
+    const security = Array.isArray(post?.security) ? post.security[0] as { bearerAuth?: unknown } | undefined : undefined;
+    const schemaRef = post?.requestBody?.content?.["application/json"]?.schema?.$ref;
+    return (
+      Array.isArray(security?.bearerAuth) &&
+      schemaRef === (approvalPolicy.get(name) ? "#/components/schemas/ApprovalCapablePayload" : "#/components/schemas/GenericMcpPayload")
+    );
+  });
 }
 
 function hasValidManifestToolMetadata(value: unknown, baseUrl: string): boolean {
@@ -405,6 +447,7 @@ function hasHandoffProof(value: unknown, baseUrl: string): boolean {
   const agentFirstSteps = Array.isArray(handoff.agentFirstSteps) ? handoff.agentFirstSteps : [];
   const proofKeys = new Set(requiredProof.map((item) => (item && typeof item === "object" ? (item as { key?: unknown }).key : null)));
   return (
+    proofKeys.has("openapi-schema") &&
     proofKeys.has("manifest") &&
     proofKeys.has("connection-pack") &&
     proofKeys.has("secure-tunnel-status") &&

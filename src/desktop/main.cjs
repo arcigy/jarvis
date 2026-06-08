@@ -1169,6 +1169,14 @@ async function runRemoteMcpSmoke(payload = {}) {
       "Manifest exposes exact approval, local-write, and read-only/draft tool policy."
     )
   );
+  const openApi = await fetchJson(`${baseUrl}/api/openapi.json`, token);
+  checks.push(
+    smokeCheck(
+      openApi.ok && hasValidOpenApiSchema(openApi.body, baseUrl),
+      "openapi-schema",
+      "OpenAPI action schema is reachable and maps every MCP tool to bearer-protected POST operations."
+    )
+  );
   const pack = await fetchJson(`${baseUrl}/api/remote-mcp-pack?includeReadiness=false`, token);
   checks.push(smokeCheck(pack.ok, "connection-pack", pack.ok ? "Remote MCP connection pack is reachable." : pack.message));
   checks.push(smokeCheck(pack.body?.auth?.tokenValueReturned === false, "pack-secret-policy", "Connection pack confirms tokenValueReturned=false."));
@@ -1270,7 +1278,7 @@ async function runRemoteMcpSmoke(payload = {}) {
   checks.push(smokeCheck(approvalGate.ok, "approval-gate", "All approval-required write tools rejected unapproved calls."));
   const topLevelApprovalGate = await checkApprovalGates(baseUrl, token, true);
   checks.push(smokeCheck(topLevelApprovalGate.ok, "approval-shape-gate", 'All approval-required write tools rejected top-level {"approved":true}.'));
-  const leakedSecret = hasSensitiveLeak({ manifest: manifest.body, pack: pack.body, tunnelStatus: tunnelStatus.body, health: health.body, approvalGate: approvalGate.bodies, topLevelApprovalGate: topLevelApprovalGate.bodies }, token);
+  const leakedSecret = hasSensitiveLeak({ manifest: manifest.body, openApi: openApi.body, pack: pack.body, tunnelStatus: tunnelStatus.body, health: health.body, approvalGate: approvalGate.bodies, topLevelApprovalGate: topLevelApprovalGate.bodies }, token);
   checks.push(smokeCheck(!leakedSecret, "secret-redaction", "Smoke responses did not echo bearer tokens, API keys, OAuth tokens, or database URLs."));
   const status = checks.every((check) => check.status === "ready") ? "ready" : "blocked";
   return {
@@ -1280,7 +1288,7 @@ async function runRemoteMcpSmoke(payload = {}) {
     baseUrl,
     summary:
       status === "ready"
-        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
+        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, OpenAPI action schema, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((check) => check.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -1374,6 +1382,29 @@ function hasExactManifestRegistry(value) {
     value.map((item) => (item && typeof item === "object" ? item.name : null)),
     expectedToolNames()
   );
+}
+
+function hasValidOpenApiSchema(value, baseUrl) {
+  if (!value || typeof value !== "object") return false;
+  const server = Array.isArray(value.servers) ? value.servers[0] : null;
+  const paths = value.paths && typeof value.paths === "object" ? value.paths : null;
+  if (value.openapi !== "3.1.0" || server?.url !== baseUrl || !paths) return false;
+  if (value.components?.securitySchemes?.bearerAuth?.type !== "http") return false;
+  if (value.components.securitySchemes.bearerAuth.scheme !== "bearer") return false;
+  if (value.components.securitySchemes.bearerAuth.bearerFormat !== "JARVIS_WEB_TOKEN") return false;
+  if (value["x-arcigy-policy"]?.tokenValueReturned !== false || value["x-arcigy-policy"]?.familyFriendly !== true) return false;
+  const names = expectedToolNames();
+  if (!sameStringArray(Object.keys(paths), names.map((name) => `/api/mcp/${name}`))) return false;
+  const approvalPolicy = new Map(listWebMcpTools().map((tool) => [tool.name, tool.requiresApproval]));
+  return names.every((name) => {
+    const post = paths[`/api/mcp/${name}`]?.post;
+    const security = Array.isArray(post?.security) ? post.security[0] : null;
+    const schemaRef = post?.requestBody?.content?.["application/json"]?.schema?.$ref;
+    return (
+      Array.isArray(security?.bearerAuth) &&
+      schemaRef === (approvalPolicy.get(name) ? "#/components/schemas/ApprovalCapablePayload" : "#/components/schemas/GenericMcpPayload")
+    );
+  });
 }
 
 function hasValidManifestToolMetadata(value, baseUrl) {
@@ -1475,6 +1506,7 @@ function hasHandoffProof(value, baseUrl) {
   const agentFirstSteps = Array.isArray(value.agentFirstSteps) ? value.agentFirstSteps : [];
   const proofKeys = new Set(requiredProof.map((item) => item?.key));
   return (
+    proofKeys.has("openapi-schema") &&
     proofKeys.has("manifest") &&
     proofKeys.has("connection-pack") &&
     proofKeys.has("secure-tunnel-status") &&
