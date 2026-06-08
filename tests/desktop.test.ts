@@ -113,6 +113,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /Quick-start calls/);
   assert.match(renderer, /copyRemotePack/);
   assert.match(renderer, /writeClipboardText/);
+  assert.match(renderer, /const copied = document\.execCommand\("copy"\)/);
+  assert.match(renderer, /Clipboard copy failed/);
   assert.match(renderer, /refreshWebBridge/);
   assert.match(renderer, /startWebBridgeWatch/);
   assert.match(renderer, /webBridgePollMs: 120000/);

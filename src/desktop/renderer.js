@@ -733,8 +733,9 @@ async function writeClipboardText(text) {
   textarea.style.left = "-9999px";
   document.body.appendChild(textarea);
   textarea.select();
-  document.execCommand("copy");
+  const copied = document.execCommand("copy");
   textarea.remove();
+  if (!copied) throw new Error("Clipboard copy failed. Select and copy the remote pack manually.");
 }
 
 function startWebBridgeWatch() {
