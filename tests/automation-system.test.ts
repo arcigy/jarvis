@@ -30,6 +30,7 @@ import {
 import { resolveJarvisIntentFromTranscript } from "../src/automation-system/jarvis-intents.ts";
 import { buildProductionReadinessReport } from "../src/automation-system/production-readiness.ts";
 import { buildOperatorBriefing } from "../src/automation-system/operator-briefing.ts";
+import { buildRemoteMcpOpenApiDocument } from "../src/automation-system/remote-mcp-openapi.ts";
 import { buildRemoteMcpConnectionPack } from "../src/automation-system/remote-mcp-pack.ts";
 import { runRemoteMcpSmoke } from "../src/automation-system/remote-mcp-smoke.ts";
 
@@ -106,6 +107,21 @@ test("production readiness report returns blockers and next actions without secr
   assert.ok(report.launchEvidence.proofGates.some((gate) => gate.id === "approval-locks" && gate.validationCommand === "npm test"));
   assert.match(report.launchEvidence.remoteHandoff.smokeCommand, /remote:mcp:smoke/);
   assert.equal(JSON.stringify(report).includes("PASSWORD"), false);
+});
+
+test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
+  const document = buildRemoteMcpOpenApiDocument("https://jarvis.example/");
+  const paths = Object.keys(document.paths);
+
+  assert.equal(document.openapi, "3.1.0");
+  assert.equal(document.servers[0].url, "https://jarvis.example");
+  assert.equal(document.components.securitySchemes.bearerAuth.bearerFormat, "JARVIS_WEB_TOKEN");
+  assert.equal(document["x-arcigy-policy"].tokenValueReturned, false);
+  assert.equal(paths.length, listJarvisMcpTools().length);
+  assert.ok(paths.includes("/api/mcp/arcigy.get_operator_briefing"));
+  assert.ok(paths.includes("/api/mcp/arcigy.generate_contract_documents"));
+  assert.equal(JSON.stringify(document).includes("<JARVIS_WEB_TOKEN>"), true);
+  assert.equal(/AIza|GOCSPX|1\/\/|postgresql:\/\/|redis:\/\//.test(JSON.stringify(document)), false);
 });
 
 test("remote MCP smoke checks every response for bearer token leaks", async () => {
@@ -799,7 +815,9 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.readiness?.launchEvidence.proofGates.some((gate) => gate.id === "live-diagnostics" && gate.validationCommand.includes("doctor")));
   assert.equal(pack.readiness?.launchEvidence.remoteHandoff.tunnelCommand, "npm run web:tunnel:secure");
   assert.ok(pack.readiness?.fixGuide.some((step) => step.id === "redis-real-password"));
+  assert.equal(pack.openApiSchemaUrl, "https://jarvis.example/api/openapi.json");
   assert.deepEqual(pack.agentCompatibility.supportedAgents.slice(0, 3), ["Claude", "ChatGPT", "Grok"]);
+  assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("openApiSchemaUrl")));
   assert.equal(pack.agentCompatibility.protocol, "HTTP JSON MCP bridge");
   assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("status=ready")));
   assert.ok(pack.agentCompatibility.safetyRules.some((rule) => rule.includes("family-friendly")));
@@ -809,6 +827,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.equal(pack.tunnel.stopUrl, "https://jarvis.example/api/stop-secure-tunnel");
   assert.equal(pack.tunnel.browserStartRequiresStrongToken, true);
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "secure-tunnel-status"));
+  assert.ok(pack.handoff.requiredProof.some((item) => item.key === "openapi-schema" && item.url.endsWith("/api/openapi.json")));
   assert.match(pack.agentPromptTemplates.grok, /xAI-compatible agents/);
   assert.match(pack.agentPromptTemplates.grok, /remote smoke/);
   assert.match(pack.agentPromptTemplates.chatgpt, /POST https:\/\/jarvis\.example\/api\/mcp\/\{toolName\}/);

@@ -143,6 +143,7 @@ function getSecureTunnelStatus() {
     logPath,
     publicUrl,
     manifestUrl: publicUrl ? `${publicUrl}/.well-known/arcigy-jarvis.json` : null,
+    openApiSchemaUrl: publicUrl ? `${publicUrl}/api/openapi.json` : null,
     connectionPackUrl: publicUrl ? `${publicUrl}/api/remote-mcp-pack?includeReadiness=true&live=true` : null,
     smokeUrl: publicUrl ? `${publicUrl}/api/remote-mcp-smoke` : null,
     mcpToolCallPattern: publicUrl ? `${publicUrl}/api/mcp/{toolName}` : null,
@@ -740,6 +741,7 @@ function getWebBridgePreflight() {
     mode: "desktop-preflight",
     host: process.env.JARVIS_WEB_HOST || "127.0.0.1",
     manifestUrl: `http://${process.env.JARVIS_WEB_HOST || "127.0.0.1"}:${process.env.JARVIS_WEB_PORT || "8765"}/.well-known/arcigy-jarvis.json`,
+    openApiSchemaUrl: `http://${process.env.JARVIS_WEB_HOST || "127.0.0.1"}:${process.env.JARVIS_WEB_PORT || "8765"}/api/openapi.json`,
     tunnelCommand: "npm run web:tunnel",
     tunnelProvider: "ngrok",
     authRequiredForExternalHosts: true,
@@ -768,6 +770,7 @@ async function getRemoteMcpPack(payload = {}) {
     generatedAt: new Date().toISOString(),
     baseUrl,
     manifestUrl: `${baseUrl}/.well-known/arcigy-jarvis.json`,
+    openApiSchemaUrl: `${baseUrl}/api/openapi.json`,
     smokeTestUrl: `${baseUrl}/api/remote-mcp-smoke`,
     mcpBaseUrl: `${baseUrl}/api/mcp`,
     mcpToolCallPattern: `${baseUrl}/api/mcp/{toolName}`,
@@ -824,6 +827,7 @@ async function getRemoteMcpPack(payload = {}) {
       : undefined,
     agentInstructions: [
       "Fetch the manifestUrl first to list live tools and schemas.",
+      "Import openApiSchemaUrl when the remote agent supports ChatGPT custom actions, Grok actions, or OpenAPI-based HTTP tool setup.",
       "Run the smokeTestUrl before handoff and require ready checks for pack-limits, approval-gate, approval-shape-gate, and secret-redaction.",
       "Call MCP tools with POST JSON to mcpToolCallPattern.",
       "Use the bearer auth header placeholder; the real token must be supplied by the operator and is never returned by this pack.",
@@ -838,13 +842,13 @@ async function getRemoteMcpPack(payload = {}) {
 function buildRemoteMcpAgentPromptTemplates(baseUrl) {
   const shared =
     `Use Arcigy Jarvis remote MCP at ${baseUrl}. ` +
-    "First fetch the connection pack and manifest with Authorization: Bearer <JARVIS_WEB_TOKEN>, then run remote smoke. " +
+    "First fetch the connection pack, manifest, and OpenAPI schema with Authorization: Bearer <JARVIS_WEB_TOKEN>, then run remote smoke. " +
     "Do not ask for or reveal secrets. Start with arcigy.get_operator_briefing. Use read-only/draft tools first. " +
     "Never call approvalRequired tools until the operator confirms the exact payload.";
   return {
     claude: `${shared} In Claude, treat this as an external HTTP MCP bridge and cite the smoke status before any write proposal.`,
-    chatgpt: `${shared} In ChatGPT, use custom actions/tool calls only through POST ${baseUrl}/api/mcp/{toolName} and keep outputs family-friendly.`,
-    grok: `${shared} In Grok or xAI-compatible agents, call the HTTP JSON endpoints directly and return the required proof gates before using local write tools.`,
+    chatgpt: `${shared} In ChatGPT, import ${baseUrl}/api/openapi.json as the custom action schema, then use tool calls only through POST ${baseUrl}/api/mcp/{toolName} and keep outputs family-friendly.`,
+    grok: `${shared} In Grok or xAI-compatible agents, import or mirror ${baseUrl}/api/openapi.json when OpenAPI actions are supported; otherwise call the HTTP JSON endpoints directly and return the required proof gates before using local write tools.`,
     generic: `${shared} For any generic agent, POST JSON to ${baseUrl}/api/mcp/{toolName} and include the bearer auth header placeholder in setup docs only.`,
   };
 }
@@ -856,6 +860,7 @@ function buildRemoteMcpAgentCompatibility() {
     authentication: "Authorization bearer header",
     requiredBeforeWork: [
       "Fetch manifestUrl.",
+      "Import openApiSchemaUrl if the agent supports OpenAPI or custom actions.",
       "Fetch handoff.connectionPackUrl and confirm tokenValueReturned=false plus repo-only limits.",
       "Run smokeTestUrl and require status=ready with pack-limits, approval-gate, approval-shape-gate, and secret-redaction ready.",
       "Inspect tunnel.statusUrl after any tunnel start and never ask for the real bearer token.",
@@ -877,11 +882,13 @@ function buildRemoteMcpHandoffRunbook(baseUrl) {
       "Run npm run web:tunnel:secure and keep the process open while the remote agent works.",
       "If using browser mode, configure a strong JARVIS_WEB_TOKEN first, then use Start tunnel or POST /api/start-secure-tunnel.",
       "Give the remote agent the external manifest, connection pack, smoke test URL, MCP base URL, and bearer auth header placeholder.",
+      "For ChatGPT custom actions or Grok-compatible OpenAPI setup, give the remote agent the external openApiSchemaUrl too.",
       "Approve approvalRequired tools only after reviewing the exact payload the agent will send.",
       "Run the smoke test again after any tunnel restart because ngrok URLs can change.",
     ],
     agentFirstSteps: [
       "Fetch connectionPackUrl with Authorization: Bearer <JARVIS_WEB_TOKEN>.",
+      "Fetch openApiSchemaUrl if the agent supports OpenAPI/custom actions.",
       "Run smokeTestUrl and require status=ready with pack-limits, approval-gate, approval-shape-gate, and secret-redaction ready before using MCP tools.",
       "Fetch tunnel.statusUrl if the operator needs the current public tunnel URLs; token values must remain redacted.",
       "Call arcigy.get_operator_briefing before proposing work.",
@@ -889,6 +896,11 @@ function buildRemoteMcpHandoffRunbook(baseUrl) {
       "Never call approvalRequired tools until the operator confirms the exact action.",
     ],
     requiredProof: [
+      {
+        key: "openapi-schema",
+        url: `${baseUrl}/api/openapi.json`,
+        expected: "HTTP 200 OpenAPI 3.1 schema, bearerAuth security scheme, one POST operation per Jarvis MCP tool, no token value.",
+      },
       {
         key: "manifest",
         url: `${baseUrl}/.well-known/arcigy-jarvis.json`,

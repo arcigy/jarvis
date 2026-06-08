@@ -15,6 +15,7 @@ import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerpe
 import { buildContractGenerationCommand, getColdOutreachMcpAnswer, listJarvisMcpTools, localStateWriteToolNames } from "../automation-system/mcp-tools.ts";
 import { buildOperatorBriefing } from "../automation-system/operator-briefing.ts";
 import { buildProductionReadinessReport } from "../automation-system/production-readiness.ts";
+import { buildRemoteMcpOpenApiDocument } from "../automation-system/remote-mcp-openapi.ts";
 import { buildRemoteMcpConnectionPack } from "../automation-system/remote-mcp-pack.ts";
 import { runRemoteMcpSmoke } from "../automation-system/remote-mcp-smoke.ts";
 import { getSmartleadCampaignStatus, getSmartleadOutreachBrief } from "../automation-system/smartlead.ts";
@@ -56,6 +57,11 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
 
   if (request.method === "GET" && (url.pathname === "/api/mcp" || url.pathname === "/.well-known/arcigy-jarvis.json")) {
     writeJson(response, 200, buildWebBridgeManifest(request));
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/openapi.json") {
+    writeJson(response, 200, buildRemoteMcpOpenApiDocument(getRequestOrigin(request)));
     return;
   }
 
@@ -414,6 +420,7 @@ function buildWebBridgeManifest(request: IncomingMessage) {
       diagnostics: `${origin}/api/run-diagnostics`,
       productionReadiness: `${origin}/api/production-readiness`,
       secureTunnelStatus: `${origin}/api/secure-tunnel-status`,
+      openApiSchema: `${origin}/api/openapi.json`,
       mcpTools: `${origin}/api/mcp`,
       mcpToolCallPattern: `${mcpBaseUrl}/{toolName}`,
     },
@@ -456,6 +463,7 @@ function buildWebBridgePreflight(request: IncomingMessage) {
     host: getRequestHost(request),
     origin,
     manifestUrl: `${origin}/.well-known/arcigy-jarvis.json`,
+    openApiSchemaUrl: `${origin}/api/openapi.json`,
     tunnelCommand: "npm run web:tunnel",
     tunnelProvider: "ngrok",
     authRequiredForExternalHosts: true,
@@ -499,6 +507,7 @@ function getSecureTunnelStatus() {
     logPath,
     publicUrl,
     manifestUrl: publicUrl ? `${publicUrl}/.well-known/arcigy-jarvis.json` : null,
+    openApiSchemaUrl: publicUrl ? `${publicUrl}/api/openapi.json` : null,
     connectionPackUrl: publicUrl ? `${publicUrl}/api/remote-mcp-pack?includeReadiness=true&live=true` : null,
     smokeUrl: publicUrl ? `${publicUrl}/api/remote-mcp-smoke` : null,
     mcpToolCallPattern: publicUrl ? `${publicUrl}/api/mcp/{toolName}` : null,

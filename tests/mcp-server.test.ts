@@ -134,6 +134,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   });
   const pack = getStructuredResult(packResult) as {
     manifestUrl: string;
+    openApiSchemaUrl: string;
     smokeTestUrl: string;
     auth: { header: string; tokenValueReturned: boolean };
     limits: { maxJsonBytes: number; pathPolicy: string; writesRequireExplicitToolCall: boolean };
@@ -145,6 +146,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
     tunnel: { secureCommand: string; statusUrl: string; startUrl: string; stopUrl: string; browserStartRequiresStrongToken: boolean };
   };
   assert.equal(pack.manifestUrl, "https://jarvis.example.ngrok-free.app/.well-known/arcigy-jarvis.json");
+  assert.equal(pack.openApiSchemaUrl, "https://jarvis.example.ngrok-free.app/api/openapi.json");
   assert.equal(pack.smokeTestUrl, "https://jarvis.example.ngrok-free.app/api/remote-mcp-smoke");
   assert.equal(pack.auth.header, "Authorization: Bearer <JARVIS_WEB_TOKEN>");
   assert.equal(pack.auth.tokenValueReturned, false);
@@ -168,6 +170,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.equal(pack.handoff.connectionPackUrl, "https://jarvis.example.ngrok-free.app/api/remote-mcp-pack?includeReadiness=true&live=true");
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.url.endsWith("/api/remote-mcp-smoke")));
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "secure-tunnel-status" && item.url.endsWith("/api/secure-tunnel-status")));
+  assert.ok(pack.handoff.requiredProof.some((item) => item.key === "openapi-schema" && item.url.endsWith("/api/openapi.json")));
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "connection-pack" && item.expected.includes("repo-only limits")));
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("pack-limits")));
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("approval-shape-gate")));
