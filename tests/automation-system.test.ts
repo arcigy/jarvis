@@ -1799,6 +1799,78 @@ test("local SQLite CLI records secret-safe audit events", () => {
   assert.match(JSON.stringify(events), /\[redacted-provider-key\]/);
 });
 
+test("local SQLite CLI redacts secrets from local data payloads", () => {
+  const dir = mkdtempSync(join(tmpdir(), "jarvis-safe-db-"));
+  const dbPath = join(dir, "jarvis.db");
+  const python = process.env.JARVIS_PYTHON || "python";
+  const googleKey = "AI" + "za" + "S" + "y" + "B".repeat(32);
+  const providerKey = ["bbbbbbbb", "cccc", "dddd", "eeee", "ffffffffffff"].join("-") + "_ehpdn6s";
+  const databaseUrl = "postgresql://postgres:local-secret@example.com:5432/db";
+
+  const person = runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "upsert-person",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify({
+      primaryEmail: "secret.lead@example.com",
+      displayName: "Secret Lead",
+      data: { googleKey, providerKey, databaseUrl },
+    }),
+  ]);
+
+  const need = runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "add-need-signal",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify({
+      personId: person.id,
+      summary: `Need help with ${googleKey}`,
+      data: { providerKey, databaseUrl },
+    }),
+  ]);
+
+  const cold = runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "add-cold-event",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify({
+      leadEmail: "secret.lead@example.com",
+      eventType: "positive_reply",
+      data: { googleKey, providerKey },
+    }),
+  ]);
+
+  const ingested = runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "ingest-message",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify({
+      email: "secret.lead@example.com",
+      source: "gmail",
+      externalId: "secret-message-1",
+      subject: `Secret ${providerKey}`,
+      text: `Please help with this token ${googleKey} and db ${databaseUrl}`,
+      data: { providerKey },
+    }),
+  ]);
+
+  const output = JSON.stringify({ person, need, cold, ingested });
+  assert.equal(output.includes(googleKey), false);
+  assert.equal(output.includes(providerKey), false);
+  assert.equal(output.includes(databaseUrl), false);
+  assert.match(output, /\[redacted-google-api-key\]/);
+  assert.match(output, /\[redacted-provider-key\]/);
+  assert.match(output, /postgresql:\/\/postgres:\[redacted\]@example\.com:5432\/db/);
+});
+
 function runPythonJson(python: string, args: string[]) {
   const result = spawnSync(python, args, {
     cwd: process.cwd(),

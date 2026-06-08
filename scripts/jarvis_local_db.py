@@ -104,7 +104,7 @@ def upsert_person(db_path: Path, payload: dict[str, Any]) -> dict[str, Any]:
     init_db(db_path)
     email = normalize_email(required(payload, "primaryEmail"))
     person_id = payload.get("id") or f"person_{uuid.uuid4().hex}"
-    data = json.dumps(payload.get("data") or {}, ensure_ascii=False)
+    data = safe_data_json(payload.get("data") or {})
     conn = connect(db_path)
     conn.execute(
         """
@@ -149,10 +149,10 @@ def add_need_signal(db_path: Path, payload: dict[str, Any]) -> dict[str, Any]:
             person_id,
             payload.get("source", "mcp"),
             payload.get("signalType", "request"),
-            required(payload, "summary"),
+            redact_text(required(payload, "summary")),
             payload.get("status", "new"),
             float(payload.get("confidence", 0.7)),
-            json.dumps(payload.get("data") or {}, ensure_ascii=False),
+            safe_data_json(payload.get("data") or {}),
             payload.get("occurredAt") or payload.get("occurred_at") or datetime.now(timezone.utc).isoformat(),
         ),
     )
@@ -180,7 +180,7 @@ def add_cold_event(db_path: Path, payload: dict[str, Any]) -> dict[str, Any]:
             payload.get("campaignName"),
             required(payload, "eventType"),
             occurred_at,
-            json.dumps(payload.get("data") or {}, ensure_ascii=False),
+            safe_data_json(payload.get("data") or {}),
         ),
     )
     conn.commit()
@@ -543,15 +543,14 @@ def ingest_message(db_path: Path, payload: dict[str, Any]) -> dict[str, Any]:
             source,
             payload.get("eventType", "message_received"),
             occurred_at,
-            json.dumps(
+            safe_data_json(
                 {
                     "subject": payload.get("subject"),
                     "text": text,
                     "threadId": payload.get("threadId"),
                     "externalId": external_id,
                     **(payload.get("data") or {}),
-                },
-                ensure_ascii=False,
+                }
             ),
         ),
     )
@@ -814,6 +813,14 @@ def required(payload: dict[str, Any], key: str) -> str:
     if value in (None, ""):
         raise ValueError(f"Missing required field: {key}")
     return str(value)
+
+
+def safe_data_json(value: Any) -> str:
+    return json.dumps(redact_secrets(value or {}), ensure_ascii=False)
+
+
+def redact_text(value: str) -> str:
+    return str(redact_secrets(value))
 
 
 def redact_secrets(value: Any) -> Any:
