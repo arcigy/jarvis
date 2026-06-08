@@ -666,6 +666,13 @@ async function runRemoteMcpSmoke(payload = {}) {
       "Connection pack identifies local write tools separately from read-only/draft tools."
     )
   );
+  checks.push(
+    smokeCheck(
+      hasUsableContractQuickStart(pack.body?.quickStartCalls),
+      "pack-contract-quick-start",
+      "Connection pack includes a usable approval-gated contract quick-start payload."
+    )
+  );
   const health = await fetchJson(`${baseUrl}/api/mcp/arcigy.get_system_health`, token, { format: "json" });
   checks.push(smokeCheck(health.ok && Array.isArray(health.body?.result?.integrations), "read-only-tool-call", "Read-only MCP tool call returned integration health."));
   const approvalGate = await fetchJson(`${baseUrl}/api/mcp/arcigy.generate_contract_documents`, token, { intake: {} });
@@ -680,7 +687,7 @@ async function runRemoteMcpSmoke(payload = {}) {
     baseUrl,
     summary:
       status === "ready"
-        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, local write policy, read-only call, approval gate, and secret policy passed.`
+        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, local write policy, contract quick-start, read-only call, approval gate, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((check) => check.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -697,6 +704,19 @@ function hasLocalWritePolicy(value) {
   const localStateWrite = Array.isArray(value.localStateWrite) ? value.localStateWrite : [];
   const readOnlyOrDraft = Array.isArray(value.readOnlyOrDraft) ? value.readOnlyOrDraft : [];
   return localStateWrite.includes("arcigy.sync_gmail_recent_messages") && !readOnlyOrDraft.includes("arcigy.sync_gmail_recent_messages");
+}
+
+function hasUsableContractQuickStart(value) {
+  if (!Array.isArray(value)) return false;
+  const call = value.find((item) => item?.tool === "arcigy.generate_contract_documents");
+  if (!call || call.approvalRequired !== true || call.body?.approval?.approved !== true) return false;
+  const intake = call.body.intake;
+  const hasRequiredShape =
+    typeof intake?.client?.businessName === "string" &&
+    typeof intake?.client?.email === "string" &&
+    Array.isArray(intake?.project?.includedModules) &&
+    Boolean(intake?.pricing);
+  return hasRequiredShape && !/dopln|todo|tbd|xxx|\?\?\?/i.test(JSON.stringify(call.body));
 }
 
 async function fetchJson(url, token, payload = null) {

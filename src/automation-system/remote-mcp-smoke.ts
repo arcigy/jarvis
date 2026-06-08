@@ -55,6 +55,13 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
       "Connection pack identifies local write tools separately from read-only/draft tools."
     )
   );
+  checks.push(
+    check(
+      hasUsableContractQuickStart(pack.body?.quickStartCalls),
+      "pack-contract-quick-start",
+      "Connection pack includes a usable approval-gated contract quick-start payload."
+    )
+  );
 
   const health = await postJson(fetchImpl, `${baseUrl}/api/mcp/arcigy.get_system_health`, { format: "json" }, input.bearerToken);
   checks.push(check(health.ok && Array.isArray(health.body?.result?.integrations), "read-only-tool-call", "Read-only MCP tool call returned integration health."));
@@ -73,7 +80,7 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
     baseUrl,
     summary:
       status === "ready"
-        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, local write policy, read-only call, approval gate, and secret policy passed.`
+        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, local write policy, contract quick-start, read-only call, approval gate, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((item) => item.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -95,6 +102,23 @@ function hasLocalWritePolicy(value: unknown): boolean {
   const localStateWrite = Array.isArray(policy.localStateWrite) ? policy.localStateWrite : [];
   const readOnlyOrDraft = Array.isArray(policy.readOnlyOrDraft) ? policy.readOnlyOrDraft : [];
   return localStateWrite.includes("arcigy.sync_gmail_recent_messages") && !readOnlyOrDraft.includes("arcigy.sync_gmail_recent_messages");
+}
+
+function hasUsableContractQuickStart(value: unknown): boolean {
+  if (!Array.isArray(value)) return false;
+  const call = value.find((item) => {
+    if (!item || typeof item !== "object") return false;
+    return (item as { tool?: unknown }).tool === "arcigy.generate_contract_documents";
+  }) as { approvalRequired?: unknown; body?: { approval?: { approved?: unknown }; intake?: unknown } } | undefined;
+  if (!call || call.approvalRequired !== true || call.body?.approval?.approved !== true) return false;
+  const intake = call.body.intake as { client?: { businessName?: unknown; email?: unknown }; project?: { includedModules?: unknown }; pricing?: unknown } | undefined;
+  if (!intake || typeof intake !== "object") return false;
+  const hasRequiredShape =
+    typeof intake.client?.businessName === "string" &&
+    typeof intake.client?.email === "string" &&
+    Array.isArray(intake.project?.includedModules) &&
+    Boolean(intake.pricing);
+  return hasRequiredShape && !/dopln|todo|tbd|xxx|\?\?\?/i.test(JSON.stringify(call.body));
 }
 
 async function getJson(fetchImpl: typeof fetch, url: string, bearerToken?: string) {

@@ -48,6 +48,7 @@ test("remote MCP smoke CLI verifies a local bridge without leaking token", async
     assert.equal(body.tokenValueReturned, false);
     assert.ok(body.checks.some((check) => check.key === "manifest-local-write-policy" && check.status === "ready"));
     assert.ok(body.checks.some((check) => check.key === "pack-local-write-policy" && check.status === "ready"));
+    assert.ok(body.checks.some((check) => check.key === "pack-contract-quick-start" && check.status === "ready"));
   } finally {
     if (previousToken === undefined) delete process.env.JARVIS_WEB_TOKEN;
     else process.env.JARVIS_WEB_TOKEN = previousToken;

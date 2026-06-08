@@ -291,6 +291,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(smokeBody.checks.some((check) => check.key === "approval-gate" && check.status === "ready"));
     assert.ok(smokeBody.checks.some((check) => check.key === "manifest-local-write-policy" && check.status === "ready"));
     assert.ok(smokeBody.checks.some((check) => check.key === "pack-local-write-policy" && check.status === "ready"));
+    assert.ok(smokeBody.checks.some((check) => check.key === "pack-contract-quick-start" && check.status === "ready"));
 
     const mcpSmoke = await postJson(`${baseUrl}/api/mcp/arcigy.run_remote_mcp_smoke`, {});
     assert.equal(mcpSmoke.result.status, "ready");
