@@ -219,6 +219,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /arcigyApi\.getPreparedOutreachReplies/);
   assert.match(renderer, /arcigyApi\.preparePositiveOutreachReply/);
   assert.match(renderer, /arcigyApi\.approvePreparedOutreachReply/);
+  assert.match(renderer, /lastApprovedPreparedReply/);
   assert.match(renderer, /arcigyApi\.identifyEmail/);
   assert.match(renderer, /arcigyApi\.ingestClientMessage/);
   assert.match(renderer, /arcigyApi\.getClientNeedAlerts/);
@@ -245,6 +246,10 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /arcigy\.prepare_positive_outreach_reply/);
   assert.match(renderer, /window\.confirm\(`Approve prepared reply to \$\{first\.leadEmail\}/);
   assert.match(renderer, /window\.confirm\(`Send approved reply to \$\{first\.leadEmail\}/);
+  assert.match(renderer, /state\.lastApprovedPreparedReply = result\.preparedReply \?\? first/);
+  assert.match(renderer, /const first = state\.lastApprovedPreparedReply \?\? state\.lastPreparedReplies\[0\]/);
+  assert.match(renderer, /Approve a prepared reply before sending/);
+  assert.match(renderer, /state\.lastApprovedPreparedReply = null/);
   assert.match(renderer, /Prepared reply approval cancelled before any write/);
   assert.match(renderer, /Approved reply send cancelled before any Gmail call/);
   assert.match(renderer, /preparedEventId: first\.id,\s+approval: \{ approved: true \}/);

@@ -5,6 +5,7 @@ const state = {
   listening: false,
   lastLeads: [],
   lastPreparedReplies: [],
+  lastApprovedPreparedReply: null,
   operatorBriefingTimer: null,
   operatorBriefingPollMs: 300000,
   webBridgeTimer: null,
@@ -1373,6 +1374,7 @@ elements.preparedReplies.addEventListener("click", async () => {
     elements.preparedReplyResult.textContent = "Loading prepared replies...";
     const result = await arcigyApi.getPreparedOutreachReplies({ status: "pending", limit: 10 });
     state.lastPreparedReplies = result.replies ?? [];
+    if (state.lastPreparedReplies.length) state.lastApprovedPreparedReply = null;
     elements.preparedReplyResult.textContent = renderPreparedReplies(result);
     if (result.count > 0 && result.summary) speak(result.summary);
   } catch (error) {
@@ -1420,6 +1422,7 @@ elements.approvePreparedReply.addEventListener("click", async () => {
     });
     elements.preparedReplyResult.textContent = result.summary;
     speak(result.summary);
+    state.lastApprovedPreparedReply = result.preparedReply ?? first;
     const refreshed = await arcigyApi.getPreparedOutreachReplies({ status: "pending", limit: 10 });
     state.lastPreparedReplies = refreshed.replies ?? [];
   } catch (error) {
@@ -1429,10 +1432,16 @@ elements.approvePreparedReply.addEventListener("click", async () => {
 elements.sendApprovedReply.addEventListener("click", async () => {
   try {
     if (!state.lastPreparedReplies.length) {
-      elements.preparedReplyResult.textContent = "Load prepared replies before sending.";
+      if (!state.lastApprovedPreparedReply) {
+        elements.preparedReplyResult.textContent = "Approve a prepared reply before sending.";
+        return;
+      }
+    }
+    const first = state.lastApprovedPreparedReply ?? state.lastPreparedReplies[0];
+    if (!first) {
+      elements.preparedReplyResult.textContent = "Approve a prepared reply before sending.";
       return;
     }
-    const first = state.lastPreparedReplies[0];
     const approved = window.confirm(`Send approved reply to ${first.leadEmail}${first.subject ? ` about ${first.subject}` : ""} through Gmail?`);
     if (!approved) {
       elements.preparedReplyResult.textContent = "Approved reply send cancelled before any Gmail call.";
@@ -1447,6 +1456,7 @@ elements.sendApprovedReply.addEventListener("click", async () => {
     });
     elements.preparedReplyResult.textContent = result.summary;
     speak(result.summary);
+    state.lastApprovedPreparedReply = null;
     const refreshed = await arcigyApi.getPreparedOutreachReplies({ status: "pending", limit: 10 });
     state.lastPreparedReplies = refreshed.replies ?? [];
   } catch (error) {
