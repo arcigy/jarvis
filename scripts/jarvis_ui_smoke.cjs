@@ -114,6 +114,7 @@ async function run() {
           title: document.title,
           bodyText: document.body.innerText,
           rail: box("#missionRail"),
+          cortex: box("#cortexMap"),
           deck: box("#commandDeck"),
           visual: box(".deckVisual"),
           jarvisPanel: box("#jarvisPanel"),
@@ -125,6 +126,10 @@ async function run() {
           visibleMissionSignals: [...document.querySelectorAll(".missionSignal")].filter((node) => {
             const rect = node.getBoundingClientRect();
             return rect.width > 20 && rect.height > 20;
+          }).length,
+          visibleCortexNodes: [...document.querySelectorAll(".cortexNode")].filter((node) => {
+            const rect = node.getBoundingClientRect();
+            return rect.width > 20 && rect.height > 20;
           }).length
         };
       })()
@@ -133,8 +138,10 @@ async function run() {
     if (dom.title !== "Arcigy Jarvis") fail(`Unexpected page title: ${dom.title}.`);
     if (!dom.coreImageComplete || dom.coreImageNaturalWidth < 100) fail("Command core image did not load.");
     if (dom.visibleMissionSignals !== 5) fail(`Expected 5 mission signals, found ${dom.visibleMissionSignals}.`);
+    if (dom.visibleCortexNodes !== 5) fail(`Expected 5 cortex nodes, found ${dom.visibleCortexNodes}.`);
     if (/undefined|null|\[object Object\]/i.test(dom.bodyText)) fail("UI contains raw undefined/null/object text.");
     assertBox("mission rail", dom.rail, { width: 600, height: 50 });
+    assertBox("cortex map", dom.cortex, { width: 600, height: 80 });
     assertBox("command deck", dom.deck, { width: 600, height: 90 });
     assertBox("deck visual", dom.visual, { width: 120, height: 80 });
     assertVisibleStart("Jarvis panel", dom.jarvisPanel, { width: 280, height: 180 });

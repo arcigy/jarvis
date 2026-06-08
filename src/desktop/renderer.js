@@ -23,6 +23,7 @@ const state = {
 
 const elements = {
   navButtons: [...document.querySelectorAll("nav button[data-target]")],
+  cortexNodes: [...document.querySelectorAll(".cortexNode[data-target]")],
   statusBadge: document.querySelector("#statusBadge"),
   healthGrid: document.querySelector("#healthGrid"),
   missionReadiness: document.querySelector("#missionReadiness"),
@@ -30,6 +31,11 @@ const elements = {
   missionGmail: document.querySelector("#missionGmail"),
   missionRemote: document.querySelector("#missionRemote"),
   missionContracts: document.querySelector("#missionContracts"),
+  cortexVoice: document.querySelector("#cortexVoice"),
+  cortexOutreach: document.querySelector("#cortexOutreach"),
+  cortexMemory: document.querySelector("#cortexMemory"),
+  cortexContracts: document.querySelector("#cortexContracts"),
+  cortexRemote: document.querySelector("#cortexRemote"),
   readyIntegrations: document.querySelector("#readyIntegrations"),
   mcpToolCount: document.querySelector("#mcpToolCount"),
   approvalLockCount: document.querySelector("#approvalLockCount"),
@@ -159,6 +165,7 @@ function setMode(mode) {
   elements.statusBadge.textContent = mode === "idle" ? "Idle" : mode === "awake" ? "Awake" : "Listening";
   elements.orb.dataset.mode = mode;
   setMissionSignal(elements.missionVoice, mode === "idle" ? "idle" : mode, mode === "idle" ? "ready" : "attention");
+  setCortexSignal(elements.cortexVoice, mode === "idle" ? "standing by" : mode, mode === "idle" ? "ready" : "attention");
 }
 
 function setupNavigation() {
@@ -175,6 +182,19 @@ function setupNavigation() {
       if (!target) return;
       target.scrollIntoView({ behavior: "smooth", block: "start" });
       setActive(targetId);
+    });
+  }
+
+  for (const node of elements.cortexNodes) {
+    const activate = () => {
+      const target = node.dataset.target ? document.getElementById(node.dataset.target) : null;
+      if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+    node.addEventListener("click", activate);
+    node.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      activate();
     });
   }
 
@@ -267,17 +287,28 @@ function setMissionSignal(node, text, stateName) {
   node.closest(".missionSignal")?.setAttribute("data-state", stateName);
 }
 
+function setCortexSignal(node, text, stateName) {
+  if (!node) return;
+  node.textContent = text;
+  node.closest(".cortexNode")?.setAttribute("data-state", stateName);
+}
+
 function renderMissionSignals(health, bridge = null) {
   const integrations = health.integrations ?? [];
   const requiredBlockers = integrations.filter((item) => !item.configured && item.requiredForProduction !== false);
   const advisories = integrations.filter((item) => !item.configured && item.requiredForProduction === false);
   const gmail = integrations.find((item) => item.key === "gmail");
   const gemini = integrations.find((item) => item.key === "gemini");
+  const smartlead = integrations.find((item) => item.key === "smartlead");
   const readinessText = requiredBlockers.length ? `${requiredBlockers.length} blocker` : advisories.length ? `${advisories.length} advisory` : "ready";
   setMissionSignal(elements.missionReadiness, readinessText, requiredBlockers.length || advisories.length ? "attention" : "ready");
   setMissionSignal(elements.missionGmail, gmail?.configured ? (state.clientAlertWatchEnabled ? "watching" : "paused") : "needs auth", gmail?.configured ? "ready" : "attention");
   setMissionSignal(elements.missionRemote, bridge ? (bridge.readyForTunnel ? "ready" : "locked") : "checking", bridge ? (bridge.readyForTunnel ? "ready" : "attention") : "checking");
   setMissionSignal(elements.missionContracts, gemini?.configured ? "Gemini ready" : "needs Gemini", gemini?.configured ? "ready" : "attention");
+  setCortexSignal(elements.cortexOutreach, smartlead?.configured ? "Smartlead ready" : "needs key", smartlead?.configured ? "ready" : "attention");
+  setCortexSignal(elements.cortexMemory, gmail?.configured ? (state.clientAlertWatchEnabled ? "Gmail watch" : "watch paused") : "needs Gmail", gmail?.configured && state.clientAlertWatchEnabled ? "ready" : "attention");
+  setCortexSignal(elements.cortexContracts, gemini?.configured ? "Gemini intake" : "needs Gemini", gemini?.configured ? "ready" : "attention");
+  setCortexSignal(elements.cortexRemote, bridge ? (bridge.readyForTunnel ? "tunnel ready" : "auth locked") : "checking", bridge ? (bridge.readyForTunnel ? "ready" : "attention") : "checking");
 }
 
 function renderReadinessReport(report) {
@@ -425,6 +456,9 @@ function leadsToSheetRows(leads) {
 function renderGmailSync(result) {
   const synced = result.synced ?? [];
   if (!synced.length) return "No Gmail accounts were synced.";
+  const fetched = synced.reduce((sum, item) => sum + Number(item.fetched ?? 0), 0);
+  const alerts = synced.reduce((sum, item) => sum + (item.alerts ?? []).length, 0);
+  setCortexSignal(elements.cortexMemory, alerts ? `${alerts} alert(s)` : `${fetched} mail(s)`, alerts ? "attention" : "ready");
   const modeLine = result.dryRun ? "Preview only: wrote 0 local records." : "Local memory sync wrote new records and skipped duplicates.";
   return synced
     .map((item) =>
@@ -540,6 +574,11 @@ async function refreshClientNeedAlerts({ announceNew = false, loadingText = null
   elements.clientAlertWatchStatus.textContent = state.clientAlertWatchEnabled
     ? `Client alert watch active. Open requests: ${result.count ?? alerts.length}. ${state.lastClientAlertGmailSyncSummary}`
     : `Client alert watch paused. Open requests: ${result.count ?? alerts.length}. ${state.lastClientAlertGmailSyncSummary}`;
+  setCortexSignal(
+    elements.cortexMemory,
+    Number(result.count ?? alerts.length) > 0 ? `${result.count ?? alerts.length} open need(s)` : "watch clear",
+    Number(result.count ?? alerts.length) > 0 ? "attention" : state.clientAlertWatchEnabled ? "ready" : "attention"
+  );
 
   if (announceNew && newAlerts.length) {
     notifyClientNeedAlert(newAlerts[0], result);
@@ -574,6 +613,7 @@ function startClientNeedWatch() {
   state.clientAlertWatchEnabled = true;
   elements.toggleClientNeedWatch.textContent = "Pause watch";
   setMissionSignal(elements.missionGmail, "watching", "ready");
+  setCortexSignal(elements.cortexMemory, "Gmail watch", "ready");
   if (state.clientAlertPollTimer) window.clearInterval(state.clientAlertPollTimer);
   void refreshClientNeedAlerts({ announceNew: false }).catch((error) => {
     elements.clientAlertWatchStatus.textContent = error instanceof Error ? error.message : String(error);
@@ -593,6 +633,7 @@ function stopClientNeedWatch() {
   elements.toggleClientNeedWatch.textContent = "Resume watch";
   elements.clientAlertWatchStatus.textContent = "Client alert watch paused.";
   setMissionSignal(elements.missionGmail, "paused", "attention");
+  setCortexSignal(elements.cortexMemory, "watch paused", "attention");
 }
 
 function renderSmartleadStatus(result) {
@@ -609,6 +650,7 @@ function renderSmartleadStatus(result) {
 
 function renderSmartleadBrief(result) {
   const metrics = result.metrics ?? {};
+  setCortexSignal(elements.cortexOutreach, `${metrics.replied ?? 0} replies`, metrics.positiveReplies > 0 || metrics.replied > 0 ? "attention" : "ready");
   const campaignLine = result.campaignCount > 1
     ? `${result.campaignCount} campaigns: ${(result.campaignIds ?? []).join(", ")}`
     : result.campaignId ?? "-";
@@ -651,6 +693,7 @@ function renderBridgeCockpit(result) {
   elements.bridgeToolState.dataset.state = result.mcpToolCount ? "ready" : "attention";
   if (warnings.length) elements.bridgeTunnelState.dataset.state = "attention";
   setMissionSignal(elements.missionRemote, result.readyForTunnel ? "ready" : "locked", result.readyForTunnel ? "ready" : "attention");
+  setCortexSignal(elements.cortexRemote, result.readyForTunnel ? "tunnel ready" : "auth locked", result.readyForTunnel ? "ready" : "attention");
 }
 
 async function refreshWebBridge({ loadingText = null } = {}) {
@@ -738,6 +781,7 @@ function renderRemoteMcpSmoke(report) {
   state.lastRemoteMcpSmoke = report;
   elements.remoteSmokeResult.dataset.state = report.status === "ready" ? "ready" : "attention";
   setMissionSignal(elements.missionRemote, report.status === "ready" ? "smoke ready" : "smoke blocked", report.status === "ready" ? "ready" : "attention");
+  setCortexSignal(elements.cortexRemote, report.status === "ready" ? "smoke ready" : "smoke blocked", report.status === "ready" ? "ready" : "attention");
   elements.remoteSmokeResult.textContent = [
     report.summary ?? `Remote MCP smoke: ${report.status}`,
     "",

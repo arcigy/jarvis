@@ -25,6 +25,13 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /id="mcpPanel"/);
   assert.match(html, /id="commandDeck"/);
   assert.match(html, /coreVisual/);
+  assert.match(html, /id="cortexMap"/);
+  assert.match(html, /id="cortexVoice"/);
+  assert.match(html, /id="cortexOutreach"/);
+  assert.match(html, /id="cortexMemory"/);
+  assert.match(html, /id="cortexContracts"/);
+  assert.match(html, /id="cortexRemote"/);
+  assert.match(html, /role="button" tabindex="0"/);
   assert.match(html, /id="readyIntegrations"/);
   assert.match(html, /id="mcpToolCount"/);
   assert.match(html, /id="approvalLockCount"/);
@@ -160,6 +167,10 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /renderCommandDeck/);
   assert.match(renderer, /buildCommandTimeline/);
   assert.match(renderer, /setMissionSignal/);
+  assert.match(renderer, /setCortexSignal/);
+  assert.match(renderer, /cortexNodes/);
+  assert.match(renderer, /cortexRemote/);
+  assert.match(renderer, /event\.key !== "Enter"/);
   assert.match(renderer, /renderMissionSignals/);
   assert.match(renderer, /missionRemote/);
   assert.match(renderer, /smoke ready/);
@@ -232,6 +243,10 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /announceNew/);
   assert.match(styles, /\.missionRail/);
   assert.match(styles, /\.missionSignal\[data-state="ready"\]/);
+  assert.match(styles, /\.cortexMap/);
+  assert.match(styles, /\.cortexNode\[data-state="ready"\]/);
+  assert.match(styles, /@keyframes cortexSweep/);
+  assert.match(styles, /@keyframes cortexPulse/);
   assert.match(styles, /@keyframes signalSweep/);
   assert.match(styles, /prefers-reduced-motion/);
   assert.equal(packageJson.scripts["ui:smoke"], "electron scripts/jarvis_ui_smoke.cjs");
@@ -239,6 +254,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(uiSmoke, /capturePage/);
   assert.match(uiSmoke, /JARVIS_UI_SMOKE_URL/);
   assert.match(uiSmoke, /#missionRail/);
+  assert.match(uiSmoke, /#cortexMap/);
+  assert.match(uiSmoke, /visibleCortexNodes/);
   assert.match(uiSmoke, /Command core image did not load/);
   assert.equal(existsSync("src/desktop/assets/jarvis-command-core.png"), true);
   assert.equal(visualAsset.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");

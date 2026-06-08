@@ -134,7 +134,8 @@ nav button.active::before {
 
 button:focus-visible,
 input:focus-visible,
-textarea:focus-visible {
+textarea:focus-visible,
+.cortexNode:focus-visible {
   outline: 2px solid #43d9c4;
   outline-offset: 2px;
 }
@@ -378,6 +379,118 @@ h2 {
   min-height: auto;
   text-align: center;
   color: #9cf8ed;
+}
+
+.cortexMap {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(120px, 1fr));
+  gap: 10px;
+  margin: 0 0 16px;
+  padding: 12px;
+  border: 1px solid #26302f;
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, rgb(67 217 196 / 7%) 1px, transparent 1px),
+    linear-gradient(0deg, rgb(67 217 196 / 6%) 1px, transparent 1px),
+    linear-gradient(135deg, rgb(67 217 196 / 10%), rgb(240 184 79 / 6%) 54%, rgb(10 15 16 / 92%));
+  background-size: 26px 26px, 26px 26px, auto;
+  overflow: hidden;
+}
+
+.cortexMap::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, transparent, rgb(67 217 196 / 16%), transparent),
+    linear-gradient(180deg, transparent, rgb(240 184 79 / 11%), transparent);
+  background-size: 160px 100%, 100% 110px;
+  opacity: 0.5;
+  animation: cortexSweep 12s linear infinite;
+}
+
+.cortexNode {
+  position: relative;
+  isolation: isolate;
+  min-height: 104px;
+  border: 1px solid #203331;
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 50% 18%, rgb(67 217 196 / 22%), transparent 36%),
+    linear-gradient(180deg, rgb(9 17 18 / 84%), rgb(6 10 11 / 94%));
+  padding: 12px;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.cortexNode::before,
+.cortexNode::after {
+  content: "";
+  position: absolute;
+  inset: 15px;
+  border: 1px solid rgb(67 217 196 / 30%);
+  border-radius: 50%;
+  transform: rotate(45deg);
+}
+
+.cortexNode::after {
+  inset: 28px;
+  border-color: rgb(240 184 79 / 26%);
+  animation: cortexPulse 3.6s ease-in-out infinite;
+}
+
+.cortexNode span,
+.cortexNode strong,
+.cortexNode i {
+  position: relative;
+  z-index: 1;
+  display: block;
+}
+
+.cortexNode span {
+  color: #91a19d;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.cortexNode strong {
+  margin-top: 42px;
+  color: #eef4f2;
+  font-size: 14px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.cortexNode i {
+  position: absolute;
+  inset: auto 12px 10px;
+  height: 3px;
+  border-radius: 999px;
+  background: #56615f;
+}
+
+.cortexNode[data-state="ready"] {
+  border-color: rgb(67 217 196 / 54%);
+}
+
+.cortexNode[data-state="ready"] i {
+  background: #43d9c4;
+  box-shadow: 0 0 18px rgb(67 217 196 / 60%);
+}
+
+.cortexNode[data-state="attention"] {
+  border-color: rgb(240 184 79 / 58%);
+}
+
+.cortexNode[data-state="attention"] i {
+  background: #f0b84f;
+  box-shadow: 0 0 18px rgb(240 184 79 / 52%);
+}
+
+.cortexNode:hover {
+  transform: translateY(-1px);
+  border-color: rgb(156 248 237 / 72%);
 }
 
 .health {
@@ -680,6 +793,8 @@ h2 {
   .deckVisual::before,
   .bridgeCockpit div::before,
   .missionSignal::before,
+  .cortexMap::before,
+  .cortexNode::after,
   .scanFrame span:nth-child(3),
   .orb {
     animation: none;
@@ -742,6 +857,19 @@ h2 {
   48%,
   100% {
     transform: translateX(110%);
+  }
+}
+
+@keyframes cortexSweep {
+  to {
+    background-position: 160px 0, 0 110px;
+  }
+}
+
+@keyframes cortexPulse {
+  50% {
+    opacity: 0.35;
+    transform: rotate(45deg) scale(1.28);
   }
 }
 
@@ -864,6 +992,7 @@ ul {
   .statusGrid,
   .missionRail,
   .commandDeck,
+  .cortexMap,
   .bridgeCockpit,
   .handoffGrid,
   .toolMatrix,

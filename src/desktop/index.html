@@ -94,6 +94,34 @@
         <button class="deckAction" id="readinessReport">Readiness report</button>
       </section>
 
+      <section class="cortexMap" id="cortexMap" aria-label="Jarvis operational cortex">
+        <div class="cortexNode" data-target="jarvisPanel" data-state="ready" role="button" tabindex="0">
+          <span>Voice</span>
+          <strong id="cortexVoice">standing by</strong>
+          <i></i>
+        </div>
+        <div class="cortexNode" data-target="coldPanel" data-state="checking" role="button" tabindex="0">
+          <span>Outreach</span>
+          <strong id="cortexOutreach">checking</strong>
+          <i></i>
+        </div>
+        <div class="cortexNode" data-target="clientPanel" data-state="checking" role="button" tabindex="0">
+          <span>Memory</span>
+          <strong id="cortexMemory">watching</strong>
+          <i></i>
+        </div>
+        <div class="cortexNode" data-target="contractPanel" data-state="checking" role="button" tabindex="0">
+          <span>Contracts</span>
+          <strong id="cortexContracts">checking</strong>
+          <i></i>
+        </div>
+        <div class="cortexNode" data-target="mcpPanel" data-state="checking" role="button" tabindex="0">
+          <span>Remote MCP</span>
+          <strong id="cortexRemote">checking</strong>
+          <i></i>
+        </div>
+      </section>
+
       <section class="grid">
         <article class="panel listener" id="jarvisPanel">
           <div class="panelHead">
