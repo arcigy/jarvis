@@ -97,7 +97,12 @@
             <div><dt>Mode</dt><dd>Local</dd></div>
             <div><dt>Approval</dt><dd>Manual</dd></div>
           </dl>
-          <button id="coldBrief">Ask Jarvis</button>
+          <div class="buttonGroup">
+            <button id="coldBrief">Ask Jarvis</button>
+            <button id="preparedReplies">Prepared replies</button>
+            <button id="approvePreparedReply">Approve first</button>
+          </div>
+          <div class="response compact" id="preparedReplyResult">No prepared replies loaded.</div>
         </article>
 
         <article class="panel operationsPanel" id="operationsPanel">
@@ -204,6 +209,8 @@
           <ul>
             <li>generate_contract_documents</li>
             <li>get_cold_outreach_brief</li>
+            <li>get_prepared_outreach_replies</li>
+            <li>approve_prepared_outreach_reply</li>
             <li>sync_gmail_recent_messages</li>
             <li>get_smartlead_campaign_status</li>
             <li>search_serper</li>

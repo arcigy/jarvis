@@ -33,6 +33,8 @@ Ak sú cold outreach eventy uložené lokálne v SQLite, MCP môže použiť:
 
 - `arcigy.add_cold_outreach_event`
 - `arcigy.get_cold_outreach_brief_from_db`
+- `arcigy.get_prepared_outreach_replies`
+- `arcigy.approve_prepared_outreach_reply`
 
 Eventy používajú typy `sent`, `opened`, `replied`, `positive_reply`, `prepared_reply`, `approved_reply_sent`. Brief sa počíta za obdobie podľa `since`, `until` a `periodLabel`.
 
@@ -55,6 +57,8 @@ MCP nástroje:
 `arcigy.get_client_need_alerts` vracia persistentny inbox otvorenych poziadaviek zo SQLite, aby Jarvis vedel sam pripomenut, co klient alebo lead aktualne chce.
 
 Desktop UI tento inbox sleduje kazdu minutu a cez TTS oznami iba novo zachytene poziadavky.
+
+Pripravene odpovede su ulozene ako `prepared_reply` eventy s textom v `data_json.replyText`. Schvalenie vytvori nadvazny `approved_reply_sent` event az po explicitnom potvrdeni.
 
 ## Jarvis hlas
 

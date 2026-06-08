@@ -26,6 +26,8 @@ Server tools:
 - `arcigy.get_cold_outreach_brief`
 - `arcigy.get_cold_outreach_brief_from_db`
 - `arcigy.add_cold_outreach_event`
+- `arcigy.get_prepared_outreach_replies`
+- `arcigy.approve_prepared_outreach_reply`
 - `arcigy.upsert_local_person`
 - `arcigy.add_client_need_signal`
 - `arcigy.ingest_client_message`
@@ -69,6 +71,7 @@ The Electron shell opens a local Arcigy Jarvis console with:
 - Slovak TTS via `speechSynthesis`
 - local Electron IPC bridge for Jarvis voice events and cold outreach briefs
 - voice cold outreach answers backed by `data\jarvis-local.db`
+- prepared cold outreach reply inbox with explicit approval before marking a reply ready to send
 - client need alerts inbox backed by local SQLite memory
 - proactive client need watch that polls local memory and speaks newly detected requests
 - runtime integration health for Gemini, Gmail, Smartlead, Postgres, Redis, Serper
@@ -136,6 +139,8 @@ It serves the same UI at `http://127.0.0.1:8765` and exposes local HTTP endpoint
 - `POST /api/production-readiness`
 - `POST /api/jarvis/voice-event`
 - `POST /api/cold-outreach-brief`
+- `POST /api/prepared-outreach-replies`
+- `POST /api/approve-prepared-outreach-reply`
 - `POST /api/identify-email`
 - `POST /api/ingest-client-message`
 - `POST /api/client-need-alerts`
@@ -154,6 +159,8 @@ It serves the same UI at `http://127.0.0.1:8765` and exposes local HTTP endpoint
 - `POST /api/mcp/arcigy.draft_contract_intake`
 - `POST /api/mcp/arcigy.generate_ai_reply`
 - `POST /api/mcp/arcigy.get_cold_outreach_brief_from_db`
+- `POST /api/mcp/arcigy.get_prepared_outreach_replies`
+- `POST /api/mcp/arcigy.approve_prepared_outreach_reply`
 - `POST /api/mcp/arcigy.identify_email`
 - `POST /api/mcp/arcigy.ingest_client_message`
 - `POST /api/mcp/arcigy.get_client_need_alerts`
@@ -206,6 +213,7 @@ Cold outreach events can also be stored locally and summarized by period:
 
 ```powershell
 python scripts\jarvis_local_db.py add-cold-event --db data\jarvis-local.db --payload "{""leadEmail"":""lead@example.com"",""eventType"":""sent"",""occurredAt"":""2026-06-07T10:00:00Z""}"
+python scripts\jarvis_local_db.py list-prepared-replies --db data\jarvis-local.db --payload "{""status"":""pending"",""limit"":10}"
 python scripts\jarvis_local_db.py cold-brief --db data\jarvis-local.db --payload "{""since"":""2026-06-01T00:00:00Z"",""until"":""2026-06-08T00:00:00Z"",""periodLabel"":""posledných 7 dní""}"
 ```
 

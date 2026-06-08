@@ -9,6 +9,8 @@ contextBridge.exposeInMainWorld("arcigyDesktop", {
   runDiagnostics: (payload) => ipcRenderer.invoke("jarvis:runDiagnostics", payload),
   productionReadiness: (payload) => ipcRenderer.invoke("jarvis:productionReadiness", payload),
   webBridgePreflight: () => ipcRenderer.invoke("jarvis:webBridgePreflight"),
+  getPreparedOutreachReplies: (payload) => ipcRenderer.invoke("jarvis:getPreparedOutreachReplies", payload),
+  approvePreparedOutreachReply: (payload) => ipcRenderer.invoke("jarvis:approvePreparedOutreachReply", payload),
   identifyEmail: (payload) => ipcRenderer.invoke("jarvis:identifyEmail", payload),
   ingestClientMessage: (payload) => ipcRenderer.invoke("jarvis:ingestClientMessage", payload),
   getClientNeedAlerts: (payload) => ipcRenderer.invoke("jarvis:getClientNeedAlerts", payload),

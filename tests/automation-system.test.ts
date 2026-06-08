@@ -35,6 +35,8 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.get_cold_outreach_brief",
     "arcigy.get_cold_outreach_brief_from_db",
     "arcigy.add_cold_outreach_event",
+    "arcigy.get_prepared_outreach_replies",
+    "arcigy.approve_prepared_outreach_reply",
     "arcigy.identify_email",
     "arcigy.upsert_local_person",
     "arcigy.add_client_need_signal",
@@ -63,7 +65,7 @@ test("production readiness report returns blockers and next actions without secr
   });
 
   assert.equal(report.status, "blocked");
-  assert.equal(report.mcp.toolCount, 21);
+  assert.equal(report.mcp.toolCount, 23);
   assert.ok(report.blockers.some((blocker) => blocker.key === "redis"));
   assert.ok(report.nextActions.some((action) => action.includes("REDIS_URL")));
   assert.ok(report.fixGuide.some((step) => step.id === "redis-real-password" && step.envKeys.includes("REDIS_URL")));
@@ -683,6 +685,64 @@ test("local SQLite CLI summarizes cold outreach events by period", () => {
   assert.equal(brief.metrics.positiveReplies, 1);
   assert.match(brief.summary, /Za posledných 7 dní sme napísali 2 ľuďom/);
   assert.match(brief.summary, /Pripravil som ti 1 odpoveď/);
+});
+
+test("local SQLite CLI lists and approves prepared outreach replies", () => {
+  const dir = mkdtempSync(join(tmpdir(), "jarvis-prepared-db-"));
+  const dbPath = join(dir, "jarvis.db");
+  const python = process.env.JARVIS_PYTHON || "python";
+
+  const prepared = runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "add-cold-event",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify({
+      leadEmail: "lead@example.com",
+      campaignName: "Founders",
+      eventType: "prepared_reply",
+      occurredAt: "2026-06-07T10:00:00Z",
+      data: {
+        subject: "Re: automation",
+        replyText: "Dakujem za odpoved, posielam dalsi krok.",
+        positiveSignal: "Lead chce call.",
+      },
+    }),
+  ]);
+
+  const pending = runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "list-prepared-replies",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify({ status: "pending", limit: 5 }),
+  ]);
+  assert.equal(pending.count, 1);
+  assert.equal(pending.replies[0].id, prepared.id);
+  assert.equal(pending.replies[0].replyText, "Dakujem za odpoved, posielam dalsi krok.");
+
+  const approved = runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "approve-prepared-reply",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify({ preparedEventId: prepared.id, approvedBy: "test" }),
+  ]);
+  assert.equal(approved.status, "approved");
+  assert.equal(approved.approvedEvent.eventType, "approved_reply_sent");
+
+  const after = runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "list-prepared-replies",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify({ status: "pending", limit: 5 }),
+  ]);
+  assert.equal(after.count, 0);
 });
 
 function runPythonJson(python: string, args: string[]) {

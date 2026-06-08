@@ -52,6 +52,8 @@ app.whenReady().then(() => {
   ipcMain.handle("jarvis:runDiagnostics", (_event, payload) => runDiagnostics(payload));
   ipcMain.handle("jarvis:productionReadiness", (_event, payload) => getProductionReadiness(payload));
   ipcMain.handle("jarvis:webBridgePreflight", () => getWebBridgePreflight());
+  ipcMain.handle("jarvis:getPreparedOutreachReplies", (_event, payload) => getPreparedOutreachReplies(payload));
+  ipcMain.handle("jarvis:approvePreparedOutreachReply", (_event, payload) => approvePreparedOutreachReply(payload));
   ipcMain.handle("jarvis:identifyEmail", (_event, payload) => identifyEmail(payload));
   ipcMain.handle("jarvis:ingestClientMessage", (_event, payload) => ingestClientMessage(payload));
   ipcMain.handle("jarvis:getClientNeedAlerts", (_event, payload) => getClientNeedAlerts(payload));
@@ -440,6 +442,8 @@ function listWebMcpTools() {
     { name: "arcigy.get_cold_outreach_brief", requiresApproval: false },
     { name: "arcigy.get_cold_outreach_brief_from_db", requiresApproval: false },
     { name: "arcigy.add_cold_outreach_event", requiresApproval: false },
+    { name: "arcigy.get_prepared_outreach_replies", requiresApproval: false },
+    { name: "arcigy.approve_prepared_outreach_reply", requiresApproval: true },
     { name: "arcigy.identify_email", requiresApproval: false },
     { name: "arcigy.upsert_local_person", requiresApproval: false },
     { name: "arcigy.add_client_need_signal", requiresApproval: false },
@@ -675,6 +679,42 @@ function getColdOutreachBrief(payload) {
   ]);
   const parsed = JSON.parse(result.stdout);
   return parsed.summary;
+}
+
+function getPreparedOutreachReplies(payload = {}) {
+  const result = runPython([
+    "scripts/jarvis_local_db.py",
+    "list-prepared-replies",
+    "--db",
+    payload?.dbPath || defaultDbPath,
+    "--payload",
+    JSON.stringify({
+      status: payload?.status || "pending",
+      since: payload?.since,
+      until: payload?.until,
+      limit: payload?.limit || 10,
+    }),
+  ]);
+  return JSON.parse(result.stdout);
+}
+
+function approvePreparedOutreachReply(payload = {}) {
+  if (payload?.approved !== true && payload?.approval?.approved !== true) {
+    throw new Error("Prepared outreach reply approval requires explicit approved: true.");
+  }
+  const result = runPython([
+    "scripts/jarvis_local_db.py",
+    "approve-prepared-reply",
+    "--db",
+    payload?.dbPath || defaultDbPath,
+    "--payload",
+    JSON.stringify({
+      preparedEventId: payload?.preparedEventId,
+      approvalNote: payload?.approvalNote,
+      approvedBy: payload?.approvedBy || "desktop",
+    }),
+  ]);
+  return JSON.parse(result.stdout);
 }
 
 function identifyEmail(payload) {

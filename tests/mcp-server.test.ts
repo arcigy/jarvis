@@ -22,6 +22,8 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(names.includes("arcigy.get_cold_outreach_brief"));
   assert.ok(names.includes("arcigy.get_cold_outreach_brief_from_db"));
   assert.ok(names.includes("arcigy.add_cold_outreach_event"));
+  assert.ok(names.includes("arcigy.get_prepared_outreach_replies"));
+  assert.ok(names.includes("arcigy.approve_prepared_outreach_reply"));
   assert.ok(names.includes("arcigy.identify_email"));
   assert.ok(names.includes("arcigy.ingest_client_message"));
   assert.ok(names.includes("arcigy.get_client_need_alerts"));
@@ -75,7 +77,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   });
   const readiness = getStructuredResult(readinessResult) as { status: string; mcp: { toolCount: number }; nextActions: string[]; fixGuide: unknown[] };
   assert.ok(["ready", "attention", "blocked"].includes(readiness.status));
-  assert.equal(readiness.mcp.toolCount, 21);
+  assert.equal(readiness.mcp.toolCount, 23);
   assert.ok(Array.isArray(readiness.nextActions));
   assert.ok(Array.isArray(readiness.fixGuide));
 
@@ -255,6 +257,35 @@ test("Jarvis MCP server summarizes cold outreach from local SQLite events", asyn
   assert.equal(brief.metrics.contacted, 2);
   assert.match(brief.summary, /Za posledných 7 dní sme napísali 2 ľuďom/);
   assert.match(brief.summary, /Pripravil som ti 1 odpoveď/);
+
+  const preparedEvent = await client.callTool({
+    name: "arcigy.add_cold_outreach_event",
+    arguments: {
+      dbPath,
+      leadEmail: "three@example.com",
+      eventType: "prepared_reply",
+      occurredAt: "2026-06-07T11:00:00Z",
+      data: { subject: "Re: Jarvis", replyText: "Dakujem, navrhujem kratky call." },
+    },
+  });
+  const preparedBody = getStructuredResult(preparedEvent) as { id: string };
+
+  const pendingReplies = await client.callTool({
+    name: "arcigy.get_prepared_outreach_replies",
+    arguments: { dbPath, status: "pending", limit: 5 },
+  });
+  const pendingBody = getStructuredResult(pendingReplies) as { count: number; replies: Array<{ id: string; replyText: string }> };
+  assert.equal(pendingBody.count, 2);
+  assert.equal(pendingBody.replies[0].id, preparedBody.id);
+  assert.equal(pendingBody.replies[0].replyText, "Dakujem, navrhujem kratky call.");
+
+  const approvedReply = await client.callTool({
+    name: "arcigy.approve_prepared_outreach_reply",
+    arguments: { dbPath, preparedEventId: preparedBody.id, approvedBy: "test" },
+  });
+  const approvedBody = getStructuredResult(approvedReply) as { status: string; approvedEvent: { eventType: string } };
+  assert.equal(approvedBody.status, "approved");
+  assert.equal(approvedBody.approvedEvent.eventType, "approved_reply_sent");
 
   await client.close();
   await server.close();

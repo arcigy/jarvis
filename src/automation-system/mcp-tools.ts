@@ -8,6 +8,8 @@ export type JarvisMcpToolName =
   | "arcigy.get_cold_outreach_brief"
   | "arcigy.get_cold_outreach_brief_from_db"
   | "arcigy.add_cold_outreach_event"
+  | "arcigy.get_prepared_outreach_replies"
+  | "arcigy.approve_prepared_outreach_reply"
   | "arcigy.upsert_local_person"
   | "arcigy.add_client_need_signal"
   | "arcigy.ingest_client_message"
@@ -66,6 +68,16 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
       name: "arcigy.add_cold_outreach_event",
       description: "Uloží lokálny cold outreach event, napríklad sent, opened, replied alebo positive_reply.",
       requiresApproval: false,
+    },
+    {
+      name: "arcigy.get_prepared_outreach_replies",
+      description: "Vrati pripravene cold outreach odpovede cakajuce na schvalenie.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.approve_prepared_outreach_reply",
+      description: "Oznaci pripravenu cold outreach odpoved ako schvalenu az po explicitnom potvrdeni.",
+      requiresApproval: true,
     },
     {
       name: "arcigy.identify_email",

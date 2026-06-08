@@ -4,6 +4,7 @@ const state = {
   recognition: null,
   listening: false,
   lastLeads: [],
+  lastPreparedReplies: [],
   clientAlertWatchEnabled: true,
   clientAlertPollTimer: null,
   seenClientNeedAlertIds: new Set(),
@@ -27,6 +28,9 @@ const elements = {
   simulateWake: document.querySelector("#simulateWake"),
   submitTranscript: document.querySelector("#submitTranscript"),
   coldBrief: document.querySelector("#coldBrief"),
+  preparedReplies: document.querySelector("#preparedReplies"),
+  approvePreparedReply: document.querySelector("#approvePreparedReply"),
+  preparedReplyResult: document.querySelector("#preparedReplyResult"),
   memoryEmail: document.querySelector("#memoryEmail"),
   memorySubject: document.querySelector("#memorySubject"),
   memoryMessage: document.querySelector("#memoryMessage"),
@@ -83,6 +87,8 @@ const arcigyApi = window.arcigyDesktop ?? {
   jarvisVoiceEvent: (payload) => postJson("/api/jarvis/voice-event", payload),
   runDiagnostics: (payload) => postJson("/api/run-diagnostics", payload),
   productionReadiness: (payload) => postJson("/api/production-readiness", payload),
+  getPreparedOutreachReplies: (payload) => postJson("/api/prepared-outreach-replies", payload),
+  approvePreparedOutreachReply: (payload) => postJson("/api/approve-prepared-outreach-reply", payload),
   identifyEmail: (payload) => postJson("/api/identify-email", payload),
   ingestClientMessage: (payload) => postJson("/api/ingest-client-message", payload),
   getClientNeedAlerts: (payload) => postJson("/api/client-need-alerts", payload),
@@ -276,6 +282,26 @@ function renderGmailSync(result) {
       ].join("\n")
     )
     .join("\n\n");
+}
+
+function renderPreparedReplies(result) {
+  const replies = result.replies ?? [];
+  if (!replies.length) return result.summary ?? "No prepared replies are waiting for approval.";
+  return [
+    result.summary ?? `Prepared replies: ${replies.length}`,
+    "",
+    ...replies.slice(0, 8).map((reply, index) =>
+      [
+        `${index + 1}. ${reply.leadEmail}`,
+        reply.campaignName ? `   Campaign: ${reply.campaignName}` : null,
+        reply.subject ? `   Subject: ${reply.subject}` : null,
+        reply.positiveSignal ? `   Signal: ${reply.positiveSignal}` : null,
+        `   Reply: ${reply.replyText ?? "-"}`,
+      ]
+        .filter(Boolean)
+        .join("\n")
+    ),
+  ].join("\n");
 }
 
 function renderDiagnostics(result) {
@@ -610,6 +636,38 @@ elements.simulateWake.addEventListener("click", () => void handleTranscript("Jar
 elements.submitTranscript.addEventListener("click", () => void handleTranscript(elements.transcript.value));
 elements.coldBrief.addEventListener("click", async () => {
   speak(await arcigyApi.coldOutreachBrief({ text: "cold outreach za posledných 7 dní" }));
+});
+elements.preparedReplies.addEventListener("click", async () => {
+  try {
+    elements.preparedReplyResult.textContent = "Loading prepared replies...";
+    const result = await arcigyApi.getPreparedOutreachReplies({ status: "pending", limit: 10 });
+    state.lastPreparedReplies = result.replies ?? [];
+    elements.preparedReplyResult.textContent = renderPreparedReplies(result);
+    if (result.count > 0 && result.summary) speak(result.summary);
+  } catch (error) {
+    state.lastPreparedReplies = [];
+    elements.preparedReplyResult.textContent = error instanceof Error ? error.message : String(error);
+  }
+});
+elements.approvePreparedReply.addEventListener("click", async () => {
+  try {
+    if (!state.lastPreparedReplies.length) {
+      elements.preparedReplyResult.textContent = "Load prepared replies before approving.";
+      return;
+    }
+    const first = state.lastPreparedReplies[0];
+    const result = await arcigyApi.approvePreparedOutreachReply({
+      preparedEventId: first.id,
+      approved: true,
+      approvedBy: "operator",
+    });
+    elements.preparedReplyResult.textContent = result.summary;
+    speak(result.summary);
+    const refreshed = await arcigyApi.getPreparedOutreachReplies({ status: "pending", limit: 10 });
+    state.lastPreparedReplies = refreshed.replies ?? [];
+  } catch (error) {
+    elements.preparedReplyResult.textContent = error instanceof Error ? error.message : String(error);
+  }
 });
 elements.identifyEmail.addEventListener("click", async () => {
   try {

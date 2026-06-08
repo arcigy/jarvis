@@ -17,6 +17,7 @@ This opens a local Electron desktop window. It is a working fallback shell until
 - If speech recognition is not available, use the transcript text box and `Send transcript`.
 - The renderer calls the local Electron preload bridge for Jarvis voice events and cold outreach briefs.
 - The diagnostics action checks configured integrations and can run live read-only probes, including Postgres TCP and Redis PING.
+- The cold outreach panel lists prepared positive-reply drafts and only marks the first pending reply approved after the user clicks `Approve first`.
 - The client memory panel identifies email addresses and ingests client requests into the local SQLite database.
 - The client memory panel starts a local watch loop that refreshes open requests every minute and speaks only newly detected client needs.
 - The Gemini panel drafts client replies without sending them.

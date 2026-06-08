@@ -175,6 +175,124 @@ def cold_brief(db_path: Path, payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def list_prepared_replies(db_path: Path, payload: dict[str, Any]) -> dict[str, Any]:
+    init_db(db_path)
+    limit = max(1, min(int(payload.get("limit", 10)), 50))
+    status = payload.get("status", "pending")
+    since = payload.get("since")
+    until = payload.get("until") or datetime.now(timezone.utc).isoformat()
+    params: list[Any] = []
+    filters = ["p.event_type = 'prepared_reply'"]
+    if since:
+        filters.append("p.occurred_at >= ?")
+        params.append(since)
+    if until:
+        filters.append("p.occurred_at <= ?")
+        params.append(until)
+    if status == "pending":
+        filters.append(
+            """
+            not exists (
+              select 1 from cold_outreach_events a
+              where a.lead_email = p.lead_email
+                and a.event_type = 'approved_reply_sent'
+                and a.occurred_at >= p.occurred_at
+            )
+            """
+        )
+    elif status == "approved":
+        filters.append(
+            """
+            exists (
+              select 1 from cold_outreach_events a
+              where a.lead_email = p.lead_email
+                and a.event_type = 'approved_reply_sent'
+                and a.occurred_at >= p.occurred_at
+            )
+            """
+        )
+    elif status != "all":
+        raise ValueError("status must be pending, approved, or all")
+
+    conn = connect(db_path)
+    rows = [
+        row
+        for row in conn.execute(
+            f"""
+            select p.*
+            from cold_outreach_events p
+            where {" and ".join(filters)}
+            order by p.occurred_at desc
+            limit ?
+            """,
+            (*params, limit),
+        )
+    ]
+    replies = [prepared_reply_from_row(row) for row in rows]
+    return {
+        "status": status,
+        "count": len(replies),
+        "replies": replies,
+        "summary": build_prepared_replies_summary(replies),
+    }
+
+
+def approve_prepared_reply(db_path: Path, payload: dict[str, Any]) -> dict[str, Any]:
+    init_db(db_path)
+    prepared_id = required(payload, "preparedEventId")
+    conn = connect(db_path)
+    row = conn.execute(
+        "select * from cold_outreach_events where id = ? and event_type = 'prepared_reply'",
+        (prepared_id,),
+    ).fetchone()
+    if row is None:
+        raise ValueError("Prepared reply was not found.")
+
+    existing = conn.execute(
+        """
+        select * from cold_outreach_events
+        where lead_email = ?
+          and event_type = 'approved_reply_sent'
+          and occurred_at >= ?
+        order by occurred_at desc
+        limit 1
+        """,
+        (row["lead_email"], row["occurred_at"]),
+    ).fetchone()
+    if existing is not None:
+        return {
+            "status": "already_approved",
+            "preparedReply": prepared_reply_from_row(row),
+            "approvedEvent": row_to_cold_event(existing),
+            "summary": "Jarvis: Tato odpoved uz bola schvalena.",
+        }
+
+    prepared_data = json.loads(row["data_json"] or "{}")
+    approved_event = add_cold_event(
+        db_path,
+        {
+            "leadEmail": row["lead_email"],
+            "campaignId": row["campaign_id"],
+            "campaignName": row["campaign_name"],
+            "eventType": "approved_reply_sent",
+            "occurredAt": payload.get("occurredAt") or datetime.now(timezone.utc).isoformat(),
+            "data": {
+                **prepared_data,
+                "preparedEventId": prepared_id,
+                "approvalNote": payload.get("approvalNote"),
+                "approvedBy": payload.get("approvedBy", "operator"),
+                "readyToSend": True,
+            },
+        },
+    )
+    return {
+        "status": "approved",
+        "preparedReply": prepared_reply_from_row(row),
+        "approvedEvent": approved_event,
+        "summary": f"Jarvis: Odpoved pre {row['lead_email']} je schvalena a oznacena ako pripravena na odoslanie.",
+    }
+
+
 def identify(db_path: Path, email: str) -> dict[str, Any]:
     init_db(db_path)
     normalized = normalize_email(email)
@@ -434,6 +552,13 @@ def build_open_needs_summary(alerts: list[dict[str, Any]]) -> str:
     return f"Jarvis: Mas {len(alerts)} otvorenych klientskych poziadaviek. Najnovsia: {name} - {first['needSignal']['summary']}."
 
 
+def build_prepared_replies_summary(replies: list[dict[str, Any]]) -> str:
+    if not replies:
+        return "Jarvis: Necaka ziadna pripravena cold outreach odpoved na schvalenie."
+    first = replies[0]
+    return f"Jarvis: Caka {prepared_reply_label(len(replies))} na schvalenie. Najnovsia je pre {first['leadEmail']}."
+
+
 def build_cold_outreach_summary(metrics: dict[str, Any]) -> str:
     contacted = int(metrics["contacted"])
     opened = int(metrics["opened"])
@@ -511,6 +636,21 @@ def row_to_cold_event(row: sqlite3.Row) -> dict[str, Any]:
     }
 
 
+def prepared_reply_from_row(row: sqlite3.Row) -> dict[str, Any]:
+    data = json.loads(row["data_json"] or "{}")
+    return {
+        "id": row["id"],
+        "leadEmail": row["lead_email"],
+        "campaignId": row["campaign_id"],
+        "campaignName": row["campaign_name"],
+        "occurredAt": row["occurred_at"],
+        "subject": data.get("subject"),
+        "replyText": data.get("replyText") or data.get("text") or data.get("draft"),
+        "positiveSignal": data.get("positiveSignal") or data.get("signal"),
+        "data": data,
+    }
+
+
 def row_to_email_activity(row: sqlite3.Row) -> dict[str, Any]:
     return {
         "id": row["id"],
@@ -541,7 +681,21 @@ def load_payload(raw: str | None) -> dict[str, Any]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Jarvis local SQLite DB helper.")
-    parser.add_argument("command", choices=["init", "upsert-person", "add-need-signal", "add-cold-event", "cold-brief", "identify", "ingest-message", "list-open-needs"])
+    parser.add_argument(
+        "command",
+        choices=[
+            "init",
+            "upsert-person",
+            "add-need-signal",
+            "add-cold-event",
+            "cold-brief",
+            "list-prepared-replies",
+            "approve-prepared-reply",
+            "identify",
+            "ingest-message",
+            "list-open-needs",
+        ],
+    )
     parser.add_argument("--db", type=Path, default=ROOT / "data" / "jarvis-local.db")
     parser.add_argument("--payload")
     parser.add_argument("--email")
@@ -558,6 +712,10 @@ def main() -> None:
             result = add_cold_event(args.db, load_payload(args.payload))
         elif args.command == "cold-brief":
             result = cold_brief(args.db, load_payload(args.payload))
+        elif args.command == "list-prepared-replies":
+            result = list_prepared_replies(args.db, load_payload(args.payload))
+        elif args.command == "approve-prepared-reply":
+            result = approve_prepared_reply(args.db, load_payload(args.payload))
         elif args.command == "ingest-message":
             result = ingest_message(args.db, load_payload(args.payload))
         elif args.command == "list-open-needs":

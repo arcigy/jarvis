@@ -135,6 +135,50 @@ export function createJarvisMcpServer(): McpServer {
   );
 
   server.registerTool(
+    "arcigy.get_prepared_outreach_replies",
+    {
+      title: "Get prepared outreach replies",
+      description: "Return prepared cold outreach replies waiting for operator approval.",
+      inputSchema: {
+        dbPath: z.string().optional(),
+        status: z.enum(["pending", "approved", "all"]).default("pending"),
+        since: z.string().optional(),
+        until: z.string().optional(),
+        limit: z.number().int().min(1).max(50).default(10),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async ({ dbPath, ...payload }) => jsonDbTool("list-prepared-replies", payload, dbPath)
+  );
+
+  server.registerTool(
+    "arcigy.approve_prepared_outreach_reply",
+    {
+      title: "Approve prepared outreach reply",
+      description: "Mark a prepared cold outreach reply as approved after explicit operator confirmation.",
+      inputSchema: {
+        dbPath: z.string().optional(),
+        preparedEventId: z.string().min(1),
+        approvalNote: z.string().optional(),
+        approvedBy: z.string().optional(),
+        occurredAt: z.string().optional(),
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async ({ dbPath, ...payload }) => jsonDbTool("approve-prepared-reply", payload, dbPath)
+  );
+
+  server.registerTool(
     "arcigy.get_cold_outreach_brief_from_db",
     {
       title: "Cold outreach brief from DB",
@@ -626,7 +670,15 @@ function runPython(args: string[]): { stdout: string; stderr: string } {
 }
 
 function jsonDbTool(
-  command: "upsert-person" | "add-need-signal" | "add-cold-event" | "cold-brief" | "ingest-message" | "list-open-needs",
+  command:
+    | "upsert-person"
+    | "add-need-signal"
+    | "add-cold-event"
+    | "cold-brief"
+    | "list-prepared-replies"
+    | "approve-prepared-reply"
+    | "ingest-message"
+    | "list-open-needs",
   payload: Record<string, unknown>,
   dbPath?: string
 ) {
@@ -634,7 +686,15 @@ function jsonDbTool(
 }
 
 function runDbCommand(
-  command: "upsert-person" | "add-need-signal" | "add-cold-event" | "cold-brief" | "ingest-message" | "list-open-needs",
+  command:
+    | "upsert-person"
+    | "add-need-signal"
+    | "add-cold-event"
+    | "cold-brief"
+    | "list-prepared-replies"
+    | "approve-prepared-reply"
+    | "ingest-message"
+    | "list-open-needs",
   payload: Record<string, unknown>,
   dbPath?: string
 ) {

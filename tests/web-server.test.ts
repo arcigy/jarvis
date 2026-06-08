@@ -87,10 +87,34 @@ test("local web bridge serves UI and API health", async () => {
     const coldEvent = await postJson(`${baseUrl}/api/mcp/arcigy.add_cold_outreach_event`, {
       dbPath: mcpDbPath,
       leadEmail: "lead@example.com",
-      eventType: "sent",
-      occurredAt: "2026-06-08T10:00:00Z",
+      eventType: "prepared_reply",
+      occurredAt: "2026-06-07T10:00:00Z",
+      data: { subject: "Re: automations", replyText: "Dakujem, posielam dalsi krok." },
     });
     assert.equal(coldEvent.result.leadEmail, "lead@example.com");
+
+    const preparedReplies = await postJson(`${baseUrl}/api/mcp/arcigy.get_prepared_outreach_replies`, {
+      dbPath: mcpDbPath,
+      status: "pending",
+      limit: 5,
+    });
+    assert.equal(preparedReplies.result.count, 1);
+    assert.equal(preparedReplies.result.replies[0].replyText, "Dakujem, posielam dalsi krok.");
+
+    const unapprovedPreparedReply = await fetch(`${baseUrl}/api/mcp/arcigy.approve_prepared_outreach_reply`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ dbPath: mcpDbPath, preparedEventId: coldEvent.result.id }),
+    });
+    assert.equal(unapprovedPreparedReply.status, 409);
+
+    const approvedPreparedReply = await postJson(`${baseUrl}/api/mcp/arcigy.approve_prepared_outreach_reply`, {
+      dbPath: mcpDbPath,
+      preparedEventId: coldEvent.result.id,
+      approval: { approved: true },
+      approvedBy: "test",
+    });
+    assert.equal(approvedPreparedReply.result.status, "approved");
 
     const voiceTool = await postJson(`${baseUrl}/api/mcp/arcigy.jarvis_voice_event`, {
       text: "Jarvis",
@@ -152,12 +176,12 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(readiness.status, 200);
     const readinessBody = (await readiness.json()) as { status: string; mcp: { toolCount: number }; nextActions: string[]; fixGuide: unknown[] };
     assert.ok(["ready", "attention", "blocked"].includes(readinessBody.status));
-    assert.equal(readinessBody.mcp.toolCount, 21);
+    assert.equal(readinessBody.mcp.toolCount, 23);
     assert.ok(Array.isArray(readinessBody.nextActions));
     assert.ok(Array.isArray(readinessBody.fixGuide));
 
     const mcpReadiness = await postJson(`${baseUrl}/api/mcp/arcigy.get_production_readiness`, { live: false });
-    assert.equal(mcpReadiness.result.mcp.toolCount, 21);
+    assert.equal(mcpReadiness.result.mcp.toolCount, 23);
     assert.ok(Array.isArray(mcpReadiness.result.fixGuide));
 
     const voice = await fetch(`${baseUrl}/api/jarvis/voice-event`, {
@@ -323,8 +347,9 @@ test("local web bridge preflight reports tunnel readiness without leaking secret
     assert.match(body.manifestUrl, /\/\.well-known\/arcigy-jarvis\.json$/);
     assert.equal(body.tunnelCommand, "npm run web:tunnel");
     assert.equal(body.tunnelProvider, "ngrok");
-    assert.ok(body.mcpToolCount >= 21);
+    assert.ok(body.mcpToolCount >= 23);
     assert.ok(body.riskyToolsRequiringApproval.includes("arcigy.generate_contract_documents"));
+    assert.ok(body.riskyToolsRequiringApproval.includes("arcigy.approve_prepared_outreach_reply"));
     assert.ok(body.riskyToolsRequiringApproval.includes("arcigy.append_leads_to_google_sheet"));
     assert.equal(body.pathPolicy, "repo-only");
     assert.equal(body.maxJsonBytes > 0, true);

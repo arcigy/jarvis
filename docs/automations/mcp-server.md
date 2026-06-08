@@ -39,6 +39,8 @@ External hosts require `Authorization: Bearer <JARVIS_WEB_TOKEN>`. The manifest 
 - `arcigy.get_cold_outreach_brief`: Slovak cold outreach summary.
 - `arcigy.add_cold_outreach_event`: stores local cold outreach activity.
 - `arcigy.get_cold_outreach_brief_from_db`: computes Slovak cold outreach summary from SQLite events.
+- `arcigy.get_prepared_outreach_replies`: returns prepared cold outreach replies waiting for approval.
+- `arcigy.approve_prepared_outreach_reply`: marks one prepared outreach reply as approved after explicit confirmation.
 - `arcigy.upsert_local_person`: local client/lead/contact upsert into SQLite.
 - `arcigy.add_client_need_signal`: stores that a client needs something.
 - `arcigy.ingest_client_message`: stores a received email/message, identifies the sender, and returns a Jarvis alert when the message contains a request.
