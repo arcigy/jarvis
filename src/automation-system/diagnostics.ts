@@ -151,14 +151,22 @@ async function checkSerper(env: RuntimeEnv, fetchImpl: FetchLike) {
 async function checkGoogleSheets(env: RuntimeEnv, fetchImpl: FetchLike) {
   const spreadsheetId = getEnv(env, "GOOGLE_SHEET_ID");
   if (!spreadsheetId) throw new Error("Missing GOOGLE_SHEET_ID.");
-  const account = listConfiguredGmailAccounts(env)[0];
-  if (!account) throw new Error("No configured Google OAuth account found.");
-  const accessToken = await refreshGoogleAccessToken(account.refreshToken, env, fetchImpl);
-  const response = await fetchImpl(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}?fields=spreadsheetId`, {
-    headers: { authorization: `Bearer ${accessToken}` },
-  });
-  if (!response.ok) throw new Error(`Google Sheets metadata request failed: ${response.status}`);
-  return "Google Sheets metadata request responded.";
+  const accounts = listConfiguredGmailAccounts(env);
+  if (!accounts.length) throw new Error("No configured Google OAuth account found.");
+  let lastError = "";
+  for (const [index, account] of accounts.entries()) {
+    try {
+      const accessToken = await refreshGoogleAccessToken(account.refreshToken, env, fetchImpl);
+      const response = await fetchImpl(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}?fields=spreadsheetId`, {
+        headers: { authorization: `Bearer ${accessToken}` },
+      });
+      if (response.ok) return `Google Sheets metadata request responded using account ${index + 1}/${accounts.length}.`;
+      lastError = `Google Sheets metadata request failed after account ${index + 1}/${accounts.length}: ${response.status}`;
+    } catch (error) {
+      lastError = `Google Sheets metadata request failed after account ${index + 1}/${accounts.length}: ${error instanceof Error ? error.message : String(error)}`;
+    }
+  }
+  throw new Error(lastError || "Google Sheets metadata request failed.");
 }
 
 type ServiceTarget = {

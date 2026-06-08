@@ -1077,13 +1077,22 @@ function sleep(ms) {
 
 async function checkGoogleSheetsAccess() {
   const spreadsheetId = requireRuntimeEnv("GOOGLE_SHEET_ID");
-  const account = listConfiguredGmailAccounts()[0];
-  if (!account) throw new Error("No configured Google OAuth account found.");
-  const accessToken = await refreshGoogleAccessToken(account.refreshToken);
-  const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}?fields=spreadsheetId`, {
-    headers: { authorization: `Bearer ${accessToken}` },
-  });
-  if (!response.ok) throw new Error(`Google Sheets metadata request failed: ${response.status}`);
+  const accounts = listConfiguredGmailAccounts();
+  if (!accounts.length) throw new Error("No configured Google OAuth account found.");
+  let lastError = "";
+  for (const [index, account] of accounts.entries()) {
+    try {
+      const accessToken = await refreshGoogleAccessToken(account.refreshToken);
+      const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}?fields=spreadsheetId`, {
+        headers: { authorization: `Bearer ${accessToken}` },
+      });
+      if (response.ok) return;
+      lastError = `Google Sheets metadata request failed after account ${index + 1}/${accounts.length}: ${response.status}`;
+    } catch (error) {
+      lastError = `Google Sheets metadata request failed after account ${index + 1}/${accounts.length}: ${error instanceof Error ? error.message : String(error)}`;
+    }
+  }
+  throw new Error(lastError || "Google Sheets metadata request failed.");
 }
 
 function parseServiceUrl(value, label) {
@@ -2097,33 +2106,44 @@ async function appendLeadsToGoogleSheet(payload) {
   const spreadsheetId = String(payload?.spreadsheetId || requireRuntimeEnv("GOOGLE_SHEET_ID"));
   const range = String(payload?.range || "Leads!A1");
   const accountEnvKey = String(payload?.accountEnvKey ?? "").trim();
-  const account = listConfiguredGmailAccounts().find((item) => !accountEnvKey || item.envKey === accountEnvKey);
-  if (!account) {
+  const accounts = listConfiguredGmailAccounts().filter((item) => !accountEnvKey || item.envKey === accountEnvKey);
+  if (!accounts.length) {
     throw new Error(accountEnvKey ? `Google account not configured: ${accountEnvKey}` : "No configured Google OAuth account found.");
   }
-  const accessToken = await refreshGoogleAccessToken(account.refreshToken);
   const params = new URLSearchParams({
     valueInputOption: "USER_ENTERED",
     insertDataOption: "INSERT_ROWS",
   });
-  const response = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(range)}:append?${params.toString()}`,
-    {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${accessToken}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        majorDimension: "ROWS",
-        values: rows,
-      }),
+  let lastError = "";
+  for (const [index, account] of accounts.entries()) {
+    try {
+      const accessToken = await refreshGoogleAccessToken(account.refreshToken);
+      const response = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(range)}:append?${params.toString()}`,
+        {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${accessToken}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            majorDimension: "ROWS",
+            values: rows,
+          }),
+        }
+      );
+      if (response.ok) {
+        const result = await response.json();
+        addAuditEvent("arcigy.append_leads_to_google_sheet", "appended", payload, result, true);
+        return result;
+      }
+      lastError = `Google Sheets append failed after account ${index + 1}/${accounts.length}: ${response.status}`;
+    } catch (error) {
+      lastError = `Google Sheets append failed after account ${index + 1}/${accounts.length}: ${error instanceof Error ? error.message : String(error)}`;
     }
-  );
-  if (!response.ok) throw new Error(`Google Sheets append failed: ${response.status}`);
-  const result = await response.json();
-  addAuditEvent("arcigy.append_leads_to_google_sheet", "appended", payload, result, true);
-  return result;
+    if (accountEnvKey) break;
+  }
+  throw new Error(lastError || "Google Sheets append failed.");
 }
 
 async function draftContractIntake(payload) {

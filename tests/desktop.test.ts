@@ -372,6 +372,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /getGoogleMapsApiKeys/);
   assert.match(main, /GOOGLE_MAPS_API_KEYS/);
   assert.match(main, /getSerperApiKeys/);
+  assert.match(main, /Google Sheets append failed after account/);
+  assert.match(main, /Google Sheets metadata request failed after account/);
   assert.match(main, /leadProviderStatus/);
   assert.match(main, /ipcMain\.handle\("contracts:generate"/);
   assert.match(main, /arcigy\.generate_contract_documents requires explicit approval/);

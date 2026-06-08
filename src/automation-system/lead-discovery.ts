@@ -126,33 +126,42 @@ export async function appendRowsToGoogleSheet(
   }
   const spreadsheetId = input.spreadsheetId || requireEnv(env, "GOOGLE_SHEET_ID");
   const range = input.range ?? "Leads!A1";
-  const account = listConfiguredGmailAccounts(env).find((item) => !input.accountEnvKey || item.envKey === input.accountEnvKey);
-  if (!account) {
+  const accounts = listConfiguredGmailAccounts(env).filter((item) => !input.accountEnvKey || item.envKey === input.accountEnvKey);
+  if (!accounts.length) {
     throw new Error(input.accountEnvKey ? `Google account not configured: ${input.accountEnvKey}` : "No configured Google OAuth account found.");
   }
-  const accessToken = await refreshGoogleAccessToken(account.refreshToken, env, fetchImpl);
   const params = new URLSearchParams({
     valueInputOption: "USER_ENTERED",
     insertDataOption: "INSERT_ROWS",
   });
-  const response = await fetchImpl(
-    `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(range)}:append?${params.toString()}`,
-    {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${accessToken}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        majorDimension: "ROWS",
-        values: input.rows,
-      }),
+  let lastError = "";
+  for (const [index, account] of accounts.entries()) {
+    try {
+      const accessToken = await refreshGoogleAccessToken(account.refreshToken, env, fetchImpl);
+      const response = await fetchImpl(
+        `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(range)}:append?${params.toString()}`,
+        {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${accessToken}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            majorDimension: "ROWS",
+            values: input.rows,
+          }),
+        }
+      );
+      if (response.ok) {
+        return response.json();
+      }
+      lastError = `Google Sheets append failed after account ${index + 1}/${accounts.length}: ${response.status}`;
+    } catch (error) {
+      lastError = `Google Sheets append failed after account ${index + 1}/${accounts.length}: ${error instanceof Error ? error.message : String(error)}`;
     }
-  );
-  if (!response.ok) {
-    throw new Error(`Google Sheets append failed: ${response.status}`);
+    if (input.accountEnvKey) break;
   }
-  return response.json();
+  throw new Error(lastError || "Google Sheets append failed.");
 }
 
 export async function discoverLeads(

@@ -898,6 +898,45 @@ test("Google Places search falls back across configured Maps keys", async () => 
   assert.equal((result as { places?: unknown[] }).places?.length, 1);
 });
 
+test("Google Sheets append falls back across configured OAuth accounts", async () => {
+  const refreshTokens: string[] = [];
+  const authorizationHeaders: string[] = [];
+  const fetchImpl = async (url: string | URL | Request, init?: RequestInit) => {
+    const target = String(url);
+    if (target.includes("oauth2.googleapis.com") || target.includes("www.googleapis.com/oauth2/v4/token")) {
+      const body = new URLSearchParams(String(init?.body));
+      const refreshToken = body.get("refresh_token") ?? "";
+      refreshTokens.push(refreshToken);
+      if (refreshToken === "bad-refresh") {
+        return { ok: false, status: 400, json: async () => ({}) } as Response;
+      }
+      return responseJson({ access_token: "good-access-token" });
+    }
+    if (target.includes("sheets.googleapis.com")) {
+      const headers = init?.headers as Record<string, string>;
+      authorizationHeaders.push(headers.authorization);
+      return responseJson({ updates: { updatedRows: 1 } });
+    }
+    throw new Error(`Unexpected URL: ${target}`);
+  };
+
+  const result = await appendRowsToGoogleSheet(
+    { rows: [["ACME"]] },
+    {
+      GOOGLE_SHEET_ID: "sheet-id",
+      GOOGLE_CLIENT_ID: "client",
+      GOOGLE_CLIENT_SECRET: "secret",
+      GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP: "bad-refresh",
+      GMAIL_REFRESH_TOKEN_ANDREJ_ARCIGY_GROUP: "good-refresh",
+    },
+    fetchImpl as typeof fetch
+  );
+
+  assert.deepEqual(refreshTokens, ["bad-refresh", "bad-refresh", "good-refresh"]);
+  assert.deepEqual(authorizationHeaders, ["Bearer good-access-token"]);
+  assert.deepEqual(result, { updates: { updatedRows: 1 } });
+});
+
 test("lead discovery reports provider status and falls back when Serper credits are exhausted", async () => {
   const fetchImpl = async (url: string | URL | Request) => {
     const target = String(url);

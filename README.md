@@ -101,6 +101,7 @@ Live integrations are runtime-only:
 - local app storage: `DATABASE_URL`, `REDIS_URL`, `data\jarvis-local.db`
 - lead discovery: `SERPER_API_KEY`, `GOOGLE_MAPS_API_KEY` or comma-separated fallback keys in `GOOGLE_MAPS_API_KEYS`
 - lead export: `GOOGLE_SHEET_ID` plus a Google OAuth refresh token with Sheets access
+- when multiple `GMAIL_REFRESH_TOKEN_*` values are configured, Sheets diagnostics and lead export try them in order unless a specific `accountEnvKey` is supplied
 
 Do not leave placeholder URL credentials such as `PASSWORD`, `changeme`, or `dummy` in `DATABASE_URL`. Redis is currently a non-blocking advisory because shipped Jarvis workflows use SQLite/local APIs for state; replace `REDIS_URL` before adding a Redis-backed queue or cache. If `npm run doctor -- --live-integrations` reports Serper credits exhausted after key `2/2`, replace or top up at least one Serper key.
 
