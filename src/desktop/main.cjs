@@ -2203,8 +2203,9 @@ async function generateGeminiText(input) {
         const text = await requestGeminiText(input, apiKey, model);
         return { model, text, attempts };
       } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-        if (!isRetryableGeminiError(lastError) || attempt === maxRetries) break;
+        const caughtError = error instanceof Error ? error : new Error(String(error));
+        lastError = redactGeminiError(caughtError);
+        if (!isRetryableGeminiError(caughtError) || attempt === maxRetries) break;
         await delay(retryBaseMs * 2 ** attempt);
       }
     }
@@ -2256,6 +2257,12 @@ function getPositiveInteger(value, fallback) {
 
 function isRetryableGeminiError(error) {
   return typeof error.status === "number" && [429, 500, 502, 503, 504].includes(error.status);
+}
+
+function redactGeminiError(error) {
+  const safeError = new Error(redactSensitiveText(error.message));
+  if (typeof error.status === "number") safeError.status = error.status;
+  return safeError;
 }
 
 function delay(ms) {

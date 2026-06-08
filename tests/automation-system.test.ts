@@ -655,6 +655,29 @@ test("Gemini helper retries transient failures and falls back to the secondary m
   assert.equal(calls.filter((url) => url.includes("gemini-fallback")).length, 2);
 });
 
+test("Gemini helper redacts secrets from transport errors", async () => {
+  const googleApiKey = `AI${"za"}Sy${"H".repeat(32)}`;
+  const providerKey = `${"a".repeat(8)}-${"c".repeat(4)}-${"e".repeat(4)}-${"f".repeat(4)}-${"b".repeat(12)}_ehpdn6s`;
+  const databaseUrl = "postgresql://postgres:private-gemini@example.com:5432/jarvis";
+  const fetchImpl = async () => {
+    throw new Error(`Gemini transport failed ${googleApiKey} ${providerKey} ${databaseUrl}`);
+  };
+
+  await assert.rejects(
+    () => generateGeminiText({ prompt: "Return OK.", temperature: 0 }, { GEMINI_API_KEY: "gemini-key" }, fetchImpl as typeof fetch),
+    (error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      assert.equal(message.includes(googleApiKey), false);
+      assert.equal(message.includes(providerKey), false);
+      assert.equal(message.includes("private-gemini"), false);
+      assert.match(message, /\[redacted-google-api-key\]/);
+      assert.match(message, /\[redacted-provider-key\]/);
+      assert.match(message, /postgresql:\/\/postgres:\[redacted\]@example\.com/);
+      return true;
+    }
+  );
+});
+
 test("Gmail helper refreshes OAuth token and normalizes message events", async () => {
   const fetchImpl = async (url: string | URL | Request) => {
     const target = String(url);
