@@ -786,6 +786,7 @@ async function getOperatorBriefing(payload: Record<string, unknown>) {
   return buildOperatorBriefing({
     readinessStatus: readiness.status,
     readinessSummary: readiness.summary,
+    readinessAttentionQueue: readiness.attentionQueue,
     coldOutreachSummary,
     liveSyncSummary,
     openClientNeedCount: Number(clientNeeds.count ?? 0),

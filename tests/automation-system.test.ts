@@ -185,6 +185,15 @@ test("operator briefing combines readiness, outreach, client needs, and approval
   const briefing = buildOperatorBriefing({
     readinessStatus: "blocked",
     readinessSummary: "Production needs attention.",
+    readinessAttentionQueue: [
+      {
+        key: "redis",
+        severity: "warning",
+        title: "Replace Redis placeholder password",
+        source: "configuration",
+        nextAction: "Replace REDIS_URL.",
+      },
+    ],
     coldOutreachSummary: "Za dnes sme napisali 10 ludom.",
     liveSyncSummary: "Gmail checked 4 account(s), fetched 8 message(s), created 6 new record(s), skipped 2 duplicate(s), raised 2 alert(s).",
     openClientNeedCount: 2,
@@ -193,6 +202,8 @@ test("operator briefing combines readiness, outreach, client needs, and approval
   });
 
   assert.match(briefing.speechText, /Jarvis briefing/);
+  assert.match(briefing.speechText, /Production attention queue: 1 item/);
+  assert.match(briefing.sections.readinessAttention ?? "", /redis: Replace Redis placeholder password/);
   assert.match(briefing.speechText, /Cold outreach/);
   assert.match(briefing.speechText, /Live sync/);
   assert.match(briefing.speechText, /Klientske poziadavky: 2/);

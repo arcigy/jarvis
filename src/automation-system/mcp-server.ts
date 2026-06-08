@@ -573,6 +573,7 @@ export function createJarvisMcpServer(): McpServer {
         buildOperatorBriefing({
           readinessStatus: readiness.status,
           readinessSummary: readiness.summary,
+          readinessAttentionQueue: readiness.attentionQueue,
           coldOutreachSummary,
           liveSyncSummary,
           openClientNeedCount: Number(clientNeeds.count ?? 0),

@@ -1084,6 +1084,7 @@ async function getOperatorBriefing(payload = {}) {
   return buildOperatorBriefing({
     readinessStatus: readiness.status,
     readinessSummary: readiness.summary,
+    readinessAttentionQueue: readiness.attentionQueue || [],
     coldOutreachSummary,
     liveSyncSummary,
     openClientNeedCount: Number(clientNeeds.count || 0),
@@ -1126,8 +1127,10 @@ async function maybeSyncGmailForOperatorBriefing(payload, dbPath) {
 
 function buildOperatorBriefing(input) {
   const nextAction = input.nextActions?.[0] || "Ziadny urgentny krok.";
+  const readinessAttention = summarizeReadinessAttention(input.readinessAttentionQueue || []);
   const sections = {
     readiness: `Readiness: ${input.readinessStatus}. ${input.readinessSummary}`,
+    readinessAttention,
     coldOutreach: `Cold outreach: ${input.coldOutreachSummary}`,
     liveSync: input.liveSyncSummary ? `Live sync: ${input.liveSyncSummary}` : undefined,
     clientNeeds:
@@ -1143,6 +1146,7 @@ function buildOperatorBriefing(input) {
   const speechText = [
     "Jarvis briefing.",
     sections.readiness,
+    sections.readinessAttention,
     sections.coldOutreach,
     sections.liveSync,
     sections.clientNeeds,
@@ -1154,6 +1158,15 @@ function buildOperatorBriefing(input) {
     speechText,
     sections,
   };
+}
+
+function summarizeReadinessAttention(queue) {
+  if (!queue.length) return undefined;
+  const topItems = queue
+    .slice(0, 3)
+    .map((item) => `${item.key}: ${item.title}`)
+    .join("; ");
+  return `Production attention queue: ${queue.length} item(s). ${topItems}.`;
 }
 
 function identifyEmail(payload) {

@@ -288,6 +288,7 @@ function renderOperatorBriefing(briefing) {
     briefing.summary ?? briefing.speechText ?? "Jarvis briefing is ready.",
     "",
     sections.readiness,
+    sections.readinessAttention,
     sections.coldOutreach,
     sections.liveSync,
     sections.clientNeeds,
