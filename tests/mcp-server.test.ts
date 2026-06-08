@@ -9,6 +9,10 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createJarvisMcpServer } from "../src/automation-system/mcp-server.ts";
 
 test("Jarvis MCP server lists and calls automation tools", async () => {
+  const source = readFileSync("src/automation-system/mcp-server.ts", "utf-8");
+  assert.match(source, /function safeErrorMessage/);
+  assert.match(source, /redactSensitiveText\(error instanceof Error \? error\.message : String\(error\)\)/);
+
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   const server = createJarvisMcpServer();
   const client = new Client({ name: "test-client", version: "0.1.0" });

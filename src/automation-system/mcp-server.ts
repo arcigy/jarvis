@@ -5,6 +5,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
+import { redactSensitiveText } from "./ai-safety.ts";
 import { draftContractIntake } from "./contract-intake-draft.ts";
 import { runIntegrationDiagnostics } from "./diagnostics.ts";
 import { getIntegrationHealth, loadLocalEnv, summarizeIntegrationHealth } from "./env.ts";
@@ -949,7 +950,7 @@ async function maybeSyncGmailForOperatorBriefing(
     const alerts = synced.reduce((sum, item) => sum + item.alerts, 0);
     return `Gmail checked ${synced.length} account(s), fetched ${fetched} message(s), created ${created} new record(s), skipped ${duplicates} duplicate(s), raised ${alerts} alert(s).`;
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = safeErrorMessage(error);
     return `Gmail live sync unavailable: ${message}`;
   }
 }
@@ -965,9 +966,13 @@ async function getOperatorColdOutreachSummary(
     const smartlead = await getSmartleadOutreachBrief({ periodLabel, maxCampaigns: 10, ...approvals });
     return smartlead.summary;
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = safeErrorMessage(error);
     return `${localSummary} Live Smartlead summary unavailable: ${message}`;
   }
+}
+
+function safeErrorMessage(error: unknown): string {
+  return redactSensitiveText(error instanceof Error ? error.message : String(error));
 }
 
 function textResult(text: string) {
