@@ -26,6 +26,8 @@ import type { ClientNeedSignal, LocalPerson } from "./types.ts";
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
 loadLocalEnv(repoRoot);
 
+const approvalSchema = z.object({ approved: z.boolean().optional() }).optional();
+
 export function createJarvisMcpServer(): McpServer {
   const server = new McpServer({
     name: "arcigy-jarvis-local",
@@ -41,6 +43,8 @@ export function createJarvisMcpServer(): McpServer {
         inputJsonPath: z.string().min(1).optional(),
         intake: z.record(z.string(), z.unknown()).optional(),
         outputDir: z.string().min(1).optional(),
+        approval: approvalSchema,
+        approved: z.boolean().optional(),
       },
       annotations: {
         readOnlyHint: false,
@@ -49,7 +53,8 @@ export function createJarvisMcpServer(): McpServer {
         openWorldHint: false,
       },
     },
-    async ({ inputJsonPath, intake, outputDir }) => {
+    async ({ inputJsonPath, intake, outputDir, approval, approved }) => {
+      requireExplicitApproval("arcigy.generate_contract_documents", { approval, approved });
       if (!inputJsonPath && !intake) {
         throw new Error("Provide either inputJsonPath or inline intake payload.");
       }
@@ -167,6 +172,8 @@ export function createJarvisMcpServer(): McpServer {
       inputSchema: {
         dbPath: z.string().optional(),
         preparedEventId: z.string().min(1),
+        approval: approvalSchema,
+        approved: z.boolean().optional(),
         approvalNote: z.string().optional(),
         approvedBy: z.string().optional(),
         occurredAt: z.string().optional(),
@@ -178,7 +185,10 @@ export function createJarvisMcpServer(): McpServer {
         openWorldHint: false,
       },
     },
-    async ({ dbPath, ...payload }) => jsonDbTool("approve-prepared-reply", payload, dbPath)
+    async ({ dbPath, ...payload }) => {
+      requireExplicitApproval("arcigy.approve_prepared_outreach_reply", payload);
+      return jsonDbTool("approve-prepared-reply", payload, dbPath);
+    }
   );
 
   server.registerTool(
@@ -755,6 +765,8 @@ export function createJarvisMcpServer(): McpServer {
         range: z.string().default("Leads!A1"),
         accountEnvKey: z.string().optional(),
         rows: z.array(z.array(z.union([z.string(), z.number(), z.boolean(), z.null()]))).min(1),
+        approval: approvalSchema,
+        approved: z.boolean().optional(),
       },
       annotations: {
         readOnlyHint: false,
@@ -763,7 +775,10 @@ export function createJarvisMcpServer(): McpServer {
         openWorldHint: true,
       },
     },
-    async (input) => jsonResult(await appendRowsToGoogleSheet(input))
+    async (input) => {
+      requireExplicitApproval("arcigy.append_leads_to_google_sheet", input);
+      return jsonResult(await appendRowsToGoogleSheet(input));
+    }
   );
 
   return server;
@@ -832,6 +847,11 @@ function runDbCommand(
   }
   const result = runPython(args);
   return JSON.parse(result.stdout);
+}
+
+function requireExplicitApproval(name: string, payload: { approval?: { approved?: boolean }; approved?: boolean }) {
+  if (payload.approval?.approved === true || payload.approved === true) return;
+  throw new Error(`${name} requires explicit approval. Send {"approval":{"approved":true}} after user confirmation.`);
 }
 
 async function maybeSyncGmailForOperatorBriefing(

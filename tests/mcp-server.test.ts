@@ -109,6 +109,16 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.generate_contract_documents" && call.approvalRequired === true));
   assert.equal(pack.tunnel.secureCommand, "npm run web:tunnel:secure");
 
+  assertToolError(
+    await client.callTool({
+      name: "arcigy.append_leads_to_google_sheet",
+      arguments: {
+        rows: [["Name", "Website"], ["ACME", "https://example.com"]],
+      },
+    }),
+    /requires explicit approval/
+  );
+
   await client.close();
   await server.close();
 });
@@ -181,11 +191,24 @@ test("Jarvis MCP server generates contracts from inline intake payload", async (
   await server.connect(serverTransport);
   await client.connect(clientTransport);
 
+  assertToolError(
+    await client.callTool({
+      name: "arcigy.generate_contract_documents",
+      arguments: {
+        intake,
+        outputDir,
+      },
+    }),
+    /requires explicit approval/
+  );
+  assert.equal(existsSync(join(outputDir, "generation-manifest.json")), false);
+
   const result = await client.callTool({
     name: "arcigy.generate_contract_documents",
     arguments: {
       intake,
       outputDir,
+      approval: { approved: true },
     },
   });
 
@@ -307,9 +330,17 @@ test("Jarvis MCP server summarizes cold outreach from local SQLite events", asyn
   assert.equal(pendingBody.replies[0].id, preparedBody.id);
   assert.equal(pendingBody.replies[0].replyText, "Dakujem, navrhujem kratky call.");
 
+  assertToolError(
+    await client.callTool({
+      name: "arcigy.approve_prepared_outreach_reply",
+      arguments: { dbPath, preparedEventId: preparedBody.id, approvedBy: "test" },
+    }),
+    /requires explicit approval/
+  );
+
   const approvedReply = await client.callTool({
     name: "arcigy.approve_prepared_outreach_reply",
-    arguments: { dbPath, preparedEventId: preparedBody.id, approvedBy: "test" },
+    arguments: { dbPath, preparedEventId: preparedBody.id, approval: { approved: true }, approvedBy: "test" },
   });
   const approvedBody = getStructuredResult(approvedReply) as { status: string; approvedEvent: { eventType: string } };
   assert.equal(approvedBody.status, "approved");
@@ -336,4 +367,11 @@ function getStructuredResult(value: unknown): unknown {
   const result = value as { structuredContent?: { result?: unknown } };
   assert.ok(result.structuredContent);
   return result.structuredContent.result;
+}
+
+function assertToolError(value: unknown, pattern: RegExp) {
+  const result = value as { isError?: boolean; content?: Array<{ type: string; text?: string }> };
+  assert.equal(result.isError, true);
+  const text = result.content?.[0]?.type === "text" ? result.content[0].text ?? "" : "";
+  assert.match(text, pattern);
 }
