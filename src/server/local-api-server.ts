@@ -168,7 +168,7 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
       return;
     }
     const outputDir = resolveRepoPath(payload.outputDir, join(repoRoot, "generated", "contracts"), "outputDir");
-    const intake = typeof payload.intake === "string" ? JSON.parse(payload.intake) : payload.intake;
+    const intake = parseContractIntake(payload.intake);
     if (!intake || typeof intake !== "object") {
       writeJson(response, 400, { error: "Contract intake JSON is required." });
       return;
@@ -1098,6 +1098,15 @@ function cleanPythonErrorMessage(message: string): string {
   const valueError = [...lines].reverse().find((line) => /^(ValueError|FileNotFoundError|TypeError|Error):\s*/.test(line));
   if (valueError) return valueError.replace(/^(ValueError|FileNotFoundError|TypeError|Error):\s*/, "");
   return lines.at(-1) || String(message);
+}
+
+function parseContractIntake(value: unknown): unknown {
+  if (typeof value !== "string") return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    throw httpError(400, "Contract intake must be valid JSON.");
+  }
 }
 
 function optionalString(value: unknown): string | undefined {

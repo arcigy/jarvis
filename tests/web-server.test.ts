@@ -207,6 +207,18 @@ test("local web bridge serves UI and API health", async () => {
     assert.match(unfinishedDirectContractError, /Unresolved contract intake placeholder/);
     assert.doesNotMatch(unfinishedDirectContractError, /Traceback|generate_contract_documents\.py/);
 
+    const malformedDirectContract = await fetch(`${baseUrl}/api/generate-contracts`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        approval: { approved: true },
+        intake: "{",
+        outputDir: makeRepoTempDir("jarvis-web-malformed-direct-contract-"),
+      }),
+    });
+    assert.equal(malformedDirectContract.status, 400);
+    assert.equal(((await malformedDirectContract.json()) as { error: string }).error, "Contract intake must be valid JSON.");
+
     const unfinishedMcpContract = await fetch(`${baseUrl}/api/mcp/arcigy.generate_contract_documents`, {
       method: "POST",
       headers: { "content-type": "application/json" },
