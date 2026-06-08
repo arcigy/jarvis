@@ -549,6 +549,14 @@ test("runtime integration health requires Google OAuth account for Sheets", () =
   assert.equal(withAccount.find((item) => item.key === "googleSheets")?.configured, true);
 });
 
+test("runtime integration health accepts plural Google Maps key list", () => {
+  const health = getIntegrationHealth({
+    GOOGLE_MAPS_API_KEYS: "maps-a,maps-b",
+  });
+
+  assert.equal(health.find((item) => item.key === "googleMaps")?.configured, true);
+});
+
 test("Gemini reply helper calls generateContent and extracts text", async () => {
   const calls: Array<{ url: string; body: unknown }> = [];
   const fetchImpl = async (url: string | URL | Request, init?: RequestInit) => {
@@ -867,6 +875,27 @@ test("lead discovery helpers call Serper, Google Places, and Google Sheets", asy
   assert.deepEqual(discovered.providerStatus.map((provider) => provider.status), ["ready", "ready"]);
   assert.deepEqual(append, { updates: { updatedRows: 1 } });
   assert.ok(calls.some((url) => url.includes("values/Leads!A1:append")));
+});
+
+test("Google Places search falls back across configured Maps keys", async () => {
+  const apiKeys: string[] = [];
+  const fetchImpl = async (_url: string | URL | Request, init?: RequestInit) => {
+    const headers = init?.headers as Record<string, string>;
+    apiKeys.push(headers["x-goog-api-key"]);
+    if (apiKeys.length === 1) {
+      return { ok: false, status: 429, text: async () => "" } as Response;
+    }
+    return responseJson({ places: [{ displayName: { text: "Fallback Maps Lead" } }] });
+  };
+
+  const result = await searchGooglePlaces(
+    { query: "automation agency Bratislava" },
+    { GOOGLE_MAPS_API_KEYS: "spent-maps-key, ready-maps-key" },
+    fetchImpl as typeof fetch
+  );
+
+  assert.deepEqual(apiKeys, ["spent-maps-key", "ready-maps-key"]);
+  assert.equal((result as { places?: unknown[] }).places?.length, 1);
 });
 
 test("lead discovery reports provider status and falls back when Serper credits are exhausted", async () => {

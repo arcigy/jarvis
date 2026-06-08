@@ -209,16 +209,21 @@ function getSystemHealth() {
     ["postgres", ["DATABASE_URL"]],
     ["redis", ["REDIS_URL"], false],
     ["serper", ["SERPER_API_KEY"], false],
-    ["googleMaps", ["GOOGLE_MAPS_API_KEY"]],
-    ["googleSheets", ["GOOGLE_SHEET_ID", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"]],
-  ].map(([key, required, requiredForProduction = true]) => {
-    const missing = required.flatMap((name) => getRuntimeEnvIssue(name));
+    ["googleMaps", [], true, ["GOOGLE_MAPS_API_KEY", "GOOGLE_MAPS_API_KEYS"]],
+    ["googleSheets", ["GOOGLE_SHEET_ID", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"], true, gmailRefreshTokenEnv],
+  ].map(([key, required, requiredForProduction = true, requiredAnyOf = []]) => {
+    const missing = [...required.flatMap((name) => getRuntimeEnvIssue(name)), ...getAnyOfRuntimeEnvIssue(requiredAnyOf)];
     return { key, configured: missing.length === 0, missing, requiredForProduction };
   });
   return {
     integrations,
     dbPath: defaultDbPath,
   };
+}
+
+function getAnyOfRuntimeEnvIssue(names) {
+  if (!names.length) return [];
+  return names.some((name) => presentEnv(name)) ? [] : [`one of ${names.join(", ")}`];
 }
 
 function getRuntimeEnvIssue(name) {
@@ -499,7 +504,7 @@ function readinessFixStepFor(blocker) {
       id: "google-oauth",
       title: "Verify Google OAuth and API access",
       detail: "Refresh OAuth credentials, confirm Sheets access, and keep Google keys in .env.local only.",
-      envKeys: ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_SHEET_ID", "GOOGLE_MAPS_API_KEY"],
+      envKeys: ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_SHEET_ID", "GOOGLE_MAPS_API_KEY", "GOOGLE_MAPS_API_KEYS"],
       validationCommand: "npm run doctor -- --live-integrations",
     };
   }
@@ -1962,7 +1967,7 @@ async function discoverLeads(payload) {
   if (!query) throw new Error("Lead search query is required.");
   const maxResults = Math.max(1, Math.min(Number(payload?.maxResults ?? 10), 25));
   const hasSerper = getSerperApiKeys().length > 0;
-  const hasGooglePlaces = presentEnv("GOOGLE_MAPS_API_KEY");
+  const hasGooglePlaces = getGoogleMapsApiKeys().length > 0;
   const [serper, places] = await Promise.allSettled([
     hasSerper ? searchSerperLeads(query, maxResults) : null,
     hasGooglePlaces ? searchGooglePlacesLeads(String(payload?.placesQuery ?? query), Math.min(maxResults, 20)) : null,
@@ -2016,19 +2021,25 @@ async function searchSerperLeads(query, maxResults) {
 }
 
 async function searchGooglePlacesLeads(query, maxResults) {
-  const apiKey = requireRuntimeEnv("GOOGLE_MAPS_API_KEY");
-  const response = await fetch("https://places.googleapis.com/v1/places:searchText", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-goog-api-key": apiKey,
-      "x-goog-fieldmask":
-        "places.id,places.displayName,places.formattedAddress,places.websiteUri,places.nationalPhoneNumber,places.googleMapsUri",
-    },
-    body: JSON.stringify({ textQuery: query, maxResultCount: maxResults, languageCode: "sk", regionCode: "SK" }),
-  });
-  if (!response.ok) throw new Error(`Google Places request failed: ${response.status}`);
-  return response.json();
+  const apiKeys = getGoogleMapsApiKeys();
+  if (!apiKeys.length) requireRuntimeEnv("GOOGLE_MAPS_API_KEY");
+  let lastError = "";
+  for (const [index, apiKey] of apiKeys.entries()) {
+    const response = await fetch("https://places.googleapis.com/v1/places:searchText", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-goog-api-key": apiKey,
+        "x-goog-fieldmask":
+          "places.id,places.displayName,places.formattedAddress,places.websiteUri,places.nationalPhoneNumber,places.googleMapsUri",
+      },
+      body: JSON.stringify({ textQuery: query, maxResultCount: maxResults, languageCode: "sk", regionCode: "SK" }),
+    });
+    if (response.ok) return response.json();
+    lastError = `Google Places request failed after key ${index + 1}/${apiKeys.length}: ${response.status}`;
+    if (![401, 403, 429].includes(response.status)) throw new Error(lastError);
+  }
+  throw new Error(lastError || "Google Places request failed.");
 }
 
 function normalizeSerperLeads(value) {
@@ -2067,6 +2078,12 @@ function dedupeLeads(leads) {
 
 function getSerperApiKeys() {
   return [process.env.SERPER_API_KEY, process.env.SERPER_API_KEY_2]
+    .map((value) => value?.trim())
+    .filter((value, index, values) => value && value !== "dummy" && values.indexOf(value) === index);
+}
+
+function getGoogleMapsApiKeys() {
+  return [process.env.GOOGLE_MAPS_API_KEY, ...(process.env.GOOGLE_MAPS_API_KEYS || "").split(",")]
     .map((value) => value?.trim())
     .filter((value, index, values) => value && value !== "dummy" && values.indexOf(value) === index);
 }

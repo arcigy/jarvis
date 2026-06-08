@@ -34,7 +34,7 @@ const integrations: Array<{ key: IntegrationKey; required: string[]; requiredAny
   { key: "postgres", required: ["DATABASE_URL"] },
   { key: "redis", required: ["REDIS_URL"], requiredForProduction: false },
   { key: "googleSheets", required: ["GOOGLE_SHEET_ID", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"], requiredAnyOf: gmailRefreshTokenEnv },
-  { key: "googleMaps", required: ["GOOGLE_MAPS_API_KEY"] },
+  { key: "googleMaps", required: [], requiredAnyOf: ["GOOGLE_MAPS_API_KEY", "GOOGLE_MAPS_API_KEYS"] },
   { key: "serper", required: ["SERPER_API_KEY"], requiredForProduction: false },
 ];
 

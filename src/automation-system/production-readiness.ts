@@ -287,7 +287,7 @@ function fixStepFor(blocker: ReadinessBlocker): ReadinessFixStep | null {
       id: "google-oauth",
       title: "Verify Google OAuth and API access",
       detail: "Refresh OAuth credentials, confirm Sheets access, and keep Google keys in .env.local only.",
-      envKeys: ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_SHEET_ID", "GOOGLE_MAPS_API_KEY"],
+      envKeys: ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_SHEET_ID", "GOOGLE_MAPS_API_KEY", "GOOGLE_MAPS_API_KEYS"],
       validationCommand: "npm run doctor -- --live-integrations",
     };
   }
