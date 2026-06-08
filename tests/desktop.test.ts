@@ -15,6 +15,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /assets\/jarvis-command-core\.png/);
   assert.match(html, /Enable/);
   assert.match(html, /data-target="jarvisPanel"/);
+  assert.match(html, /data-target="leadPanel"/);
   assert.match(html, /id="operationsPanel"/);
   assert.match(html, /id="mcpPanel"/);
   assert.match(html, /id="commandDeck"/);
