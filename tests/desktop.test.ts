@@ -97,6 +97,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /renderRemoteMcpPack/);
   assert.match(renderer, /renderRemoteMcpSmoke/);
   assert.match(renderer, /buildRemoteAgentPrompt/);
+  assert.match(renderer, /Quick-start calls/);
   assert.match(renderer, /copyRemotePack/);
   assert.match(renderer, /writeClipboardText/);
   assert.match(renderer, /refreshWebBridge/);
@@ -181,6 +182,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /ipcMain\.handle\("jarvis:remoteMcpPack"/);
   assert.match(main, /ipcMain\.handle\("jarvis:remoteMcpSmoke"/);
   assert.match(main, /getRemoteMcpPack/);
+  assert.match(main, /buildRemoteMcpQuickStartCalls/);
   assert.match(main, /runRemoteMcpSmoke/);
   assert.match(main, /ipcMain\.handle\("jarvis:getPreparedOutreachReplies"/);
   assert.match(main, /ipcMain\.handle\("jarvis:approvePreparedOutreachReply"/);

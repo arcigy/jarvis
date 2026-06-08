@@ -40,6 +40,14 @@ export type RemoteMcpConnectionPack = {
     approvalRequired: string[];
     readOnlyOrDraft: string[];
   };
+  quickStartCalls: Array<{
+    label: string;
+    tool: string;
+    method: "POST";
+    url: string;
+    body: Record<string, unknown>;
+    approvalRequired: boolean;
+  }>;
   approval: {
     requiredPayload: { approval: { approved: true } };
     rule: string;
@@ -95,6 +103,7 @@ export async function buildRemoteMcpConnectionPack(
       approvalRequired,
       readOnlyOrDraft: tools.filter((tool) => !tool.requiresApproval).map((tool) => tool.name),
     },
+    quickStartCalls: buildQuickStartCalls(baseUrl),
     approval: {
       requiredPayload: { approval: { approved: true } },
       rule: "Never call approval-required tools until the operator explicitly confirms the exact action.",
@@ -122,4 +131,50 @@ export async function buildRemoteMcpConnectionPack(
       "Use get_operator_briefing for a Jarvis-style daily status before making recommendations.",
     ],
   };
+}
+
+function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickStartCalls"] {
+  const toolUrl = (name: string) => `${baseUrl}/api/mcp/${name}`;
+  return [
+    {
+      label: "Run remote MCP smoke proof",
+      tool: "arcigy.run_remote_mcp_smoke",
+      method: "POST",
+      url: toolUrl("arcigy.run_remote_mcp_smoke"),
+      body: {},
+      approvalRequired: false,
+    },
+    {
+      label: "Get Jarvis operator briefing",
+      tool: "arcigy.get_operator_briefing",
+      method: "POST",
+      url: toolUrl("arcigy.get_operator_briefing"),
+      body: { periodLabel: "poslednych 7 dni", live: false },
+      approvalRequired: false,
+    },
+    {
+      label: "Draft a Gemini client reply",
+      tool: "arcigy.generate_ai_reply",
+      method: "POST",
+      url: toolUrl("arcigy.generate_ai_reply"),
+      body: { message: "Client message here", context: "Arcigy Jarvis remote handoff.", language: "sk", tone: "executive" },
+      approvalRequired: false,
+    },
+    {
+      label: "Discover leads without writing",
+      tool: "arcigy.discover_leads",
+      method: "POST",
+      url: toolUrl("arcigy.discover_leads"),
+      body: { query: "automation agency Bratislava", maxResults: 8 },
+      approvalRequired: false,
+    },
+    {
+      label: "Generate contract documents after approval",
+      tool: "arcigy.generate_contract_documents",
+      method: "POST",
+      url: toolUrl("arcigy.generate_contract_documents"),
+      body: { approval: { approved: true }, intake: { client: {}, project: {}, pricing: {} } },
+      approvalRequired: true,
+    },
+  ];
 }

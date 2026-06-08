@@ -541,6 +541,9 @@ function renderRemoteMcpPack(pack) {
 
 function buildRemoteAgentPrompt(pack) {
   const approvalTools = pack.tools?.approvalRequired ?? [];
+  const quickStart = (pack.quickStartCalls ?? [])
+    .map((call) => `- ${call.label}: ${call.tool} ${JSON.stringify(call.body)}`)
+    .join("\n");
   return [
     "Arcigy Jarvis remote MCP connection pack",
     `Manifest: ${pack.manifestUrl}`,
@@ -552,6 +555,7 @@ function buildRemoteAgentPrompt(pack) {
     `Smoke test: ${pack.smokeTestUrl ?? "--"}`,
     "Rule: never call approval-required tools without explicit operator confirmation.",
     "Start with arcigy.get_operator_briefing, then use read-only tools before proposing any write action.",
+    quickStart ? `Quick-start calls:\n${quickStart}` : "",
   ].join("\n");
 }
 
