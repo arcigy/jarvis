@@ -776,6 +776,42 @@ test("local web bridge reports secure tunnel status without leaking one-time tok
   }
 });
 
+test("local web bridge tunnel start requires a strong token", async () => {
+  const previousToken = process.env.JARVIS_WEB_TOKEN;
+  const previousApiSecret = process.env.API_SECRET_KEY;
+  delete process.env.JARVIS_WEB_TOKEN;
+  process.env.API_SECRET_KEY = "dummy";
+  const server = createLocalApiServer();
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  const baseUrl = `http://127.0.0.1:${address.port}`;
+
+  try {
+    const start = await fetch(`${baseUrl}/api/start-secure-tunnel`, { method: "POST", body: "{}" });
+    assert.equal(start.status, 200);
+    const startText = await start.text();
+    assert.doesNotMatch(startText, /dummy/);
+    const startBody = JSON.parse(startText) as { started: boolean; requiresToken: boolean; command: string; reason: string };
+    assert.equal(startBody.started, false);
+    assert.equal(startBody.requiresToken, true);
+    assert.equal(startBody.command, "npm run web:tunnel");
+    assert.match(startBody.reason, /JARVIS_WEB_TOKEN/);
+
+    const stop = await fetch(`${baseUrl}/api/stop-secure-tunnel`, { method: "POST", body: "{}" });
+    assert.equal(stop.status, 200);
+    const stopBody = (await stop.json()) as { stopped: boolean; wasRunning: boolean };
+    assert.equal(stopBody.stopped, false);
+    assert.equal(stopBody.wasRunning, false);
+  } finally {
+    if (previousToken === undefined) delete process.env.JARVIS_WEB_TOKEN;
+    else process.env.JARVIS_WEB_TOKEN = previousToken;
+    if (previousApiSecret === undefined) delete process.env.API_SECRET_KEY;
+    else process.env.API_SECRET_KEY = previousApiSecret;
+    await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
 test("local web bridge rejects malformed or oversized JSON bodies", async () => {
   const previousLimit = process.env.JARVIS_MAX_JSON_BYTES;
   process.env.JARVIS_MAX_JSON_BYTES = "64";

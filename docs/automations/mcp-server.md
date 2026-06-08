@@ -47,12 +47,14 @@ The web bridge publishes its protected manifest at:
 - `GET /api/mcp`
 - `GET /.well-known/arcigy-jarvis.json`
 - `GET /api/secure-tunnel-status`
+- `POST /api/start-secure-tunnel`
+- `POST /api/stop-secure-tunnel`
 - `GET /api/remote-mcp-pack`
 - `GET /api/remote-mcp-smoke`
 
 External hosts require `Authorization: Bearer <JARVIS_WEB_TOKEN>`. The manifest returns concrete `tools[].url` values for POST calls. The remote MCP pack returns the manifest URL, smoke test URL, tool-call pattern, approval rules, tunnel command, tool count, and readiness summary without returning the bearer token value. The smoke test verifies the manifest, connection pack, a read-only tool call, approval-gate rejection, and token redaction.
 
-The desktop MCP panel now runs an automatic preflight watch every two minutes. It shows tunnel readiness, token/auth state, manifest availability, MCP tool count, and the exact remote tool-call pattern before you expose the bridge through ngrok. After `Start tunnel`, `Tunnel status` reads the private secure-tunnel log, extracts the public manifest, connection pack, smoke, and MCP tool-call URLs, and redacts the one-time bearer token from the UI.
+The MCP panel now runs an automatic preflight watch every two minutes. It shows tunnel readiness, token/auth state, manifest availability, MCP tool count, and the exact remote tool-call pattern before you expose the bridge through ngrok. In Electron, `Start tunnel` can generate a one-time tunnel token. In browser/web mode, `Start tunnel` launches `npm run web:tunnel` only after a strong `JARVIS_WEB_TOKEN` is already configured. `Tunnel status` reads the private secure-tunnel log, extracts the public manifest, connection pack, smoke, and MCP tool-call URLs, and redacts the bearer token from the UI.
 
 ## Tools
 

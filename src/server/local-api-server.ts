@@ -1,7 +1,7 @@
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { existsSync, readFileSync } from "node:fs";
-import { extname, join, normalize, resolve, sep } from "node:path";
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync } from "node:fs";
+import { dirname, extname, join, normalize, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { redactSensitiveText } from "../automation-system/ai-safety.ts";
@@ -23,6 +23,7 @@ const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
 const desktopRoot = join(repoRoot, "src", "desktop");
 const defaultDbPath = join(repoRoot, "data", "jarvis-local.db");
 const defaultMaxJsonBytes = 1_000_000;
+let webTunnelProcess: ChildProcess | null = null;
 
 loadLocalEnv(repoRoot);
 
@@ -65,6 +66,16 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
 
   if (request.method === "GET" && url.pathname === "/api/secure-tunnel-status") {
     writeJson(response, 200, getSecureTunnelStatus());
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/start-secure-tunnel") {
+    writeJson(response, 200, startSecureTunnelFromWeb());
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/stop-secure-tunnel") {
+    writeJson(response, 200, stopSecureTunnelFromWeb());
     return;
   }
 
@@ -462,13 +473,14 @@ function buildWebBridgePreflight(request: IncomingMessage) {
 
 function getSecureTunnelStatus() {
   const logPath = secureTunnelLogPath();
+  const running = Boolean(webTunnelProcess && webTunnelProcess.exitCode === null && !webTunnelProcess.killed);
   if (!existsSync(logPath)) {
     return {
-      running: false,
+      running,
       logExists: false,
       ready: false,
       logPath,
-      summary: "No secure tunnel log exists yet.",
+      summary: running ? "Secure tunnel process is starting; log is not written yet." : "No secure tunnel log exists yet.",
     };
   }
 
@@ -481,7 +493,7 @@ function getSecureTunnelStatus() {
   const ready = /Arcigy Jarvis tunnel is ready\./.test(raw) && Boolean(publicUrl);
   const smokeSummary = matchFirst(safe, /Smoke:\s*([^\r\n]+)/i);
   return {
-    running: false,
+    running,
     logExists: true,
     ready,
     logPath,
@@ -497,8 +509,97 @@ function getSecureTunnelStatus() {
   };
 }
 
+function startSecureTunnelFromWeb() {
+  if (webTunnelProcess && webTunnelProcess.exitCode === null && !webTunnelProcess.killed) {
+    return {
+      started: false,
+      alreadyRunning: true,
+      pid: webTunnelProcess.pid,
+      command: "npm run web:tunnel",
+      logPath: secureTunnelLogPath(),
+    };
+  }
+  const token = getWebToken();
+  if (!isStrongWebToken(token)) {
+    return {
+      started: false,
+      alreadyRunning: false,
+      requiresToken: true,
+      command: "npm run web:tunnel",
+      logPath: secureTunnelLogPath(),
+      reason: "Set JARVIS_WEB_TOKEN to at least 32 characters before starting a browser-launched tunnel.",
+    };
+  }
+
+  const logPath = secureTunnelLogPath();
+  mkdirForLog(logPath);
+  appendTunnelLog(`\n[${new Date().toISOString()}] Starting npm run web:tunnel from local web bridge\n`);
+  const outputFd = openSync(logPath, "a");
+  const errorFd = openSync(logPath, "a");
+  const command = process.platform === "win32" ? "npm.cmd" : "npm";
+  const child = spawn(command, ["run", "web:tunnel"], {
+    cwd: repoRoot,
+    detached: true,
+    env: { ...process.env },
+    stdio: ["ignore", outputFd, errorFd],
+    windowsHide: true,
+  });
+  closeFd(outputFd);
+  closeFd(errorFd);
+  child.unref();
+  webTunnelProcess = child;
+  child.once("error", (error) => {
+    appendTunnelLog(`[${new Date().toISOString()}] Web tunnel launch failed: ${redactSensitiveText(error.message)}\n`);
+    if (webTunnelProcess === child) webTunnelProcess = null;
+  });
+  child.once("exit", () => {
+    if (webTunnelProcess === child) webTunnelProcess = null;
+  });
+  return {
+    started: true,
+    alreadyRunning: false,
+    pid: child.pid,
+    command: "npm run web:tunnel",
+    logPath,
+  };
+}
+
+function stopSecureTunnelFromWeb() {
+  const logPath = secureTunnelLogPath();
+  if (!webTunnelProcess || webTunnelProcess.exitCode !== null || webTunnelProcess.killed || !webTunnelProcess.pid) {
+    return { stopped: false, wasRunning: false, logPath };
+  }
+  const pid = webTunnelProcess.pid;
+  appendTunnelLog(`[${new Date().toISOString()}] Stopping web-launched secure tunnel process ${pid}\n`);
+  try {
+    if (process.platform === "win32") {
+      spawnSync("taskkill", ["/pid", String(pid), "/T", "/F"], { windowsHide: true });
+    } else {
+      process.kill(-pid, "SIGTERM");
+    }
+  } catch (error) {
+    appendTunnelLog(`[${new Date().toISOString()}] Web tunnel stop warning: ${redactSensitiveText(error instanceof Error ? error.message : String(error))}\n`);
+  }
+  webTunnelProcess = null;
+  return { stopped: true, wasRunning: true, pid, logPath };
+}
+
 function secureTunnelLogPath() {
   return join(repoRoot, "generated", "jarvis-secure-tunnel.log");
+}
+
+function mkdirForLog(logPath: string) {
+  mkdirSync(dirname(logPath), { recursive: true });
+}
+
+function closeFd(fd: number) {
+  if (fd > 2) closeSync(fd);
+}
+
+function appendTunnelLog(line: string) {
+  const logPath = secureTunnelLogPath();
+  mkdirForLog(logPath);
+  appendFileSync(logPath, line, "utf-8");
 }
 
 function matchFirst(value: string, pattern: RegExp) {

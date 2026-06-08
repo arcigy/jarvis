@@ -148,6 +148,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /arcigyApi\.webBridgePreflight/);
   assert.match(renderer, /arcigyApi\.startSecureTunnel/);
   assert.match(renderer, /arcigyApi\.stopSecureTunnel/);
+  assert.match(renderer, /\/api\/start-secure-tunnel/);
+  assert.match(renderer, /\/api\/stop-secure-tunnel/);
+  assert.doesNotMatch(renderer, /startSecureTunnel: async \(\) => \(\{ started: false, reason: "desktop-only" \}\)/);
   assert.match(renderer, /arcigyApi\.getSecureTunnelStatus/);
   assert.match(renderer, /\/api\/secure-tunnel-status/);
   assert.match(renderer, /checkTunnelStatus: document\.querySelector\("#checkTunnelStatus"\)/);
