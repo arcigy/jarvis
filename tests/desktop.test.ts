@@ -82,6 +82,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /Live \+ SQLite fallback/);
   assert.match(html, /Manual send lock/);
   assert.match(html, /approvePreparedReply/);
+  assert.match(html, /sendApprovedReply/);
   assert.match(html, /preparedReplyResult/);
   assert.match(html, /runDiagnostics/);
   assert.match(html, /diagnosticsResult/);
@@ -202,8 +203,11 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /arcigyApi\.appendLeadsToGoogleSheet/);
   assert.match(renderer, /window\.confirm\(`Export \$\{state\.lastLeads\.length\} lead\(s\) to Google Sheets\?`\)/);
   assert.match(renderer, /window\.confirm\(`Approve prepared reply to \$\{first\.leadEmail\}/);
+  assert.match(renderer, /window\.confirm\(`Send approved reply to \$\{first\.leadEmail\}/);
   assert.match(renderer, /Prepared reply approval cancelled before any write/);
+  assert.match(renderer, /Approved reply send cancelled before any Gmail call/);
   assert.match(renderer, /preparedEventId: first\.id,\s+approval: \{ approved: true \}/);
+  assert.match(renderer, /arcigyApi\.sendApprovedOutreachReply/);
   assert.match(renderer, /approval: \{ approved: true \}/);
   assert.match(renderer, /providerStatus/);
   assert.match(renderer, /renderCommandDeck/);
@@ -257,6 +261,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /\/api\/operator-briefing/);
   assert.match(renderer, /\/api\/prepared-outreach-replies/);
   assert.match(renderer, /\/api\/approve-prepared-outreach-reply/);
+  assert.match(renderer, /\/api\/mcp\/arcigy\.send_approved_outreach_reply/);
   assert.match(renderer, /\/api\/system-health/);
   assert.match(renderer, /\/api\/run-diagnostics/);
   assert.match(renderer, /\/api\/web-bridge-preflight/);
@@ -385,6 +390,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /API keys, OAuth tokens, or database URLs/);
   assert.match(main, /ipcMain\.handle\("jarvis:getPreparedOutreachReplies"/);
   assert.match(main, /ipcMain\.handle\("jarvis:approvePreparedOutreachReply"/);
+  assert.match(main, /ipcMain\.handle\("jarvis:sendApprovedOutreachReply"/);
   assert.match(main, /getWebBridgePreflight/);
   assert.match(main, /tokenStrong/);
   assert.match(main, /isStrongWebToken/);
@@ -442,6 +448,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /ipcMain\.handle\("jarvis:appendLeadsToGoogleSheet"/);
   assert.match(main, /arcigy\.append_leads_to_google_sheet requires explicit approval/);
   assert.match(main, /arcigy\.send_approved_outreach_reply/);
+  assert.match(main, /async function sendGmailTextMessage/);
+  assert.match(main, /function encodeGmailRawMessage/);
   assert.doesNotMatch(main, /payload\?\.approved !== true && payload\?\.approval\?\.approved !== true/);
   assert.match(main, /listRecentGmailMessageEvents/);
   assert.match(main, /defaultGmailSyncQuery/);
@@ -493,6 +501,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /add-audit-event/);
   assert.match(main, /list-prepared-replies/);
   assert.match(main, /approve-prepared-reply/);
+  assert.match(main, /get-prepared-reply/);
   assert.match(main, /list-open-needs/);
   assert.match(main, /cold-brief/);
   assert.match(main, /defaultDbPath/);
@@ -508,6 +517,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(preload, /remoteMcpSmoke/);
   assert.match(preload, /getPreparedOutreachReplies/);
   assert.match(preload, /approvePreparedOutreachReply/);
+  assert.match(preload, /sendApprovedOutreachReply/);
   assert.match(preload, /coldOutreachBrief/);
   assert.match(preload, /identifyEmail/);
   assert.match(preload, /ingestClientMessage/);

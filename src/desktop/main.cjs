@@ -60,6 +60,7 @@ app.whenReady().then(() => {
   ipcMain.handle("jarvis:remoteMcpSmoke", (_event, payload) => runRemoteMcpSmoke(payload));
   ipcMain.handle("jarvis:getPreparedOutreachReplies", (_event, payload) => getPreparedOutreachReplies(payload));
   ipcMain.handle("jarvis:approvePreparedOutreachReply", (_event, payload) => approvePreparedOutreachReply(payload));
+  ipcMain.handle("jarvis:sendApprovedOutreachReply", (_event, payload) => sendApprovedOutreachReply(payload));
   ipcMain.handle("jarvis:identifyEmail", (_event, payload) => identifyEmail(payload));
   ipcMain.handle("jarvis:ingestClientMessage", (_event, payload) => ingestClientMessage(payload));
   ipcMain.handle("jarvis:getClientNeedAlerts", (_event, payload) => getClientNeedAlerts(payload));
@@ -1632,6 +1633,94 @@ function approvePreparedOutreachReply(payload = {}) {
   return JSON.parse(result.stdout);
 }
 
+async function sendApprovedOutreachReply(payload = {}) {
+  if (payload?.approval?.approved !== true) {
+    throw new Error('arcigy.send_approved_outreach_reply requires explicit approval. Send {"approval":{"approved":true}} after user confirmation.');
+  }
+  const preparedEventId = String(payload?.preparedEventId ?? "").trim();
+  if (!preparedEventId) throw new Error("Prepared event id is required.");
+  const dbPath = payload?.dbPath || defaultDbPath;
+  const status = getPreparedReplyStatus({ dbPath, preparedEventId });
+  if (status.status === "sent") {
+    return {
+      status: "already_sent",
+      preparedReply: status.preparedReply,
+      sentEvent: status.sentEvent,
+      summary: `Jarvis: Odpoved pre ${status.preparedReply.leadEmail} uz bola odoslana.`,
+    };
+  }
+  if (status.status !== "approved") throw new Error("Prepared reply must be approved before sending.");
+  const replyText = String(status.preparedReply.replyText ?? "").trim();
+  if (!replyText) throw new Error("Prepared reply text is missing.");
+
+  const accountEnvKey = String(payload?.accountEnvKey ?? "").trim();
+  const accounts = listConfiguredGmailAccounts().filter((account) => !accountEnvKey || account.envKey === accountEnvKey);
+  if (!accounts.length) throw new Error(accountEnvKey ? `Configured Gmail account not found: ${accountEnvKey}` : "No configured Gmail accounts found.");
+
+  let lastError = "";
+  for (const account of accounts) {
+    try {
+      const subject = String(payload?.subject || status.preparedReply.subject || "Re: Arcigy");
+      const gmail = await sendGmailTextMessage(account, {
+        to: status.preparedReply.leadEmail,
+        subject,
+        text: replyText,
+        threadId: payload?.threadId || (typeof status.preparedReply.data?.threadId === "string" ? status.preparedReply.data.threadId : undefined),
+      });
+      const sentEvent = JSON.parse(
+        runPython([
+          "scripts/jarvis_local_db.py",
+          "add-cold-event",
+          "--db",
+          dbPath,
+          "--payload",
+          JSON.stringify({
+            leadEmail: status.preparedReply.leadEmail,
+            campaignId: status.preparedReply.campaignId,
+            campaignName: status.preparedReply.campaignName,
+            eventType: "approved_reply_sent",
+            occurredAt: payload?.occurredAt,
+            data: {
+              preparedEventId,
+              sentBy: payload?.sentBy || "operator",
+              account: account.label,
+              accountEnvKey: account.envKey,
+              gmailMessageId: gmail.id,
+              gmailThreadId: gmail.threadId,
+              subject,
+            },
+          }),
+        ]).stdout
+      );
+      const result = {
+        status: "sent",
+        preparedReply: status.preparedReply,
+        sentEvent,
+        gmail,
+        summary: `Jarvis: Odpoved pre ${status.preparedReply.leadEmail} bola odoslana cez Gmail.`,
+      };
+      addAuditEvent("arcigy.send_approved_outreach_reply", "sent", { preparedEventId, accountEnvKey, subject }, result, true);
+      return result;
+    } catch (error) {
+      lastError = redactSensitiveText(error instanceof Error ? error.message : String(error));
+      if (accountEnvKey) break;
+    }
+  }
+  throw new Error(lastError || "Gmail send failed.");
+}
+
+function getPreparedReplyStatus(payload = {}) {
+  const result = runPython([
+    "scripts/jarvis_local_db.py",
+    "get-prepared-reply",
+    "--db",
+    payload?.dbPath || defaultDbPath,
+    "--payload",
+    JSON.stringify({ preparedEventId: payload?.preparedEventId }),
+  ]);
+  return JSON.parse(result.stdout);
+}
+
 async function getOperatorBriefing(payload = {}) {
   const period = resolveColdOutreachPeriod(String(payload?.text ?? payload?.periodLabel ?? ""));
   const dbPath = payload?.dbPath || defaultDbPath;
@@ -2023,6 +2112,44 @@ async function gmailFetch(url, accessToken) {
   const response = await fetch(url, { headers: { authorization: `Bearer ${accessToken}` } });
   if (!response.ok) throw new Error(`Gmail request failed: ${response.status}`);
   return response.json();
+}
+
+async function gmailPost(url, accessToken, payload) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new Error(`Gmail request failed: ${response.status}`);
+  return response.json();
+}
+
+async function sendGmailTextMessage(account, input) {
+  const accessToken = await refreshGoogleAccessToken(account.refreshToken);
+  const payload = { raw: encodeGmailRawMessage(input) };
+  if (input.threadId) payload.threadId = input.threadId;
+  return gmailPost("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", accessToken, payload);
+}
+
+function encodeGmailRawMessage(input) {
+  const lines = [
+    `To: ${input.to}`,
+    `Subject: ${sanitizeHeader(String(input.subject || "Re: Arcigy"))}`,
+    "MIME-Version: 1.0",
+    'Content-Type: text/plain; charset="UTF-8"',
+    "Content-Transfer-Encoding: 8bit",
+    "",
+    input.text,
+  ];
+  return Buffer.from(lines.join("\r\n"), "utf-8")
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
+
+function sanitizeHeader(value) {
+  return value.replace(/[\r\n]+/g, " ").trim();
 }
 
 function parseFromHeader(header) {

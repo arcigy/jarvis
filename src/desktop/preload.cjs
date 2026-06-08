@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld("arcigyDesktop", {
   remoteMcpSmoke: (payload) => ipcRenderer.invoke("jarvis:remoteMcpSmoke", payload),
   getPreparedOutreachReplies: (payload) => ipcRenderer.invoke("jarvis:getPreparedOutreachReplies", payload),
   approvePreparedOutreachReply: (payload) => ipcRenderer.invoke("jarvis:approvePreparedOutreachReply", payload),
+  sendApprovedOutreachReply: (payload) => ipcRenderer.invoke("jarvis:sendApprovedOutreachReply", payload),
   identifyEmail: (payload) => ipcRenderer.invoke("jarvis:identifyEmail", payload),
   ingestClientMessage: (payload) => ipcRenderer.invoke("jarvis:ingestClientMessage", payload),
   getClientNeedAlerts: (payload) => ipcRenderer.invoke("jarvis:getClientNeedAlerts", payload),

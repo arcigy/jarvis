@@ -52,6 +52,7 @@ const elements = {
   coldBrief: document.querySelector("#coldBrief"),
   preparedReplies: document.querySelector("#preparedReplies"),
   approvePreparedReply: document.querySelector("#approvePreparedReply"),
+  sendApprovedReply: document.querySelector("#sendApprovedReply"),
   preparedReplyResult: document.querySelector("#preparedReplyResult"),
   memoryEmail: document.querySelector("#memoryEmail"),
   memorySubject: document.querySelector("#memorySubject"),
@@ -134,6 +135,7 @@ const arcigyApi = window.arcigyDesktop ?? {
   operatorBriefing: (payload) => postJson("/api/operator-briefing", payload),
   getPreparedOutreachReplies: (payload) => postJson("/api/prepared-outreach-replies", payload),
   approvePreparedOutreachReply: (payload) => postJson("/api/approve-prepared-outreach-reply", payload),
+  sendApprovedOutreachReply: (payload) => postJson("/api/mcp/arcigy.send_approved_outreach_reply", payload).then((value) => value.result),
   identifyEmail: (payload) => postJson("/api/identify-email", payload),
   ingestClientMessage: (payload) => postJson("/api/ingest-client-message", payload),
   getClientNeedAlerts: (payload) => postJson("/api/client-need-alerts", payload),
@@ -1217,6 +1219,33 @@ elements.approvePreparedReply.addEventListener("click", async () => {
       preparedEventId: first.id,
       approval: { approved: true },
       approvedBy: "operator",
+    });
+    elements.preparedReplyResult.textContent = result.summary;
+    speak(result.summary);
+    const refreshed = await arcigyApi.getPreparedOutreachReplies({ status: "pending", limit: 10 });
+    state.lastPreparedReplies = refreshed.replies ?? [];
+  } catch (error) {
+    elements.preparedReplyResult.textContent = safeUiErrorText(error);
+  }
+});
+elements.sendApprovedReply.addEventListener("click", async () => {
+  try {
+    if (!state.lastPreparedReplies.length) {
+      elements.preparedReplyResult.textContent = "Load prepared replies before sending.";
+      return;
+    }
+    const first = state.lastPreparedReplies[0];
+    const approved = window.confirm(`Send approved reply to ${first.leadEmail}${first.subject ? ` about ${first.subject}` : ""} through Gmail?`);
+    if (!approved) {
+      elements.preparedReplyResult.textContent = "Approved reply send cancelled before any Gmail call.";
+      return;
+    }
+    elements.preparedReplyResult.textContent = "Sending approved reply through Gmail...";
+    const result = await arcigyApi.sendApprovedOutreachReply({
+      preparedEventId: first.id,
+      subject: first.subject,
+      approval: { approved: true },
+      sentBy: "operator",
     });
     elements.preparedReplyResult.textContent = result.summary;
     speak(result.summary);
