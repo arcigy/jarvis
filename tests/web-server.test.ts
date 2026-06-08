@@ -754,6 +754,50 @@ test("local web bridge requires bearer auth on external hosts", async () => {
   }
 });
 
+test("local web bridge throttles repeated external auth failures", async () => {
+  const previousToken = process.env.JARVIS_WEB_TOKEN;
+  const previousLimit = process.env.JARVIS_AUTH_FAILURE_LIMIT;
+  const previousWindow = process.env.JARVIS_AUTH_FAILURE_WINDOW_MS;
+  process.env.JARVIS_WEB_TOKEN = "rate-limit-token";
+  process.env.JARVIS_AUTH_FAILURE_LIMIT = "2";
+  process.env.JARVIS_AUTH_FAILURE_WINDOW_MS = "60000";
+  const server = createLocalApiServer();
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  const baseUrl = `http://127.0.0.1:${address.port}`;
+  const externalHeaders = {
+    "x-forwarded-host": "rate-limit.example.ngrok-free.app",
+    "x-forwarded-for": "203.0.113.44",
+  };
+
+  try {
+    const first = await fetch(`${baseUrl}/api/system-health`, { headers: externalHeaders });
+    assert.equal(first.status, 401);
+    const second = await fetch(`${baseUrl}/api/system-health`, { headers: externalHeaders });
+    assert.equal(second.status, 401);
+    const third = await fetch(`${baseUrl}/api/system-health`, { headers: externalHeaders });
+    assert.equal(third.status, 429);
+    assert.equal(third.headers.get("retry-after"), "60");
+
+    const allowed = await fetch(`${baseUrl}/api/system-health`, {
+      headers: { ...externalHeaders, authorization: "Bearer rate-limit-token" },
+    });
+    assert.equal(allowed.status, 200);
+
+    const afterClear = await fetch(`${baseUrl}/api/system-health`, { headers: externalHeaders });
+    assert.equal(afterClear.status, 401);
+  } finally {
+    if (previousToken === undefined) delete process.env.JARVIS_WEB_TOKEN;
+    else process.env.JARVIS_WEB_TOKEN = previousToken;
+    if (previousLimit === undefined) delete process.env.JARVIS_AUTH_FAILURE_LIMIT;
+    else process.env.JARVIS_AUTH_FAILURE_LIMIT = previousLimit;
+    if (previousWindow === undefined) delete process.env.JARVIS_AUTH_FAILURE_WINDOW_MS;
+    else process.env.JARVIS_AUTH_FAILURE_WINDOW_MS = previousWindow;
+    await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
 test("local web bridge preflight reports tunnel readiness without leaking secrets", async () => {
   const previousToken = process.env.JARVIS_WEB_TOKEN;
   const previousApiSecret = process.env.API_SECRET_KEY;

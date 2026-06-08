@@ -24,7 +24,10 @@ const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
 const desktopRoot = join(repoRoot, "src", "desktop");
 const defaultDbPath = join(repoRoot, "data", "jarvis-local.db");
 const defaultMaxJsonBytes = 1_000_000;
+const defaultAuthFailureLimit = 20;
+const defaultAuthFailureWindowMs = 60_000;
 let webTunnelProcess: ChildProcess | null = null;
+const authFailureBuckets = new Map<string, { count: number; resetAt: number }>();
 
 loadLocalEnv(repoRoot);
 
@@ -55,11 +58,23 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
   }
 
   if (protectedBridgePath && !isApiAuthorized(request)) {
+    const throttle = registerAuthFailure(request);
+    if (throttle.throttled) {
+      writeJson(
+        response,
+        429,
+        { error: "Too many failed Jarvis web API auth attempts. Retry after the current window resets." },
+        { "retry-after": String(throttle.retryAfterSeconds) }
+      );
+      return;
+    }
     writeJson(response, 401, {
       error: "Jarvis web API is locked. Provide a bearer token using JARVIS_WEB_TOKEN or API_SECRET_KEY.",
     });
     return;
   }
+
+  if (protectedBridgePath) clearAuthFailures(request);
 
   if (request.method === "GET" && (url.pathname === "/api/mcp" || url.pathname === "/.well-known/arcigy-jarvis.json")) {
     writeJson(response, 200, buildWebBridgeManifest(request));
@@ -409,6 +424,39 @@ function getBearerToken(request: IncomingMessage): string | null {
   if (!header) return null;
   const match = /^Bearer\s+(.+)$/i.exec(Array.isArray(header) ? header[0] : header);
   return match?.[1]?.trim() || null;
+}
+
+function registerAuthFailure(request: IncomingMessage): { throttled: boolean; retryAfterSeconds: number } {
+  if (isLocalRequest(request)) return { throttled: false, retryAfterSeconds: 0 };
+  const key = authFailureKey(request);
+  const now = Date.now();
+  const windowMs = getAuthFailureWindowMs();
+  const resetAt = now + windowMs;
+  const current = authFailureBuckets.get(key);
+  const bucket = current && current.resetAt > now ? { count: current.count + 1, resetAt: current.resetAt } : { count: 1, resetAt };
+  authFailureBuckets.set(key, bucket);
+  const retryAfterSeconds = Math.max(1, Math.ceil((bucket.resetAt - now) / 1000));
+  return { throttled: bucket.count > getAuthFailureLimit(), retryAfterSeconds };
+}
+
+function clearAuthFailures(request: IncomingMessage) {
+  authFailureBuckets.delete(authFailureKey(request));
+}
+
+function authFailureKey(request: IncomingMessage): string {
+  const forwardedFor = getForwardedValue(request.headers["x-forwarded-for"]);
+  const remote = forwardedFor || request.socket.remoteAddress || "unknown";
+  return `${getRequestHost(request)}|${remote}`;
+}
+
+function getAuthFailureLimit(): number {
+  const value = Number(process.env.JARVIS_AUTH_FAILURE_LIMIT ?? defaultAuthFailureLimit);
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : defaultAuthFailureLimit;
+}
+
+function getAuthFailureWindowMs(): number {
+  const value = Number(process.env.JARVIS_AUTH_FAILURE_WINDOW_MS ?? defaultAuthFailureWindowMs);
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : defaultAuthFailureWindowMs;
 }
 
 function buildWebBridgeManifest(request: IncomingMessage) {
@@ -1359,10 +1407,11 @@ function writeNoContent(response: ServerResponse, statusCode: number) {
   response.end();
 }
 
-function writeJson(response: ServerResponse, statusCode: number, value: unknown) {
+function writeJson(response: ServerResponse, statusCode: number, value: unknown, headers: Record<string, string> = {}) {
   response.writeHead(statusCode, {
     ...jsonResponseHeaders(),
     "content-type": "application/json; charset=utf-8",
+    ...headers,
   });
   response.end(JSON.stringify(value));
 }
