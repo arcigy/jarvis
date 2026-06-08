@@ -431,6 +431,19 @@ test("Jarvis MCP server summarizes cold outreach from local SQLite events", asyn
   assert.equal(approvedBody.status, "approved");
   assert.equal(approvedBody.approvedEvent.eventType, "approved_reply_sent");
 
+  await client.callTool({
+    name: "arcigy.ingest_client_message",
+    arguments: {
+      dbPath,
+      fromEmail: "client@example.com",
+      displayName: "Client Contact",
+      source: "email",
+      subject: "Onboarding",
+      text: "Please update onboarding automation by Friday.",
+      occurredAt: "2026-06-07T12:00:00Z",
+    },
+  });
+
   const operatorBriefing = await client.callTool({
     name: "arcigy.get_operator_briefing",
     arguments: {
@@ -440,9 +453,11 @@ test("Jarvis MCP server summarizes cold outreach from local SQLite events", asyn
       periodLabel: "poslednych 7 dni",
     },
   });
-  const operatorBody = getStructuredResult(operatorBriefing) as { speechText: string; sections: { coldOutreach: string } };
+  const operatorBody = getStructuredResult(operatorBriefing) as { speechText: string; sections: { coldOutreach: string; clientNeeds: string } };
   assert.match(operatorBody.speechText, /Jarvis briefing/);
   assert.match(operatorBody.sections.coldOutreach, /Cold outreach/);
+  assert.match(operatorBody.sections.clientNeeds, /Client Contact/);
+  assert.match(operatorBody.sections.clientNeeds, /update onboarding automation/);
   assertToolError(
     await client.callTool({
       name: "arcigy.get_operator_briefing",

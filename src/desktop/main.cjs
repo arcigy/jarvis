@@ -1147,6 +1147,7 @@ async function getOperatorBriefing(payload = {}) {
     coldOutreachSummary,
     liveSyncSummary,
     openClientNeedCount: Number(clientNeeds.count || 0),
+    clientNeedHighlights: Array.isArray(clientNeeds.alerts) ? clientNeeds.alerts : [],
     preparedReplyCount,
     nextActions: readiness.nextActions || [],
   });
@@ -1187,15 +1188,13 @@ async function maybeSyncGmailForOperatorBriefing(payload, dbPath) {
 function buildOperatorBriefing(input) {
   const nextAction = input.nextActions?.[0] || "Ziadny urgentny krok.";
   const readinessAttention = summarizeReadinessAttention(input.readinessAttentionQueue || []);
+  const clientNeeds = summarizeClientNeeds(Number(input.openClientNeedCount || 0), input.clientNeedHighlights || []);
   const sections = {
     readiness: `Readiness: ${input.readinessStatus}. ${input.readinessSummary}`,
     readinessAttention,
     coldOutreach: `Cold outreach: ${input.coldOutreachSummary}`,
     liveSync: input.liveSyncSummary ? `Live sync: ${input.liveSyncSummary}` : undefined,
-    clientNeeds:
-      input.openClientNeedCount > 0
-        ? `Klientske poziadavky: ${input.openClientNeedCount} otvorenych.`
-        : "Klientske poziadavky: ziadne otvorene.",
+    clientNeeds,
     preparedReplies:
       input.preparedReplyCount > 0
         ? `Pripravene odpovede: ${input.preparedReplyCount} caka na schvalenie.`
@@ -1226,6 +1225,22 @@ function summarizeReadinessAttention(queue) {
     .map((item) => `${item.key}: ${item.title}`)
     .join("; ");
   return `Production attention queue: ${queue.length} item(s). ${topItems}.`;
+}
+
+function summarizeClientNeeds(count, highlights) {
+  if (count <= 0) return "Klientske poziadavky: ziadne otvorene.";
+  const topItems = highlights
+    .slice(0, 3)
+    .map((item) => {
+      const person = item.person || {};
+      const need = item.needSignal || {};
+      const name = person.displayName || person.companyName || person.primaryEmail || "neznamy kontakt";
+      const summary = need.summary || "bez detailu";
+      return `${name}: ${summary}`;
+    })
+    .filter(Boolean);
+  if (!topItems.length) return `Klientske poziadavky: ${count} otvorenych.`;
+  return `Klientske poziadavky: ${count} otvorenych. Najnovsie: ${topItems.join("; ")}.`;
 }
 
 function identifyEmail(payload) {

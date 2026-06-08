@@ -250,6 +250,12 @@ test("operator briefing combines readiness, outreach, client needs, and approval
     coldOutreachSummary: "Za dnes sme napisali 10 ludom.",
     liveSyncSummary: "Gmail checked 4 account(s), fetched 8 message(s), created 6 new record(s), skipped 2 duplicate(s), raised 2 alert(s).",
     openClientNeedCount: 2,
+    clientNeedHighlights: [
+      {
+        person: { primaryEmail: "client@example.com", displayName: "Demo Client", companyName: "Demo s.r.o." },
+        needSignal: { summary: "potrebuje upravit onboarding automatizaciu", occurredAt: "2026-06-08T09:00:00Z" },
+      },
+    ],
     preparedReplyCount: 1,
     nextActions: ["Replace REDIS_URL."],
   });
@@ -260,6 +266,7 @@ test("operator briefing combines readiness, outreach, client needs, and approval
   assert.match(briefing.speechText, /Cold outreach/);
   assert.match(briefing.speechText, /Live sync/);
   assert.match(briefing.speechText, /Klientske poziadavky: 2/);
+  assert.match(briefing.sections.clientNeeds, /Demo Client: potrebuje upravit onboarding automatizaciu/);
   assert.match(briefing.speechText, /Pripravene odpovede: 1/);
   assert.equal(briefing.sections.nextAction, "Najblizsi krok: Replace REDIS_URL.");
 });

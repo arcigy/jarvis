@@ -398,6 +398,16 @@ test("local web bridge serves UI and API health", async () => {
     const clientAlertsBody = (await clientAlerts.json()) as { count: number; alerts: Array<{ person: { primaryEmail: string } }> };
     assert.equal(clientAlertsBody.count, 1);
     assert.equal(clientAlertsBody.alerts[0].person.primaryEmail, "client@example.com");
+
+    const memoryOperatorBriefing = await fetch(`${baseUrl}/api/operator-briefing`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ dbPath, periodLabel: "poslednych 7 dni" }),
+    });
+    assert.equal(memoryOperatorBriefing.status, 200);
+    const memoryOperatorBriefingBody = (await memoryOperatorBriefing.json()) as { sections: { clientNeeds: string } };
+    assert.match(memoryOperatorBriefingBody.sections.clientNeeds, /client@example\.com/);
+    assert.match(memoryOperatorBriefingBody.sections.clientNeeds, /onboarding automatizaciu/);
   } finally {
     await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   }

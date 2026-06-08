@@ -11,6 +11,17 @@ export type OperatorBriefingInput = {
   coldOutreachSummary: string;
   liveSyncSummary?: string | null;
   openClientNeedCount: number;
+  clientNeedHighlights?: Array<{
+    person?: {
+      primaryEmail?: string | null;
+      displayName?: string | null;
+      companyName?: string | null;
+    } | null;
+    needSignal?: {
+      summary?: string | null;
+      occurredAt?: string | null;
+    } | null;
+  }>;
   preparedReplyCount: number;
   nextActions: string[];
 };
@@ -32,15 +43,13 @@ export type OperatorBriefing = {
 export function buildOperatorBriefing(input: OperatorBriefingInput): OperatorBriefing {
   const nextAction = input.nextActions[0] ?? "Ziadny urgentny krok.";
   const readinessAttention = summarizeReadinessAttention(input.readinessAttentionQueue ?? []);
+  const clientNeeds = summarizeClientNeeds(input.openClientNeedCount, input.clientNeedHighlights ?? []);
   const sections = {
     readiness: `Readiness: ${input.readinessStatus}. ${input.readinessSummary}`,
     readinessAttention,
     coldOutreach: `Cold outreach: ${input.coldOutreachSummary}`,
     liveSync: input.liveSyncSummary ? `Live sync: ${input.liveSyncSummary}` : undefined,
-    clientNeeds:
-      input.openClientNeedCount > 0
-        ? `Klientske poziadavky: ${input.openClientNeedCount} otvorenych.`
-        : "Klientske poziadavky: ziadne otvorene.",
+    clientNeeds,
     preparedReplies:
       input.preparedReplyCount > 0
         ? `Pripravene odpovede: ${input.preparedReplyCount} caka na schvalenie.`
@@ -71,4 +80,20 @@ function summarizeReadinessAttention(queue: NonNullable<OperatorBriefingInput["r
     .map((item) => `${item.key}: ${item.title}`)
     .join("; ");
   return `Production attention queue: ${queue.length} item(s). ${topItems}.`;
+}
+
+function summarizeClientNeeds(count: number, highlights: NonNullable<OperatorBriefingInput["clientNeedHighlights"]>): string {
+  if (count <= 0) return "Klientske poziadavky: ziadne otvorene.";
+  const topItems = highlights
+    .slice(0, 3)
+    .map((item) => {
+      const person = item.person ?? {};
+      const need = item.needSignal ?? {};
+      const name = person.displayName || person.companyName || person.primaryEmail || "neznamy kontakt";
+      const summary = need.summary || "bez detailu";
+      return `${name}: ${summary}`;
+    })
+    .filter(Boolean);
+  if (!topItems.length) return `Klientske poziadavky: ${count} otvorenych.`;
+  return `Klientske poziadavky: ${count} otvorenych. Najnovsie: ${topItems.join("; ")}.`;
 }

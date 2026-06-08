@@ -577,6 +577,7 @@ export function createJarvisMcpServer(): McpServer {
           coldOutreachSummary,
           liveSyncSummary,
           openClientNeedCount: Number(clientNeeds.count ?? 0),
+          clientNeedHighlights: Array.isArray(clientNeeds.alerts) ? clientNeeds.alerts : [],
           preparedReplyCount,
           nextActions: readiness.nextActions,
         })
