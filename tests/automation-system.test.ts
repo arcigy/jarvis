@@ -269,6 +269,37 @@ test("Gemini reply helper calls generateContent and extracts text", async () => 
   assert.match(calls[0].url, /generateContent/);
 });
 
+test("Gemini helper retries transient failures and falls back to the secondary model", async () => {
+  const calls: string[] = [];
+  const fetchImpl = async (url: string | URL | Request) => {
+    const target = String(url);
+    calls.push(target);
+    if (calls.length <= 3) {
+      return { ok: false, status: 503, json: async () => ({}) } as Response;
+    }
+    return responseJson({
+      candidates: [{ content: { parts: [{ text: "OK fallback" }] } }],
+    });
+  };
+
+  const result = await generateGeminiText(
+    { prompt: "Return OK.", temperature: 0 },
+    {
+      GEMINI_API_KEY: "gemini-key",
+      GEMINI_MAX_RETRIES: "1",
+      GEMINI_RETRY_BASE_MS: "0",
+      GEMINI_FALLBACK_MODEL: "gemini-fallback",
+    },
+    fetchImpl as typeof fetch
+  );
+
+  assert.equal(result.model, "gemini-fallback");
+  assert.equal(result.text, "OK fallback");
+  assert.equal(result.attempts, 4);
+  assert.equal(calls.filter((url) => url.includes("gemini-2.5-flash")).length, 2);
+  assert.equal(calls.filter((url) => url.includes("gemini-fallback")).length, 2);
+});
+
 test("Gmail helper refreshes OAuth token and normalizes message events", async () => {
   const fetchImpl = async (url: string | URL | Request) => {
     const target = String(url);

@@ -12,6 +12,7 @@ export type GeminiTextInput = {
 export type GeminiTextResult = {
   model: string;
   text: string;
+  attempts: number;
 };
 
 export type ClientReplyDraftInput = {
@@ -28,7 +29,30 @@ export async function generateGeminiText(
   fetchImpl: FetchLike = fetch
 ): Promise<GeminiTextResult> {
   const apiKey = requireEnv(env, "GEMINI_API_KEY");
-  const model = input.model ?? "gemini-2.5-flash";
+  const models = getGeminiModels(input, env);
+  const maxRetries = getPositiveInteger(env.GEMINI_MAX_RETRIES, 2);
+  const retryBaseMs = getPositiveInteger(env.GEMINI_RETRY_BASE_MS, 250);
+  let attempts = 0;
+  let lastError: Error | null = null;
+
+  for (const model of models) {
+    for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+      attempts += 1;
+      try {
+        const text = await requestGeminiText(input, apiKey, model, fetchImpl);
+        return { model, text, attempts };
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        if (!isRetryableGeminiError(lastError) || attempt === maxRetries) break;
+        await delay(retryBaseMs * 2 ** attempt);
+      }
+    }
+  }
+
+  throw lastError ?? new Error("Gemini request failed.");
+}
+
+async function requestGeminiText(input: GeminiTextInput, apiKey: string, model: string, fetchImpl: FetchLike): Promise<string> {
   const response = await fetchImpl(
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
     {
@@ -54,7 +78,9 @@ export async function generateGeminiText(
   );
 
   if (!response.ok) {
-    throw new Error(`Gemini request failed: ${response.status}`);
+    const error = new Error(`Gemini request failed for ${model}: ${response.status}`);
+    (error as Error & { status?: number }).status = response.status;
+    throw error;
   }
 
   const data = (await response.json()) as {
@@ -64,7 +90,28 @@ export async function generateGeminiText(
   if (!text) {
     throw new Error("Gemini returned an empty response.");
   }
-  return { model, text };
+  return text;
+}
+
+function getGeminiModels(input: GeminiTextInput, env: RuntimeEnv): string[] {
+  const primary = input.model ?? env.GEMINI_MODEL ?? "gemini-2.5-flash";
+  const fallback = env.GEMINI_FALLBACK_MODEL ?? "gemini-2.0-flash";
+  return [primary, fallback].filter((model, index, models) => model && models.indexOf(model) === index);
+}
+
+function getPositiveInteger(value: string | undefined, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+function isRetryableGeminiError(error: Error): boolean {
+  const status = (error as Error & { status?: unknown }).status;
+  return typeof status === "number" && [429, 500, 502, 503, 504].includes(status);
+}
+
+function delay(ms: number): Promise<void> {
+  if (ms <= 0) return Promise.resolve();
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export function buildClientReplyPrompt(input: ClientReplyDraftInput): GeminiTextInput {

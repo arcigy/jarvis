@@ -90,13 +90,16 @@ Copy `.env.example` to `.env.local` and fill runtime values there. `.env.local`,
 Live integrations are runtime-only:
 
 - Gemini: `GEMINI_API_KEY`
+- Gemini resilience: optional `GEMINI_MODEL`, `GEMINI_FALLBACK_MODEL`, `GEMINI_MAX_RETRIES`, and `GEMINI_RETRY_BASE_MS`
 - Gmail: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and the `GMAIL_REFRESH_TOKEN_*` values
 - Smartlead: `SMARTLEAD_API_KEY`
 - local app storage: `DATABASE_URL`, `REDIS_URL`, `data\jarvis-local.db`
 - lead discovery: `SERPER_API_KEY`, `GOOGLE_MAPS_API_KEY`
 - lead export: `GOOGLE_SHEET_ID` plus a Google OAuth refresh token with Sheets access
 
-Do not leave placeholder URL credentials such as `PASSWORD`, `changeme`, or `dummy` in `DATABASE_URL` or `REDIS_URL`; runtime health reports them as not configured. If `npm run doctor -- --live-integrations` reports Serper credits exhausted after key `2/2`, replace or top up at least one Serper key.
+Do not leave placeholder URL credentials such as `PASSWORD`, `changeme`, or `dummy` in `DATABASE_URL`. Redis is currently a non-blocking advisory because shipped Jarvis workflows use SQLite/local APIs for state; replace `REDIS_URL` before adding a Redis-backed queue or cache. If `npm run doctor -- --live-integrations` reports Serper credits exhausted after key `2/2`, replace or top up at least one Serper key.
+
+Gemini calls retry transient `429`, `500`, `502`, `503`, and `504` responses before trying `GEMINI_FALLBACK_MODEL`. Auth, quota, and invalid request errors still surface as live-readiness blockers.
 
 Use `arcigy.get_production_readiness` or `POST /api/production-readiness` for a secret-safe status report. It returns blockers, next actions, and a `fixGuide` with env key names and validation commands, never the secret values.
 

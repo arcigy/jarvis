@@ -629,10 +629,8 @@ function cleanVoiceQuery(text, removeWords) {
 }
 
 async function generateAiReply(payload) {
-  const apiKey = requireRuntimeEnv("GEMINI_API_KEY");
   const message = String(payload?.message ?? "").trim();
   if (!message) throw new Error("Client message is required.");
-  const model = payload?.model || "gemini-2.5-flash";
   const prompt = [
     "Si Arcigy Jarvis. Priprav profesionalnu, vecnu a family-friendly odpoved klientovi.",
     "Nikdy neslubuj odoslanie bez schvalenia pouzivatelom.",
@@ -645,24 +643,11 @@ async function generateAiReply(payload) {
     .filter(Boolean)
     .join("\n");
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
-    {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.35 },
-      }),
-    }
-  );
-  if (!response.ok) {
-    throw new Error(`Gemini request failed: ${response.status}`);
-  }
-  const data = await response.json();
-  const text = data?.candidates?.[0]?.content?.parts?.map((part) => part.text || "").join("").trim();
-  if (!text) throw new Error("Gemini returned an empty response.");
-  return { model, text };
+  return generateGeminiText({
+    prompt,
+    model: payload?.model,
+    temperature: 0.35,
+  });
 }
 
 function getColdOutreachBrief(payload) {
@@ -1192,8 +1177,6 @@ async function draftContractIntake(payload) {
 }
 
 async function generateGeminiTextForContract(input) {
-  const apiKey = requireRuntimeEnv("GEMINI_API_KEY");
-  const model = "gemini-2.5-flash";
   const prompt = [
     "Create a filled Arcigy contract intake JSON object from this business brief.",
     "Keep Arcigy/provider details unchanged when present in the base intake.",
@@ -1205,29 +1188,85 @@ async function generateGeminiTextForContract(input) {
     "Business brief:",
     input.brief,
   ].join("\n");
+  return generateGeminiText({
+    prompt,
+    model: "gemini-2.5-flash",
+    temperature: 0.2,
+    systemInstruction: "You are Arcigy Jarvis. Return only valid JSON for the Arcigy contract intake schema.",
+  });
+}
+
+async function generateGeminiText(input) {
+  const apiKey = requireRuntimeEnv("GEMINI_API_KEY");
+  const models = getGeminiModels(input);
+  const maxRetries = getPositiveInteger(process.env.GEMINI_MAX_RETRIES, 2);
+  const retryBaseMs = getPositiveInteger(process.env.GEMINI_RETRY_BASE_MS, 250);
+  let attempts = 0;
+  let lastError = null;
+
+  for (const model of models) {
+    for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+      attempts += 1;
+      try {
+        const text = await requestGeminiText(input, apiKey, model);
+        return { model, text, attempts };
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        if (!isRetryableGeminiError(lastError) || attempt === maxRetries) break;
+        await delay(retryBaseMs * 2 ** attempt);
+      }
+    }
+  }
+
+  throw lastError || new Error("Gemini request failed.");
+}
+
+async function requestGeminiText(input, apiKey, model) {
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
     {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        systemInstruction: {
-          parts: [
-            {
-              text: "You are Arcigy Jarvis. Return only valid JSON for the Arcigy contract intake schema.",
-            },
-          ],
-        },
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.2 },
+        systemInstruction: input.systemInstruction
+          ? {
+              parts: [{ text: input.systemInstruction }],
+            }
+          : undefined,
+        contents: [{ role: "user", parts: [{ text: input.prompt }] }],
+        generationConfig: { temperature: input.temperature ?? 0.35 },
       }),
     }
   );
-  if (!response.ok) throw new Error(`Gemini request failed: ${response.status}`);
+  if (!response.ok) {
+    const error = new Error(`Gemini request failed for ${model}: ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
   const data = await response.json();
   const text = data?.candidates?.[0]?.content?.parts?.map((part) => part.text || "").join("").trim();
   if (!text) throw new Error("Gemini returned an empty response.");
-  return { model, text };
+  return text;
+}
+
+function getGeminiModels(input) {
+  const primary = input.model || process.env.GEMINI_MODEL || "gemini-2.5-flash";
+  const fallback = process.env.GEMINI_FALLBACK_MODEL || "gemini-2.0-flash";
+  return [primary, fallback].filter((model, index, models) => model && models.indexOf(model) === index);
+}
+
+function getPositiveInteger(value, fallback) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+function isRetryableGeminiError(error) {
+  return typeof error.status === "number" && [429, 500, 502, 503, 504].includes(error.status);
+}
+
+function delay(ms) {
+  if (ms <= 0) return Promise.resolve();
+  return new Promise((resolveDelay) => setTimeout(resolveDelay, ms));
 }
 
 function parseJsonObject(text) {
