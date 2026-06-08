@@ -4,7 +4,7 @@ import { connect as connectTls } from "node:tls";
 
 import { getEnv, getIntegrationHealth, type RuntimeEnv } from "./env.ts";
 import { generateGeminiText, type FetchLike } from "./gemini.ts";
-import { listConfiguredGmailAccounts, refreshGoogleAccessToken } from "./gmail.ts";
+import { defaultGmailBriefingQuery, listConfiguredGmailAccounts, listRecentGmailMessageEvents, refreshGoogleAccessToken } from "./gmail.ts";
 import { searchGooglePlaces, searchSerper } from "./lead-discovery.ts";
 import { getSmartleadCampaignStatus } from "./smartlead.ts";
 
@@ -108,8 +108,8 @@ async function checkGemini(env: RuntimeEnv, fetchImpl: FetchLike) {
 async function checkGmail(env: RuntimeEnv, fetchImpl: FetchLike) {
   const accounts = listConfiguredGmailAccounts(env);
   if (!accounts.length) throw new Error("No configured Gmail accounts found.");
-  await Promise.all(accounts.map((account) => refreshGoogleAccessToken(account.refreshToken, env, fetchImpl)));
-  return `OAuth refresh succeeded for ${accounts.length} Gmail account(s).`;
+  await Promise.all(accounts.map((account) => listRecentGmailMessageEvents(account, { query: defaultGmailBriefingQuery, maxResults: 1 }, env, fetchImpl)));
+  return `Gmail API read check succeeded for ${accounts.length} account(s).`;
 }
 
 async function checkSmartlead(env: RuntimeEnv, fetchImpl: FetchLike) {

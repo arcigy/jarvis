@@ -987,6 +987,7 @@ test("integration diagnostics run live read-only checks with mocked providers", 
       return responseJson({ candidates: [{ content: { parts: [{ text: "OK" }] } }] });
     }
     if (target.includes("oauth2.googleapis.com")) return responseJson({ access_token: "access-token" });
+    if (target.includes("gmail.googleapis.com")) return responseJson({ messages: [] });
     if (target.includes("server.smartlead.ai")) return responseJson([{ id: 1, name: "Campaign" }]);
     if (target.includes("places.googleapis.com")) return responseJson({ places: [] });
     if (target.includes("google.serper.dev")) return responseJson({ organic: [] });
@@ -1029,6 +1030,8 @@ test("integration diagnostics run live read-only checks with mocked providers", 
     assert.equal(result.checks.find((check) => check.key === "postgres")?.status, "ready");
     assert.equal(result.checks.find((check) => check.key === "redis")?.status, "ready");
     assert.equal(result.checks.find((check) => check.key === "serper")?.status, "ready");
+    assert.match(result.checks.find((check) => check.key === "gmail")?.message ?? "", /Gmail API read check/);
+    assert.ok(calls.some((url) => url.includes("gmail.googleapis.com/gmail/v1/users/me/messages")));
     assert.ok(calls.some((url) => url.includes("sheets.googleapis.com")));
   } finally {
     await postgres.close();
@@ -1062,6 +1065,7 @@ test("production readiness treats Serper exhaustion as advisory when other lead 
       return responseJson({ candidates: [{ content: { parts: [{ text: "OK" }] } }] });
     }
     if (target.includes("oauth2.googleapis.com")) return responseJson({ access_token: "access-token" });
+    if (target.includes("gmail.googleapis.com")) return responseJson({ messages: [] });
     if (target.includes("server.smartlead.ai")) return responseJson([{ id: 1, name: "Campaign" }]);
     if (target.includes("places.googleapis.com")) return responseJson({ places: [] });
     if (target.includes("google.serper.dev")) {

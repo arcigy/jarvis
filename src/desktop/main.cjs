@@ -267,8 +267,8 @@ async function runDiagnostics(payload) {
       updateDiagnosticCheck(checks, "gmail", async () => {
         const accounts = listConfiguredGmailAccounts();
         if (!accounts.length) throw new Error("No configured Gmail accounts found.");
-        await Promise.all(accounts.map((account) => refreshGoogleAccessToken(account.refreshToken)));
-        return `OAuth refresh succeeded for ${accounts.length} Gmail account(s).`;
+        await Promise.all(accounts.map((account) => listRecentGmailMessageEvents(account, { query: defaultGmailBriefingQuery, maxResults: 1 })));
+        return `Gmail API read check succeeded for ${accounts.length} account(s).`;
       }),
       updateDiagnosticCheck(checks, "smartlead", async () => {
         const result = await getSmartleadCampaignStatus({});
