@@ -28,6 +28,7 @@ import {
 } from "../src/automation-system/jarvis-voice.ts";
 import { buildProductionReadinessReport } from "../src/automation-system/production-readiness.ts";
 import { buildOperatorBriefing } from "../src/automation-system/operator-briefing.ts";
+import { runRemoteMcpSmoke } from "../src/automation-system/remote-mcp-smoke.ts";
 
 test("MCP tools expose the requested automation surface", () => {
   const names = listJarvisMcpTools().map((tool) => tool.name);
@@ -80,6 +81,60 @@ test("production readiness report returns blockers and next actions without secr
   assert.ok(report.fixGuide.some((step) => step.id === "redis-real-password" && step.envKeys.includes("REDIS_URL")));
   assert.ok(report.fixGuide.every((step) => step.validationCommand.includes("doctor")));
   assert.equal(JSON.stringify(report).includes("PASSWORD"), false);
+});
+
+test("remote MCP smoke checks every response for bearer token leaks", async () => {
+  const token = "smoke-secret-token";
+  const tools = listJarvisMcpTools().map((tool) => ({ name: tool.name }));
+  const fetchImpl = async (target: string | URL, init?: RequestInit) => {
+    const url = String(target);
+    if (url.endsWith("/.well-known/arcigy-jarvis.json")) {
+      return responseJson({
+        tools,
+        auth: { header: "Authorization: Bearer <JARVIS_WEB_TOKEN>" },
+        toolPolicy: {
+          localStateWrite: ["arcigy.sync_gmail_recent_messages"],
+          readOnlyOrDraft: ["arcigy.generate_ai_reply"],
+        },
+      });
+    }
+    if (url.includes("/api/remote-mcp-pack")) {
+      return responseJson({
+        auth: { tokenValueReturned: false },
+        tools: {
+          localStateWrite: ["arcigy.sync_gmail_recent_messages"],
+          readOnlyOrDraft: ["arcigy.generate_ai_reply"],
+        },
+        quickStartCalls: [
+          {
+            tool: "arcigy.generate_contract_documents",
+            approvalRequired: true,
+            body: {
+              approval: { approved: true },
+              intake: {
+                client: { businessName: "Demo", email: "demo@example.com" },
+                project: { includedModules: ["Portal"] },
+                pricing: { monthlyFee: 100 },
+              },
+            },
+          },
+        ],
+      });
+    }
+    if (url.endsWith("/api/mcp/arcigy.get_system_health")) {
+      assert.equal((init?.headers as Record<string, string>).authorization, `Bearer ${token}`);
+      return responseJson({ result: { integrations: [] } });
+    }
+    if (url.endsWith("/api/mcp/arcigy.generate_contract_documents")) {
+      return responseJson({ error: `token leaked ${token}` }, 409);
+    }
+    return responseJson({ error: "unexpected URL" }, 404);
+  };
+
+  const report = await runRemoteMcpSmoke({ baseUrl: "https://jarvis.example", bearerToken: token, fetchImpl: fetchImpl as typeof fetch });
+
+  assert.equal(report.status, "blocked");
+  assert.ok(report.checks.some((check) => check.key === "secret-redaction" && check.status === "blocked"));
 });
 
 test("production readiness treats unused Redis as non-blocking advisory", async () => {
@@ -1183,10 +1238,10 @@ function runPythonJson(python: string, args: string[]) {
   return JSON.parse(result.stdout);
 }
 
-function responseJson(value: unknown): Response {
+function responseJson(value: unknown, status = 200): Response {
   return {
-    ok: true,
-    status: 200,
+    ok: status >= 200 && status < 300,
+    status,
     json: async () => value,
   } as Response;
 }

@@ -69,7 +69,7 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
   const approvalGate = await postJson(fetchImpl, `${baseUrl}/api/mcp/arcigy.generate_contract_documents`, { intake: {} }, input.bearerToken);
   checks.push(check(approvalGate.status === 409, "approval-gate", "Approval-required write tool rejected an unapproved call."));
 
-  const leakedToken = input.bearerToken ? JSON.stringify({ manifest: manifest.body, pack: pack.body, health: health.body }).includes(input.bearerToken) : false;
+  const leakedToken = input.bearerToken ? JSON.stringify({ manifest: manifest.body, pack: pack.body, health: health.body, approvalGate: approvalGate.body }).includes(input.bearerToken) : false;
   checks.push(check(!leakedToken, "secret-redaction", "Smoke responses did not echo the bearer token."));
 
   const status: RemoteMcpSmokeStatus = checks.every((item) => item.status === "ready") ? "ready" : "blocked";
