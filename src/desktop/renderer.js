@@ -110,6 +110,7 @@ const elements = {
   mcpToolListStatus: document.querySelector("#mcpToolListStatus"),
   mcpToolList: document.querySelector("#mcpToolList"),
   remoteAgentPrompt: document.querySelector("#remoteAgentPrompt"),
+  startSecureTunnel: document.querySelector("#startSecureTunnel"),
   copyTunnelCommand: document.querySelector("#copyTunnelCommand"),
   copyClaudePrompt: document.querySelector("#copyClaudePrompt"),
   copyChatGptPrompt: document.querySelector("#copyChatGptPrompt"),
@@ -152,6 +153,7 @@ const arcigyApi = window.arcigyDesktop ?? {
   productionReadiness: (payload) => postJson("/api/production-readiness", payload),
   notifyOperator: async () => ({ delivered: false }),
   operatorBriefing: (payload) => postJson("/api/operator-briefing", payload),
+  startSecureTunnel: async () => ({ started: false, reason: "desktop-only" }),
   getPreparedOutreachReplies: (payload) => postJson("/api/prepared-outreach-replies", payload),
   preparePositiveOutreachReply: (payload) => postJson("/api/mcp/arcigy.prepare_positive_outreach_reply", payload).then((value) => value.result),
   approvePreparedOutreachReply: (payload) => postJson("/api/approve-prepared-outreach-reply", payload),
@@ -1668,6 +1670,29 @@ elements.copyGrokPrompt.addEventListener("click", async () => {
 elements.copyTunnelCommand.addEventListener("click", async () => {
   try {
     await copyTunnelCommand();
+  } catch (error) {
+    elements.remoteAgentPrompt.textContent = safeUiErrorText(error);
+  }
+});
+elements.startSecureTunnel.addEventListener("click", async () => {
+  try {
+    const confirmed = window.confirm(`Start a secure Jarvis MCP tunnel for remote agents? Keep the tunnel log private because it can contain a one-time bearer token.`);
+    if (!confirmed) {
+      elements.remoteAgentPrompt.textContent = "Secure tunnel launch cancelled.";
+      return;
+    }
+    elements.remoteAgentPrompt.textContent = "Starting secure Jarvis MCP tunnel...";
+    const result = await arcigyApi.startSecureTunnel();
+    const status = result.alreadyRunning ? "Secure tunnel is already running." : result.started ? "Secure tunnel launch requested." : "Secure tunnel was not started.";
+    elements.remoteAgentPrompt.textContent = [
+      status,
+      `Command: ${result.command ?? "npm run web:tunnel:secure"}`,
+      result.pid ? `Process id: ${result.pid}` : null,
+      result.logPath ? `Log: ${result.logPath}` : null,
+      "After the tunnel prints ready, run smoke before giving the MCP pack to Claude, ChatGPT, or Grok.",
+    ]
+      .filter(Boolean)
+      .join("\n");
   } catch (error) {
     elements.remoteAgentPrompt.textContent = safeUiErrorText(error);
   }

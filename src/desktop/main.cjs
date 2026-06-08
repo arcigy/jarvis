@@ -1,5 +1,5 @@
 ﻿const { app, BrowserWindow, ipcMain, shell, Tray, Menu, nativeImage, Notification } = require("electron");
-const { spawnSync } = require("node:child_process");
+const { spawn, spawnSync } = require("node:child_process");
 const fs = require("node:fs");
 const net = require("node:net");
 const path = require("node:path");
@@ -7,6 +7,7 @@ const tls = require("node:tls");
 
 let mainWindow;
 let tray;
+let tunnelProcess = null;
 const repoRoot = path.resolve(__dirname, "..", "..");
 const defaultDbPath = path.join(repoRoot, "data", "jarvis-local.db");
 const defaultGmailSyncQuery = "in:inbox newer_than:7d";
@@ -46,6 +47,52 @@ function createTray() {
   );
 }
 
+function startSecureTunnel() {
+  if (tunnelProcess && tunnelProcess.exitCode === null && !tunnelProcess.killed) {
+    return {
+      started: false,
+      alreadyRunning: true,
+      pid: tunnelProcess.pid,
+      command: "npm run web:tunnel:secure",
+      logPath: path.join(repoRoot, "generated", "jarvis-secure-tunnel.log"),
+    };
+  }
+
+  const logDir = path.join(repoRoot, "generated");
+  fs.mkdirSync(logDir, { recursive: true });
+  const logPath = path.join(logDir, "jarvis-secure-tunnel.log");
+  fs.appendFileSync(logPath, `\n[${new Date().toISOString()}] Starting npm run web:tunnel:secure\n`, "utf-8");
+  const outputFd = fs.openSync(logPath, "a");
+  const errorFd = fs.openSync(logPath, "a");
+  const command = process.platform === "win32" ? "npm.cmd" : "npm";
+  const child = spawn(command, ["run", "web:tunnel:secure"], {
+    cwd: repoRoot,
+    detached: true,
+    env: { ...process.env },
+    stdio: ["ignore", outputFd, errorFd],
+    windowsHide: true,
+  });
+  fs.closeSync(outputFd);
+  fs.closeSync(errorFd);
+  child.unref();
+  tunnelProcess = child;
+  child.once("error", (error) => {
+    fs.appendFileSync(logPath, `[${new Date().toISOString()}] Tunnel launch failed: ${redactSensitiveText(error.message)}\n`, "utf-8");
+    if (tunnelProcess === child) tunnelProcess = null;
+  });
+  child.once("exit", () => {
+    if (tunnelProcess === child) tunnelProcess = null;
+  });
+
+  return {
+    started: true,
+    alreadyRunning: false,
+    pid: child.pid,
+    command: "npm run web:tunnel:secure",
+    logPath,
+  };
+}
+
 app.whenReady().then(() => {
   ipcMain.handle("app:version", () => app.getVersion());
   ipcMain.handle("app:openPath", (_event, targetPath) => shell.openPath(targetPath));
@@ -57,6 +104,7 @@ app.whenReady().then(() => {
   ipcMain.handle("jarvis:notifyOperator", (_event, payload) => showOperatorNotification(payload));
   ipcMain.handle("jarvis:operatorBriefing", (_event, payload) => getOperatorBriefing(payload));
   ipcMain.handle("jarvis:webBridgePreflight", () => getWebBridgePreflight());
+  ipcMain.handle("jarvis:startSecureTunnel", () => startSecureTunnel());
   ipcMain.handle("jarvis:remoteMcpPack", (_event, payload) => getRemoteMcpPack(payload));
   ipcMain.handle("jarvis:remoteMcpSmoke", (_event, payload) => runRemoteMcpSmoke(payload));
   ipcMain.handle("jarvis:getPreparedOutreachReplies", (_event, payload) => getPreparedOutreachReplies(payload));
