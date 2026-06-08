@@ -794,7 +794,7 @@ function renderRemoteMcpPack(pack) {
   elements.handoffProofGates.textContent = "smoke not run";
   elements.handoffProofGates.dataset.state = "attention";
   renderMcpToolList(pack);
-  elements.remoteAgentPrompt.textContent = buildRemoteAgentPrompt(pack);
+  elements.remoteAgentPrompt.textContent = buildRemoteAgentPrompt(pack, state.lastRemoteMcpSmoke);
 }
 
 function renderMcpToolList(pack) {
@@ -820,7 +820,8 @@ function renderMcpToolList(pack) {
   }
 }
 
-function buildRemoteAgentPrompt(pack) {
+function buildRemoteAgentPrompt(pack, smokeReport = null) {
+  const handoffStatus = buildCopiedHandoffStatus(smokeReport);
   const approvalTools = pack.tools?.approvalRequired ?? [];
   const localWriteTools = pack.tools?.localStateWrite ?? [];
   const proof = (pack.handoff?.requiredProof ?? [])
@@ -837,6 +838,8 @@ function buildRemoteAgentPrompt(pack) {
     .map((call) => `- ${call.label}: ${call.method} ${call.url} approvalRequired=${call.approvalRequired} body=${JSON.stringify(call.body)}`)
     .join("\n");
   return [
+    handoffStatus.text,
+    "",
     "Arcigy Jarvis remote MCP connection pack",
     `Manifest: ${pack.manifestUrl}`,
     `Connection pack: ${pack.handoff?.connectionPackUrl ?? `${pack.baseUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`}`,
@@ -868,6 +871,7 @@ function renderRemoteMcpSmoke(report) {
   const proof = summarizeRemoteProofGates(report);
   elements.handoffProofGates.textContent = proof.text;
   elements.handoffProofGates.dataset.state = proof.ready ? "ready" : "attention";
+  if (state.lastRemoteMcpPack) elements.remoteAgentPrompt.textContent = buildRemoteAgentPrompt(state.lastRemoteMcpPack, report);
   elements.remoteSmokeResult.textContent = [
     report.summary ?? `Remote MCP smoke: ${report.status}`,
     "",
@@ -891,9 +895,7 @@ async function copyRemotePack() {
   }
   const handoffStatus = buildCopiedHandoffStatus(state.lastRemoteMcpSmoke);
   const payload = [
-    handoffStatus.text,
-    "",
-    buildRemoteAgentPrompt(state.lastRemoteMcpPack),
+    buildRemoteAgentPrompt(state.lastRemoteMcpPack, state.lastRemoteMcpSmoke),
     "",
     JSON.stringify(
       {

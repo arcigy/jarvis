@@ -153,6 +153,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /buildCopiedHandoffStatus/);
   assert.match(renderer, /HANDOFF STATUS: BLOCKED/);
   assert.match(renderer, /HANDOFF STATUS: READY/);
+  assert.match(renderer, /buildRemoteAgentPrompt\(pack, state\.lastRemoteMcpSmoke\)/);
+  assert.match(renderer, /buildRemoteAgentPrompt\(state\.lastRemoteMcpPack, report\)/);
+  assert.match(renderer, /buildRemoteAgentPrompt\(state\.lastRemoteMcpPack, state\.lastRemoteMcpSmoke\)/);
   assert.match(renderer, /handoffStatus,/);
   assert.match(renderer, /Local memory writes:/);
   assert.match(renderer, /preview Gmail with dryRun: true first/);
