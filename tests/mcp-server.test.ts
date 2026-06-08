@@ -109,7 +109,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
     fixGuide: unknown[];
     attentionQueue: unknown[];
     launchChecklist: Array<{ id: string; status: string }>;
-    launchEvidence: { mode: string; proofGates: Array<{ id: string; validationCommand: string }>; remoteHandoff: { tunnelCommand: string } };
+    launchEvidence: { mode: string; proofGates: Array<{ id: string; validationCommand: string }>; remoteHandoff: { tunnelCommand: string; requiredBeforeExternalAgent: string[] } };
   };
   assert.ok(["ready", "attention", "blocked"].includes(readiness.status));
   assert.equal(readiness.mcp.toolCount, listJarvisMcpTools().length);
@@ -120,6 +120,8 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.equal(readiness.launchEvidence.mode, "production-launch-evidence");
   assert.ok(readiness.launchEvidence.proofGates.some((gate) => gate.id === "approval-locks" && gate.validationCommand === "npm test"));
   assert.equal(readiness.launchEvidence.remoteHandoff.tunnelCommand, "npm run web:tunnel:secure");
+  assert.ok(readiness.launchEvidence.remoteHandoff.requiredBeforeExternalAgent.some((step) => step.includes("/.well-known/ai-plugin.json") && step.includes("/api/openapi.json")));
+  assert.ok(readiness.launchEvidence.remoteHandoff.requiredBeforeExternalAgent.some((step) => step.includes("cors-preflight") && step.includes("secret-redaction")));
   assertToolError(
     await client.callTool({
       name: "arcigy.get_production_readiness",

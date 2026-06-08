@@ -106,6 +106,8 @@ test("production readiness report returns blockers and next actions without secr
   assert.equal(report.launchEvidence.decision, "blocked");
   assert.ok(report.launchEvidence.proofGates.some((gate) => gate.id === "approval-locks" && gate.validationCommand === "npm test"));
   assert.match(report.launchEvidence.remoteHandoff.smokeCommand, /remote:mcp:smoke/);
+  assert.ok(report.launchEvidence.remoteHandoff.requiredBeforeExternalAgent.some((step) => step.includes("/.well-known/ai-plugin.json") && step.includes("/api/openapi.json")));
+  assert.ok(report.launchEvidence.remoteHandoff.requiredBeforeExternalAgent.some((step) => step.includes("cors-preflight") && step.includes("secret-redaction")));
   assert.equal(JSON.stringify(report).includes("PASSWORD"), false);
 });
 

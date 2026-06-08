@@ -330,7 +330,7 @@ test("local web bridge serves UI and API health", async () => {
       fixGuide: unknown[];
       attentionQueue: unknown[];
       launchChecklist: Array<{ id: string; status: string }>;
-      launchEvidence: { mode: string; proofGates: Array<{ id: string; validationCommand: string }>; remoteHandoff: { tunnelCommand: string } };
+      launchEvidence: { mode: string; proofGates: Array<{ id: string; validationCommand: string }>; remoteHandoff: { tunnelCommand: string; requiredBeforeExternalAgent: string[] } };
     };
     assert.ok(["ready", "attention", "blocked"].includes(readinessBody.status));
     assert.equal(readinessBody.mcp.toolCount, listJarvisMcpTools().length);
@@ -341,6 +341,8 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(readinessBody.launchEvidence.mode, "production-launch-evidence");
     assert.ok(readinessBody.launchEvidence.proofGates.some((gate) => gate.id === "mcp-registry" && gate.validationCommand === "npm test"));
     assert.equal(readinessBody.launchEvidence.remoteHandoff.tunnelCommand, "npm run web:tunnel:secure");
+    assert.ok(readinessBody.launchEvidence.remoteHandoff.requiredBeforeExternalAgent.some((step) => step.includes("/.well-known/ai-plugin.json") && step.includes("/api/openapi.json")));
+    assert.ok(readinessBody.launchEvidence.remoteHandoff.requiredBeforeExternalAgent.some((step) => step.includes("cors-preflight") && step.includes("secret-redaction")));
 
     const mcpReadiness = await postJson(`${baseUrl}/api/mcp/arcigy.get_production_readiness`, { live: false });
     assert.equal(mcpReadiness.result.mcp.toolCount, listJarvisMcpTools().length);
@@ -348,6 +350,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(Array.isArray(mcpReadiness.result.attentionQueue));
     assert.ok(mcpReadiness.result.launchChecklist.some((item: { id: string }) => item.id === "mcp-registry"));
     assert.ok(mcpReadiness.result.launchEvidence.proofGates.some((gate: { id: string }) => gate.id === "approval-locks"));
+    assert.ok(mcpReadiness.result.launchEvidence.remoteHandoff.requiredBeforeExternalAgent.some((step: string) => step.includes("action-manifest") || step.includes("/.well-known/ai-plugin.json")));
 
     const actionManifest = await fetch(`${baseUrl}/.well-known/ai-plugin.json`);
     assert.equal(actionManifest.status, 200);
