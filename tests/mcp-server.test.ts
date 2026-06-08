@@ -138,7 +138,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
     handoff: { connectionPackUrl: string; requiredProof: Array<{ key: string; url: string; expected: string }>; agentFirstSteps: string[] };
     agentCompatibility: { supportedAgents: string[]; safetyRules: string[]; requiredBeforeWork: string[] };
     agentPromptTemplates: { claude: string; chatgpt: string; grok: string; generic: string };
-    tunnel: { secureCommand: string };
+    tunnel: { secureCommand: string; statusUrl: string; startUrl: string; stopUrl: string; browserStartRequiresStrongToken: boolean };
   };
   assert.equal(pack.manifestUrl, "https://jarvis.example.ngrok-free.app/.well-known/arcigy-jarvis.json");
   assert.equal(pack.smokeTestUrl, "https://jarvis.example.ngrok-free.app/api/remote-mcp-smoke");
@@ -163,6 +163,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_audit_events" && call.approvalRequired === false && call.body.limit === 20));
   assert.equal(pack.handoff.connectionPackUrl, "https://jarvis.example.ngrok-free.app/api/remote-mcp-pack?includeReadiness=true&live=true");
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.url.endsWith("/api/remote-mcp-smoke")));
+  assert.ok(pack.handoff.requiredProof.some((item) => item.key === "secure-tunnel-status" && item.url.endsWith("/api/secure-tunnel-status")));
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "connection-pack" && item.expected.includes("repo-only limits")));
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("pack-limits")));
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("approval-shape-gate")));
@@ -192,6 +193,10 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(contractIntake?.pricing);
   assert.doesNotMatch(JSON.stringify(contractQuickStart?.body), /dopln|todo|tbd|xxx|\?\?\?/i);
   assert.equal(pack.tunnel.secureCommand, "npm run web:tunnel:secure");
+  assert.equal(pack.tunnel.statusUrl, "https://jarvis.example.ngrok-free.app/api/secure-tunnel-status");
+  assert.equal(pack.tunnel.startUrl, "https://jarvis.example.ngrok-free.app/api/start-secure-tunnel");
+  assert.equal(pack.tunnel.stopUrl, "https://jarvis.example.ngrok-free.app/api/stop-secure-tunnel");
+  assert.equal(pack.tunnel.browserStartRequiresStrongToken, true);
   assertToolError(
     await client.callTool({
       name: "arcigy.get_remote_mcp_pack",

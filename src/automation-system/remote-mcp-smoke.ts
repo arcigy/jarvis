@@ -72,6 +72,13 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
   );
   checks.push(
     check(
+      hasTunnelControls(pack.body?.tunnel, baseUrl),
+      "pack-tunnel-controls",
+      "Connection pack exposes secure tunnel status/start/stop URLs with browser token requirements."
+    )
+  );
+  checks.push(
+    check(
       hasExactToolPolicy(pack.body?.tools),
       "pack-local-write-policy",
       "Connection pack exposes exact approval, local-write, and read-only/draft tool policy."
@@ -160,7 +167,7 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
     baseUrl,
     summary:
       status === "ready"
-        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, manifest metadata, local write policy, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
+        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, manifest metadata, local write policy, tunnel controls, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((item) => item.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -216,6 +223,28 @@ function hasGuardedPackLimits(value: unknown): boolean {
     limits.maxJsonBytes > 0 &&
     limits.pathPolicy === "repo-only" &&
     limits.writesRequireExplicitToolCall === true
+  );
+}
+
+function hasTunnelControls(value: unknown, baseUrl: string): boolean {
+  if (!value || typeof value !== "object") return false;
+  const tunnel = value as {
+    provider?: unknown;
+    secureCommand?: unknown;
+    standardCommand?: unknown;
+    statusUrl?: unknown;
+    startUrl?: unknown;
+    stopUrl?: unknown;
+    browserStartRequiresStrongToken?: unknown;
+  };
+  return (
+    tunnel.provider === "ngrok" &&
+    tunnel.secureCommand === "npm run web:tunnel:secure" &&
+    tunnel.standardCommand === "npm run web:tunnel" &&
+    tunnel.statusUrl === `${baseUrl}/api/secure-tunnel-status` &&
+    tunnel.startUrl === `${baseUrl}/api/start-secure-tunnel` &&
+    tunnel.stopUrl === `${baseUrl}/api/stop-secure-tunnel` &&
+    tunnel.browserStartRequiresStrongToken === true
   );
 }
 
@@ -357,6 +386,7 @@ function hasHandoffProof(value: unknown, baseUrl: string): boolean {
   return (
     proofKeys.has("manifest") &&
     proofKeys.has("connection-pack") &&
+    proofKeys.has("secure-tunnel-status") &&
     proofKeys.has("remote-smoke") &&
     agentFirstSteps.some((step) => typeof step === "string" && step.includes("arcigy.get_operator_briefing")) &&
     agentFirstSteps.some((step) => typeof step === "string" && step.includes("status=ready"))

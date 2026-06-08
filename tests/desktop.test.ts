@@ -320,6 +320,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /approvalLockCount/);
   assert.match(renderer, /liveBlockerCount/);
   assert.match(renderer, /Tunnel command/);
+  assert.match(renderer, /Tunnel status:/);
+  assert.match(renderer, /Browser tunnel start:/);
+  assert.match(renderer, /Browser tunnel stop:/);
   assert.match(renderer, /Tool call pattern/);
   assert.match(renderer, /Connection pack:/);
   assert.match(renderer, /Limits: pathPolicy=\$\{pack\.limits\.pathPolicy\}/);
@@ -556,6 +559,12 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /at least 32 characters/);
   assert.match(main, /tunnelCommand: "npm run web:tunnel"/);
   assert.match(main, /tunnelProvider: "ngrok"/);
+  assert.match(main, /statusUrl: `\$\{baseUrl\}\/api\/secure-tunnel-status`/);
+  assert.match(main, /startUrl: `\$\{baseUrl\}\/api\/start-secure-tunnel`/);
+  assert.match(main, /stopUrl: `\$\{baseUrl\}\/api\/stop-secure-tunnel`/);
+  assert.match(main, /browserStartRequiresStrongToken: true/);
+  assert.match(main, /pack-tunnel-controls/);
+  assert.match(main, /tunnel controls/);
   assert.match(main, /getRuntimeEnvIssue/);
   assert.match(main, /hasPlaceholderUrlCredential/);
   assert.match(main, /buildReadinessFixGuide/);

@@ -750,6 +750,10 @@ async function getRemoteMcpPack(payload = {}) {
       provider: "ngrok",
       secureCommand: "npm run web:tunnel:secure",
       standardCommand: "npm run web:tunnel",
+      statusUrl: `${baseUrl}/api/secure-tunnel-status`,
+      startUrl: `${baseUrl}/api/start-secure-tunnel`,
+      stopUrl: `${baseUrl}/api/stop-secure-tunnel`,
+      browserStartRequiresStrongToken: true,
     },
     handoff: buildRemoteMcpHandoffRunbook(baseUrl),
     tools: {
@@ -788,6 +792,7 @@ async function getRemoteMcpPack(payload = {}) {
       "Run the smokeTestUrl before handoff and require ready checks for pack-limits, approval-gate, approval-shape-gate, and secret-redaction.",
       "Call MCP tools with POST JSON to mcpToolCallPattern.",
       "Use the bearer auth header placeholder; the real token must be supplied by the operator and is never returned by this pack.",
+      "Use tunnel.statusUrl to inspect public tunnel URLs from the redacted secure-tunnel log. Browser-launched tunnel start requires a strong JARVIS_WEB_TOKEN.",
       "Treat generate_contract_documents, approve_prepared_outreach_reply, send_approved_outreach_reply, update_client_need_status, and append_leads_to_google_sheet as approval-gated actions.",
       "Treat localStateWrite tools as local memory writes. Prefer dryRun: true for sync_gmail_recent_messages before ingesting messages.",
       "Use get_operator_briefing for a Jarvis-style daily status before making recommendations.",
@@ -818,6 +823,7 @@ function buildRemoteMcpAgentCompatibility() {
       "Fetch manifestUrl.",
       "Fetch handoff.connectionPackUrl and confirm tokenValueReturned=false plus repo-only limits.",
       "Run smokeTestUrl and require status=ready with pack-limits, approval-gate, approval-shape-gate, and secret-redaction ready.",
+      "Inspect tunnel.statusUrl after any tunnel start and never ask for the real bearer token.",
     ],
     safetyRules: [
       "Never request, print, store, or infer the real bearer token from this pack.",
@@ -834,6 +840,7 @@ function buildRemoteMcpHandoffRunbook(baseUrl) {
     connectionPackUrl: `${baseUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`,
     operatorChecklist: [
       "Run npm run web:tunnel:secure and keep the process open while the remote agent works.",
+      "If using browser mode, configure a strong JARVIS_WEB_TOKEN first, then use Start tunnel or POST /api/start-secure-tunnel.",
       "Give the remote agent the external manifest, connection pack, smoke test URL, MCP base URL, and bearer auth header placeholder.",
       "Approve approvalRequired tools only after reviewing the exact payload the agent will send.",
       "Run the smoke test again after any tunnel restart because ngrok URLs can change.",
@@ -841,6 +848,7 @@ function buildRemoteMcpHandoffRunbook(baseUrl) {
     agentFirstSteps: [
       "Fetch connectionPackUrl with Authorization: Bearer <JARVIS_WEB_TOKEN>.",
       "Run smokeTestUrl and require status=ready with pack-limits, approval-gate, approval-shape-gate, and secret-redaction ready before using MCP tools.",
+      "Fetch tunnel.statusUrl if the operator needs the current public tunnel URLs; token values must remain redacted.",
       "Call arcigy.get_operator_briefing before proposing work.",
       "Use read-only or draft tools first; use dryRun: true before Gmail sync writes.",
       "Never call approvalRequired tools until the operator confirms the exact action.",
@@ -855,6 +863,11 @@ function buildRemoteMcpHandoffRunbook(baseUrl) {
         key: "connection-pack",
         url: `${baseUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`,
         expected: "HTTP 200, tokenValueReturned=false, repo-only limits, bounded JSON, explicit write tool calls, handoff runbook present.",
+      },
+      {
+        key: "secure-tunnel-status",
+        url: `${baseUrl}/api/secure-tunnel-status`,
+        expected: "HTTP 200, redacted log tail, public MCP URLs when a tunnel is ready, and no bearer token value.",
       },
       {
         key: "remote-smoke",
@@ -1121,6 +1134,13 @@ async function runRemoteMcpSmoke(payload = {}) {
   );
   checks.push(
     smokeCheck(
+      hasTunnelControls(pack.body?.tunnel, baseUrl),
+      "pack-tunnel-controls",
+      "Connection pack exposes secure tunnel status/start/stop URLs with browser token requirements."
+    )
+  );
+  checks.push(
+    smokeCheck(
       hasExactToolPolicy(pack.body?.tools),
       "pack-local-write-policy",
       "Connection pack exposes exact approval, local-write, and read-only/draft tool policy."
@@ -1205,7 +1225,7 @@ async function runRemoteMcpSmoke(payload = {}) {
     baseUrl,
     summary:
       status === "ready"
-        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, manifest metadata, local write policy, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
+        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, manifest metadata, local write policy, tunnel controls, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((check) => check.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -1268,6 +1288,19 @@ function hasGuardedPackLimits(value) {
     value.maxJsonBytes > 0 &&
     value.pathPolicy === "repo-only" &&
     value.writesRequireExplicitToolCall === true
+  );
+}
+
+function hasTunnelControls(value, baseUrl) {
+  if (!value || typeof value !== "object") return false;
+  return (
+    value.provider === "ngrok" &&
+    value.secureCommand === "npm run web:tunnel:secure" &&
+    value.standardCommand === "npm run web:tunnel" &&
+    value.statusUrl === `${baseUrl}/api/secure-tunnel-status` &&
+    value.startUrl === `${baseUrl}/api/start-secure-tunnel` &&
+    value.stopUrl === `${baseUrl}/api/stop-secure-tunnel` &&
+    value.browserStartRequiresStrongToken === true
   );
 }
 
@@ -1380,6 +1413,7 @@ function hasHandoffProof(value, baseUrl) {
   return (
     proofKeys.has("manifest") &&
     proofKeys.has("connection-pack") &&
+    proofKeys.has("secure-tunnel-status") &&
     proofKeys.has("remote-smoke") &&
     agentFirstSteps.some((step) => typeof step === "string" && step.includes("arcigy.get_operator_briefing")) &&
     agentFirstSteps.some((step) => typeof step === "string" && step.includes("status=ready"))

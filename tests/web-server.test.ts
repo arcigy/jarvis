@@ -357,7 +357,7 @@ test("local web bridge serves UI and API health", async () => {
       handoff: { connectionPackUrl: string; requiredProof: Array<{ key: string; url: string; expected: string }>; agentFirstSteps: string[] };
       agentCompatibility: { supportedAgents: string[]; safetyRules: string[]; requiredBeforeWork: string[] };
       agentPromptTemplates: { claude: string; chatgpt: string; grok: string; generic: string };
-      tunnel: { secureCommand: string };
+      tunnel: { secureCommand: string; statusUrl: string; startUrl: string; stopUrl: string; browserStartRequiresStrongToken: boolean };
     };
     assert.match(remotePackBody.manifestUrl, /\/\.well-known\/arcigy-jarvis\.json$/);
     assert.match(remotePackBody.smokeTestUrl, /\/api\/remote-mcp-smoke$/);
@@ -371,6 +371,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(remotePackBody.tools.count, listJarvisMcpTools().length);
     assert.match(remotePackBody.handoff.connectionPackUrl, /\/api\/remote-mcp-pack\?includeReadiness=true&live=true$/);
     assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "connection-pack" && item.url.includes("includeReadiness=true")));
+    assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "secure-tunnel-status" && item.url.endsWith("/api/secure-tunnel-status")));
     assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "connection-pack" && item.expected.includes("repo-only limits")));
     assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("pack-limits")));
     assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("approval-shape-gate")));
@@ -411,6 +412,10 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(contractIntake?.pricing);
     assert.doesNotMatch(JSON.stringify(contractQuickStart?.body), /dopln|todo|tbd|xxx|\?\?\?/i);
     assert.equal(remotePackBody.tunnel.secureCommand, "npm run web:tunnel:secure");
+    assert.match(remotePackBody.tunnel.statusUrl, /\/api\/secure-tunnel-status$/);
+    assert.match(remotePackBody.tunnel.startUrl, /\/api\/start-secure-tunnel$/);
+    assert.match(remotePackBody.tunnel.stopUrl, /\/api\/stop-secure-tunnel$/);
+    assert.equal(remotePackBody.tunnel.browserStartRequiresStrongToken, true);
 
     const mcpRemotePack = await postJson(`${baseUrl}/api/mcp/arcigy.get_remote_mcp_pack`, { includeReadiness: false });
     assert.equal(mcpRemotePack.result.tools.count, listJarvisMcpTools().length);

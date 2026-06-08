@@ -1120,6 +1120,9 @@ function buildRemoteAgentPrompt(pack, smokeReport = null) {
     supportedAgents ? `Supported agents: ${supportedAgents}` : "",
     compatibility?.protocol ? `Protocol: ${compatibility.protocol}` : "",
     `Secure tunnel: ${pack.tunnel?.secureCommand ?? "npm run web:tunnel:secure"}`,
+    pack.tunnel?.statusUrl ? `Tunnel status: ${pack.tunnel.statusUrl}` : "",
+    pack.tunnel?.startUrl ? `Browser tunnel start: ${pack.tunnel.startUrl}` : "",
+    pack.tunnel?.stopUrl ? `Browser tunnel stop: ${pack.tunnel.stopUrl}` : "",
     `Smoke test: ${pack.smokeTestUrl ?? "--"}`,
     proof ? `Required proof:\n${proof}` : "",
     agentFirstSteps ? `Agent first steps:\n${agentFirstSteps}` : "",
@@ -1214,6 +1217,7 @@ async function copyAgentPrompt(agentKey, agentLabel, button) {
     `Manifest: ${pack.manifestUrl}`,
     `Connection pack: ${pack.handoff?.connectionPackUrl ?? `${pack.baseUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`}`,
     `Smoke test: ${pack.smokeTestUrl}`,
+    pack.tunnel?.statusUrl ? `Tunnel status: ${pack.tunnel.statusUrl}` : "",
     `Tool call pattern: ${pack.mcpToolCallPattern}`,
     `Auth header: ${pack.auth?.header ?? "Authorization: Bearer <JARVIS_WEB_TOKEN>"}`,
   ].join("\n");

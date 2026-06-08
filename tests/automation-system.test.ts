@@ -798,6 +798,11 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("status=ready")));
   assert.ok(pack.agentCompatibility.safetyRules.some((rule) => rule.includes("family-friendly")));
   assert.ok(pack.agentCompatibility.safetyRules.some((rule) => rule.includes("approvalRequired")));
+  assert.equal(pack.tunnel.statusUrl, "https://jarvis.example/api/secure-tunnel-status");
+  assert.equal(pack.tunnel.startUrl, "https://jarvis.example/api/start-secure-tunnel");
+  assert.equal(pack.tunnel.stopUrl, "https://jarvis.example/api/stop-secure-tunnel");
+  assert.equal(pack.tunnel.browserStartRequiresStrongToken, true);
+  assert.ok(pack.handoff.requiredProof.some((item) => item.key === "secure-tunnel-status"));
   assert.match(pack.agentPromptTemplates.grok, /xAI-compatible agents/);
   assert.match(pack.agentPromptTemplates.grok, /remote smoke/);
   assert.match(pack.agentPromptTemplates.chatgpt, /POST https:\/\/jarvis\.example\/api\/mcp\/\{toolName\}/);
