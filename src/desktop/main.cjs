@@ -2031,7 +2031,7 @@ async function searchSerperLeads(query, maxResults) {
       body: JSON.stringify({ q: query, num: maxResults, gl: "sk", hl: "sk" }),
     });
     if (response.ok) return response.json();
-    const body = await response.text().catch(() => "");
+    const body = redactSensitiveText(await response.text().catch(() => ""));
     lastError = body ? `Serper request failed: ${response.status} - ${body}` : `Serper request failed: ${response.status}`;
     if (!/not enough credits/i.test(body) && ![401, 403, 429].includes(response.status)) throw new Error(lastError);
   }

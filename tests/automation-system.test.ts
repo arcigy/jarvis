@@ -1189,11 +1189,13 @@ test("Serper search falls back to the secondary API key when credits are exhaust
 });
 
 test("Serper search reports exhausted fallback attempts without leaking keys", async () => {
+  const googleKey = "AI" + "za" + "S" + "y" + "E".repeat(32);
+  const providerKey = ["aaaaaaaa", "bbbb", "cccc", "dddd", "eeeeeeeeeeee"].join("-") + "_ehpdn6s";
   const fetchImpl = async () =>
     ({
       ok: false,
       status: 400,
-      text: async () => JSON.stringify({ message: "Not enough credits" }),
+      text: async () => JSON.stringify({ message: "Not enough credits", googleKey, providerKey }),
     }) as Response;
 
   await assert.rejects(
@@ -1209,6 +1211,10 @@ test("Serper search reports exhausted fallback attempts without leaking keys", a
       assert.match(message, /Not enough credits/);
       assert.equal(message.includes("spent-key"), false);
       assert.equal(message.includes("fallback-key"), false);
+      assert.equal(message.includes(googleKey), false);
+      assert.equal(message.includes(providerKey), false);
+      assert.match(message, /\[redacted-google-api-key\]/);
+      assert.match(message, /\[redacted-provider-key\]/);
       return true;
     }
   );

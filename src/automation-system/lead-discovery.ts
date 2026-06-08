@@ -1,6 +1,7 @@
 import { getEnv, requireEnv, type RuntimeEnv } from "./env.ts";
 import { listConfiguredGmailAccounts, refreshGoogleAccessToken } from "./gmail.ts";
 import type { FetchLike } from "./gemini.ts";
+import { redactSensitiveText } from "./ai-safety.ts";
 
 export type SerperSearchInput = {
   query: string;
@@ -69,7 +70,7 @@ export async function searchSerper(
     if (response.ok) {
       return response.json();
     }
-    const body = await response.text().catch(() => "");
+    const body = redactSensitiveText(await response.text().catch(() => ""));
     lastError = body
       ? `Serper request failed after key ${index + 1}/${apiKeys.length}: ${response.status} - ${body}`
       : `Serper request failed after key ${index + 1}/${apiKeys.length}: ${response.status}`;
