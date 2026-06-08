@@ -361,7 +361,7 @@ export function createJarvisMcpServer(): McpServer {
     },
     async ({ email, dbPath, people, needSignals }) => {
       if (dbPath) {
-        const result = runPython(["scripts/jarvis_local_db.py", "identify", "--db", dbPath, "--email", email]);
+        const result = runPython(["scripts/jarvis_local_db.py", "identify", "--db", resolveRepoPath(dbPath, "", "dbPath"), "--email", email]);
         return jsonResult(JSON.parse(result.stdout));
       }
 
@@ -876,7 +876,7 @@ function runDbCommand(
 ) {
   const args = ["scripts/jarvis_local_db.py", command, "--payload", JSON.stringify(payload)];
   if (dbPath) {
-    args.push("--db", dbPath);
+    args.push("--db", resolveRepoPath(dbPath, "", "dbPath"));
   }
   const result = runPython(args);
   return JSON.parse(result.stdout);

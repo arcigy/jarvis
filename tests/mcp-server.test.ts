@@ -141,10 +141,22 @@ test("Jarvis MCP server persists and identifies local people through SQLite tool
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   const server = createJarvisMcpServer();
   const client = new Client({ name: "test-client", version: "0.1.0" });
-  const dbPath = join(mkdtempSync(join(tmpdir(), "jarvis-mcp-db-")), "jarvis.db");
+  const dbPath = join(makeRepoTempDir("jarvis-mcp-db-"), "jarvis.db");
 
   await server.connect(serverTransport);
   await client.connect(clientTransport);
+
+  assertToolError(
+    await client.callTool({
+      name: "arcigy.upsert_local_person",
+      arguments: {
+        dbPath: join(tmpdir(), "outside-jarvis-mcp-db.sqlite"),
+        kind: "client",
+        primaryEmail: "outside@example.com",
+      },
+    }),
+    /dbPath must stay inside the Jarvis repository/
+  );
 
   const upsert = await client.callTool({
     name: "arcigy.upsert_local_person",
@@ -265,7 +277,7 @@ test("Jarvis MCP server ingests client messages and returns a need alert", async
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   const server = createJarvisMcpServer();
   const client = new Client({ name: "test-client", version: "0.1.0" });
-  const dbPath = join(mkdtempSync(join(tmpdir(), "jarvis-mcp-message-")), "jarvis.db");
+  const dbPath = join(makeRepoTempDir("jarvis-mcp-message-"), "jarvis.db");
 
   await server.connect(serverTransport);
   await client.connect(clientTransport);
@@ -310,7 +322,7 @@ test("Jarvis MCP server summarizes cold outreach from local SQLite events", asyn
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   const server = createJarvisMcpServer();
   const client = new Client({ name: "test-client", version: "0.1.0" });
-  const dbPath = join(mkdtempSync(join(tmpdir(), "jarvis-mcp-cold-")), "jarvis.db");
+  const dbPath = join(makeRepoTempDir("jarvis-mcp-cold-"), "jarvis.db");
 
   await server.connect(serverTransport);
   await client.connect(clientTransport);
