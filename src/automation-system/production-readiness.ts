@@ -28,6 +28,7 @@ export type ProductionReadinessReport = {
   blockers: ReadinessBlocker[];
   attentionQueue: ReadinessAttentionItem[];
   launchChecklist: ReadinessLaunchChecklistItem[];
+  launchEvidence: ReadinessLaunchEvidence;
   nextActions: string[];
   fixGuide: ReadinessFixStep[];
   diagnostics?: DiagnosticsResult;
@@ -66,6 +67,26 @@ export type ReadinessLaunchChecklistItem = {
   nextAction: string;
 };
 
+export type ReadinessLaunchEvidence = {
+  mode: "production-launch-evidence";
+  decision: "ready_for_operator_handoff" | "needs_attention" | "blocked";
+  generatedAt: string;
+  secretPolicy: string;
+  proofGates: Array<{
+    id: string;
+    title: string;
+    status: ReadinessStatus;
+    proof: string;
+    validationCommand: string;
+  }>;
+  remoteHandoff: {
+    requiredBeforeExternalAgent: string[];
+    smokeCommand: string;
+    tunnelCommand: string;
+  };
+  operatorNextAction: string;
+};
+
 export async function buildProductionReadinessReport(
   input: ProductionReadinessInput = {},
   env: RuntimeEnv = process.env,
@@ -83,6 +104,8 @@ export async function buildProductionReadinessReport(
   const status: ReadinessStatus = blockingCount ? "blocked" : uniqueBlockers.length ? "attention" : "ready";
   const readyIntegrations = health.filter((item) => item.configured).length;
   const fixGuide = buildFixGuide(uniqueBlockers);
+  const launchChecklist = buildLaunchChecklist(health, tools, uniqueBlockers, diagnostics);
+  const nextActions = uniqueBlockers.length ? uniqueBlockers.map((blocker) => blocker.nextAction) : ["No action needed. Keep secrets out of git and run doctor before changes."];
 
   return {
     status,
@@ -99,10 +122,46 @@ export async function buildProductionReadinessReport(
     },
     blockers: uniqueBlockers,
     attentionQueue: buildAttentionQueue(uniqueBlockers, fixGuide),
-    launchChecklist: buildLaunchChecklist(health, tools, uniqueBlockers, diagnostics),
-    nextActions: uniqueBlockers.length ? uniqueBlockers.map((blocker) => blocker.nextAction) : ["No action needed. Keep secrets out of git and run doctor before changes."],
+    launchChecklist,
+    launchEvidence: buildLaunchEvidence(status, launchChecklist, nextActions),
+    nextActions,
     fixGuide,
     diagnostics,
+  };
+}
+
+function buildLaunchEvidence(
+  status: ReadinessStatus,
+  launchChecklist: ReadinessLaunchChecklistItem[],
+  nextActions: string[]
+): ReadinessLaunchEvidence {
+  const gateCommand = (id: string) => {
+    if (id === "mcp-registry" || id === "approval-locks") return "npm test";
+    if (id === "live-diagnostics" || id === "required-integrations") return "npm run doctor -- --live-integrations";
+    return "npm run verify:production";
+  };
+  return {
+    mode: "production-launch-evidence",
+    decision: status === "ready" ? "ready_for_operator_handoff" : status === "blocked" ? "blocked" : "needs_attention",
+    generatedAt: new Date().toISOString(),
+    secretPolicy: "Secret-safe: reports only configuration state, placeholders, counts, commands, URLs with placeholders, and redacted diagnostic messages.",
+    proofGates: launchChecklist.map((item) => ({
+      id: item.id,
+      title: item.title,
+      status: item.status,
+      proof: item.proof,
+      validationCommand: gateCommand(item.id),
+    })),
+    remoteHandoff: {
+      requiredBeforeExternalAgent: [
+        "Run npm run web:tunnel:secure or use the browser Start tunnel button with a strong JARVIS_WEB_TOKEN.",
+        "Fetch /.well-known/arcigy-jarvis.json and /api/remote-mcp-pack?includeReadiness=true&live=true through the external URL.",
+        "Run /api/remote-mcp-smoke and require status=ready before any remote agent uses write-capable tools.",
+      ],
+      smokeCommand: "npm run remote:mcp:smoke -- --url <external-url>",
+      tunnelCommand: "npm run web:tunnel:secure",
+    },
+    operatorNextAction: nextActions[0] ?? "No action needed.",
   };
 }
 

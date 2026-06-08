@@ -109,6 +109,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
     fixGuide: unknown[];
     attentionQueue: unknown[];
     launchChecklist: Array<{ id: string; status: string }>;
+    launchEvidence: { mode: string; proofGates: Array<{ id: string; validationCommand: string }>; remoteHandoff: { tunnelCommand: string } };
   };
   assert.ok(["ready", "attention", "blocked"].includes(readiness.status));
   assert.equal(readiness.mcp.toolCount, listJarvisMcpTools().length);
@@ -116,6 +117,9 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(Array.isArray(readiness.fixGuide));
   assert.ok(Array.isArray(readiness.attentionQueue));
   assert.ok(readiness.launchChecklist.some((item) => item.id === "mcp-registry" && item.status === "ready"));
+  assert.equal(readiness.launchEvidence.mode, "production-launch-evidence");
+  assert.ok(readiness.launchEvidence.proofGates.some((gate) => gate.id === "approval-locks" && gate.validationCommand === "npm test"));
+  assert.equal(readiness.launchEvidence.remoteHandoff.tunnelCommand, "npm run web:tunnel:secure");
   assertToolError(
     await client.callTool({
       name: "arcigy.get_production_readiness",

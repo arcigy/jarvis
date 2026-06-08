@@ -443,6 +443,8 @@ function renderReadinessReport(report) {
   const blockers = report.blockers ?? [];
   const attentionQueue = report.attentionQueue ?? [];
   const launchChecklist = report.launchChecklist ?? [];
+  const launchEvidence = report.launchEvidence ?? null;
+  const proofGates = launchEvidence?.proofGates ?? [];
   return [
     report.summary ?? `Status: ${report.status}`,
     `Status: ${report.status}`,
@@ -452,6 +454,16 @@ function renderReadinessReport(report) {
     "",
     launchChecklist.length ? "Launch checklist:" : "Launch checklist: not loaded",
     ...launchChecklist.map((item) => [`- [${item.status}] ${item.title}`, `  Proof: ${item.proof}`, `  Next: ${item.nextAction}`].join("\n")),
+    "",
+    launchEvidence ? `Launch evidence: ${launchEvidence.decision}` : "Launch evidence: not loaded",
+    ...proofGates.map((gate) => [`- [${gate.status}] ${gate.title}`, `  Proof: ${gate.proof}`, `  Validate: ${gate.validationCommand}`].join("\n")),
+    launchEvidence?.remoteHandoff
+      ? [
+          `Remote handoff: ${launchEvidence.remoteHandoff.tunnelCommand}`,
+          `Smoke: ${launchEvidence.remoteHandoff.smokeCommand}`,
+          `Next: ${launchEvidence.operatorNextAction}`,
+        ].join("\n")
+      : null,
     "",
     blockers.length ? "Blockers:" : "Blockers: none",
     ...blockers.map((blocker) => `- ${blocker.key}: ${blocker.message}`),

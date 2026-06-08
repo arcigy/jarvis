@@ -328,6 +328,7 @@ test("local web bridge serves UI and API health", async () => {
       fixGuide: unknown[];
       attentionQueue: unknown[];
       launchChecklist: Array<{ id: string; status: string }>;
+      launchEvidence: { mode: string; proofGates: Array<{ id: string; validationCommand: string }>; remoteHandoff: { tunnelCommand: string } };
     };
     assert.ok(["ready", "attention", "blocked"].includes(readinessBody.status));
     assert.equal(readinessBody.mcp.toolCount, listJarvisMcpTools().length);
@@ -335,12 +336,16 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(Array.isArray(readinessBody.fixGuide));
     assert.ok(Array.isArray(readinessBody.attentionQueue));
     assert.ok(readinessBody.launchChecklist.some((item) => item.id === "approval-locks" && item.status === "ready"));
+    assert.equal(readinessBody.launchEvidence.mode, "production-launch-evidence");
+    assert.ok(readinessBody.launchEvidence.proofGates.some((gate) => gate.id === "mcp-registry" && gate.validationCommand === "npm test"));
+    assert.equal(readinessBody.launchEvidence.remoteHandoff.tunnelCommand, "npm run web:tunnel:secure");
 
     const mcpReadiness = await postJson(`${baseUrl}/api/mcp/arcigy.get_production_readiness`, { live: false });
     assert.equal(mcpReadiness.result.mcp.toolCount, listJarvisMcpTools().length);
     assert.ok(Array.isArray(mcpReadiness.result.fixGuide));
     assert.ok(Array.isArray(mcpReadiness.result.attentionQueue));
     assert.ok(mcpReadiness.result.launchChecklist.some((item: { id: string }) => item.id === "mcp-registry"));
+    assert.ok(mcpReadiness.result.launchEvidence.proofGates.some((gate: { id: string }) => gate.id === "approval-locks"));
 
     const remotePack = await fetch(`${baseUrl}/api/remote-mcp-pack?includeReadiness=false`);
     assert.equal(remotePack.status, 200);

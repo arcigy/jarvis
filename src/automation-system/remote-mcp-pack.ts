@@ -96,6 +96,7 @@ export type RemoteMcpConnectionPack = {
     blockers: ProductionReadinessReport["blockers"];
     attentionQueue: ProductionReadinessReport["attentionQueue"];
     launchChecklist: ProductionReadinessReport["launchChecklist"];
+    launchEvidence: ProductionReadinessReport["launchEvidence"];
     nextActions: string[];
     fixGuide: ProductionReadinessReport["fixGuide"];
   };
@@ -169,6 +170,7 @@ export async function buildRemoteMcpConnectionPack(
           blockers: readiness.blockers,
           attentionQueue: readiness.attentionQueue,
           launchChecklist: readiness.launchChecklist,
+          launchEvidence: readiness.launchEvidence,
           nextActions: readiness.nextActions,
           fixGuide: readiness.fixGuide,
         }

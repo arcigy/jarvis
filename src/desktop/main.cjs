@@ -483,6 +483,10 @@ async function getProductionReadiness(payload) {
   const status = blocking ? "blocked" : uniqueBlockers.length ? "attention" : "ready";
   const warnings = uniqueBlockers.length - blocking;
   const fixGuide = buildReadinessFixGuide(uniqueBlockers);
+  const launchChecklist = buildReadinessLaunchChecklist(health.integrations, bridge, uniqueBlockers, diagnostics);
+  const nextActions = uniqueBlockers.length
+    ? uniqueBlockers.map((blocker) => blocker.nextAction)
+    : ["No action needed. Keep secrets out of git and run doctor before changes."];
   return {
     status,
     checkedAt: new Date().toISOString(),
@@ -503,12 +507,42 @@ async function getProductionReadiness(payload) {
     },
     blockers: uniqueBlockers,
     attentionQueue: buildReadinessAttentionQueue(uniqueBlockers, fixGuide),
-    launchChecklist: buildReadinessLaunchChecklist(health.integrations, bridge, uniqueBlockers, diagnostics),
-    nextActions: uniqueBlockers.length
-      ? uniqueBlockers.map((blocker) => blocker.nextAction)
-      : ["No action needed. Keep secrets out of git and run doctor before changes."],
+    launchChecklist,
+    launchEvidence: buildReadinessLaunchEvidence(status, launchChecklist, nextActions),
+    nextActions,
     fixGuide,
     diagnostics: diagnostics || undefined,
+  };
+}
+
+function buildReadinessLaunchEvidence(status, launchChecklist, nextActions) {
+  const gateCommand = (id) => {
+    if (id === "mcp-registry" || id === "approval-locks") return "npm test";
+    if (id === "live-diagnostics" || id === "required-integrations") return "npm run doctor -- --live-integrations";
+    return "npm run verify:production";
+  };
+  return {
+    mode: "production-launch-evidence",
+    decision: status === "ready" ? "ready_for_operator_handoff" : status === "blocked" ? "blocked" : "needs_attention",
+    generatedAt: new Date().toISOString(),
+    secretPolicy: "Secret-safe: reports only configuration state, placeholders, counts, commands, URLs with placeholders, and redacted diagnostic messages.",
+    proofGates: launchChecklist.map((item) => ({
+      id: item.id,
+      title: item.title,
+      status: item.status,
+      proof: item.proof,
+      validationCommand: gateCommand(item.id),
+    })),
+    remoteHandoff: {
+      requiredBeforeExternalAgent: [
+        "Run npm run web:tunnel:secure or use the browser Start tunnel button with a strong JARVIS_WEB_TOKEN.",
+        "Fetch /.well-known/arcigy-jarvis.json and /api/remote-mcp-pack?includeReadiness=true&live=true through the external URL.",
+        "Run /api/remote-mcp-smoke and require status=ready before any remote agent uses write-capable tools.",
+      ],
+      smokeCommand: "npm run remote:mcp:smoke -- --url <external-url>",
+      tunnelCommand: "npm run web:tunnel:secure",
+    },
+    operatorNextAction: nextActions[0] || "No action needed.",
   };
 }
 
@@ -783,6 +817,7 @@ async function getRemoteMcpPack(payload = {}) {
           blockers: readiness.blockers,
           attentionQueue: readiness.attentionQueue,
           launchChecklist: readiness.launchChecklist,
+          launchEvidence: readiness.launchEvidence,
           nextActions: readiness.nextActions,
           fixGuide: readiness.fixGuide,
         }

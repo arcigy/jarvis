@@ -101,6 +101,10 @@ test("production readiness report returns blockers and next actions without secr
   assert.ok(report.attentionQueue.every((item) => item.validationCommand.includes("doctor")));
   assert.ok(report.launchChecklist.some((item) => item.id === "required-integrations" && item.status === "blocked"));
   assert.ok(report.launchChecklist.some((item) => item.id === "approval-locks" && item.status === "ready"));
+  assert.equal(report.launchEvidence.mode, "production-launch-evidence");
+  assert.equal(report.launchEvidence.decision, "blocked");
+  assert.ok(report.launchEvidence.proofGates.some((gate) => gate.id === "approval-locks" && gate.validationCommand === "npm test"));
+  assert.match(report.launchEvidence.remoteHandoff.smokeCommand, /remote:mcp:smoke/);
   assert.equal(JSON.stringify(report).includes("PASSWORD"), false);
 });
 
@@ -792,6 +796,8 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.equal(pack.readiness?.status, "blocked");
   assert.ok(pack.readiness?.attentionQueue.some((item) => item.key === "redis"));
   assert.ok(pack.readiness?.launchChecklist.some((item) => item.id === "mcp-registry" && item.status === "ready"));
+  assert.ok(pack.readiness?.launchEvidence.proofGates.some((gate) => gate.id === "live-diagnostics" && gate.validationCommand.includes("doctor")));
+  assert.equal(pack.readiness?.launchEvidence.remoteHandoff.tunnelCommand, "npm run web:tunnel:secure");
   assert.ok(pack.readiness?.fixGuide.some((step) => step.id === "redis-real-password"));
   assert.deepEqual(pack.agentCompatibility.supportedAgents.slice(0, 3), ["Claude", "ChatGPT", "Grok"]);
   assert.equal(pack.agentCompatibility.protocol, "HTTP JSON MCP bridge");
