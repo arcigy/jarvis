@@ -585,9 +585,11 @@ export function createJarvisMcpServer(): McpServer {
       const preparedReplies = runDbCommand("list-prepared-replies", { status: "pending", limit: 10 }, safeDbPath);
       const readiness = await buildProductionReadinessReport({ live, dbPath: safeDbPath });
       const preparedReplyCount = Number(preparedReplies.count ?? 0);
+      const preparedPositiveReplyCount = Number(localCold.metrics?.preparedPositiveReplyCount ?? preparedReplyCount);
+      const pendingPositiveApprovalCount = Number(localCold.metrics?.pendingPositiveApprovalCount ?? preparedPositiveReplyCount);
       const coldOutreachSummary = await getOperatorColdOutreachSummary(live, periodLabel, localCold.summary, {
-        preparedPositiveReplyCount: preparedReplyCount,
-        pendingApprovalCount: preparedReplyCount,
+        preparedPositiveReplyCount,
+        pendingApprovalCount: pendingPositiveApprovalCount,
       });
       return jsonResult(
         buildOperatorBriefing({

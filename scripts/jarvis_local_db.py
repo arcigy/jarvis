@@ -208,6 +208,24 @@ def cold_brief(db_path: Path, payload: dict[str, Any]) -> dict[str, Any]:
         for event_type in ["sent", "opened", "replied", "positive_reply", "prepared_reply"]
     }
 
+    prepared_rows = [
+        row
+        for row in conn.execute(
+            """
+            select * from cold_outreach_events
+            where event_type = 'prepared_reply'
+              and occurred_at >= ? and occurred_at <= ?
+            """,
+            params,
+        )
+    ]
+    prepared_positive_rows = [
+        row
+        for row in prepared_rows
+        if prepared_reply_has_positive_signal(conn, row)
+    ]
+    prepared_positive_leads = {row["lead_email"] for row in prepared_positive_rows}
+
     pending_approval = conn.execute(
         """
         select count(distinct p.lead_email) as count
@@ -223,6 +241,13 @@ def cold_brief(db_path: Path, payload: dict[str, Any]) -> dict[str, Any]:
         """,
         params,
     ).fetchone()["count"]
+    pending_positive_approval = len(
+        {
+            row["lead_email"]
+            for row in prepared_positive_rows
+            if not prepared_reply_has_later_approval(conn, row)
+        }
+    )
 
     metrics = {
         "periodLabel": period_label,
@@ -230,8 +255,10 @@ def cold_brief(db_path: Path, payload: dict[str, Any]) -> dict[str, Any]:
         "opened": counts["opened"],
         "replied": counts["replied"],
         "positiveReplies": counts["positive_reply"],
-        "preparedPositiveReplyCount": counts["prepared_reply"],
+        "preparedReplyCount": counts["prepared_reply"],
+        "preparedPositiveReplyCount": len(prepared_positive_leads),
         "pendingApprovalCount": pending_approval,
+        "pendingPositiveApprovalCount": pending_positive_approval,
     }
     return {
         "metrics": metrics,
@@ -668,7 +695,7 @@ def build_cold_outreach_summary(metrics: dict[str, Any]) -> str:
     opened = int(metrics["opened"])
     replied = int(metrics["replied"])
     positive = int(metrics["positiveReplies"])
-    prepared = int(metrics["preparedPositiveReplyCount"])
+    prepared = int(metrics.get("preparedPositiveReplyCount", metrics.get("preparedReplyCount", 0)))
     pending = int(metrics["pendingApprovalCount"])
     open_rate = round((opened / contacted) * 100, 1) if contacted else 0
     parts = [
@@ -781,6 +808,64 @@ def prepared_reply_from_row(row: sqlite3.Row) -> dict[str, Any]:
         "positiveSignal": data.get("positiveSignal") or data.get("signal"),
         "data": data,
     }
+
+
+def prepared_reply_has_later_approval(conn: sqlite3.Connection, row: sqlite3.Row) -> bool:
+    return (
+        conn.execute(
+            """
+            select 1 from cold_outreach_events
+            where lead_email = ?
+              and event_type in ('approved_reply', 'approved_reply_sent')
+              and occurred_at >= ?
+            limit 1
+            """,
+            (row["lead_email"], row["occurred_at"]),
+        ).fetchone()
+        is not None
+    )
+
+
+def prepared_reply_has_positive_signal(conn: sqlite3.Connection, row: sqlite3.Row) -> bool:
+    data = json.loads(row["data_json"] or "{}")
+    if json_has_positive_signal(data):
+        return True
+    return (
+        conn.execute(
+            """
+            select 1 from cold_outreach_events
+            where lead_email = ?
+              and event_type = 'positive_reply'
+              and occurred_at <= ?
+            order by occurred_at desc
+            limit 1
+            """,
+            (row["lead_email"], row["occurred_at"]),
+        ).fetchone()
+        is not None
+    )
+
+
+def json_has_positive_signal(value: Any) -> bool:
+    if isinstance(value, list):
+        return any(json_has_positive_signal(item) for item in value)
+    if not isinstance(value, dict):
+        return False
+
+    positive_needles = ("positive", "interested", "qualified", "meeting", "booked", "call", "demo")
+    explicit_positive_keys = {"positivesignal", "positiveintent", "positiveclassification"}
+    signal_keys = {"signal", "replyintent", "leadcategory", "category", "sentiment", "classification", "intent", "status"}
+    for key, item in value.items():
+        normalized_key = re.sub(r"[^a-zA-Z0-9]", "", str(key)).lower()
+        if normalized_key in explicit_positive_keys and bool(item):
+            return True
+        if normalized_key in signal_keys and isinstance(item, str):
+            normalized_item = re.sub(r"[^a-zA-Z0-9]", "", item).lower()
+            if any(needle in normalized_item for needle in positive_needles):
+                return True
+        if isinstance(item, (dict, list)) and json_has_positive_signal(item):
+            return True
+    return False
 
 
 def row_to_audit_event(row: sqlite3.Row) -> dict[str, Any]:

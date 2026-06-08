@@ -2064,6 +2064,20 @@ test("local SQLite CLI summarizes cold outreach events by period", () => {
     ]);
   }
 
+  runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "add-cold-event",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify({
+      leadEmail: "b@example.com",
+      eventType: "prepared_reply",
+      occurredAt: "2026-06-07T10:05:00Z",
+      data: { replyText: "Neutral follow-up draft." },
+    }),
+  ]);
+
   const brief = runPythonJson(python, [
     "scripts/jarvis_local_db.py",
     "cold-brief",
@@ -2076,6 +2090,10 @@ test("local SQLite CLI summarizes cold outreach events by period", () => {
   assert.equal(brief.metrics.contacted, 2);
   assert.equal(brief.metrics.opened, 1);
   assert.equal(brief.metrics.positiveReplies, 1);
+  assert.equal(brief.metrics.preparedReplyCount, 2);
+  assert.equal(brief.metrics.preparedPositiveReplyCount, 1);
+  assert.equal(brief.metrics.pendingApprovalCount, 2);
+  assert.equal(brief.metrics.pendingPositiveApprovalCount, 1);
   assert.match(brief.summary, /Za posledných 7 dní sme napísali 2 ľuďom/);
   assert.match(brief.summary, /Pripravil som ti 1 odpoveď/);
 });

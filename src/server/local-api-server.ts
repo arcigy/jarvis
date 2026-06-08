@@ -815,9 +815,11 @@ async function getOperatorBriefing(payload: Record<string, unknown>) {
   const preparedReplies = runDbTool("list-prepared-replies", { dbPath, status: "pending", limit: 10 });
   const readiness = await buildProductionReadinessReport({ live: payload.live === true, dbPath });
   const preparedReplyCount = Number(preparedReplies.count ?? 0);
+  const preparedPositiveReplyCount = Number(cold.metrics?.preparedPositiveReplyCount ?? preparedReplyCount);
+  const pendingPositiveApprovalCount = Number(cold.metrics?.pendingPositiveApprovalCount ?? preparedPositiveReplyCount);
   const coldOutreachSummary = await getOperatorColdOutreachSummary(payload.live === true, String(payload.periodLabel ?? period.periodLabel), cold.summary, {
-    preparedPositiveReplyCount: preparedReplyCount,
-    pendingApprovalCount: preparedReplyCount,
+    preparedPositiveReplyCount,
+    pendingApprovalCount: pendingPositiveApprovalCount,
   });
   return buildOperatorBriefing({
     readinessStatus: readiness.status,
