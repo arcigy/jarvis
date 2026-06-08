@@ -830,7 +830,7 @@ def redact_secrets(value: Any) -> Any:
     text = re.sub(r"GOCSPX-[0-9A-Za-z_-]{10,}", "[redacted-google-client-secret]", text)
     text = re.sub(r"1//[0-9A-Za-z_-]{20,}", "[redacted-google-refresh-token]", text)
     text = re.sub(r"\b[0-9a-f]{32,}\b", "[redacted-hex-secret]", text, flags=re.I)
-    text = re.sub(r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_[A-Za-z0-9_-]{8,}\b", "[redacted-provider-key]", text, flags=re.I)
+    text = re.sub(r"\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_[A-Za-z0-9_-]{6,}\b", "[redacted-provider-key]", text, flags=re.I)
     return text
 
 

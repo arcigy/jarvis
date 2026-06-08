@@ -580,7 +580,7 @@ test("Gemini reply helper calls generateContent and extracts text", async () => 
 test("AI safety redacts secrets before Gemini prompts and after model output", async () => {
   const googleKey = "AI" + "za" + "S" + "y" + "A".repeat(32);
   const refreshToken = "1" + "//" + "A".repeat(34);
-  const smartleadKey = ["aaaaaaaa", "bbbb", "cccc", "dddd", "eeeeeeeeeeee"].join("-") + "_abcdefgh";
+  const smartleadKey = ["aaaaaaaa", "bbbb", "cccc", "dddd", "eeeeeeeeeeee"].join("-") + "_ehpdn6s";
   const databaseUrl = "postgres://postgres:super-private@example.com:5432/db";
   const rawMessage = `Client sent ${googleKey} and ${refreshToken} and ${smartleadKey} and ${databaseUrl}`;
   const calls: Array<{ body: { contents?: Array<{ parts?: Array<{ text?: string }> }>; systemInstruction?: { parts?: Array<{ text?: string }> } } }> = [];
@@ -1595,6 +1595,7 @@ test("local SQLite CLI records secret-safe audit events", () => {
   const dbPath = join(dir, "jarvis.db");
   const python = process.env.JARVIS_PYTHON || "python";
   const googleKey = "AI" + "za" + "S" + "y" + "A".repeat(32);
+  const providerKey = ["aaaaaaaa", "bbbb", "cccc", "dddd", "eeeeeeeeeeee"].join("-") + "_ehpdn6s";
 
   runPythonJson(python, [
     "scripts/jarvis_local_db.py",
@@ -1606,7 +1607,7 @@ test("local SQLite CLI records secret-safe audit events", () => {
       automationKey: "arcigy.generate_contract_documents",
       status: "generated",
       requiresApproval: true,
-      input: { secret: googleKey },
+      input: { secret: googleKey, providerKey },
       output: { manifestPath: "generated/contracts/generation-manifest.json" },
     }),
   ]);
@@ -1624,7 +1625,9 @@ test("local SQLite CLI records secret-safe audit events", () => {
   assert.equal(events.events[0].automationKey, "arcigy.generate_contract_documents");
   assert.equal(events.events[0].requiresApproval, true);
   assert.equal(JSON.stringify(events).includes(googleKey), false);
+  assert.equal(JSON.stringify(events).includes(providerKey), false);
   assert.match(JSON.stringify(events), /\[redacted-google-api-key\]/);
+  assert.match(JSON.stringify(events), /\[redacted-provider-key\]/);
 });
 
 function runPythonJson(python: string, args: string[]) {
