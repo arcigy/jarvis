@@ -167,6 +167,32 @@ test("contract generation rejects non-json input", () => {
   assert.throws(() => buildContractGenerationCommand("contract.docx"), /JSON/);
 });
 
+test("contract generator rejects unresolved intake placeholders", () => {
+  const dir = mkdtempSync(join(tmpdir(), "jarvis-contract-placeholder-"));
+  const python = process.env.JARVIS_PYTHON || "python";
+  const intake = JSON.parse(readFileSync("docs/contracts/examples/sample-intake.json", "utf-8"));
+  intake.client.businessName = "[doplnit]";
+  intake.project.outputs.push("TODO");
+  const result = spawnSync(
+    python,
+    ["scripts/generate_contract_documents.py", "--payload", JSON.stringify(intake), "--output-dir", dir],
+    {
+      cwd: process.cwd(),
+      encoding: "utf-8",
+      env: {
+        ...process.env,
+        PYTHONIOENCODING: "utf-8",
+      },
+    }
+  );
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /Unresolved contract intake placeholder/);
+  assert.match(result.stderr, /\$\.client\.businessName/);
+  assert.match(result.stderr, /\$\.project\.outputs/);
+  assert.equal(existsSync(join(dir, "generation-manifest.json")), false);
+});
+
 test("contract generator creates core documents, extra attachments, and manifest", () => {
   const dir = mkdtempSync(join(tmpdir(), "jarvis-contracts-"));
   const python = process.env.JARVIS_PYTHON || "python";

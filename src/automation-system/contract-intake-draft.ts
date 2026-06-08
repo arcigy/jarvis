@@ -22,7 +22,7 @@ export async function draftContractIntake(
       prompt: [
         "Create a filled Arcigy contract intake JSON object from this business brief.",
         "Keep Arcigy/provider details unchanged when present in the base intake.",
-        "If a value is unknown, use a clear placeholder like [doplnit].",
+        "If a value is unknown, use [doplnit] so the operator can review it; final DOCX generation rejects unresolved placeholders.",
         "The JSON must include client, contacts, project, pricing, dates, specialTerms, and additionalAttachments when useful.",
         "Base intake JSON:",
         JSON.stringify(input.baseIntake ?? {}, null, 2),

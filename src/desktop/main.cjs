@@ -1695,7 +1695,7 @@ async function generateGeminiTextForContract(input) {
   const prompt = [
     "Create a filled Arcigy contract intake JSON object from this business brief.",
     "Keep Arcigy/provider details unchanged when present in the base intake.",
-    "If a value is unknown, use a clear placeholder like [doplnit].",
+    "If a value is unknown, use [doplnit] so the operator can review it; final DOCX generation rejects unresolved placeholders.",
     "Return only valid JSON. Do not include markdown, comments, signatures, or legal advice.",
     "The JSON must include client, contacts, project, pricing, dates, specialTerms, and additionalAttachments when useful.",
     "Base intake JSON:",

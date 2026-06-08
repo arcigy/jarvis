@@ -17,6 +17,8 @@ python scripts\generate_contract_documents.py --input docs\contracts\examples\sa
 
 MCP tool `arcigy.generate_contract_documents` môže dostať priamo inline `intake` JSON, takže Claude/ChatGPT nemusí najprv vytvárať súbor.
 
+Generovanie DOCX odmietne intake, ktorý ešte obsahuje pracovné placeholdery ako `[doplnit]`, `TODO` alebo `TBD`. Gemini draft ich môže použiť iba ako značku pre review; pred finálnym generovaním musia byť doplnené reálnymi údajmi.
+
 Ďalšie prílohy sa pridávajú cez `additionalAttachments[]` v JSON formulári. Každá položka určí `templatePath`, `outputName`, voliteľný `title`, `description` a `items`. Generátor vytvorí aj `generation-manifest.json`.
 
 ## Cold outreach prehľad

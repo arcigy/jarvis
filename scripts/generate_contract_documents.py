@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE_DIR = ROOT / "docs" / "contracts" / "templates"
 DEFAULT_OUTPUT_DIR = ROOT / "generated" / "contracts"
 MANIFEST_NAME = "generation-manifest.json"
+UNRESOLVED_PLACEHOLDER_RE = re.compile(r"\[[^\]]*(dopln|todo|tbd|xxx|\?{2,})[^\]]*\]|\b(todo|tbd|xxx)\b|\?{3,}", re.IGNORECASE)
 
 
 def money(value: float | int) -> str:
@@ -28,6 +29,30 @@ def required(data: dict[str, Any], path: str) -> Any:
             raise ValueError(f"Missing required field: {path}")
         current = current[part]
     return current
+
+
+def assert_no_unresolved_placeholders(value: Any, path: str = "$") -> None:
+    paths = collect_unresolved_placeholders(value, path)
+    if paths:
+        joined = ", ".join(paths[:10])
+        suffix = "" if len(paths) <= 10 else f" and {len(paths) - 10} more"
+        raise ValueError(f"Unresolved contract intake placeholder(s): {joined}{suffix}. Complete the intake before generating DOCX files.")
+
+
+def collect_unresolved_placeholders(value: Any, path: str) -> list[str]:
+    if isinstance(value, str):
+        return [path] if UNRESOLVED_PLACEHOLDER_RE.search(value) else []
+    if isinstance(value, dict):
+        found: list[str] = []
+        for key, nested in value.items():
+            found.extend(collect_unresolved_placeholders(nested, f"{path}.{key}"))
+        return found
+    if isinstance(value, list):
+        found = []
+        for index, nested in enumerate(value):
+            found.extend(collect_unresolved_placeholders(nested, f"{path}[{index}]"))
+        return found
+    return []
 
 
 def join_items(items: list[Any] | None, fallback: str = "[●]") -> str:
@@ -176,6 +201,7 @@ def generate_contract_documents_from_data(
     output_dir: Path = DEFAULT_OUTPUT_DIR,
     input_label: str = "inline-payload",
 ) -> list[Path]:
+    assert_no_unresolved_placeholders(data)
     slug = re.sub(r"[^a-zA-Z0-9_-]+", "-", data["client"]["businessName"]).strip("-").lower() or "klient"
     targets = [
         (
