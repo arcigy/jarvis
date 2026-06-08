@@ -1298,15 +1298,19 @@ function cleanVoiceQuery(text, removeWords) {
 async function generateAiReply(payload) {
   const message = safeAiPromptPart(payload?.message);
   if (!message) throw new Error("Client message is required.");
+  const language = payload?.language === "en" ? "en" : "sk";
+  const tone = payload?.tone === "direct" || payload?.tone === "warm" ? payload.tone : "executive";
   const prompt = [
     "Si Arcigy Jarvis. Priprav profesionalnu, vecnu a family-friendly odpoved klientovi.",
     "Nikdy neslubuj odoslanie bez schvalenia pouzivatelom.",
     "Ak sprava obsahuje citlive udaje alebo secrety, nereprodukuj ich.",
     payload?.clientName ? `Klient: ${safeAiPromptPart(payload.clientName)}` : null,
+    `Jazyk odpovede: ${language}.`,
+    `Ton: ${tone}.`,
     payload?.context ? `Kontext: ${safeAiPromptPart(payload.context)}` : null,
     "Sprava klienta:",
     message,
-    "Vytvor kratku odpoved v slovencine a jednu vetu, co ma pouzivatel schvalit.",
+    "Vytvor kratku odpoved a jednu vetu, co ma pouzivatel schvalit pred odoslanim.",
   ]
     .filter(Boolean)
     .join("\n");
