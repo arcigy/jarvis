@@ -235,6 +235,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(styles, /@keyframes signalSweep/);
   assert.match(styles, /prefers-reduced-motion/);
   assert.equal(packageJson.scripts["ui:smoke"], "electron scripts/jarvis_ui_smoke.cjs");
+  assert.equal(packageJson.scripts["verify:production"], "node scripts/verify_production.ts");
   assert.match(uiSmoke, /capturePage/);
   assert.match(uiSmoke, /JARVIS_UI_SMOKE_URL/);
   assert.match(uiSmoke, /#missionRail/);

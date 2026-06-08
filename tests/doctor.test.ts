@@ -24,7 +24,7 @@ test("Jarvis doctor reports local readiness without leaking secrets", () => {
   };
   assert.equal(body.ok, true);
   assert.equal(body.checks.find((check) => check.key === "requiredFiles")?.status, "ready");
-  assert.match(body.checks.find((check) => check.key === "requiredFiles")?.message ?? "", /14 required files/);
+  assert.match(body.checks.find((check) => check.key === "requiredFiles")?.message ?? "", /15 required files/);
   assert.equal(body.checks.find((check) => check.key === "mcpToolRegistry")?.status, "ready");
   assert.equal(body.checks.find((check) => check.key === "runtimeEnv")?.status, "warning");
   assert.equal(body.checks.some((check) => check.key === "liveIntegrationDiagnostics"), false);
