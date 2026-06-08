@@ -100,10 +100,8 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
   const topLevelApprovalGate = await checkApprovalGates(fetchImpl, baseUrl, input.bearerToken, true);
   checks.push(check(topLevelApprovalGate.ok, "approval-shape-gate", 'All approval-required write tools rejected top-level {"approved":true}.'));
 
-  const leakedToken = input.bearerToken
-    ? JSON.stringify({ manifest: manifest.body, pack: pack.body, health: health.body, approvalGate: approvalGate.bodies, topLevelApprovalGate: topLevelApprovalGate.bodies }).includes(input.bearerToken)
-    : false;
-  checks.push(check(!leakedToken, "secret-redaction", "Smoke responses did not echo the bearer token."));
+  const leakedSecret = hasSensitiveLeak({ manifest: manifest.body, pack: pack.body, health: health.body, approvalGate: approvalGate.bodies, topLevelApprovalGate: topLevelApprovalGate.bodies }, input.bearerToken);
+  checks.push(check(!leakedSecret, "secret-redaction", "Smoke responses did not echo bearer tokens, API keys, OAuth tokens, or database URLs."));
 
   const status: RemoteMcpSmokeStatus = checks.every((item) => item.status === "ready") ? "ready" : "blocked";
   return {
@@ -134,6 +132,19 @@ async function checkApprovalGates(fetchImpl: typeof fetch, baseUrl: string, bear
     if (response.status !== 409) return { ok: false, bodies };
   }
   return { ok: true, bodies };
+}
+
+function hasSensitiveLeak(value: unknown, bearerToken?: string): boolean {
+  const text = JSON.stringify(value);
+  return (
+    Boolean(bearerToken && text.includes(bearerToken)) ||
+    /AIza[0-9A-Za-z_-]{20,}/.test(text) ||
+    /GOCSPX-[0-9A-Za-z_-]{10,}/.test(text) ||
+    /1\/\/[0-9A-Za-z_-]{20,}/.test(text) ||
+    /(postgres(?:ql)?|redis):\/\/[^:\s/@]+:[^@\s]+@/i.test(text) ||
+    /\b[0-9a-f]{32,}\b/i.test(text) ||
+    /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_[A-Za-z0-9_-]{8,}\b/i.test(text)
+  );
 }
 
 function check(ok: boolean, key: string, message: string): RemoteMcpSmokeCheck {

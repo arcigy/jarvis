@@ -336,6 +336,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /hasHandoffProof/);
   assert.match(main, /hasClientMemoryQuickStarts/);
   assert.match(main, /approvalGate: approvalGate\.bodies/);
+  assert.match(main, /function hasSensitiveLeak/);
+  assert.match(main, /API keys, OAuth tokens, or database URLs/);
   assert.match(main, /ipcMain\.handle\("jarvis:getPreparedOutreachReplies"/);
   assert.match(main, /ipcMain\.handle\("jarvis:approvePreparedOutreachReply"/);
   assert.match(main, /getWebBridgePreflight/);
