@@ -1064,8 +1064,14 @@ elements.exportLeads.addEventListener("click", async () => {
       elements.leadResult.textContent = "Search leads before exporting.";
       return;
     }
+    const approved = window.confirm(`Export ${state.lastLeads.length} lead(s) to Google Sheets?`);
+    if (!approved) {
+      elements.leadResult.textContent = "Google Sheets export cancelled before any write.";
+      return;
+    }
     elements.leadResult.textContent = "Exporting leads to Google Sheets...";
     const result = await arcigyApi.appendLeadsToGoogleSheet({
+      approval: { approved: true },
       range: "Leads!A1",
       rows: leadsToSheetRows(state.lastLeads),
     });

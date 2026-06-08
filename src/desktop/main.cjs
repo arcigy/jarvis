@@ -1606,6 +1606,9 @@ function getSerperApiKeys() {
 }
 
 async function appendLeadsToGoogleSheet(payload) {
+  if (payload?.approved !== true && payload?.approval?.approved !== true) {
+    throw new Error('arcigy.append_leads_to_google_sheet requires explicit approval. Send {"approval":{"approved":true}} after user confirmation.');
+  }
   const rows = Array.isArray(payload?.rows) ? payload.rows : [];
   if (!rows.length) throw new Error("At least one lead row is required.");
   const spreadsheetId = String(payload?.spreadsheetId || requireRuntimeEnv("GOOGLE_SHEET_ID"));

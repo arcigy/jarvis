@@ -82,6 +82,13 @@ test("local web bridge serves UI and API health", async () => {
     });
     assert.match(String(mcpBrief.result), /Za dnes/);
 
+    const unapprovedDirectSheetExport = await fetch(`${baseUrl}/api/append-leads-to-google-sheet`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ rows: [["ACME", "https://example.com"]] }),
+    });
+    assert.equal(unapprovedDirectSheetExport.status, 409);
+
     const mcpDbPath = join(makeRepoTempDir("jarvis-web-mcp-"), "memory.db");
     const upsert = await postJson(`${baseUrl}/api/mcp/arcigy.upsert_local_person`, {
       dbPath: mcpDbPath,

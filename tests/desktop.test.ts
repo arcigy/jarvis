@@ -127,6 +127,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /arcigyApi\.getSmartleadOutreachBrief/);
   assert.match(renderer, /arcigyApi\.discoverLeads/);
   assert.match(renderer, /arcigyApi\.appendLeadsToGoogleSheet/);
+  assert.match(renderer, /window\.confirm\(`Export \$\{state\.lastLeads\.length\} lead\(s\) to Google Sheets\?`\)/);
+  assert.match(renderer, /approval: \{ approved: true \}/);
   assert.match(renderer, /providerStatus/);
   assert.match(renderer, /renderCommandDeck/);
   assert.match(renderer, /buildCommandTimeline/);
@@ -241,6 +243,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /ipcMain\.handle\("jarvis:getSmartleadOutreachBrief"/);
   assert.match(main, /ipcMain\.handle\("jarvis:discoverLeads"/);
   assert.match(main, /ipcMain\.handle\("jarvis:appendLeadsToGoogleSheet"/);
+  assert.match(main, /arcigy\.append_leads_to_google_sheet requires explicit approval/);
   assert.match(main, /listRecentGmailMessageEvents/);
   assert.match(main, /defaultGmailSyncQuery/);
   assert.match(main, /defaultGmailBriefingQuery/);

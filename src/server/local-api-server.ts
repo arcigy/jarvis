@@ -263,6 +263,11 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
 
   if (request.method === "POST" && url.pathname === "/api/append-leads-to-google-sheet") {
     const payload = await readJson(request);
+    const approvalError = getApprovalError("arcigy.append_leads_to_google_sheet", payload);
+    if (approvalError) {
+      writeJson(response, 409, { error: approvalError });
+      return;
+    }
     writeJson(
       response,
       200,
