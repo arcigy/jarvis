@@ -40,8 +40,9 @@ The web bridge publishes its protected manifest at:
 - `GET /api/mcp`
 - `GET /.well-known/arcigy-jarvis.json`
 - `GET /api/remote-mcp-pack`
+- `GET /api/remote-mcp-smoke`
 
-External hosts require `Authorization: Bearer <JARVIS_WEB_TOKEN>`. The manifest returns concrete `tools[].url` values for POST calls. The remote MCP pack returns the manifest URL, tool-call pattern, approval rules, tunnel command, tool count, and readiness summary without returning the bearer token value.
+External hosts require `Authorization: Bearer <JARVIS_WEB_TOKEN>`. The manifest returns concrete `tools[].url` values for POST calls. The remote MCP pack returns the manifest URL, smoke test URL, tool-call pattern, approval rules, tunnel command, tool count, and readiness summary without returning the bearer token value. The smoke test verifies the manifest, connection pack, a read-only tool call, approval-gate rejection, and token redaction.
 
 The desktop MCP panel now runs an automatic preflight watch every two minutes. It shows tunnel readiness, token/auth state, manifest availability, MCP tool count, and the exact remote tool-call pattern before you expose the bridge through ngrok.
 
@@ -63,6 +64,7 @@ The desktop MCP panel now runs an automatic preflight watch every two minutes. I
 - `arcigy.run_integration_diagnostics`: runs configured checks or explicit live read-only probes, including Postgres TCP and Redis PING.
 - `arcigy.get_production_readiness`: summarizes production readiness, blockers, next actions, MCP tool count, approval locks, and optional live diagnostics.
 - `arcigy.get_remote_mcp_pack`: returns a secret-safe connection pack for Claude, ChatGPT, Grok, or another remote MCP agent.
+- `arcigy.run_remote_mcp_smoke`: verifies remote web MCP manifest, connection pack, read-only tool call, approval gate, and token redaction.
 - `arcigy.get_operator_briefing`: combines readiness, cold outreach, open client requests, and prepared reply approvals into one Jarvis briefing.
 - `arcigy.generate_ai_reply`: uses Gemini to draft a client reply without sending it.
 - `arcigy.sync_gmail_recent_messages`: fetches Gmail messages and ingests client requests into SQLite.

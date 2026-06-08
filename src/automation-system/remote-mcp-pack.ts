@@ -18,6 +18,7 @@ export type RemoteMcpConnectionPack = {
   generatedAt: string;
   baseUrl: string;
   manifestUrl: string;
+  smokeTestUrl: string;
   mcpBaseUrl: string;
   mcpToolCallPattern: string;
   auth: {
@@ -72,6 +73,7 @@ export async function buildRemoteMcpConnectionPack(
     generatedAt: new Date().toISOString(),
     baseUrl,
     manifestUrl: `${baseUrl}/.well-known/arcigy-jarvis.json`,
+    smokeTestUrl: `${baseUrl}/api/remote-mcp-smoke`,
     mcpBaseUrl: `${baseUrl}/api/mcp`,
     mcpToolCallPattern: `${baseUrl}/api/mcp/{toolName}`,
     auth: {
@@ -113,6 +115,7 @@ export async function buildRemoteMcpConnectionPack(
       : undefined,
     agentInstructions: [
       "Fetch the manifestUrl first to list live tools and schemas.",
+      "Run the smokeTestUrl before handoff if you need proof that the bridge, read-only MCP calls, approval gates, and secret policy are working.",
       "Call MCP tools with POST JSON to mcpToolCallPattern.",
       "Use the bearer auth header placeholder; the real token must be supplied by the operator and is never returned by this pack.",
       "Treat generate_contract_documents, approve_prepared_outreach_reply, and append_leads_to_google_sheet as approval-gated actions.",

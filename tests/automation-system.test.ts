@@ -48,6 +48,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.run_integration_diagnostics",
     "arcigy.get_production_readiness",
     "arcigy.get_remote_mcp_pack",
+    "arcigy.run_remote_mcp_smoke",
     "arcigy.get_operator_briefing",
     "arcigy.generate_ai_reply",
     "arcigy.sync_gmail_recent_messages",
@@ -68,7 +69,7 @@ test("production readiness report returns blockers and next actions without secr
   });
 
   assert.equal(report.status, "blocked");
-  assert.equal(report.mcp.toolCount, 25);
+  assert.equal(report.mcp.toolCount, 26);
   assert.ok(report.blockers.some((blocker) => blocker.key === "redis" && blocker.severity === "warning"));
   assert.ok(report.nextActions.some((action) => action.includes("REDIS_URL")));
   assert.ok(report.fixGuide.some((step) => step.id === "redis-real-password" && step.envKeys.includes("REDIS_URL")));

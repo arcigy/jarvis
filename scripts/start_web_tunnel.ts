@@ -19,6 +19,11 @@ type Preflight = {
   warnings?: string[];
 };
 
+type RemoteMcpSmoke = {
+  status?: string;
+  summary?: string;
+};
+
 class TunnelExit extends Error {}
 
 const repoRoot = fileURLToPath(new URL("../", import.meta.url));
@@ -103,6 +108,7 @@ async function main() {
     ngrokChild = startNgrok();
     const publicUrl = await waitForPublicTunnel();
     await verifyExternalManifest(publicUrl, token);
+    const smoke = await verifyRemoteMcpSmoke(publicUrl, token);
 
     process.stdout.write(
       [
@@ -110,8 +116,10 @@ async function main() {
         "Arcigy Jarvis tunnel is ready.",
         `Local UI: ${origin}/index.html`,
         `External manifest: ${publicUrl}/.well-known/arcigy-jarvis.json`,
+        `External smoke test: ${publicUrl}/api/remote-mcp-smoke`,
         `External MCP tools: ${publicUrl}/api/mcp`,
         `MCP tool count: ${preflight.mcpToolCount ?? "unknown"}`,
+        smoke?.summary ? `Smoke: ${smoke.summary}` : "Smoke: skipped because no bearer token was available.",
         "Auth header: Authorization: Bearer <JARVIS_WEB_TOKEN>",
         generatedToken ? `One-time token: ${generatedToken}` : "Token source: JARVIS_WEB_TOKEN",
         generatedToken ? "This token exists only for this running tunnel session." : "Keep the token only in local secrets.",
@@ -230,6 +238,24 @@ async function verifyExternalManifest(publicUrl: string, token: string | null) {
   if (!response.ok) {
     exitWithMessage(`Tunnel opened, but the external Jarvis manifest returned HTTP ${response.status}.`);
   }
+}
+
+async function verifyRemoteMcpSmoke(publicUrl: string, token: string | null): Promise<RemoteMcpSmoke | null> {
+  if (!token) return null;
+  const response = await fetch(`${publicUrl}/api/remote-mcp-smoke`, {
+    headers: {
+      authorization: `Bearer ${token}`,
+      "ngrok-skip-browser-warning": "true",
+    },
+  });
+  if (!response.ok) {
+    exitWithMessage(`Tunnel opened, but the external Jarvis remote MCP smoke returned HTTP ${response.status}.`);
+  }
+  const body = (await response.json()) as RemoteMcpSmoke;
+  if (body.status !== "ready") {
+    exitWithMessage(`Tunnel opened, but remote MCP smoke is not ready: ${body.summary ?? "unknown smoke failure"}`);
+  }
+  return body;
 }
 
 async function fetchJson<T>(url: string): Promise<T> {

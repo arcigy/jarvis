@@ -54,6 +54,7 @@ app.whenReady().then(() => {
   ipcMain.handle("jarvis:operatorBriefing", (_event, payload) => getOperatorBriefing(payload));
   ipcMain.handle("jarvis:webBridgePreflight", () => getWebBridgePreflight());
   ipcMain.handle("jarvis:remoteMcpPack", (_event, payload) => getRemoteMcpPack(payload));
+  ipcMain.handle("jarvis:remoteMcpSmoke", (_event, payload) => runRemoteMcpSmoke(payload));
   ipcMain.handle("jarvis:getPreparedOutreachReplies", (_event, payload) => getPreparedOutreachReplies(payload));
   ipcMain.handle("jarvis:approvePreparedOutreachReply", (_event, payload) => approvePreparedOutreachReply(payload));
   ipcMain.handle("jarvis:identifyEmail", (_event, payload) => identifyEmail(payload));
@@ -456,6 +457,7 @@ async function getRemoteMcpPack(payload = {}) {
     generatedAt: new Date().toISOString(),
     baseUrl,
     manifestUrl: `${baseUrl}/.well-known/arcigy-jarvis.json`,
+    smokeTestUrl: `${baseUrl}/api/remote-mcp-smoke`,
     mcpBaseUrl: `${baseUrl}/api/mcp`,
     mcpToolCallPattern: `${baseUrl}/api/mcp/{toolName}`,
     auth: {
@@ -497,12 +499,70 @@ async function getRemoteMcpPack(payload = {}) {
       : undefined,
     agentInstructions: [
       "Fetch the manifestUrl first to list live tools and schemas.",
+      "Run the smokeTestUrl before handoff if you need proof that the bridge, read-only MCP calls, approval gates, and secret policy are working.",
       "Call MCP tools with POST JSON to mcpToolCallPattern.",
       "Use the bearer auth header placeholder; the real token must be supplied by the operator and is never returned by this pack.",
       "Treat generate_contract_documents, approve_prepared_outreach_reply, and append_leads_to_google_sheet as approval-gated actions.",
       "Use get_operator_briefing for a Jarvis-style daily status before making recommendations.",
     ],
   };
+}
+
+async function runRemoteMcpSmoke(payload = {}) {
+  const bridge = getWebBridgePreflight();
+  const baseUrl = String(payload.baseUrl || bridge.manifestUrl.replace(/\/\.well-known\/arcigy-jarvis\.json$/, "")).replace(/\/+$/g, "");
+  const token = typeof payload.bearerToken === "string" && payload.bearerToken.trim() ? payload.bearerToken.trim() : undefined;
+  const expectedToolCount = listWebMcpTools().length;
+  const checks = [];
+  const manifest = await fetchJson(`${baseUrl}/.well-known/arcigy-jarvis.json`, token);
+  checks.push(smokeCheck(manifest.ok, "manifest", manifest.ok ? "Manifest is reachable." : manifest.message));
+  const manifestTools = Array.isArray(manifest.body?.tools) ? manifest.body.tools : [];
+  checks.push(smokeCheck(manifestTools.length === expectedToolCount, "tool-count", `Manifest exposes ${manifestTools.length}/${expectedToolCount} MCP tools.`));
+  checks.push(smokeCheck(manifest.body?.auth?.header === "Authorization: Bearer <JARVIS_WEB_TOKEN>", "auth-placeholder", "Manifest returns auth placeholder, not the token value."));
+  const pack = await fetchJson(`${baseUrl}/api/remote-mcp-pack?includeReadiness=false`, token);
+  checks.push(smokeCheck(pack.ok, "connection-pack", pack.ok ? "Remote MCP connection pack is reachable." : pack.message));
+  checks.push(smokeCheck(pack.body?.auth?.tokenValueReturned === false, "pack-secret-policy", "Connection pack confirms tokenValueReturned=false."));
+  const health = await fetchJson(`${baseUrl}/api/mcp/arcigy.get_system_health`, token, { format: "json" });
+  checks.push(smokeCheck(health.ok && Array.isArray(health.body?.result?.integrations), "read-only-tool-call", "Read-only MCP tool call returned integration health."));
+  const approvalGate = await fetchJson(`${baseUrl}/api/mcp/arcigy.generate_contract_documents`, token, { intake: {} });
+  checks.push(smokeCheck(approvalGate.status === 409, "approval-gate", "Approval-required write tool rejected an unapproved call."));
+  const leakedToken = token ? JSON.stringify({ manifest: manifest.body, pack: pack.body, health: health.body }).includes(token) : false;
+  checks.push(smokeCheck(!leakedToken, "secret-redaction", "Smoke responses did not echo the bearer token."));
+  const status = checks.every((check) => check.status === "ready") ? "ready" : "blocked";
+  return {
+    mode: "remote-mcp-smoke",
+    status,
+    checkedAt: new Date().toISOString(),
+    baseUrl,
+    summary:
+      status === "ready"
+        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, read-only call, approval gate, and secret policy passed.`
+        : `Remote MCP smoke blocked: ${checks.filter((check) => check.status === "blocked").length} check(s) failed.`,
+    tokenValueReturned: false,
+    expectedToolCount,
+    checks,
+  };
+}
+
+function smokeCheck(ok, key, message) {
+  return { key, status: ok ? "ready" : "blocked", message };
+}
+
+async function fetchJson(url, token, payload = null) {
+  try {
+    const response = await fetch(url, {
+      method: payload ? "POST" : "GET",
+      headers: {
+        ...(payload ? { "content-type": "application/json" } : {}),
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
+      },
+      body: payload ? JSON.stringify(payload) : undefined,
+    });
+    const body = await response.json().catch(() => null);
+    return { ok: response.ok, status: response.status, body, message: response.ok ? "OK" : `HTTP ${response.status}` };
+  } catch (error) {
+    return { ok: false, status: 0, body: null, message: error instanceof Error ? error.message : String(error) };
+  }
 }
 
 function listWebMcpTools() {
@@ -524,6 +584,7 @@ function listWebMcpTools() {
     { name: "arcigy.run_integration_diagnostics", requiresApproval: false },
     { name: "arcigy.get_production_readiness", requiresApproval: false },
     { name: "arcigy.get_remote_mcp_pack", requiresApproval: false },
+    { name: "arcigy.run_remote_mcp_smoke", requiresApproval: false },
     { name: "arcigy.get_operator_briefing", requiresApproval: false },
     { name: "arcigy.generate_ai_reply", requiresApproval: false },
     { name: "arcigy.sync_gmail_recent_messages", requiresApproval: false },

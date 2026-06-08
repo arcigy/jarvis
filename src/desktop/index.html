@@ -248,10 +248,16 @@
                 <code id="handoffTunnelCommand">--</code>
               </div>
               <div>
+                <span>Smoke test</span>
+                <code id="handoffSmokeUrl">--</code>
+              </div>
+              <div>
                 <span>Approval locks</span>
                 <code id="handoffApprovalTools">--</code>
               </div>
             </div>
+            <button id="runRemoteSmoke">Run smoke</button>
+            <div class="response compact" id="remoteSmokeResult">Smoke test not run.</div>
             <pre class="response compact handoffPrompt" id="remoteAgentPrompt">Remote pack not loaded.</pre>
           </div>
           <ul>
@@ -269,6 +275,7 @@
             <li>get_system_health</li>
             <li>get_production_readiness</li>
             <li>get_remote_mcp_pack</li>
+            <li>run_remote_mcp_smoke</li>
             <li>upsert_local_person</li>
             <li>add_client_need_signal</li>
             <li>ingest_client_message</li>

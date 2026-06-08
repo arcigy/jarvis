@@ -37,6 +37,7 @@ Server tools:
 - `arcigy.run_integration_diagnostics`
 - `arcigy.get_production_readiness`
 - `arcigy.get_remote_mcp_pack`
+- `arcigy.run_remote_mcp_smoke`
 - `arcigy.get_operator_briefing`
 - `arcigy.generate_ai_reply`
 - `arcigy.sync_gmail_recent_messages`
@@ -147,6 +148,7 @@ It serves the same UI at `http://127.0.0.1:8765` and exposes local HTTP endpoint
 - `GET /.well-known/arcigy-jarvis.json`
 - `GET /api/web-bridge-preflight`
 - `GET /api/remote-mcp-pack`
+- `GET /api/remote-mcp-smoke`
 - `GET /api/system-health`
 - `POST /api/run-diagnostics`
 - `POST /api/production-readiness`
@@ -171,6 +173,7 @@ It serves the same UI at `http://127.0.0.1:8765` and exposes local HTTP endpoint
 - `POST /api/mcp/arcigy.run_integration_diagnostics`
 - `POST /api/mcp/arcigy.get_production_readiness`
 - `POST /api/mcp/arcigy.get_remote_mcp_pack`
+- `POST /api/mcp/arcigy.run_remote_mcp_smoke`
 - `POST /api/mcp/arcigy.get_operator_briefing`
 - `POST /api/mcp/arcigy.draft_contract_intake`
 - `POST /api/mcp/arcigy.generate_ai_reply`
@@ -193,10 +196,11 @@ External agent setup flow:
 
 1. Set `JARVIS_WEB_TOKEN` to a non-dummy secret in `.env.local`.
 2. Run `npm run web:tunnel:secure` for a one-time token, or `npm run web:tunnel` when `JARVIS_WEB_TOKEN` is already configured.
-3. The runner starts `npm run web` if needed, checks `/api/web-bridge-preflight`, starts ngrok, finds the public HTTPS URL, and verifies the protected manifest.
-4. Give Claude, ChatGPT, Grok, or another remote agent the printed external manifest URL, `/api/remote-mcp-pack`, plus `Authorization: Bearer <JARVIS_WEB_TOKEN>`.
+3. The runner starts `npm run web` if needed, checks `/api/web-bridge-preflight`, starts ngrok, finds the public HTTPS URL, verifies the protected manifest, and runs `/api/remote-mcp-smoke`.
+4. Give Claude, ChatGPT, Grok, or another remote agent the printed external manifest URL, `/api/remote-mcp-pack`, `/api/remote-mcp-smoke`, plus `Authorization: Bearer <JARVIS_WEB_TOKEN>`.
 5. Use the returned `tools[].url` values for web MCP-style calls. Each tool expects JSON in the POST body and returns `{ "result": ... }`.
-6. For manifest tools with `requiresApproval: true`, include `"approval": { "approved": true }` only after explicit user confirmation.
+6. Run `arcigy.run_remote_mcp_smoke` or `GET /api/remote-mcp-smoke` before handoff when you need proof that manifest, read-only calls, approval gates, and token redaction work.
+7. For manifest tools with `requiresApproval: true`, include `"approval": { "approved": true }` only after explicit user confirmation.
 
 Advanced/manual flow:
 

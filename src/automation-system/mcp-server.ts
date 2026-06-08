@@ -19,6 +19,7 @@ import {
 import { buildOperatorBriefing } from "./operator-briefing.ts";
 import { buildProductionReadinessReport } from "./production-readiness.ts";
 import { buildRemoteMcpConnectionPack } from "./remote-mcp-pack.ts";
+import { runRemoteMcpSmoke } from "./remote-mcp-smoke.ts";
 import { getSmartleadCampaignStatus } from "./smartlead.ts";
 import type { ClientNeedSignal, LocalPerson } from "./types.ts";
 
@@ -498,6 +499,25 @@ export function createJarvisMcpServer(): McpServer {
           source: "mcp",
         })
       )
+  );
+
+  server.registerTool(
+    "arcigy.run_remote_mcp_smoke",
+    {
+      title: "Remote MCP smoke test",
+      description: "Verify a Jarvis web MCP bridge manifest, read-only tool call, approval gate, and secret policy.",
+      inputSchema: {
+        baseUrl: z.string().url().optional(),
+        bearerToken: z.string().min(1).optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async ({ baseUrl, bearerToken }) => jsonResult(await runRemoteMcpSmoke({ baseUrl, bearerToken }))
   );
 
   server.registerTool(

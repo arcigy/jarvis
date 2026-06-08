@@ -35,9 +35,12 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /id="handoffManifestUrl"/);
   assert.match(html, /id="handoffToolPattern"/);
   assert.match(html, /id="handoffTunnelCommand"/);
+  assert.match(html, /id="handoffSmokeUrl"/);
   assert.match(html, /id="handoffApprovalTools"/);
   assert.match(html, /id="remoteAgentPrompt"/);
   assert.match(html, /id="copyRemotePack"/);
+  assert.match(html, /id="runRemoteSmoke"/);
+  assert.match(html, /id="remoteSmokeResult"/);
   assert.match(html, /checkWebBridge/);
   assert.match(html, /webBridgeResult/);
   assert.match(html, /Contract generator/);
@@ -50,6 +53,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /healthGrid/);
   assert.match(html, /get_production_readiness/);
   assert.match(html, /get_remote_mcp_pack/);
+  assert.match(html, /run_remote_mcp_smoke/);
   assert.match(html, /draftReply/);
   assert.match(html, /preparedReplies/);
   assert.match(html, /approvePreparedReply/);
@@ -88,8 +92,10 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /arcigyApi\.operatorBriefing/);
   assert.match(renderer, /arcigyApi\.webBridgePreflight/);
   assert.match(renderer, /arcigyApi\.remoteMcpPack/);
+  assert.match(renderer, /arcigyApi\.remoteMcpSmoke/);
   assert.match(renderer, /renderBridgeCockpit/);
   assert.match(renderer, /renderRemoteMcpPack/);
+  assert.match(renderer, /renderRemoteMcpSmoke/);
   assert.match(renderer, /buildRemoteAgentPrompt/);
   assert.match(renderer, /copyRemotePack/);
   assert.match(renderer, /writeClipboardText/);
@@ -119,7 +125,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /Tunnel command/);
   assert.match(renderer, /Tool call pattern/);
   assert.match(renderer, /\/api\/remote-mcp-pack/);
+  assert.match(renderer, /\/api\/remote-mcp-smoke/);
   assert.match(renderer, /arcigy\.get_remote_mcp_pack/);
+  assert.match(renderer, /arcigy\.run_remote_mcp_smoke/);
   assert.match(renderer, /renderReadinessReport/);
   assert.match(renderer, /renderOperatorBriefing/);
   assert.match(renderer, /refreshOperatorBriefing/);
@@ -171,7 +179,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /ipcMain\.handle\("jarvis:operatorBriefing"/);
   assert.match(main, /ipcMain\.handle\("jarvis:webBridgePreflight"/);
   assert.match(main, /ipcMain\.handle\("jarvis:remoteMcpPack"/);
+  assert.match(main, /ipcMain\.handle\("jarvis:remoteMcpSmoke"/);
   assert.match(main, /getRemoteMcpPack/);
+  assert.match(main, /runRemoteMcpSmoke/);
   assert.match(main, /ipcMain\.handle\("jarvis:getPreparedOutreachReplies"/);
   assert.match(main, /ipcMain\.handle\("jarvis:approvePreparedOutreachReply"/);
   assert.match(main, /getWebBridgePreflight/);
@@ -221,6 +231,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(preload, /operatorBriefing/);
   assert.match(preload, /webBridgePreflight/);
   assert.match(preload, /remoteMcpPack/);
+  assert.match(preload, /remoteMcpSmoke/);
   assert.match(preload, /getPreparedOutreachReplies/);
   assert.match(preload, /approvePreparedOutreachReply/);
   assert.match(preload, /coldOutreachBrief/);

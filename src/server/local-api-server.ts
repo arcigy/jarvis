@@ -15,6 +15,7 @@ import { buildContractGenerationCommand, getColdOutreachMcpAnswer, listJarvisMcp
 import { buildOperatorBriefing } from "../automation-system/operator-briefing.ts";
 import { buildProductionReadinessReport } from "../automation-system/production-readiness.ts";
 import { buildRemoteMcpConnectionPack } from "../automation-system/remote-mcp-pack.ts";
+import { runRemoteMcpSmoke } from "../automation-system/remote-mcp-smoke.ts";
 import { getSmartleadCampaignStatus } from "../automation-system/smartlead.ts";
 
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
@@ -63,6 +64,11 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
 
   if (request.method === "GET" && url.pathname === "/api/remote-mcp-pack") {
     writeJson(response, 200, await getRemoteMcpPack(request, url));
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/remote-mcp-smoke") {
+    writeJson(response, 200, await getRemoteMcpSmoke(request));
     return;
   }
 
@@ -481,6 +487,15 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
     writeJson(response, 200, { result: await getRemoteMcpPack(request, null, payload) });
     return;
   }
+  if (name === "arcigy.run_remote_mcp_smoke") {
+    writeJson(response, 200, {
+      result: await runRemoteMcpSmoke({
+        baseUrl: optionalString(payload.baseUrl) ?? getRequestOrigin(request),
+        bearerToken: optionalString(payload.bearerToken) ?? getBearerToken(request) ?? undefined,
+      }),
+    });
+    return;
+  }
   if (name === "arcigy.get_operator_briefing") {
     writeJson(response, 200, { result: await getOperatorBriefing(payload) });
     return;
@@ -595,6 +610,13 @@ async function getRemoteMcpPack(request: IncomingMessage, url: URL | null, paylo
     localhostBypass: process.env.JARVIS_WEB_REQUIRE_AUTH !== "true",
     maxJsonBytes: getMaxJsonBytes(),
     source: "web",
+  });
+}
+
+async function getRemoteMcpSmoke(request: IncomingMessage) {
+  return runRemoteMcpSmoke({
+    baseUrl: getRequestOrigin(request),
+    bearerToken: getBearerToken(request) ?? undefined,
   });
 }
 

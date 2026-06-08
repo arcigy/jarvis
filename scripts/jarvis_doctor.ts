@@ -386,6 +386,7 @@ async function checkWebBridgeSmoke(): Promise<DoctorCheck> {
       intake: contractIntake,
       outputDir: webContractOutputDir,
     });
+    const remoteMcpSmoke = await fetchJsonWithRetry(`${origin}/api/remote-mcp-smoke`);
     const expectedToolCount = listJarvisMcpTools().length;
     const mcpToolCount = Number((preflight as { mcpToolCount?: unknown }).mcpToolCount);
     const manifestToolCount = Array.isArray((manifest as { tools?: unknown }).tools) ? (manifest as { tools: unknown[] }).tools.length : 0;
@@ -394,7 +395,8 @@ async function checkWebBridgeSmoke(): Promise<DoctorCheck> {
       indexHtml.includes("checkWebBridge") &&
       stylesCss.includes(".orb") &&
       rendererJs.includes("arcigyApi") &&
-      rendererJs.includes("webBridgePreflight");
+      rendererJs.includes("webBridgePreflight") &&
+      rendererJs.includes("remoteMcpSmoke");
     const commandDeckReady =
       indexHtml.includes("commandDeck") &&
       indexHtml.includes("readyIntegrations") &&
@@ -413,6 +415,9 @@ async function checkWebBridgeSmoke(): Promise<DoctorCheck> {
       typeof (approvedContract as { result?: unknown }).result === "string" &&
       String((approvedContract as { result: string }).result).includes("generation-manifest.json") &&
       existsSync(join(webContractOutputDir, "generation-manifest.json"));
+    const remoteMcpSmokeReady =
+      (remoteMcpSmoke as { status?: unknown }).status === "ready" &&
+      (remoteMcpSmoke as { expectedToolCount?: unknown }).expectedToolCount === expectedToolCount;
     const ready =
       mcpToolCount === expectedToolCount &&
       manifestToolCount === expectedToolCount &&
@@ -420,14 +425,15 @@ async function checkWebBridgeSmoke(): Promise<DoctorCheck> {
       commandDeckReady &&
       mcpToolCallReady &&
       externalAuthReady &&
-      approvalGateReady;
+      approvalGateReady &&
+      remoteMcpSmokeReady;
 
     return {
       key: "webBridgeSmoke",
       status: ready ? "ready" : "failed",
       message: ready
-        ? `Web bridge served UI assets, MCP manifest, and a tool call with ${expectedToolCount} tool(s).`
-        : "Web bridge smoke returned unexpected UI, manifest, or tool call data.",
+        ? `Web bridge served UI assets, MCP manifest, remote smoke, and a tool call with ${expectedToolCount} tool(s).`
+        : "Web bridge smoke returned unexpected UI, manifest, remote smoke, or tool call data.",
       details: {
         origin,
         mcpToolCount,
@@ -439,6 +445,7 @@ async function checkWebBridgeSmoke(): Promise<DoctorCheck> {
         externalAuthReady,
         deniedExternalManifestStatus,
         approvalGateReady,
+        remoteMcpSmokeReady,
         deniedContractStatus,
         webContractOutputDir,
       },

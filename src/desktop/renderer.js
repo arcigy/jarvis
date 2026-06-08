@@ -10,6 +10,7 @@ const state = {
   webBridgeTimer: null,
   webBridgePollMs: 120000,
   lastRemoteMcpPack: null,
+  lastRemoteMcpSmoke: null,
   clientAlertWatchEnabled: true,
   clientAlertPollTimer: null,
   seenClientNeedAlertIds: new Set(),
@@ -68,9 +69,12 @@ const elements = {
   handoffManifestUrl: document.querySelector("#handoffManifestUrl"),
   handoffToolPattern: document.querySelector("#handoffToolPattern"),
   handoffTunnelCommand: document.querySelector("#handoffTunnelCommand"),
+  handoffSmokeUrl: document.querySelector("#handoffSmokeUrl"),
   handoffApprovalTools: document.querySelector("#handoffApprovalTools"),
   remoteAgentPrompt: document.querySelector("#remoteAgentPrompt"),
   copyRemotePack: document.querySelector("#copyRemotePack"),
+  runRemoteSmoke: document.querySelector("#runRemoteSmoke"),
+  remoteSmokeResult: document.querySelector("#remoteSmokeResult"),
   leadQuery: document.querySelector("#leadQuery"),
   discoverLeads: document.querySelector("#discoverLeads"),
   exportLeads: document.querySelector("#exportLeads"),
@@ -114,6 +118,8 @@ const arcigyApi = window.arcigyDesktop ?? {
   webBridgePreflight: () => getJson("/api/web-bridge-preflight"),
   remoteMcpPack: (payload) =>
     payload ? postJson("/api/mcp/arcigy.get_remote_mcp_pack", payload).then((value) => value.result) : getJson("/api/remote-mcp-pack?includeReadiness=false"),
+  remoteMcpSmoke: (payload) =>
+    payload ? postJson("/api/mcp/arcigy.run_remote_mcp_smoke", payload).then((value) => value.result) : getJson("/api/remote-mcp-smoke"),
   syncGmailRecentMessages: (payload) => postJson("/api/sync-gmail-recent-messages", payload),
   getSmartleadCampaignStatus: (payload) => postJson("/api/smartlead-campaign-status", payload),
   discoverLeads: (payload) => postJson("/api/discover-leads", payload),
@@ -528,6 +534,7 @@ function renderRemoteMcpPack(pack) {
   elements.handoffManifestUrl.textContent = pack.manifestUrl ?? "--";
   elements.handoffToolPattern.textContent = pack.mcpToolCallPattern ?? "--";
   elements.handoffTunnelCommand.textContent = pack.tunnel?.secureCommand ?? "npm run web:tunnel:secure";
+  elements.handoffSmokeUrl.textContent = pack.smokeTestUrl ?? "--";
   elements.handoffApprovalTools.textContent = approvalTools.length ? `${approvalTools.length}: ${approvalTools.join(", ")}` : "none";
   elements.remoteAgentPrompt.textContent = buildRemoteAgentPrompt(pack);
 }
@@ -542,8 +549,19 @@ function buildRemoteAgentPrompt(pack) {
     `Tools: ${pack.tools?.count ?? 0}`,
     `Approval required: ${approvalTools.join(", ") || "none"}`,
     `Secure tunnel: ${pack.tunnel?.secureCommand ?? "npm run web:tunnel:secure"}`,
+    `Smoke test: ${pack.smokeTestUrl ?? "--"}`,
     "Rule: never call approval-required tools without explicit operator confirmation.",
     "Start with arcigy.get_operator_briefing, then use read-only tools before proposing any write action.",
+  ].join("\n");
+}
+
+function renderRemoteMcpSmoke(report) {
+  state.lastRemoteMcpSmoke = report;
+  elements.remoteSmokeResult.dataset.state = report.status === "ready" ? "ready" : "attention";
+  elements.remoteSmokeResult.textContent = [
+    report.summary ?? `Remote MCP smoke: ${report.status}`,
+    "",
+    ...(report.checks ?? []).map((check) => `${check.status.toUpperCase()} ${check.key}: ${check.message}`),
   ].join("\n");
 }
 
@@ -552,7 +570,18 @@ async function copyRemotePack() {
     elements.remoteAgentPrompt.textContent = "Load the web bridge first.";
     return;
   }
-  const payload = `${buildRemoteAgentPrompt(state.lastRemoteMcpPack)}\n\n${JSON.stringify(state.lastRemoteMcpPack, null, 2)}`;
+  const payload = [
+    buildRemoteAgentPrompt(state.lastRemoteMcpPack),
+    "",
+    JSON.stringify(
+      {
+        connectionPack: state.lastRemoteMcpPack,
+        smokeTest: state.lastRemoteMcpSmoke,
+      },
+      null,
+      2
+    ),
+  ].join("\n");
   await writeClipboardText(payload);
   elements.copyRemotePack.textContent = "Copied";
   window.setTimeout(() => {
@@ -920,6 +949,15 @@ elements.copyRemotePack.addEventListener("click", async () => {
     await copyRemotePack();
   } catch (error) {
     elements.remoteAgentPrompt.textContent = error instanceof Error ? error.message : String(error);
+  }
+});
+elements.runRemoteSmoke.addEventListener("click", async () => {
+  try {
+    elements.remoteSmokeResult.textContent = "Running remote MCP smoke test...";
+    const report = await arcigyApi.remoteMcpSmoke({ baseUrl: state.lastRemoteMcpPack?.baseUrl });
+    renderRemoteMcpSmoke(report);
+  } catch (error) {
+    elements.remoteSmokeResult.textContent = error instanceof Error ? error.message : String(error);
   }
 });
 elements.readinessReport.addEventListener("click", async () => {

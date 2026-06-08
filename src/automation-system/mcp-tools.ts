@@ -19,6 +19,7 @@ export type JarvisMcpToolName =
   | "arcigy.run_integration_diagnostics"
   | "arcigy.get_production_readiness"
   | "arcigy.get_remote_mcp_pack"
+  | "arcigy.run_remote_mcp_smoke"
   | "arcigy.get_operator_briefing"
   | "arcigy.generate_ai_reply"
   | "arcigy.sync_gmail_recent_messages"
@@ -129,6 +130,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.get_remote_mcp_pack",
       description: "Vrati secret-safe connection pack pre Claude, ChatGPT, Grok alebo iny remote MCP agent.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.run_remote_mcp_smoke",
+      description: "Overi remote MCP manifest, connection pack, read-only tool call a approval gate bez zapisu.",
       requiresApproval: false,
     },
     {

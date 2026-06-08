@@ -536,6 +536,18 @@ h2 {
   overflow: auto;
 }
 
+.handoffPanel > button {
+  margin-top: 10px;
+}
+
+#remoteSmokeResult[data-state="ready"] {
+  border-color: rgb(67 217 196 / 44%);
+}
+
+#remoteSmokeResult[data-state="attention"] {
+  border-color: rgb(240 184 79 / 55%);
+}
+
 .orb {
   position: relative;
   width: 150px;

@@ -32,6 +32,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(names.includes("arcigy.run_integration_diagnostics"));
   assert.ok(names.includes("arcigy.get_production_readiness"));
   assert.ok(names.includes("arcigy.get_remote_mcp_pack"));
+  assert.ok(names.includes("arcigy.run_remote_mcp_smoke"));
   assert.ok(names.includes("arcigy.get_operator_briefing"));
   assert.ok(names.includes("arcigy.generate_ai_reply"));
   assert.ok(names.includes("arcigy.sync_gmail_recent_messages"));
@@ -79,7 +80,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   });
   const readiness = getStructuredResult(readinessResult) as { status: string; mcp: { toolCount: number }; nextActions: string[]; fixGuide: unknown[] };
   assert.ok(["ready", "attention", "blocked"].includes(readiness.status));
-  assert.equal(readiness.mcp.toolCount, 25);
+  assert.equal(readiness.mcp.toolCount, 26);
   assert.ok(Array.isArray(readiness.nextActions));
   assert.ok(Array.isArray(readiness.fixGuide));
 
@@ -89,14 +90,16 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   });
   const pack = getStructuredResult(packResult) as {
     manifestUrl: string;
+    smokeTestUrl: string;
     auth: { header: string; tokenValueReturned: boolean };
     tools: { count: number; approvalRequired: string[] };
     tunnel: { secureCommand: string };
   };
   assert.equal(pack.manifestUrl, "https://jarvis.example.ngrok-free.app/.well-known/arcigy-jarvis.json");
+  assert.equal(pack.smokeTestUrl, "https://jarvis.example.ngrok-free.app/api/remote-mcp-smoke");
   assert.equal(pack.auth.header, "Authorization: Bearer <JARVIS_WEB_TOKEN>");
   assert.equal(pack.auth.tokenValueReturned, false);
-  assert.equal(pack.tools.count, 25);
+  assert.equal(pack.tools.count, 26);
   assert.ok(pack.tools.approvalRequired.includes("arcigy.generate_contract_documents"));
   assert.equal(pack.tunnel.secureCommand, "npm run web:tunnel:secure");
 
