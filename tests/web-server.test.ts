@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -713,6 +713,65 @@ test("local web bridge preflight reports tunnel readiness without leaking secret
     else process.env.JARVIS_WEB_TOKEN = previousToken;
     if (previousApiSecret === undefined) delete process.env.API_SECRET_KEY;
     else process.env.API_SECRET_KEY = previousApiSecret;
+    await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
+test("local web bridge reports secure tunnel status without leaking one-time token", async () => {
+  const logPath = join(process.cwd(), "generated", "jarvis-secure-tunnel.log");
+  const previousLog = existsSync(logPath) ? readFileSync(logPath, "utf-8") : null;
+  mkdirSync(join(process.cwd(), "generated"), { recursive: true });
+  const token = "temporary-test-token-that-must-not-leak";
+  const publicUrl = "https://jarvis-status-test.ngrok-free.app";
+  writeFileSync(
+    logPath,
+    [
+      "Arcigy Jarvis tunnel is ready.",
+      `External manifest: ${publicUrl}/.well-known/arcigy-jarvis.json`,
+      `External connection pack: ${publicUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`,
+      `External smoke test: ${publicUrl}/api/remote-mcp-smoke`,
+      `External MCP tool pattern: ${publicUrl}/api/mcp/{toolName}`,
+      "Smoke: Remote MCP smoke ready.",
+      `One-time token: ${token}`,
+    ].join("\n"),
+    "utf-8"
+  );
+  const server = createLocalApiServer();
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  const baseUrl = `http://127.0.0.1:${address.port}`;
+
+  try {
+    const response = await fetch(`${baseUrl}/api/secure-tunnel-status`);
+    assert.equal(response.status, 200);
+    const text = await response.text();
+    assert.equal(text.includes(token), false);
+    const body = JSON.parse(text) as {
+      ready: boolean;
+      tokenPresent: boolean;
+      publicUrl: string;
+      manifestUrl: string;
+      connectionPackUrl: string;
+      smokeUrl: string;
+      mcpToolCallPattern: string;
+      redactedTail: string;
+    };
+    assert.equal(body.ready, true);
+    assert.equal(body.tokenPresent, true);
+    assert.equal(body.publicUrl, publicUrl);
+    assert.equal(body.manifestUrl, `${publicUrl}/.well-known/arcigy-jarvis.json`);
+    assert.equal(body.connectionPackUrl, `${publicUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`);
+    assert.equal(body.smokeUrl, `${publicUrl}/api/remote-mcp-smoke`);
+    assert.equal(body.mcpToolCallPattern, `${publicUrl}/api/mcp/{toolName}`);
+    assert.match(body.redactedTail, /One-time token: \[redacted\]/);
+
+    const manifest = await fetch(`${baseUrl}/.well-known/arcigy-jarvis.json`);
+    const manifestBody = (await manifest.json()) as { endpoints: { secureTunnelStatus: string } };
+    assert.equal(manifestBody.endpoints.secureTunnelStatus, `${baseUrl}/api/secure-tunnel-status`);
+  } finally {
+    if (previousLog === null) rmSync(logPath, { force: true });
+    else writeFileSync(logPath, previousLog, "utf-8");
     await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   }
 });

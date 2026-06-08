@@ -149,6 +149,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /arcigyApi\.startSecureTunnel/);
   assert.match(renderer, /arcigyApi\.stopSecureTunnel/);
   assert.match(renderer, /arcigyApi\.getSecureTunnelStatus/);
+  assert.match(renderer, /\/api\/secure-tunnel-status/);
   assert.match(renderer, /checkTunnelStatus: document\.querySelector\("#checkTunnelStatus"\)/);
   assert.match(renderer, /openTunnelLog: document\.querySelector\("#openTunnelLog"\)/);
   assert.match(renderer, /arcigyApi\.remoteMcpPack/);

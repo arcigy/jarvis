@@ -63,6 +63,11 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
     return;
   }
 
+  if (request.method === "GET" && url.pathname === "/api/secure-tunnel-status") {
+    writeJson(response, 200, getSecureTunnelStatus());
+    return;
+  }
+
   if (request.method === "GET" && url.pathname === "/api/remote-mcp-pack") {
     writeJson(response, 200, await getRemoteMcpPack(request, url));
     return;
@@ -397,6 +402,7 @@ function buildWebBridgeManifest(request: IncomingMessage) {
       systemHealth: `${origin}/api/system-health`,
       diagnostics: `${origin}/api/run-diagnostics`,
       productionReadiness: `${origin}/api/production-readiness`,
+      secureTunnelStatus: `${origin}/api/secure-tunnel-status`,
       mcpTools: `${origin}/api/mcp`,
       mcpToolCallPattern: `${mcpBaseUrl}/{toolName}`,
     },
@@ -452,6 +458,51 @@ function buildWebBridgePreflight(request: IncomingMessage) {
     readyForTunnel: tokenConfigured && tokenStrong && riskyToolsRequiringApproval.length > 0,
     warnings,
   };
+}
+
+function getSecureTunnelStatus() {
+  const logPath = secureTunnelLogPath();
+  if (!existsSync(logPath)) {
+    return {
+      running: false,
+      logExists: false,
+      ready: false,
+      logPath,
+      summary: "No secure tunnel log exists yet.",
+    };
+  }
+
+  const raw = readFileSync(logPath, "utf-8").slice(-80_000);
+  const safe = redactSensitiveText(raw).replace(/One-time token:\s*\S+/gi, "One-time token: [redacted]");
+  const publicUrl =
+    matchFirst(raw, /External manifest:\s*(https:\/\/[^\s/]+(?:\/[^\s]*)?)\/\.well-known\/arcigy-jarvis\.json/i) ||
+    matchFirst(raw, /External connection pack:\s*(https:\/\/[^\s/]+(?:\/[^\s]*)?)\/api\/remote-mcp-pack/i) ||
+    matchFirst(raw, /External smoke test:\s*(https:\/\/[^\s/]+(?:\/[^\s]*)?)\/api\/remote-mcp-smoke/i);
+  const ready = /Arcigy Jarvis tunnel is ready\./.test(raw) && Boolean(publicUrl);
+  const smokeSummary = matchFirst(safe, /Smoke:\s*([^\r\n]+)/i);
+  return {
+    running: false,
+    logExists: true,
+    ready,
+    logPath,
+    publicUrl,
+    manifestUrl: publicUrl ? `${publicUrl}/.well-known/arcigy-jarvis.json` : null,
+    connectionPackUrl: publicUrl ? `${publicUrl}/api/remote-mcp-pack?includeReadiness=true&live=true` : null,
+    smokeUrl: publicUrl ? `${publicUrl}/api/remote-mcp-smoke` : null,
+    mcpToolCallPattern: publicUrl ? `${publicUrl}/api/mcp/{toolName}` : null,
+    tokenPresent: /One-time token:\s*\S+|Token source:\s*JARVIS_WEB_TOKEN/i.test(raw),
+    smokeSummary,
+    summary: ready ? "Secure tunnel is ready. Public MCP URLs were extracted without returning the bearer token." : "Secure tunnel is not ready yet.",
+    redactedTail: safe.split(/\r?\n/).filter(Boolean).slice(-18).join("\n"),
+  };
+}
+
+function secureTunnelLogPath() {
+  return join(repoRoot, "generated", "jarvis-secure-tunnel.log");
+}
+
+function matchFirst(value: string, pattern: RegExp) {
+  return String(value).match(pattern)?.[1]?.replace(/\/$/, "") || null;
 }
 
 function getRequestOrigin(request: IncomingMessage): string {

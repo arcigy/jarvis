@@ -167,7 +167,7 @@ const arcigyApi = window.arcigyDesktop ?? {
   operatorBriefing: (payload) => postJson("/api/operator-briefing", payload),
   startSecureTunnel: async () => ({ started: false, reason: "desktop-only" }),
   stopSecureTunnel: async () => ({ stopped: false, reason: "desktop-only" }),
-  getSecureTunnelStatus: async () => ({ running: false, ready: false, reason: "desktop-only" }),
+  getSecureTunnelStatus: () => getJson("/api/secure-tunnel-status"),
   getPreparedOutreachReplies: (payload) => postJson("/api/prepared-outreach-replies", payload),
   getApprovalQueue: (payload) => postJson("/api/approval-queue", payload),
   preparePositiveOutreachReply: (payload) => postJson("/api/mcp/arcigy.prepare_positive_outreach_reply", payload).then((value) => value.result),

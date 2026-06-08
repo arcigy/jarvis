@@ -46,6 +46,7 @@ The web bridge publishes its protected manifest at:
 
 - `GET /api/mcp`
 - `GET /.well-known/arcigy-jarvis.json`
+- `GET /api/secure-tunnel-status`
 - `GET /api/remote-mcp-pack`
 - `GET /api/remote-mcp-smoke`
 
