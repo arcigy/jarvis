@@ -7,6 +7,8 @@ const state = {
   lastPreparedReplies: [],
   operatorBriefingTimer: null,
   operatorBriefingPollMs: 300000,
+  webBridgeTimer: null,
+  webBridgePollMs: 120000,
   clientAlertWatchEnabled: true,
   clientAlertPollTimer: null,
   seenClientNeedAlertIds: new Set(),
@@ -56,6 +58,10 @@ const elements = {
   checkSmartlead: document.querySelector("#checkSmartlead"),
   smartleadResult: document.querySelector("#smartleadResult"),
   checkWebBridge: document.querySelector("#checkWebBridge"),
+  bridgeTunnelState: document.querySelector("#bridgeTunnelState"),
+  bridgeAuthState: document.querySelector("#bridgeAuthState"),
+  bridgeManifestState: document.querySelector("#bridgeManifestState"),
+  bridgeToolState: document.querySelector("#bridgeToolState"),
   webBridgeResult: document.querySelector("#webBridgeResult"),
   leadQuery: document.querySelector("#leadQuery"),
   discoverLeads: document.querySelector("#discoverLeads"),
@@ -462,13 +468,50 @@ function renderWebBridgePreflight(result) {
   return [
     `Tunnel ready: ${result.readyForTunnel ? "yes" : "no"}`,
     `Token configured: ${result.tokenConfigured ? "yes" : "no"}`,
+    `Remote auth: ${result.authRequiredForExternalHosts ? "required" : "not required"}`,
     `Tunnel command: ${result.tunnelCommand ?? "npm run web:tunnel"}`,
+    `Manifest URL: ${result.manifestUrl}`,
+    `Tool call pattern: ${result.mcpToolCallPattern ?? `${result.origin ?? "http://127.0.0.1:8765"}/api/mcp/{toolName}`}`,
     `MCP tools: ${result.mcpToolCount}`,
     `Approval tools: ${(result.riskyToolsRequiringApproval ?? []).join(", ") || "none"}`,
     `Path policy: ${result.pathPolicy}`,
-    `Manifest: ${result.manifestUrl}`,
     ...(result.warnings?.length ? ["", ...result.warnings.map((warning) => `Warning: ${warning}`)] : []),
   ].join("\n");
+}
+
+function renderBridgeCockpit(result) {
+  const warnings = result.warnings ?? [];
+  elements.bridgeTunnelState.textContent = result.readyForTunnel ? "ready" : "locked";
+  elements.bridgeAuthState.textContent = result.tokenConfigured ? "token set" : "needs token";
+  elements.bridgeManifestState.textContent = result.manifestUrl ? "online" : "missing";
+  elements.bridgeToolState.textContent = result.mcpToolCount ? `${result.mcpToolCount} tools` : "offline";
+  elements.bridgeTunnelState.dataset.state = result.readyForTunnel ? "ready" : "attention";
+  elements.bridgeAuthState.dataset.state = result.tokenConfigured ? "ready" : "attention";
+  elements.bridgeManifestState.dataset.state = result.manifestUrl ? "ready" : "attention";
+  elements.bridgeToolState.dataset.state = result.mcpToolCount ? "ready" : "attention";
+  if (warnings.length) elements.bridgeTunnelState.dataset.state = "attention";
+}
+
+async function refreshWebBridge({ loadingText = null } = {}) {
+  if (loadingText) elements.webBridgeResult.textContent = loadingText;
+  const result = await arcigyApi.webBridgePreflight();
+  renderBridgeCockpit(result);
+  elements.webBridgeResult.textContent = renderWebBridgePreflight(result);
+  const health = await arcigyApi.systemHealth();
+  renderCommandDeck(health, result);
+  return result;
+}
+
+function startWebBridgeWatch() {
+  if (state.webBridgeTimer) window.clearInterval(state.webBridgeTimer);
+  void refreshWebBridge().catch((error) => {
+    elements.webBridgeResult.textContent = error instanceof Error ? error.message : String(error);
+  });
+  state.webBridgeTimer = window.setInterval(() => {
+    void refreshWebBridge().catch((error) => {
+      elements.webBridgeResult.textContent = error instanceof Error ? error.message : String(error);
+    });
+  }, state.webBridgePollMs);
 }
 
 async function getJson(url) {
@@ -793,11 +836,7 @@ elements.checkSmartlead.addEventListener("click", async () => {
 });
 elements.checkWebBridge.addEventListener("click", async () => {
   try {
-    elements.webBridgeResult.textContent = "Checking web bridge...";
-    const result = await arcigyApi.webBridgePreflight();
-    elements.webBridgeResult.textContent = renderWebBridgePreflight(result);
-    const health = await arcigyApi.systemHealth();
-    renderCommandDeck(health, result);
+    await refreshWebBridge({ loadingText: "Checking web bridge..." });
   } catch (error) {
     elements.webBridgeResult.textContent = error instanceof Error ? error.message : String(error);
   }
@@ -901,6 +940,7 @@ elements.clientMessage.value = "Potrebujem upravit onboarding automatizaciu do p
 elements.gmailQuery.value = "newer_than:7d";
 elements.leadQuery.value = "automation agency Bratislava";
 void refreshHealth();
+startWebBridgeWatch();
 startOperatorBriefingWatch();
 startClientNeedWatch();
 setMode("idle");

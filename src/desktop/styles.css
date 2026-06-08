@@ -36,6 +36,19 @@ body::before {
   animation: scanWash 9s linear infinite;
 }
 
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(115deg, transparent 0 40%, rgb(67 217 196 / 8%) 45%, transparent 50% 100%),
+    linear-gradient(245deg, transparent 0 54%, rgb(240 184 79 / 7%) 57%, transparent 62% 100%);
+  background-size: 360px 100%, 420px 100%;
+  opacity: 0.38;
+  animation: tacticalSweep 14s linear infinite;
+}
+
 .sidebar {
   position: sticky;
   top: 0;
@@ -250,6 +263,7 @@ h2 {
 
 .deckMetric,
 .deckStatus {
+  position: relative;
   padding: 14px;
 }
 
@@ -361,6 +375,24 @@ h2 {
   border-color: rgb(67 217 196 / 52%);
 }
 
+.panel::after,
+.deckMetric::after,
+.deckStatus::after {
+  content: "";
+  position: absolute;
+  inset: auto 14px 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgb(240 184 79 / 42%), transparent);
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.panel:hover::after,
+.deckMetric:hover::after,
+.deckStatus:hover::after {
+  opacity: 1;
+}
+
 .panelHead {
   display: flex;
   justify-content: space-between;
@@ -382,6 +414,60 @@ h2 {
   margin: 16px 0;
 }
 
+.bridgeCockpit {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.bridgeCockpit div {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #283634;
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgb(67 217 196 / 10%), transparent 58%),
+    rgb(9 15 16 / 88%);
+  padding: 10px;
+  min-height: 66px;
+}
+
+.bridgeCockpit div::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgb(67 217 196 / 12%), transparent);
+  transform: translateX(-100%);
+  animation: bridgeSweep 5.2s ease-in-out infinite;
+}
+
+.bridgeCockpit span,
+.bridgeCockpit strong {
+  position: relative;
+  display: block;
+}
+
+.bridgeCockpit span {
+  color: #91a19d;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.bridgeCockpit strong {
+  margin-top: 8px;
+  color: #eef4f2;
+  font-size: 15px;
+}
+
+.bridgeCockpit strong[data-state="ready"] {
+  color: #9cf8ed;
+}
+
+.bridgeCockpit strong[data-state="attention"] {
+  color: #ffd893;
+}
+
 .orb {
   position: relative;
   width: 150px;
@@ -401,7 +487,9 @@ h2 {
   }
 
   body::before,
+  body::after,
   .deckVisual::before,
+  .bridgeCockpit div::before,
   .scanFrame span:nth-child(3),
   .orb {
     animation: none;
@@ -444,6 +532,19 @@ h2 {
   50% {
     opacity: 0.4;
     transform: scale(1.18);
+  }
+}
+
+@keyframes tacticalSweep {
+  to {
+    background-position: 360px 0, -420px 0;
+  }
+}
+
+@keyframes bridgeSweep {
+  55%,
+  100% {
+    transform: translateX(100%);
   }
 }
 
@@ -565,6 +666,7 @@ ul {
 
   .statusGrid,
   .commandDeck,
+  .bridgeCockpit,
   .grid {
     grid-template-columns: 1fr;
   }

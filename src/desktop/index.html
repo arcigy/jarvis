@@ -207,6 +207,24 @@
             </div>
             <button id="checkWebBridge">Preflight</button>
           </div>
+          <div class="bridgeCockpit" id="bridgeCockpit" aria-label="Remote MCP bridge status">
+            <div>
+              <span>Remote tunnel</span>
+              <strong id="bridgeTunnelState">checking</strong>
+            </div>
+            <div>
+              <span>Auth</span>
+              <strong id="bridgeAuthState">checking</strong>
+            </div>
+            <div>
+              <span>Manifest</span>
+              <strong id="bridgeManifestState">checking</strong>
+            </div>
+            <div>
+              <span>Tool URL</span>
+              <strong id="bridgeToolState">checking</strong>
+            </div>
+          </div>
           <div class="response compact" id="webBridgeResult">Ready to check tunnel readiness.</div>
           <ul>
             <li>generate_contract_documents</li>

@@ -32,6 +32,8 @@ The web bridge publishes its protected manifest at:
 
 External hosts require `Authorization: Bearer <JARVIS_WEB_TOKEN>`. The manifest returns concrete `tools[].url` values for POST calls.
 
+The desktop MCP panel now runs an automatic preflight watch every two minutes. It shows tunnel readiness, token/auth state, manifest availability, MCP tool count, and the exact remote tool-call pattern before you expose the bridge through ngrok.
+
 ## Tools
 
 - `arcigy.generate_contract_documents`: JSON intake form -> framework agreement + project appendix DOCX. Accepts either `inputJsonPath` or inline `intake`.

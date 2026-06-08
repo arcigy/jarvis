@@ -26,6 +26,11 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /id="commandTimeline"/);
   assert.match(html, /id="readinessReport"/);
   assert.match(html, /id="operatorBriefing"/);
+  assert.match(html, /id="bridgeCockpit"/);
+  assert.match(html, /id="bridgeTunnelState"/);
+  assert.match(html, /id="bridgeAuthState"/);
+  assert.match(html, /id="bridgeManifestState"/);
+  assert.match(html, /id="bridgeToolState"/);
   assert.match(html, /checkWebBridge/);
   assert.match(html, /webBridgeResult/);
   assert.match(html, /Contract generator/);
@@ -74,6 +79,10 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /arcigyApi\.productionReadiness/);
   assert.match(renderer, /arcigyApi\.operatorBriefing/);
   assert.match(renderer, /arcigyApi\.webBridgePreflight/);
+  assert.match(renderer, /renderBridgeCockpit/);
+  assert.match(renderer, /refreshWebBridge/);
+  assert.match(renderer, /startWebBridgeWatch/);
+  assert.match(renderer, /webBridgePollMs: 120000/);
   assert.match(renderer, /arcigyApi\.coldOutreachBrief/);
   assert.match(renderer, /arcigyApi\.getPreparedOutreachReplies/);
   assert.match(renderer, /arcigyApi\.approvePreparedOutreachReply/);
@@ -94,6 +103,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /approvalLockCount/);
   assert.match(renderer, /liveBlockerCount/);
   assert.match(renderer, /Tunnel command/);
+  assert.match(renderer, /Tool call pattern/);
   assert.match(renderer, /renderReadinessReport/);
   assert.match(renderer, /renderOperatorBriefing/);
   assert.match(renderer, /refreshOperatorBriefing/);

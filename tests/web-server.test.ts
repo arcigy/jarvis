@@ -27,6 +27,8 @@ test("local web bridge serves UI and API health", async () => {
     assert.match(styles, /commandDeck/);
     assert.match(styles, /scanFrame/);
     assert.match(styles, /coreVisual/);
+    assert.match(styles, /bridgeCockpit/);
+    assert.match(styles, /bridgeSweep/);
 
     const visual = await fetch(`${baseUrl}/assets/jarvis-command-core.png`);
     assert.equal(visual.status, 200);
@@ -40,6 +42,7 @@ test("local web bridge serves UI and API health", async () => {
     const rendererText = await renderer.text();
     assert.match(rendererText, /renderCommandDeck/);
     assert.match(rendererText, /buildCommandTimeline/);
+    assert.match(rendererText, /startWebBridgeWatch/);
 
     const health = await fetch(`${baseUrl}/api/system-health`);
     assert.equal(health.status, 200);
