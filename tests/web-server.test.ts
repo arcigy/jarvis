@@ -676,10 +676,27 @@ test("local web bridge requires bearer auth on external hosts", async () => {
   const baseUrl = `http://127.0.0.1:${address.port}`;
 
   try {
+    const preflight = await fetch(`${baseUrl}/api/mcp/arcigy.get_operator_briefing`, {
+      method: "OPTIONS",
+      headers: {
+        origin: "https://chat.openai.com",
+        "x-forwarded-host": "jarvis.example.ngrok-free.app",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "authorization,content-type",
+      },
+    });
+    assert.equal(preflight.status, 204);
+    assert.equal(preflight.headers.get("access-control-allow-origin"), "*");
+    assert.match(preflight.headers.get("access-control-allow-methods") ?? "", /POST/);
+    assert.match(preflight.headers.get("access-control-allow-headers") ?? "", /authorization/);
+    assert.equal(preflight.headers.get("cache-control"), "no-store");
+
     const denied = await fetch(`${baseUrl}/api/system-health`, {
       headers: { "x-forwarded-host": "jarvis.example.ngrok-free.app" },
     });
     assert.equal(denied.status, 401);
+    assert.equal(denied.headers.get("access-control-allow-origin"), "*");
+    assert.equal(denied.headers.get("x-content-type-options"), "nosniff");
 
     const allowed = await fetch(`${baseUrl}/api/system-health`, {
       headers: {

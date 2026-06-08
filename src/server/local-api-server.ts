@@ -47,8 +47,14 @@ export function createLocalApiServer() {
 
 async function routeRequest(request: IncomingMessage, response: ServerResponse) {
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
+  const protectedBridgePath = isProtectedBridgePath(url.pathname);
 
-  if ((url.pathname.startsWith("/api/") || url.pathname === "/.well-known/arcigy-jarvis.json" || url.pathname === "/.well-known/ai-plugin.json" || url.pathname === "/ai-plugin.json") && !isApiAuthorized(request)) {
+  if (request.method === "OPTIONS" && protectedBridgePath) {
+    writeNoContent(response, 204);
+    return;
+  }
+
+  if (protectedBridgePath && !isApiAuthorized(request)) {
     writeJson(response, 401, {
       error: "Jarvis web API is locked. Provide a bearer token using JARVIS_WEB_TOKEN or API_SECRET_KEY.",
     });
@@ -371,6 +377,10 @@ function isApiAuthorized(request: IncomingMessage): boolean {
   if (!token) return isLocalRequest(request);
   if (isLocalRequest(request) && process.env.JARVIS_WEB_REQUIRE_AUTH !== "true") return true;
   return getBearerToken(request) === token;
+}
+
+function isProtectedBridgePath(pathname: string): boolean {
+  return pathname.startsWith("/api/") || pathname === "/.well-known/arcigy-jarvis.json" || pathname === "/.well-known/ai-plugin.json" || pathname === "/ai-plugin.json";
 }
 
 function isLocalRequest(request: IncomingMessage): boolean {
@@ -1341,12 +1351,33 @@ async function readJson(request: IncomingMessage): Promise<Record<string, unknow
   }
 }
 
+function writeNoContent(response: ServerResponse, statusCode: number) {
+  response.writeHead(statusCode, {
+    ...jsonResponseHeaders(),
+    "content-length": "0",
+  });
+  response.end();
+}
+
 function writeJson(response: ServerResponse, statusCode: number, value: unknown) {
   response.writeHead(statusCode, {
+    ...jsonResponseHeaders(),
     "content-type": "application/json; charset=utf-8",
-    "cache-control": "no-store",
   });
   response.end(JSON.stringify(value));
+}
+
+function jsonResponseHeaders() {
+  return {
+    "access-control-allow-origin": "*",
+    "access-control-allow-methods": "GET,POST,OPTIONS",
+    "access-control-allow-headers": "authorization,content-type,x-requested-with",
+    "access-control-max-age": "600",
+    "cache-control": "no-store",
+    "referrer-policy": "no-referrer",
+    "vary": "origin",
+    "x-content-type-options": "nosniff",
+  };
 }
 
 function getErrorStatus(error: unknown): number {
