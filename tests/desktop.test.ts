@@ -153,6 +153,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /liveBlockerCount/);
   assert.match(renderer, /Tunnel command/);
   assert.match(renderer, /Tool call pattern/);
+  assert.match(renderer, /Connection pack:/);
+  assert.match(renderer, /Required proof:/);
+  assert.match(renderer, /Agent first steps:/);
   assert.match(renderer, /\/api\/remote-mcp-pack/);
   assert.match(renderer, /\/api\/remote-mcp-smoke/);
   assert.match(renderer, /arcigy\.get_remote_mcp_pack/);
@@ -233,6 +236,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /Preview Gmail without local writes/);
   assert.match(main, /dryRun: true/);
   assert.match(main, /buildRemoteMcpQuickStartCalls/);
+  assert.match(main, /buildRemoteMcpHandoffRunbook/);
+  assert.match(main, /connectionPackUrl/);
   assert.match(main, /Get Smartlead outreach brief/);
   assert.match(main, /maxCampaigns: 10/);
   assert.match(main, /runRemoteMcpSmoke/);

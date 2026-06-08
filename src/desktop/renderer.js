@@ -674,12 +674,17 @@ function renderMcpToolList(pack) {
 function buildRemoteAgentPrompt(pack) {
   const approvalTools = pack.tools?.approvalRequired ?? [];
   const localWriteTools = pack.tools?.localStateWrite ?? [];
+  const proof = (pack.handoff?.requiredProof ?? [])
+    .map((item) => `- ${item.key}: ${item.url} => ${item.expected}`)
+    .join("\n");
+  const agentFirstSteps = (pack.handoff?.agentFirstSteps ?? []).map((step) => `- ${step}`).join("\n");
   const quickStart = (pack.quickStartCalls ?? [])
     .map((call) => `- ${call.label}: ${call.tool} ${JSON.stringify(call.body)}`)
     .join("\n");
   return [
     "Arcigy Jarvis remote MCP connection pack",
     `Manifest: ${pack.manifestUrl}`,
+    `Connection pack: ${pack.handoff?.connectionPackUrl ?? `${pack.baseUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`}`,
     `Tool call pattern: ${pack.mcpToolCallPattern}`,
     `Auth header: ${pack.auth?.header ?? "Authorization: Bearer <JARVIS_WEB_TOKEN>"}`,
     `Tools: ${pack.tools?.count ?? 0}`,
@@ -687,6 +692,8 @@ function buildRemoteAgentPrompt(pack) {
     `Local memory writes: ${localWriteTools.join(", ") || "none"}`,
     `Secure tunnel: ${pack.tunnel?.secureCommand ?? "npm run web:tunnel:secure"}`,
     `Smoke test: ${pack.smokeTestUrl ?? "--"}`,
+    proof ? `Required proof:\n${proof}` : "",
+    agentFirstSteps ? `Agent first steps:\n${agentFirstSteps}` : "",
     "Rule: never call approval-required tools without explicit operator confirmation.",
     "Rule: treat local memory write tools as persistent local state changes; preview Gmail with dryRun: true first.",
     "Start with arcigy.get_operator_briefing, then use read-only tools before proposing any write action.",

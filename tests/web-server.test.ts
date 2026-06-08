@@ -300,6 +300,7 @@ test("local web bridge serves UI and API health", async () => {
       auth: { header: string; tokenValueReturned: boolean };
       tools: { count: number; approvalRequired: string[]; readOnlyOrDraft: string[]; localStateWrite: string[] };
       quickStartCalls: Array<{ tool: string; approvalRequired: boolean; body: Record<string, unknown> }>;
+      handoff: { connectionPackUrl: string; requiredProof: Array<{ key: string; url: string }>; agentFirstSteps: string[] };
       tunnel: { secureCommand: string };
     };
     assert.match(remotePackBody.manifestUrl, /\/\.well-known\/arcigy-jarvis\.json$/);
@@ -308,6 +309,9 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(remotePackBody.auth.header, "Authorization: Bearer <JARVIS_WEB_TOKEN>");
     assert.equal(remotePackBody.auth.tokenValueReturned, false);
     assert.equal(remotePackBody.tools.count, 27);
+    assert.match(remotePackBody.handoff.connectionPackUrl, /\/api\/remote-mcp-pack\?includeReadiness=true&live=true$/);
+    assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "connection-pack" && item.url.includes("includeReadiness=true")));
+    assert.ok(remotePackBody.handoff.agentFirstSteps.some((step) => step.includes("status=ready")));
     assert.ok(remotePackBody.tools.approvalRequired.includes("arcigy.append_leads_to_google_sheet"));
     assert.ok(remotePackBody.tools.localStateWrite.includes("arcigy.sync_gmail_recent_messages"));
     assert.equal(remotePackBody.tools.readOnlyOrDraft.includes("arcigy.ingest_client_message"), false);

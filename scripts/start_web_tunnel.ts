@@ -116,6 +116,7 @@ async function main() {
         "Arcigy Jarvis tunnel is ready.",
         `Local UI: ${origin}/index.html`,
         `External manifest: ${publicUrl}/.well-known/arcigy-jarvis.json`,
+        `External connection pack: ${publicUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`,
         `External smoke test: ${publicUrl}/api/remote-mcp-smoke`,
         `External MCP tools: ${publicUrl}/api/mcp`,
         `MCP tool count: ${preflight.mcpToolCount ?? "unknown"}`,

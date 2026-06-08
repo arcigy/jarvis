@@ -36,6 +36,16 @@ export type RemoteMcpConnectionPack = {
     secureCommand: "npm run web:tunnel:secure";
     standardCommand: "npm run web:tunnel";
   };
+  handoff: {
+    connectionPackUrl: string;
+    operatorChecklist: string[];
+    agentFirstSteps: string[];
+    requiredProof: Array<{
+      key: string;
+      url: string;
+      expected: string;
+    }>;
+  };
   tools: {
     count: number;
     names: string[];
@@ -106,6 +116,7 @@ export async function buildRemoteMcpConnectionPack(
       secureCommand: "npm run web:tunnel:secure",
       standardCommand: "npm run web:tunnel",
     },
+    handoff: buildHandoffRunbook(baseUrl),
     tools: {
       count: tools.length,
       names: tools.map((tool) => tool.name),
@@ -142,6 +153,42 @@ export async function buildRemoteMcpConnectionPack(
       "Treat generate_contract_documents, approve_prepared_outreach_reply, and append_leads_to_google_sheet as approval-gated actions.",
       "Treat localStateWrite tools as local memory writes. Prefer dryRun: true for sync_gmail_recent_messages before ingesting messages.",
       "Use get_operator_briefing for a Jarvis-style daily status before making recommendations.",
+    ],
+  };
+}
+
+function buildHandoffRunbook(baseUrl: string): RemoteMcpConnectionPack["handoff"] {
+  return {
+    connectionPackUrl: `${baseUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`,
+    operatorChecklist: [
+      "Run npm run web:tunnel:secure and keep the process open while the remote agent works.",
+      "Give the remote agent the external manifest, connection pack, smoke test URL, MCP base URL, and bearer auth header placeholder.",
+      "Approve approvalRequired tools only after reviewing the exact payload the agent will send.",
+      "Run the smoke test again after any tunnel restart because ngrok URLs can change.",
+    ],
+    agentFirstSteps: [
+      "Fetch connectionPackUrl with Authorization: Bearer <JARVIS_WEB_TOKEN>.",
+      "Run smokeTestUrl and require status=ready before using MCP tools.",
+      "Call arcigy.get_operator_briefing before proposing work.",
+      "Use read-only or draft tools first; use dryRun: true before Gmail sync writes.",
+      "Never call approvalRequired tools until the operator confirms the exact action.",
+    ],
+    requiredProof: [
+      {
+        key: "manifest",
+        url: `${baseUrl}/.well-known/arcigy-jarvis.json`,
+        expected: "HTTP 200, auth header placeholder, complete MCP tool registry.",
+      },
+      {
+        key: "connection-pack",
+        url: `${baseUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`,
+        expected: "HTTP 200, tokenValueReturned=false, handoff runbook present.",
+      },
+      {
+        key: "remote-smoke",
+        url: `${baseUrl}/api/remote-mcp-smoke`,
+        expected: "status=ready for manifest, tool count, local write policy, approval gate, and secret redaction.",
+      },
     ],
   };
 }
