@@ -33,6 +33,7 @@ export function buildRemoteMcpOpenApiDocument(baseUrl = "http://127.0.0.1:8765")
   const tools = listJarvisMcpTools();
   const paths: Record<string, unknown> = {};
   for (const tool of tools) {
+    const example = examplePayloadForTool(tool.name);
     paths[`/api/mcp/${tool.name}`] = {
       post: {
         operationId: operationIdFor(tool.name),
@@ -40,11 +41,18 @@ export function buildRemoteMcpOpenApiDocument(baseUrl = "http://127.0.0.1:8765")
         description: `${tool.description} ${tool.requiresApproval ? 'Requires explicit {"approval":{"approved":true}} after operator confirmation.' : "Read-only, draft, or local-memory workflow as described by the MCP registry."}`,
         tags: [tool.requiresApproval ? "approval-required" : "jarvis"],
         security: [{ bearerAuth: [] }],
+        "x-arcigy-requiresApproval": tool.requiresApproval,
         requestBody: {
           required: false,
           content: {
             "application/json": {
               schema: tool.requiresApproval ? { $ref: "#/components/schemas/ApprovalCapablePayload" } : { $ref: "#/components/schemas/GenericMcpPayload" },
+              examples: {
+                quickStart: {
+                  summary: "Secret-safe quick-start payload",
+                  value: example,
+                },
+              },
             },
           },
         },
@@ -140,4 +148,43 @@ export function buildRemoteMcpOpenApiDocument(baseUrl = "http://127.0.0.1:8765")
 
 function operationIdFor(toolName: string): string {
   return toolName.replace(/^arcigy\./, "arcigy_").replace(/[^A-Za-z0-9_]/g, "_");
+}
+
+function examplePayloadForTool(toolName: string): Record<string, unknown> {
+  if (toolName === "arcigy.run_remote_mcp_smoke") return {};
+  if (toolName === "arcigy.get_operator_briefing") return { periodLabel: "poslednych 7 dni", live: false, syncGmail: false };
+  if (toolName === "arcigy.get_production_readiness") return { live: false };
+  if (toolName === "arcigy.get_approval_queue") return { limit: 20 };
+  if (toolName === "arcigy.identify_email") return { email: "client@example.com" };
+  if (toolName === "arcigy.get_client_need_alerts") return { status: "new", limit: 10 };
+  if (toolName === "arcigy.get_audit_events") return { limit: 20 };
+  if (toolName === "arcigy.get_local_memory_snapshot") return { limit: 10 };
+  if (toolName === "arcigy.draft_contract_intake") return { brief: "Klient potrebuje webovu aplikaciu pre lead intake, reporting a klientsku evidenciu." };
+  if (toolName === "arcigy.generate_ai_reply") return { message: "Potrebujem upravit onboarding automatizaciu do piatku.", language: "sk", tone: "executive" };
+  if (toolName === "arcigy.sync_gmail_recent_messages") return { dryRun: true, maxResults: 5 };
+  if (toolName === "arcigy.get_smartlead_outreach_brief") return { periodLabel: "poslednych 7 dni" };
+  if (toolName === "arcigy.discover_leads") return { query: "automation agency Bratislava", maxResults: 5 };
+  if (toolName === "arcigy.prepare_positive_outreach_reply") {
+    return {
+      leadEmail: "lead@example.com",
+      companyName: "Demo Company",
+      positiveSignal: "Lead asked for pricing and a short discovery call.",
+      language: "sk",
+      tone: "executive",
+    };
+  }
+  if (toolName === "arcigy.generate_contract_documents") {
+    return {
+      approval: { approved: true },
+      intake: {
+        client: { businessName: "Demo Klient s. r. o.", email: "client@example.com" },
+        project: { name: "Demo webova aplikacia", includedModules: ["Klientsky portal", "Reporting"] },
+        pricing: { implementationFeeEur: 2000, monthlyFeeEur: 200 },
+      },
+    };
+  }
+  if (toolName === "arcigy.send_approved_outreach_reply") return { preparedEventId: "prepared_reply_id", approval: { approved: true } };
+  if (toolName === "arcigy.update_client_need_status") return { needSignalId: "client_need_signal_id", status: "resolved", approval: { approved: true } };
+  if (toolName === "arcigy.append_leads_to_google_sheet") return { rows: [["Demo Company", "https://example.com", "lead@example.com"]], approval: { approved: true } };
+  return {};
 }

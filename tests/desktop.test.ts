@@ -341,6 +341,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /api\/openapi\.json/);
   assert.match(main, /openapi-schema/);
   assert.match(main, /hasValidOpenApiSchema/);
+  assert.match(main, /hasSafeOpenApiExample/);
   assert.match(main, /OpenAPI action schema/);
   assert.match(renderer, /renderReadinessReport/);
   assert.match(renderer, /Launch checklist/);

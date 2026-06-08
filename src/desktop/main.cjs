@@ -1399,12 +1399,25 @@ function hasValidOpenApiSchema(value, baseUrl) {
   return names.every((name) => {
     const post = paths[`/api/mcp/${name}`]?.post;
     const security = Array.isArray(post?.security) ? post.security[0] : null;
-    const schemaRef = post?.requestBody?.content?.["application/json"]?.schema?.$ref;
+    const jsonContent = post?.requestBody?.content?.["application/json"];
+    const schemaRef = jsonContent?.schema?.$ref;
     return (
       Array.isArray(security?.bearerAuth) &&
-      schemaRef === (approvalPolicy.get(name) ? "#/components/schemas/ApprovalCapablePayload" : "#/components/schemas/GenericMcpPayload")
+      schemaRef === (approvalPolicy.get(name) ? "#/components/schemas/ApprovalCapablePayload" : "#/components/schemas/GenericMcpPayload") &&
+      hasSafeOpenApiExample(name, jsonContent?.examples?.quickStart?.value)
     );
   });
+}
+
+function hasSafeOpenApiExample(toolName, value) {
+  if (!value || typeof value !== "object") return false;
+  if (/AIza|GOCSPX|1\/\/|postgres(?:ql)?:\/\/|redis:\/\//i.test(JSON.stringify(value))) return false;
+  if (toolName === "arcigy.get_operator_briefing") return value.live === false && value.syncGmail === false;
+  if (toolName === "arcigy.sync_gmail_recent_messages") return value.dryRun === true;
+  if (toolName === "arcigy.identify_email") return typeof value.email === "string" && value.email.includes("@");
+  if (toolName === "arcigy.generate_contract_documents") return value.approval?.approved === true && typeof value.intake === "object";
+  if (toolName === "arcigy.append_leads_to_google_sheet") return value.approval?.approved === true && Array.isArray(value.rows);
+  return true;
 }
 
 function hasValidManifestToolMetadata(value, baseUrl) {

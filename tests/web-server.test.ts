@@ -364,6 +364,13 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(Object.keys(openApiBody.paths).length, listJarvisMcpTools().length);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.get_operator_briefing"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.generate_contract_documents"]);
+    const openApiOperator = openApiBody.paths["/api/mcp/arcigy.get_operator_briefing"] as OpenApiPathFixture;
+    const openApiGmailSync = openApiBody.paths["/api/mcp/arcigy.sync_gmail_recent_messages"] as OpenApiPathFixture;
+    const openApiContract = openApiBody.paths["/api/mcp/arcigy.generate_contract_documents"] as OpenApiPathFixture;
+    assert.equal(openApiOperator.post.requestBody.content["application/json"].examples.quickStart.value.syncGmail, false);
+    assert.equal(openApiGmailSync.post.requestBody.content["application/json"].examples.quickStart.value.dryRun, true);
+    assert.equal(openApiContract.post["x-arcigy-requiresApproval"], true);
+    assert.equal(openApiContract.post.requestBody.content["application/json"].examples.quickStart.value.approval.approved, true);
 
     const remotePack = await fetch(`${baseUrl}/api/remote-mcp-pack?includeReadiness=false`);
     assert.equal(remotePack.status, 200);
@@ -1132,3 +1139,20 @@ test("local web bridge redacts secrets from API error responses", async () => {
     await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   }
 });
+
+type OpenApiPathFixture = {
+  post: {
+    "x-arcigy-requiresApproval"?: boolean;
+    requestBody: {
+      content: {
+        "application/json": {
+          examples: {
+            quickStart: {
+              value: Record<string, any>;
+            };
+          };
+        };
+      };
+    };
+  };
+};

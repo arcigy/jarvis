@@ -322,14 +322,31 @@ function hasValidOpenApiSchema(value: unknown, baseUrl: string): boolean {
   return names.every((name) => {
     const entry = paths[`/api/mcp/${name}`];
     if (!entry || typeof entry !== "object") return false;
-    const post = (entry as { post?: unknown }).post as { security?: unknown; requestBody?: { content?: { "application/json"?: { schema?: { $ref?: unknown } } } } } | undefined;
+    const post = (entry as { post?: unknown }).post as {
+      security?: unknown;
+      requestBody?: { content?: { "application/json"?: { schema?: { $ref?: unknown }; examples?: { quickStart?: { value?: unknown } } } } };
+    } | undefined;
     const security = Array.isArray(post?.security) ? post.security[0] as { bearerAuth?: unknown } | undefined : undefined;
-    const schemaRef = post?.requestBody?.content?.["application/json"]?.schema?.$ref;
+    const jsonContent = post?.requestBody?.content?.["application/json"];
+    const schemaRef = jsonContent?.schema?.$ref;
     return (
       Array.isArray(security?.bearerAuth) &&
-      schemaRef === (approvalPolicy.get(name) ? "#/components/schemas/ApprovalCapablePayload" : "#/components/schemas/GenericMcpPayload")
+      schemaRef === (approvalPolicy.get(name) ? "#/components/schemas/ApprovalCapablePayload" : "#/components/schemas/GenericMcpPayload") &&
+      hasSafeOpenApiExample(name, jsonContent?.examples?.quickStart?.value)
     );
   });
+}
+
+function hasSafeOpenApiExample(toolName: string, value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const payload = value as Record<string, unknown>;
+  if (/AIza|GOCSPX|1\/\/|postgres(?:ql)?:\/\/|redis:\/\//i.test(JSON.stringify(payload))) return false;
+  if (toolName === "arcigy.get_operator_briefing") return payload.live === false && payload.syncGmail === false;
+  if (toolName === "arcigy.sync_gmail_recent_messages") return payload.dryRun === true;
+  if (toolName === "arcigy.identify_email") return typeof payload.email === "string" && payload.email.includes("@");
+  if (toolName === "arcigy.generate_contract_documents") return (payload.approval as { approved?: unknown } | undefined)?.approved === true && typeof payload.intake === "object";
+  if (toolName === "arcigy.append_leads_to_google_sheet") return (payload.approval as { approved?: unknown } | undefined)?.approved === true && Array.isArray(payload.rows);
+  return true;
 }
 
 function hasValidManifestToolMetadata(value: unknown, baseUrl: string): boolean {

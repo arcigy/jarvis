@@ -120,6 +120,14 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.equal(paths.length, listJarvisMcpTools().length);
   assert.ok(paths.includes("/api/mcp/arcigy.get_operator_briefing"));
   assert.ok(paths.includes("/api/mcp/arcigy.generate_contract_documents"));
+  const operatorBriefing = document.paths["/api/mcp/arcigy.get_operator_briefing"] as OpenApiPathFixture;
+  const gmailSync = document.paths["/api/mcp/arcigy.sync_gmail_recent_messages"] as OpenApiPathFixture;
+  const contractGenerate = document.paths["/api/mcp/arcigy.generate_contract_documents"] as OpenApiPathFixture;
+  assert.equal(operatorBriefing.post.requestBody.content["application/json"].examples.quickStart.value.live, false);
+  assert.equal(operatorBriefing.post.requestBody.content["application/json"].examples.quickStart.value.syncGmail, false);
+  assert.equal(gmailSync.post.requestBody.content["application/json"].examples.quickStart.value.dryRun, true);
+  assert.equal(contractGenerate.post["x-arcigy-requiresApproval"], true);
+  assert.equal(contractGenerate.post.requestBody.content["application/json"].examples.quickStart.value.approval.approved, true);
   assert.equal(JSON.stringify(document).includes("<JARVIS_WEB_TOKEN>"), true);
   assert.equal(/AIza|GOCSPX|1\/\/|postgresql:\/\/|redis:\/\//.test(JSON.stringify(document)), false);
 });
@@ -2738,3 +2746,20 @@ async function startTcpServer(onConnection?: (socket: Socket) => void) {
     close: () => new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve()))),
   };
 }
+
+type OpenApiPathFixture = {
+  post: {
+    "x-arcigy-requiresApproval"?: boolean;
+    requestBody: {
+      content: {
+        "application/json": {
+          examples: {
+            quickStart: {
+              value: Record<string, any>;
+            };
+          };
+        };
+      };
+    };
+  };
+};
