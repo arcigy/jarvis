@@ -238,6 +238,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /buildRemoteMcpQuickStartCalls/);
   assert.match(main, /buildRemoteMcpHandoffRunbook/);
   assert.match(main, /connectionPackUrl/);
+  assert.match(main, /Identify a client by email and open needs/);
+  assert.match(main, /List open client need alerts/);
   assert.match(main, /Get Smartlead outreach brief/);
   assert.match(main, /maxCampaigns: 10/);
   assert.match(main, /runRemoteMcpSmoke/);
@@ -246,8 +248,10 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /hasLocalWritePolicy/);
   assert.match(main, /pack-contract-quick-start/);
   assert.match(main, /pack-handoff-proof/);
+  assert.match(main, /pack-client-memory-quick-start/);
   assert.match(main, /hasUsableContractQuickStart/);
   assert.match(main, /hasHandoffProof/);
+  assert.match(main, /hasClientMemoryQuickStarts/);
   assert.match(main, /approvalGate: approvalGate\.body/);
   assert.match(main, /ipcMain\.handle\("jarvis:getPreparedOutreachReplies"/);
   assert.match(main, /ipcMain\.handle\("jarvis:approvePreparedOutreachReply"/);

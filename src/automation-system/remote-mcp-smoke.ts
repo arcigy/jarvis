@@ -69,6 +69,13 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
       "Connection pack includes remote handoff proof URLs and first-step instructions."
     )
   );
+  checks.push(
+    check(
+      hasClientMemoryQuickStarts(pack.body?.quickStartCalls),
+      "pack-client-memory-quick-start",
+      "Connection pack includes read-only client identity and open-need quick-start calls."
+    )
+  );
 
   const health = await postJson(fetchImpl, `${baseUrl}/api/mcp/arcigy.get_system_health`, { format: "json" }, input.bearerToken);
   checks.push(check(health.ok && Array.isArray(health.body?.result?.integrations), "read-only-tool-call", "Read-only MCP tool call returned integration health."));
@@ -87,7 +94,7 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
     baseUrl,
     summary:
       status === "ready"
-        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, local write policy, contract quick-start, handoff proof, read-only call, approval gate, and secret policy passed.`
+        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, local write policy, contract quick-start, client memory quick-start, handoff proof, read-only call, approval gate, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((item) => item.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -141,6 +148,23 @@ function hasHandoffProof(value: unknown, baseUrl: string): boolean {
     proofKeys.has("remote-smoke") &&
     agentFirstSteps.some((step) => typeof step === "string" && step.includes("arcigy.get_operator_briefing")) &&
     agentFirstSteps.some((step) => typeof step === "string" && step.includes("status=ready"))
+  );
+}
+
+function hasClientMemoryQuickStarts(value: unknown): boolean {
+  if (!Array.isArray(value)) return false;
+  const identify = value.find((item) => item && typeof item === "object" && (item as { tool?: unknown }).tool === "arcigy.identify_email") as
+    | { approvalRequired?: unknown; body?: { email?: unknown } }
+    | undefined;
+  const alerts = value.find((item) => item && typeof item === "object" && (item as { tool?: unknown }).tool === "arcigy.get_client_need_alerts") as
+    | { approvalRequired?: unknown; body?: { status?: unknown; limit?: unknown } }
+    | undefined;
+  return (
+    identify?.approvalRequired === false &&
+    typeof identify.body?.email === "string" &&
+    alerts?.approvalRequired === false &&
+    alerts.body?.status === "new" &&
+    typeof alerts.body?.limit === "number"
   );
 }
 

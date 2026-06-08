@@ -214,6 +214,22 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Identify a client by email and open needs",
+      tool: "arcigy.identify_email",
+      method: "POST",
+      url: toolUrl("arcigy.identify_email"),
+      body: { email: "client@example.com" },
+      approvalRequired: false,
+    },
+    {
+      label: "List open client need alerts",
+      tool: "arcigy.get_client_need_alerts",
+      method: "POST",
+      url: toolUrl("arcigy.get_client_need_alerts"),
+      body: { status: "new", limit: 10 },
+      approvalRequired: false,
+    },
+    {
       label: "Get Smartlead outreach brief",
       tool: "arcigy.get_smartlead_outreach_brief",
       method: "POST",

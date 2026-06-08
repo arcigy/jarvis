@@ -604,6 +604,22 @@ function buildRemoteMcpQuickStartCalls(baseUrl) {
       approvalRequired: false,
     },
     {
+      label: "Identify a client by email and open needs",
+      tool: "arcigy.identify_email",
+      method: "POST",
+      url: toolUrl("arcigy.identify_email"),
+      body: { email: "client@example.com" },
+      approvalRequired: false,
+    },
+    {
+      label: "List open client need alerts",
+      tool: "arcigy.get_client_need_alerts",
+      method: "POST",
+      url: toolUrl("arcigy.get_client_need_alerts"),
+      body: { status: "new", limit: 10 },
+      approvalRequired: false,
+    },
+    {
       label: "Get Smartlead outreach brief",
       tool: "arcigy.get_smartlead_outreach_brief",
       method: "POST",
@@ -739,6 +755,13 @@ async function runRemoteMcpSmoke(payload = {}) {
       "Connection pack includes remote handoff proof URLs and first-step instructions."
     )
   );
+  checks.push(
+    smokeCheck(
+      hasClientMemoryQuickStarts(pack.body?.quickStartCalls),
+      "pack-client-memory-quick-start",
+      "Connection pack includes read-only client identity and open-need quick-start calls."
+    )
+  );
   const health = await fetchJson(`${baseUrl}/api/mcp/arcigy.get_system_health`, token, { format: "json" });
   checks.push(smokeCheck(health.ok && Array.isArray(health.body?.result?.integrations), "read-only-tool-call", "Read-only MCP tool call returned integration health."));
   const approvalGate = await fetchJson(`${baseUrl}/api/mcp/arcigy.generate_contract_documents`, token, { intake: {} });
@@ -755,7 +778,7 @@ async function runRemoteMcpSmoke(payload = {}) {
     baseUrl,
     summary:
       status === "ready"
-        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, local write policy, contract quick-start, handoff proof, read-only call, approval gate, and secret policy passed.`
+        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, local write policy, contract quick-start, client memory quick-start, handoff proof, read-only call, approval gate, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((check) => check.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -799,6 +822,19 @@ function hasHandoffProof(value, baseUrl) {
     proofKeys.has("remote-smoke") &&
     agentFirstSteps.some((step) => typeof step === "string" && step.includes("arcigy.get_operator_briefing")) &&
     agentFirstSteps.some((step) => typeof step === "string" && step.includes("status=ready"))
+  );
+}
+
+function hasClientMemoryQuickStarts(value) {
+  if (!Array.isArray(value)) return false;
+  const identify = value.find((item) => item?.tool === "arcigy.identify_email");
+  const alerts = value.find((item) => item?.tool === "arcigy.get_client_need_alerts");
+  return (
+    identify?.approvalRequired === false &&
+    typeof identify?.body?.email === "string" &&
+    alerts?.approvalRequired === false &&
+    alerts?.body?.status === "new" &&
+    typeof alerts?.body?.limit === "number"
   );
 }
 

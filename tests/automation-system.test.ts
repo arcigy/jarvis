@@ -115,6 +115,16 @@ test("remote MCP smoke checks every response for bearer token leaks", async () =
         },
         quickStartCalls: [
           {
+            tool: "arcigy.identify_email",
+            approvalRequired: false,
+            body: { email: "client@example.com" },
+          },
+          {
+            tool: "arcigy.get_client_need_alerts",
+            approvalRequired: false,
+            body: { status: "new", limit: 10 },
+          },
+          {
             tool: "arcigy.generate_contract_documents",
             approvalRequired: true,
             body: {
@@ -167,6 +177,16 @@ test("remote MCP smoke requires the handoff proof runbook", async () => {
           readOnlyOrDraft: ["arcigy.generate_ai_reply"],
         },
         quickStartCalls: [
+          {
+            tool: "arcigy.identify_email",
+            approvalRequired: false,
+            body: { email: "client@example.com" },
+          },
+          {
+            tool: "arcigy.get_client_need_alerts",
+            approvalRequired: false,
+            body: { status: "new", limit: 10 },
+          },
           {
             tool: "arcigy.generate_contract_documents",
             approvalRequired: true,
