@@ -329,6 +329,10 @@ function getWebToken(): string | null {
   return value;
 }
 
+function isStrongWebToken(value: string | null): boolean {
+  return Boolean(value && value.length >= 32);
+}
+
 function getBearerToken(request: IncomingMessage): string | null {
   const header = request.headers.authorization;
   if (!header) return null;
@@ -386,10 +390,13 @@ function buildWebBridgePreflight(request: IncomingMessage) {
   const origin = getRequestOrigin(request);
   const tools = listJarvisMcpTools();
   const riskyToolsRequiringApproval = tools.filter((tool) => tool.requiresApproval).map((tool) => tool.name);
-  const tokenConfigured = getWebToken() !== null;
+  const token = getWebToken();
+  const tokenConfigured = token !== null;
+  const tokenStrong = isStrongWebToken(token);
   const localhostBypass = process.env.JARVIS_WEB_REQUIRE_AUTH !== "true";
   const warnings: string[] = [];
   if (!tokenConfigured) warnings.push("Set JARVIS_WEB_TOKEN before exposing the bridge through a tunnel.");
+  if (tokenConfigured && !tokenStrong) warnings.push("Use a JARVIS_WEB_TOKEN with at least 32 characters before exposing the bridge through a tunnel.");
   if (localhostBypass) warnings.push("Localhost auth bypass is enabled for desktop/local use.");
   if (!isCommandAvailable("ngrok") && !isCommandAvailable("npx")) warnings.push("Neither ngrok nor npx was found on PATH; npm run web:tunnel needs one of them.");
 
@@ -402,12 +409,13 @@ function buildWebBridgePreflight(request: IncomingMessage) {
     tunnelProvider: "ngrok",
     authRequiredForExternalHosts: true,
     tokenConfigured,
+    tokenStrong,
     localhostBypass,
     maxJsonBytes: getMaxJsonBytes(),
     mcpToolCount: tools.length,
     riskyToolsRequiringApproval,
     pathPolicy: "repo-only",
-    readyForTunnel: tokenConfigured && riskyToolsRequiringApproval.length > 0,
+    readyForTunnel: tokenConfigured && tokenStrong && riskyToolsRequiringApproval.length > 0,
     warnings,
   };
 }
@@ -637,6 +645,7 @@ async function getRemoteMcpPack(request: IncomingMessage, url: URL | null, paylo
     includeReadiness,
     dbPath: resolveRepoPath(payload.dbPath, defaultDbPath, "dbPath"),
     tokenConfigured: getWebToken() !== null,
+    tokenStrong: isStrongWebToken(getWebToken()),
     localhostBypass: process.env.JARVIS_WEB_REQUIRE_AUTH !== "true",
     maxJsonBytes: getMaxJsonBytes(),
     source: "web",

@@ -14,6 +14,7 @@ type Tunnel = {
 type Preflight = {
   readyForTunnel?: boolean;
   tokenConfigured?: boolean;
+  tokenStrong?: boolean;
   manifestUrl?: string;
   mcpToolCount?: number;
   warnings?: string[];

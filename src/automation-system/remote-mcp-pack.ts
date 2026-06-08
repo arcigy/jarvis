@@ -9,6 +9,7 @@ export type RemoteMcpConnectionPackInput = {
   includeReadiness?: boolean;
   dbPath?: string;
   tokenConfigured?: boolean;
+  tokenStrong?: boolean;
   localhostBypass?: boolean;
   maxJsonBytes?: number;
   source?: "web" | "mcp";
@@ -27,6 +28,7 @@ export type RemoteMcpConnectionPack = {
     type: "bearer";
     header: "Authorization: Bearer <JARVIS_WEB_TOKEN>";
     tokenConfigured: boolean;
+    tokenStrong: boolean;
     tokenValueReturned: false;
     requiredForExternalHosts: true;
     localhostBypass: boolean;
@@ -108,6 +110,7 @@ export async function buildRemoteMcpConnectionPack(
       type: "bearer",
       header: "Authorization: Bearer <JARVIS_WEB_TOKEN>",
       tokenConfigured: input.tokenConfigured === true,
+      tokenStrong: input.tokenStrong === true,
       tokenValueReturned: false,
       requiredForExternalHosts: true,
       localhostBypass: input.localhostBypass !== false,

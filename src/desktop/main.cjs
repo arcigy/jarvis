@@ -541,10 +541,13 @@ function readinessFixStepFor(blocker) {
 function getWebBridgePreflight() {
   const tools = listWebMcpTools();
   const riskyToolsRequiringApproval = tools.filter((tool) => tool.requiresApproval).map((tool) => tool.name);
-  const tokenConfigured = getWebToken() !== null;
+  const token = getWebToken();
+  const tokenConfigured = token !== null;
+  const tokenStrong = isStrongWebToken(token);
   const localhostBypass = process.env.JARVIS_WEB_REQUIRE_AUTH !== "true";
   const warnings = [];
   if (!tokenConfigured) warnings.push("Set JARVIS_WEB_TOKEN before exposing the bridge through a tunnel.");
+  if (tokenConfigured && !tokenStrong) warnings.push("Use a JARVIS_WEB_TOKEN with at least 32 characters before exposing the bridge through a tunnel.");
   if (localhostBypass) warnings.push("Localhost auth bypass is enabled for desktop/local use.");
   if (!isCommandAvailable("ngrok") && !isCommandAvailable("npx")) warnings.push("Neither ngrok nor npx was found on PATH; npm run web:tunnel needs one of them.");
 
@@ -556,12 +559,13 @@ function getWebBridgePreflight() {
     tunnelProvider: "ngrok",
     authRequiredForExternalHosts: true,
     tokenConfigured,
+    tokenStrong,
     localhostBypass,
     maxJsonBytes: getMaxJsonBytes(),
     mcpToolCount: tools.length,
     riskyToolsRequiringApproval,
     pathPolicy: "repo-only",
-    readyForTunnel: tokenConfigured && riskyToolsRequiringApproval.length > 0,
+    readyForTunnel: tokenConfigured && tokenStrong && riskyToolsRequiringApproval.length > 0,
     warnings,
   };
 }
@@ -586,6 +590,7 @@ async function getRemoteMcpPack(payload = {}) {
       type: "bearer",
       header: "Authorization: Bearer <JARVIS_WEB_TOKEN>",
       tokenConfigured: bridge.tokenConfigured,
+      tokenStrong: bridge.tokenStrong,
       tokenValueReturned: false,
       requiredForExternalHosts: true,
       localhostBypass: bridge.localhostBypass,
@@ -1026,6 +1031,10 @@ function listWebMcpTools() {
 function getWebToken() {
   const value = (process.env.JARVIS_WEB_TOKEN || process.env.API_SECRET_KEY || "").trim();
   return value && value !== "dummy" ? value : null;
+}
+
+function isStrongWebToken(value) {
+  return Boolean(value && value.length >= 32);
 }
 
 function getMaxJsonBytes() {

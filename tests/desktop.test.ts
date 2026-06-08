@@ -311,6 +311,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /ipcMain\.handle\("jarvis:getPreparedOutreachReplies"/);
   assert.match(main, /ipcMain\.handle\("jarvis:approvePreparedOutreachReply"/);
   assert.match(main, /getWebBridgePreflight/);
+  assert.match(main, /tokenStrong/);
+  assert.match(main, /isStrongWebToken/);
+  assert.match(main, /at least 32 characters/);
   assert.match(main, /tunnelCommand: "npm run web:tunnel"/);
   assert.match(main, /tunnelProvider: "ngrok"/);
   assert.match(main, /getRuntimeEnvIssue/);

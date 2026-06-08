@@ -336,7 +336,7 @@ function parseJson(value: string): any {
 
 async function checkWebBridgeSmoke(): Promise<DoctorCheck> {
   const port = await getFreePort();
-  const doctorToken = "doctor-web-token";
+  const doctorToken = "doctor-web-token-for-local-smoke-only";
   const stdout: string[] = [];
   const stderr: string[] = [];
   const child = spawn(process.execPath, ["src/server/local-api-server.ts"], {

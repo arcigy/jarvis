@@ -306,7 +306,7 @@ test("local web bridge serves UI and API health", async () => {
       manifestUrl: string;
       smokeTestUrl: string;
       mcpToolCallPattern: string;
-      auth: { header: string; tokenValueReturned: boolean };
+      auth: { header: string; tokenStrong: boolean; tokenValueReturned: boolean };
       tools: { count: number; approvalRequired: string[]; readOnlyOrDraft: string[]; localStateWrite: string[] };
       quickStartCalls: Array<{ tool: string; approvalRequired: boolean; body: Record<string, unknown> }>;
       handoff: { connectionPackUrl: string; requiredProof: Array<{ key: string; url: string }>; agentFirstSteps: string[] };
@@ -316,6 +316,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.match(remotePackBody.smokeTestUrl, /\/api\/remote-mcp-smoke$/);
     assert.match(remotePackBody.mcpToolCallPattern, /\/api\/mcp\/\{toolName\}$/);
     assert.equal(remotePackBody.auth.header, "Authorization: Bearer <JARVIS_WEB_TOKEN>");
+    assert.equal(remotePackBody.auth.tokenStrong, false);
     assert.equal(remotePackBody.auth.tokenValueReturned, false);
     assert.equal(remotePackBody.tools.count, 28);
     assert.match(remotePackBody.handoff.connectionPackUrl, /\/api\/remote-mcp-pack\?includeReadiness=true&live=true$/);
@@ -498,7 +499,8 @@ test("local web bridge requires bearer auth on external hosts", async () => {
 test("local web bridge preflight reports tunnel readiness without leaking secrets", async () => {
   const previousToken = process.env.JARVIS_WEB_TOKEN;
   const previousApiSecret = process.env.API_SECRET_KEY;
-  const secretValue = "preflight-secret-token";
+  const weakSecretValue = "preflight-secret-token";
+  const secretValue = "preflight-secret-token-with-strong-length";
   delete process.env.JARVIS_WEB_TOKEN;
   process.env.API_SECRET_KEY = "dummy";
   const server = createLocalApiServer();
@@ -515,6 +517,17 @@ test("local web bridge preflight reports tunnel readiness without leaking secret
     assert.equal(unconfiguredBody.readyForTunnel, false);
     assert.ok(unconfiguredBody.warnings.some((warning) => warning.includes("JARVIS_WEB_TOKEN")));
 
+    process.env.JARVIS_WEB_TOKEN = weakSecretValue;
+    const weak = await fetch(`${baseUrl}/api/web-bridge-preflight`);
+    assert.equal(weak.status, 200);
+    const weakText = await weak.text();
+    assert.equal(weakText.includes(weakSecretValue), false);
+    const weakBody = JSON.parse(weakText) as { tokenConfigured: boolean; tokenStrong: boolean; readyForTunnel: boolean; warnings: string[] };
+    assert.equal(weakBody.tokenConfigured, true);
+    assert.equal(weakBody.tokenStrong, false);
+    assert.equal(weakBody.readyForTunnel, false);
+    assert.ok(weakBody.warnings.some((warning) => warning.includes("at least 32 characters")));
+
     process.env.JARVIS_WEB_TOKEN = secretValue;
     const configured = await fetch(`${baseUrl}/api/web-bridge-preflight`);
     assert.equal(configured.status, 200);
@@ -522,6 +535,7 @@ test("local web bridge preflight reports tunnel readiness without leaking secret
     assert.equal(configuredText.includes(secretValue), false);
     const body = JSON.parse(configuredText) as {
       tokenConfigured: boolean;
+      tokenStrong: boolean;
       readyForTunnel: boolean;
       manifestUrl: string;
       tunnelCommand: string;
@@ -532,6 +546,7 @@ test("local web bridge preflight reports tunnel readiness without leaking secret
       maxJsonBytes: number;
     };
     assert.equal(body.tokenConfigured, true);
+    assert.equal(body.tokenStrong, true);
     assert.equal(body.readyForTunnel, true);
     assert.match(body.manifestUrl, /\/\.well-known\/arcigy-jarvis\.json$/);
     assert.equal(body.tunnelCommand, "npm run web:tunnel");

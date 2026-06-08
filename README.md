@@ -202,7 +202,7 @@ For a temporary external URL, run the guarded ngrok runner after configuring `JA
 
 External agent setup flow:
 
-1. Set `JARVIS_WEB_TOKEN` to a non-dummy secret in `.env.local`.
+1. Set `JARVIS_WEB_TOKEN` to a non-dummy secret with at least 32 characters in `.env.local`.
 2. Run `npm run web:tunnel:secure` for a one-time token, or `npm run web:tunnel` when `JARVIS_WEB_TOKEN` is already configured.
 3. The runner starts `npm run web` if needed, checks `/api/web-bridge-preflight`, starts ngrok, finds the public HTTPS URL, verifies the protected manifest, and runs `/api/remote-mcp-smoke`.
 4. Give Claude, ChatGPT, Grok, or another remote agent the printed external manifest URL, `/api/remote-mcp-pack`, `/api/remote-mcp-smoke`, plus `Authorization: Bearer <JARVIS_WEB_TOKEN>`.
