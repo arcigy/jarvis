@@ -233,6 +233,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /arcigyApi\.syncGmailRecentMessages/);
   assert.match(renderer, /Previewing Gmail without writing local records/);
   assert.match(renderer, /dryRun: true/);
+  assert.match(renderer, /window\.confirm\(`Sync recent Gmail messages into local client memory\? Preview first when unsure\.`\)/);
+  assert.match(renderer, /Gmail sync cancelled before local memory writes/);
+  assert.match(renderer, /dryRun: false/);
   assert.match(renderer, /Preview only: wrote 0 local records/);
   assert.match(renderer, /in:inbox newer_than:7d/);
   assert.match(renderer, /arcigyApi\.getSmartleadCampaignStatus/);

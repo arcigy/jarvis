@@ -1579,6 +1579,11 @@ elements.previewGmail.addEventListener("click", async () => {
 });
 elements.syncGmail.addEventListener("click", async () => {
   try {
+    const confirmed = window.confirm(`Sync recent Gmail messages into local client memory? Preview first when unsure.`);
+    if (!confirmed) {
+      elements.gmailResult.textContent = "Gmail sync cancelled before local memory writes.";
+      return;
+    }
     elements.gmailResult.textContent = "Syncing Gmail...";
     const result = await arcigyApi.syncGmailRecentMessages({
       query: elements.gmailQuery.value,
