@@ -7,6 +7,11 @@ import { tmpdir } from "node:os";
 import { createLocalApiServer } from "../src/server/local-api-server.ts";
 
 test("local web bridge serves UI and API health", async () => {
+  const source = readFileSync("src/server/local-api-server.ts", "utf-8");
+  assert.match(source, /function cleanPythonErrorMessage/);
+  assert.match(source, /return redactSensitiveText\(valueError\.replace/);
+  assert.match(source, /return redactSensitiveText\(lines\.at\(-1\) \|\| String\(message\)\)/);
+
   const server = createLocalApiServer();
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();

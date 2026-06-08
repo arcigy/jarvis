@@ -1146,8 +1146,8 @@ function cleanPythonErrorMessage(message: string): string {
     .map((line) => line.trim())
     .filter(Boolean);
   const valueError = [...lines].reverse().find((line) => /^(ValueError|FileNotFoundError|TypeError|Error):\s*/.test(line));
-  if (valueError) return valueError.replace(/^(ValueError|FileNotFoundError|TypeError|Error):\s*/, "");
-  return lines.at(-1) || String(message);
+  if (valueError) return redactSensitiveText(valueError.replace(/^(ValueError|FileNotFoundError|TypeError|Error):\s*/, ""));
+  return redactSensitiveText(lines.at(-1) || String(message));
 }
 
 function parseContractIntake(value: unknown): unknown {

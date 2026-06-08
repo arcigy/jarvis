@@ -13,6 +13,8 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.match(source, /function safeErrorMessage/);
   assert.match(source, /redactSensitiveText\(error instanceof Error \? error\.message : String\(error\)\)/);
   assert.match(source, /console\.error\(safeErrorMessage\(error\)\)/);
+  assert.match(source, /function cleanPythonErrorMessage/);
+  assert.match(source, /return redactSensitiveText\(valueError\.replace/);
 
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   const server = createJarvisMcpServer();
