@@ -389,6 +389,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /safeAiPromptPart/);
   assert.match(main, /redactSensitiveText/);
   assert.match(main, /check\.message = redactSensitiveText/);
+  assert.match(main, /const message = redactSensitiveText\(error instanceof Error \? error\.message : String\(error\)\)/);
   assert.match(main, /\{6,\}/);
   assert.match(main, /withAiSafetySystemInstruction/);
   assert.match(main, /Never copy secrets, API keys, OAuth tokens/);

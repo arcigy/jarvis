@@ -1425,7 +1425,7 @@ async function getOperatorColdOutreachSummary(live, periodLabel, localSummary, a
     const smartlead = await getSmartleadOutreachBrief({ periodLabel, maxCampaigns: 10, ...approvals });
     return smartlead.summary;
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = redactSensitiveText(error instanceof Error ? error.message : String(error));
     return `${localSummary} Live Smartlead summary unavailable: ${message}`;
   }
 }
@@ -1446,7 +1446,7 @@ async function maybeSyncGmailForOperatorBriefing(payload, dbPath) {
     const alerts = result.synced.reduce((sum, item) => sum + item.alerts.length, 0);
     return `Gmail checked ${result.synced.length} account(s), fetched ${fetched} message(s), created ${created} new record(s), skipped ${duplicates} duplicate(s), raised ${alerts} alert(s).`;
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = redactSensitiveText(error instanceof Error ? error.message : String(error));
     return `Gmail live sync unavailable: ${message}`;
   }
 }
