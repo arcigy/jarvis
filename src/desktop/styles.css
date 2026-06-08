@@ -198,6 +198,16 @@ h2 {
   place-items: center;
 }
 
+.coreVisual {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.72;
+  filter: saturate(1.12) contrast(1.08);
+}
+
 .deckVisual::before {
   content: "";
   position: absolute;
@@ -211,6 +221,7 @@ h2 {
 
 .scanFrame {
   position: relative;
+  z-index: 1;
   width: 122px;
   aspect-ratio: 1;
   border: 1px solid rgb(67 217 196 / 48%);

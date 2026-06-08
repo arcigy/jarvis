@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import test from "node:test";
 
 import { listJarvisMcpTools } from "../src/automation-system/mcp-tools.ts";
@@ -9,13 +9,16 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   const renderer = readFileSync("src/desktop/renderer.js", "utf-8");
   const main = readFileSync("src/desktop/main.cjs", "utf-8");
   const preload = readFileSync("src/desktop/preload.cjs", "utf-8");
+  const visualAsset = readFileSync("src/desktop/assets/jarvis-command-core.png");
 
   assert.match(html, /Arcigy Jarvis/);
+  assert.match(html, /assets\/jarvis-command-core\.png/);
   assert.match(html, /Enable/);
   assert.match(html, /data-target="jarvisPanel"/);
   assert.match(html, /id="operationsPanel"/);
   assert.match(html, /id="mcpPanel"/);
   assert.match(html, /id="commandDeck"/);
+  assert.match(html, /coreVisual/);
   assert.match(html, /id="readyIntegrations"/);
   assert.match(html, /id="mcpToolCount"/);
   assert.match(html, /id="approvalLockCount"/);
@@ -118,6 +121,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /seenClientNeedAlertIds/);
   assert.match(renderer, /window\.setInterval/);
   assert.match(renderer, /announceNew/);
+  assert.equal(existsSync("src/desktop/assets/jarvis-command-core.png"), true);
+  assert.equal(visualAsset.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
+  assert.equal(statSync("src/desktop/assets/jarvis-command-core.png").size > 200000, true);
   assert.doesNotMatch(renderer, /demoColdOutreachMetrics/);
   assert.doesNotMatch(renderer, /Za dnes sme napísali/);
   assert.doesNotMatch(html, /[\u0102\u00c4\u0139\u00e2]/);

@@ -26,6 +26,14 @@ test("local web bridge serves UI and API health", async () => {
     const styles = await css.text();
     assert.match(styles, /commandDeck/);
     assert.match(styles, /scanFrame/);
+    assert.match(styles, /coreVisual/);
+
+    const visual = await fetch(`${baseUrl}/assets/jarvis-command-core.png`);
+    assert.equal(visual.status, 200);
+    assert.equal(visual.headers.get("content-type"), "image/png");
+    const visualBody = Buffer.from(await visual.arrayBuffer());
+    assert.equal(visualBody.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
+    assert.equal(visualBody.length > 200000, true);
 
     const renderer = await fetch(`${baseUrl}/renderer.js`);
     assert.equal(renderer.status, 200);
