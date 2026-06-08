@@ -108,7 +108,7 @@ test("operator briefing combines readiness, outreach, client needs, and approval
     readinessStatus: "blocked",
     readinessSummary: "Production needs attention.",
     coldOutreachSummary: "Za dnes sme napisali 10 ludom.",
-    liveSyncSummary: "Gmail checked 4 account(s), fetched 8 message(s), ingested 8, raised 2 alert(s).",
+    liveSyncSummary: "Gmail checked 4 account(s), fetched 8 message(s), created 6 new record(s), skipped 2 duplicate(s), raised 2 alert(s).",
     openClientNeedCount: 2,
     preparedReplyCount: 1,
     nextActions: ["Replace REDIS_URL."],

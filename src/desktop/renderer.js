@@ -347,7 +347,7 @@ function renderGmailSync(result) {
   return synced
     .map((item) =>
       [
-        `${item.account}: fetched ${item.fetched}, ingested ${item.ingested}`,
+        `${item.account}: fetched ${item.fetched}, created ${item.created ?? item.ingested}, skipped ${item.duplicates ?? 0} duplicates`,
         ...(item.alerts ?? []).map((alert) => `Alert: ${alert}`),
         ...(item.preview ?? []).map((event) => `Preview: ${event.fromEmail} - ${event.subject ?? "no subject"}`),
       ].join("\n")

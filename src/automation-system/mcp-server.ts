@@ -622,10 +622,16 @@ export function createJarvisMcpServer(): McpServer {
             ingested.push(runDbCommand("ingest-message", event, dbPath));
           }
         }
+        const createdItems = ingested.filter((item) => item.status === "created");
+        const duplicateItems = ingested.filter((item) => item.status === "duplicate");
         synced.push({
           account: account.label,
           fetched: events.length,
-          ingested: ingested.length,
+          ingested: createdItems.length,
+          created: createdItems.length,
+          duplicates: duplicateItems.length,
+          processed: ingested.length,
+          alerts: createdItems.map((item) => item.jarvisAlert).filter(Boolean),
           preview: events.slice(0, 3).map((event) => ({
             fromEmail: event.fromEmail,
             subject: event.subject,
@@ -842,16 +848,20 @@ async function maybeSyncGmailForOperatorBriefing(
     for (const account of accounts) {
       const events = await listRecentGmailMessageEvents(account, { query: input.gmailQuery, maxResults: input.gmailMaxResults });
       const ingested = events.map((event) => runDbCommand("ingest-message", event, dbPath));
+      const createdItems = ingested.filter((item) => item.status === "created");
+      const duplicateItems = ingested.filter((item) => item.status === "duplicate");
       synced.push({
         fetched: events.length,
-        ingested: ingested.length,
-        alerts: ingested.map((item) => item.jarvisAlert).filter(Boolean).length,
+        created: createdItems.length,
+        duplicates: duplicateItems.length,
+        alerts: createdItems.map((item) => item.jarvisAlert).filter(Boolean).length,
       });
     }
     const fetched = synced.reduce((sum, item) => sum + item.fetched, 0);
-    const ingested = synced.reduce((sum, item) => sum + item.ingested, 0);
+    const created = synced.reduce((sum, item) => sum + item.created, 0);
+    const duplicates = synced.reduce((sum, item) => sum + item.duplicates, 0);
     const alerts = synced.reduce((sum, item) => sum + item.alerts, 0);
-    return `Gmail checked ${synced.length} account(s), fetched ${fetched} message(s), ingested ${ingested}, raised ${alerts} alert(s).`;
+    return `Gmail checked ${synced.length} account(s), fetched ${fetched} message(s), created ${created} new record(s), skipped ${duplicates} duplicate(s), raised ${alerts} alert(s).`;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return `Gmail live sync unavailable: ${message}`;

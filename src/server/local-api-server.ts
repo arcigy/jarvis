@@ -661,11 +661,16 @@ async function syncGmailRecentMessages(payload: Record<string, unknown>) {
         );
       }
     }
+    const createdItems = ingested.filter((item) => item.status === "created");
+    const duplicateItems = ingested.filter((item) => item.status === "duplicate");
     synced.push({
       account: account.label,
       fetched: events.length,
-      ingested: ingested.length,
-      alerts: ingested.map((item) => item.jarvisAlert).filter(Boolean),
+      ingested: createdItems.length,
+      created: createdItems.length,
+      duplicates: duplicateItems.length,
+      processed: ingested.length,
+      alerts: createdItems.map((item) => item.jarvisAlert).filter(Boolean),
       preview: events.slice(0, 3).map((event) => ({
         fromEmail: event.fromEmail,
         subject: event.subject,
@@ -776,9 +781,10 @@ async function maybeSyncGmailForOperatorBriefing(payload: Record<string, unknown
       dryRun: false,
     });
     const fetched = result.synced.reduce((sum, item) => sum + item.fetched, 0);
-    const ingested = result.synced.reduce((sum, item) => sum + item.ingested, 0);
+    const created = result.synced.reduce((sum, item) => sum + item.created, 0);
+    const duplicates = result.synced.reduce((sum, item) => sum + item.duplicates, 0);
     const alerts = result.synced.reduce((sum, item) => sum + item.alerts.length, 0);
-    return `Gmail checked ${result.synced.length} account(s), fetched ${fetched} message(s), ingested ${ingested}, raised ${alerts} alert(s).`;
+    return `Gmail checked ${result.synced.length} account(s), fetched ${fetched} message(s), created ${created} new record(s), skipped ${duplicates} duplicate(s), raised ${alerts} alert(s).`;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return `Gmail live sync unavailable: ${message}`;
