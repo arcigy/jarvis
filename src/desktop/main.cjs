@@ -453,6 +453,7 @@ async function getRemoteMcpPack(payload = {}) {
   const bridge = getWebBridgePreflight();
   const tools = listWebMcpTools();
   const approvalRequired = tools.filter((tool) => tool.requiresApproval).map((tool) => tool.name);
+  const localStateWrite = tools.filter((tool) => localStateWriteTools.has(tool.name)).map((tool) => tool.name);
   const baseUrl = String(payload.baseUrl || bridge.manifestUrl.replace(/\/\.well-known\/arcigy-jarvis\.json$/, "")).replace(/\/+$/g, "");
   const readiness = payload.includeReadiness === false ? null : await getProductionReadiness({ live: payload.live === true });
   return {
@@ -481,7 +482,8 @@ async function getRemoteMcpPack(payload = {}) {
       count: tools.length,
       names: tools.map((tool) => tool.name),
       approvalRequired,
-      readOnlyOrDraft: tools.filter((tool) => !tool.requiresApproval).map((tool) => tool.name),
+      readOnlyOrDraft: tools.filter((tool) => !tool.requiresApproval && !localStateWriteTools.has(tool.name)).map((tool) => tool.name),
+      localStateWrite,
     },
     quickStartCalls: buildRemoteMcpQuickStartCalls(baseUrl),
     approval: {
@@ -508,10 +510,19 @@ async function getRemoteMcpPack(payload = {}) {
       "Call MCP tools with POST JSON to mcpToolCallPattern.",
       "Use the bearer auth header placeholder; the real token must be supplied by the operator and is never returned by this pack.",
       "Treat generate_contract_documents, approve_prepared_outreach_reply, and append_leads_to_google_sheet as approval-gated actions.",
+      "Treat localStateWrite tools as local memory writes. Prefer dryRun: true for sync_gmail_recent_messages before ingesting messages.",
       "Use get_operator_briefing for a Jarvis-style daily status before making recommendations.",
     ],
   };
 }
+
+const localStateWriteTools = new Set([
+  "arcigy.add_cold_outreach_event",
+  "arcigy.upsert_local_person",
+  "arcigy.add_client_need_signal",
+  "arcigy.ingest_client_message",
+  "arcigy.sync_gmail_recent_messages",
+]);
 
 function buildRemoteMcpQuickStartCalls(baseUrl) {
   const toolUrl = (name) => `${baseUrl}/api/mcp/${name}`;
@@ -554,6 +565,14 @@ function buildRemoteMcpQuickStartCalls(baseUrl) {
       method: "POST",
       url: toolUrl("arcigy.discover_leads"),
       body: { query: "automation agency Bratislava", maxResults: 8 },
+      approvalRequired: false,
+    },
+    {
+      label: "Preview Gmail without local writes",
+      tool: "arcigy.sync_gmail_recent_messages",
+      method: "POST",
+      url: toolUrl("arcigy.sync_gmail_recent_messages"),
+      body: { query: "in:inbox newer_than:7d", maxResults: 5, dryRun: true },
       approvalRequired: false,
     },
     {

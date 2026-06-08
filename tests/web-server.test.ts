@@ -248,7 +248,7 @@ test("local web bridge serves UI and API health", async () => {
       smokeTestUrl: string;
       mcpToolCallPattern: string;
       auth: { header: string; tokenValueReturned: boolean };
-      tools: { count: number; approvalRequired: string[] };
+      tools: { count: number; approvalRequired: string[]; readOnlyOrDraft: string[]; localStateWrite: string[] };
       quickStartCalls: Array<{ tool: string; approvalRequired: boolean; body: Record<string, unknown> }>;
       tunnel: { secureCommand: string };
     };
@@ -259,8 +259,11 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(remotePackBody.auth.tokenValueReturned, false);
     assert.equal(remotePackBody.tools.count, 27);
     assert.ok(remotePackBody.tools.approvalRequired.includes("arcigy.append_leads_to_google_sheet"));
+    assert.ok(remotePackBody.tools.localStateWrite.includes("arcigy.sync_gmail_recent_messages"));
+    assert.equal(remotePackBody.tools.readOnlyOrDraft.includes("arcigy.ingest_client_message"), false);
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.run_remote_mcp_smoke" && call.approvalRequired === false));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_outreach_brief" && !("campaignId" in call.body)));
+    assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.sync_gmail_recent_messages" && call.body.dryRun === true));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.generate_contract_documents" && call.approvalRequired === true));
     assert.equal(remotePackBody.tunnel.secureCommand, "npm run web:tunnel:secure");
 

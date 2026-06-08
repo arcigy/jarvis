@@ -1,4 +1,4 @@
-import { listJarvisMcpTools } from "./mcp-tools.ts";
+import { listJarvisMcpTools, type JarvisMcpToolName } from "./mcp-tools.ts";
 import { buildProductionReadinessReport, type ProductionReadinessReport } from "./production-readiness.ts";
 
 export type RemoteMcpConnectionPackInput = {
@@ -39,6 +39,7 @@ export type RemoteMcpConnectionPack = {
     names: string[];
     approvalRequired: string[];
     readOnlyOrDraft: string[];
+    localStateWrite: string[];
   };
   quickStartCalls: Array<{
     label: string;
@@ -73,6 +74,7 @@ export async function buildRemoteMcpConnectionPack(
   const baseUrl = (input.baseUrl || "http://127.0.0.1:8765").replace(/\/+$/g, "");
   const tools = listJarvisMcpTools();
   const approvalRequired = tools.filter((tool) => tool.requiresApproval).map((tool) => tool.name);
+  const localStateWrite = tools.filter((tool) => localStateWriteTools.has(tool.name)).map((tool) => tool.name);
   const readiness = input.includeReadiness === false ? undefined : await buildProductionReadinessReport({ live: input.live === true, dbPath: input.dbPath });
 
   return {
@@ -101,7 +103,8 @@ export async function buildRemoteMcpConnectionPack(
       count: tools.length,
       names: tools.map((tool) => tool.name),
       approvalRequired,
-      readOnlyOrDraft: tools.filter((tool) => !tool.requiresApproval).map((tool) => tool.name),
+      readOnlyOrDraft: tools.filter((tool) => !tool.requiresApproval && !localStateWriteTools.has(tool.name)).map((tool) => tool.name),
+      localStateWrite,
     },
     quickStartCalls: buildQuickStartCalls(baseUrl),
     approval: {
@@ -128,10 +131,19 @@ export async function buildRemoteMcpConnectionPack(
       "Call MCP tools with POST JSON to mcpToolCallPattern.",
       "Use the bearer auth header placeholder; the real token must be supplied by the operator and is never returned by this pack.",
       "Treat generate_contract_documents, approve_prepared_outreach_reply, and append_leads_to_google_sheet as approval-gated actions.",
+      "Treat localStateWrite tools as local memory writes. Prefer dryRun: true for sync_gmail_recent_messages before ingesting messages.",
       "Use get_operator_briefing for a Jarvis-style daily status before making recommendations.",
     ],
   };
 }
+
+const localStateWriteTools = new Set<JarvisMcpToolName>([
+  "arcigy.add_cold_outreach_event",
+  "arcigy.upsert_local_person",
+  "arcigy.add_client_need_signal",
+  "arcigy.ingest_client_message",
+  "arcigy.sync_gmail_recent_messages",
+]);
 
 function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickStartCalls"] {
   const toolUrl = (name: string) => `${baseUrl}/api/mcp/${name}`;
@@ -174,6 +186,14 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       method: "POST",
       url: toolUrl("arcigy.discover_leads"),
       body: { query: "automation agency Bratislava", maxResults: 8 },
+      approvalRequired: false,
+    },
+    {
+      label: "Preview Gmail without local writes",
+      tool: "arcigy.sync_gmail_recent_messages",
+      method: "POST",
+      url: toolUrl("arcigy.sync_gmail_recent_messages"),
+      body: { query: "in:inbox newer_than:7d", maxResults: 5, dryRun: true },
       approvalRequired: false,
     },
     {

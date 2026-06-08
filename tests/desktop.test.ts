@@ -211,6 +211,10 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /ipcMain\.handle\("jarvis:remoteMcpPack"/);
   assert.match(main, /ipcMain\.handle\("jarvis:remoteMcpSmoke"/);
   assert.match(main, /getRemoteMcpPack/);
+  assert.match(main, /localStateWriteTools/);
+  assert.match(main, /localStateWrite/);
+  assert.match(main, /Preview Gmail without local writes/);
+  assert.match(main, /dryRun: true/);
   assert.match(main, /buildRemoteMcpQuickStartCalls/);
   assert.match(main, /Get Smartlead outreach brief/);
   assert.match(main, /maxCampaigns: 10/);
