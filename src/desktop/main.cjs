@@ -1196,6 +1196,14 @@ async function runRemoteMcpSmoke(payload = {}) {
       "OpenAPI action schema is reachable and maps every MCP tool to bearer-protected POST operations."
     )
   );
+  const corsPreflight = await fetchOptions(`${baseUrl}/api/mcp/arcigy.get_operator_briefing`);
+  checks.push(
+    smokeCheck(
+      corsPreflight.ok,
+      "cors-preflight",
+      corsPreflight.ok ? "CORS preflight allows external browser-based agents without bypassing bearer-protected GET/POST calls." : corsPreflight.message
+    )
+  );
   const pack = await fetchJson(`${baseUrl}/api/remote-mcp-pack?includeReadiness=false`, token);
   checks.push(smokeCheck(pack.ok, "connection-pack", pack.ok ? "Remote MCP connection pack is reachable." : pack.message));
   checks.push(smokeCheck(pack.body?.auth?.tokenValueReturned === false, "pack-secret-policy", "Connection pack confirms tokenValueReturned=false."));
@@ -1307,7 +1315,7 @@ async function runRemoteMcpSmoke(payload = {}) {
     baseUrl,
     summary:
       status === "ready"
-        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, action manifest, OpenAPI action schema, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
+      ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, action manifest, OpenAPI action schema, CORS preflight, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((check) => check.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -1610,6 +1618,32 @@ async function fetchJson(url, token, payload = null) {
     return { ok: response.ok, status: response.status, body, message: response.ok ? "OK" : `HTTP ${response.status}` };
   } catch (error) {
     return { ok: false, status: 0, body: null, message: redactSensitiveText(error instanceof Error ? error.message : String(error)) };
+  }
+}
+
+async function fetchOptions(url) {
+  try {
+    const response = await fetch(url, {
+      method: "OPTIONS",
+      headers: {
+        origin: "https://chat.openai.com",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "authorization,content-type",
+      },
+    });
+    const allowOrigin = response.headers.get("access-control-allow-origin") || "";
+    const allowMethods = response.headers.get("access-control-allow-methods") || "";
+    const allowHeaders = response.headers.get("access-control-allow-headers") || "";
+    const ok =
+      response.status === 204 &&
+      allowOrigin === "*" &&
+      /\bPOST\b/i.test(allowMethods) &&
+      /\bOPTIONS\b/i.test(allowMethods) &&
+      /authorization/i.test(allowHeaders) &&
+      /content-type/i.test(allowHeaders);
+    return { ok, status: response.status, message: ok ? "OK" : `HTTP ${response.status} missing required CORS headers` };
+  } catch (error) {
+    return { ok: false, status: 0, message: redactSensitiveText(error instanceof Error ? error.message : String(error)) };
   }
 }
 

@@ -213,7 +213,7 @@ External agent setup flow:
 4. Give Claude, ChatGPT, Grok, or another remote agent the printed external action manifest URL, Jarvis manifest URL, `/api/openapi.json`, `/api/remote-mcp-pack`, `/api/remote-mcp-smoke`, `/api/secure-tunnel-status`, plus `Authorization: Bearer <JARVIS_WEB_TOKEN>`.
 5. For agents that expect plugin/action manifests, import `/.well-known/ai-plugin.json`. For ChatGPT custom actions or Grok-compatible OpenAPI setup, import `/api/openapi.json`. Browser-based clients can run CORS `OPTIONS` preflight, but every real external `GET` or `POST` still needs the bearer header. Otherwise use the returned `tools[].url` values for web MCP-style calls. Each tool expects JSON in the POST body and returns `{ "result": ... }`.
 6. Use `quickStartCalls[]` from the connection pack for safe first calls: smoke proof, operator briefing, audit review, Smartlead outreach brief, Gemini reply draft, lead discovery, and approval-gated contract generation.
-7. Run `arcigy.run_remote_mcp_smoke` or `GET /api/remote-mcp-smoke` before handoff when you need proof that action manifest, OpenAPI schema, Jarvis manifest, tunnel controls, exact tool registry, read-only calls, audit quick-start, approval gates, and token redaction work.
+7. Run `arcigy.run_remote_mcp_smoke` or `GET /api/remote-mcp-smoke` before handoff when you need proof that action manifest, OpenAPI schema, CORS preflight, Jarvis manifest, tunnel controls, exact tool registry, read-only calls, audit quick-start, approval gates, and token redaction work.
 8. For manifest tools with `requiresApproval: true`, include `"approval": { "approved": true }` only after explicit user confirmation.
 
 Remote smoke can also be run without opening the UI:

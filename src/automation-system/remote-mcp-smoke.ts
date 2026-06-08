@@ -78,6 +78,15 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
     )
   );
 
+  const corsPreflight = await optionsRequest(fetchImpl, `${baseUrl}/api/mcp/arcigy.get_operator_briefing`);
+  checks.push(
+    check(
+      corsPreflight.ok,
+      "cors-preflight",
+      corsPreflight.ok ? "CORS preflight allows external browser-based agents without bypassing bearer-protected GET/POST calls." : corsPreflight.message
+    )
+  );
+
   const pack = await getJson(fetchImpl, `${baseUrl}/api/remote-mcp-pack?includeReadiness=false`, input.bearerToken);
   checks.push(check(pack.ok, "connection-pack", pack.ok ? "Remote MCP connection pack is reachable." : pack.message));
   checks.push(check(pack.body?.auth?.tokenValueReturned === false, "pack-secret-policy", "Connection pack confirms tokenValueReturned=false."));
@@ -196,7 +205,7 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
     baseUrl,
     summary:
       status === "ready"
-        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, action manifest, OpenAPI action schema, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
+        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, action manifest, OpenAPI action schema, CORS preflight, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((item) => item.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -566,6 +575,32 @@ async function postJson(fetchImpl: typeof fetch, url: string, payload: unknown, 
     return { ok: response.ok, status: response.status, body, message: response.ok ? "OK" : `HTTP ${response.status}` };
   } catch (error) {
     return { ok: false, status: 0, body: null, message: safeErrorMessage(error) };
+  }
+}
+
+async function optionsRequest(fetchImpl: typeof fetch, url: string) {
+  try {
+    const response = await fetchImpl(url, {
+      method: "OPTIONS",
+      headers: {
+        origin: "https://chat.openai.com",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "authorization,content-type",
+      },
+    });
+    const allowOrigin = response.headers.get("access-control-allow-origin") || "";
+    const allowMethods = response.headers.get("access-control-allow-methods") || "";
+    const allowHeaders = response.headers.get("access-control-allow-headers") || "";
+    const ok =
+      response.status === 204 &&
+      allowOrigin === "*" &&
+      /\bPOST\b/i.test(allowMethods) &&
+      /\bOPTIONS\b/i.test(allowMethods) &&
+      /authorization/i.test(allowHeaders) &&
+      /content-type/i.test(allowHeaders);
+    return { ok, status: response.status, message: ok ? "OK" : `HTTP ${response.status} missing required CORS headers` };
+  } catch (error) {
+    return { ok: false, status: 0, message: safeErrorMessage(error) };
   }
 }
 
