@@ -156,11 +156,37 @@ function resolveWebToken() {
   const params = new URLSearchParams(window.location.search);
   const token = params.get("token");
   if (token) {
-    window.localStorage.setItem("arcigyJarvisToken", token);
+    writeSessionWebToken(token);
+    clearPersistentWebToken();
     window.history.replaceState({}, document.title, window.location.pathname);
     return token;
   }
-  return window.localStorage.getItem("arcigyJarvisToken");
+  clearPersistentWebToken();
+  return readSessionWebToken();
+}
+
+function writeSessionWebToken(token) {
+  try {
+    window.sessionStorage.setItem("arcigyJarvisToken", token);
+  } catch {
+    return;
+  }
+}
+
+function readSessionWebToken() {
+  try {
+    return window.sessionStorage.getItem("arcigyJarvisToken");
+  } catch {
+    return null;
+  }
+}
+
+function clearPersistentWebToken() {
+  try {
+    window.localStorage.removeItem("arcigyJarvisToken");
+  } catch {
+    return;
+  }
 }
 
 function redactSensitiveText(value) {

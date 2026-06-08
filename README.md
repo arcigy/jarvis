@@ -231,7 +231,7 @@ API security:
 - Localhost requests are allowed by default for desktop/local use.
 - External hosts, including ngrok domains, require `Authorization: Bearer <JARVIS_WEB_TOKEN>`.
 - If `JARVIS_WEB_TOKEN` is not set, `API_SECRET_KEY` is used unless it is `dummy`.
-- Open the web UI with `?token=<token>` once; the browser stores it in localStorage and removes it from the URL.
+- Open the web UI with `?token=<token>` once per browser session; the UI stores it only in sessionStorage, removes it from the URL, and clears the legacy localStorage key.
 - Set `JARVIS_WEB_REQUIRE_AUTH=true` to require the token even on localhost.
 
 ## Local clients/leads DB
