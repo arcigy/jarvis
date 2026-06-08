@@ -68,6 +68,10 @@ test("MCP tools expose the requested automation surface", () => {
   assert.ok(localStateWriteToolNames.has("arcigy.sync_gmail_recent_messages"));
   assert.ok(localStateWriteToolNames.has("arcigy.ingest_client_message"));
   assert.equal(localStateWriteToolNames.has("arcigy.generate_contract_documents"), false);
+  for (const tool of listJarvisMcpTools()) {
+    assert.equal(tool.description.length > 20, true);
+    assert.doesNotMatch(tool.description, /[\u0102\u00c4\u0139\u00e2]/);
+  }
 });
 
 test("production readiness report returns blockers and next actions without secrets", async () => {

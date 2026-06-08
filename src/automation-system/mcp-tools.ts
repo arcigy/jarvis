@@ -57,29 +57,29 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
   return [
     {
       name: "arcigy.generate_contract_documents",
-      description: "Vygeneruje rámcovú zmluvu a projektovú prílohu z vyplneného Arcigy JSON formulára.",
+      description: "Vygeneruje ramcovu zmluvu a projektovu prilohu z vyplneneho Arcigy JSON formulara.",
       inputSchemaRef: "docs/contracts/contract-intake.schema.json",
       requiresApproval: true,
     },
     {
       name: "arcigy.draft_contract_intake",
-      description: "Použije Gemini na návrh Arcigy contract intake JSON z krátkeho briefu bez generovania dokumentov.",
+      description: "Pouzije Gemini na navrh Arcigy contract intake JSON z kratkeho briefu bez generovania dokumentov.",
       inputSchemaRef: "docs/contracts/contract-intake.schema.json",
       requiresApproval: false,
     },
     {
       name: "arcigy.get_cold_outreach_brief",
-      description: "Vráti stručný Slovak brief o cold outreach aktivite za zvolené obdobie.",
+      description: "Vrati strucny slovensky brief o cold outreach aktivite za zvolene obdobie.",
       requiresApproval: false,
     },
     {
       name: "arcigy.get_cold_outreach_brief_from_db",
-      description: "Vypočíta cold outreach brief z lokálnych SQLite eventov za zvolené obdobie.",
+      description: "Vypocita cold outreach brief z lokalnych SQLite eventov za zvolene obdobie.",
       requiresApproval: false,
     },
     {
       name: "arcigy.add_cold_outreach_event",
-      description: "Uloží lokálny cold outreach event, napríklad sent, opened, replied alebo positive_reply.",
+      description: "Ulozi lokalny cold outreach event, napriklad sent, opened, replied alebo positive_reply.",
       requiresApproval: false,
     },
     {
@@ -94,22 +94,22 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     },
     {
       name: "arcigy.identify_email",
-      description: "Podľa emailu nájde lokálneho klienta alebo lead a otvorené klientské požiadavky.",
+      description: "Podla emailu najde lokalneho klienta alebo lead a otvorene klientske poziadavky.",
       requiresApproval: false,
     },
     {
       name: "arcigy.upsert_local_person",
-      description: "Vytvorí alebo aktualizuje lokálneho klienta, lead alebo kontakt podľa emailu.",
+      description: "Vytvori alebo aktualizuje lokalneho klienta, lead alebo kontakt podla emailu.",
       requiresApproval: false,
     },
     {
       name: "arcigy.add_client_need_signal",
-      description: "Uloží lokálny signál, že klient niečo chce alebo potrebuje.",
+      description: "Ulozi lokalny signal, ze klient nieco chce alebo potrebuje.",
       requiresApproval: false,
     },
     {
       name: "arcigy.ingest_client_message",
-      description: "Uloží prijatú správu/email, spáruje odosielateľa a pri požiadavke vytvorí Jarvis alert.",
+      description: "Ulozi prijatu spravu alebo email, sparuje odosielatela a pri poziadavke vytvori Jarvis alert.",
       requiresApproval: false,
     },
     {
@@ -124,17 +124,17 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     },
     {
       name: "arcigy.jarvis_voice_event",
-      description: "Spracuje transcript event pre Jarvis wake-word a vráti text na hlasovú odpoveď.",
+      description: "Spracuje transcript event pre Jarvis wake-word a vrati text na hlasovu odpoved.",
       requiresApproval: false,
     },
     {
       name: "arcigy.get_system_health",
-      description: "Skontroluje, ktoré produkčné integrácie majú runtime konfiguráciu bez odhalenia secretov.",
+      description: "Skontroluje, ktore produkcne integracie maju runtime konfiguraciu bez odhalenia secretov.",
       requiresApproval: false,
     },
     {
       name: "arcigy.run_integration_diagnostics",
-      description: "Spustí konfiguračné alebo live read-only diagnostiky integrácií bez odhalenia secretov.",
+      description: "Spusti konfiguracne alebo live read-only diagnostiky integracii bez odhalenia secretov.",
       requiresApproval: false,
     },
     {
@@ -159,17 +159,17 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     },
     {
       name: "arcigy.generate_ai_reply",
-      description: "Použije Gemini na prípravu návrhu odpovede klientovi bez odoslania.",
+      description: "Pouzije Gemini na pripravu navrhu odpovede klientovi bez odoslania.",
       requiresApproval: false,
     },
     {
       name: "arcigy.sync_gmail_recent_messages",
-      description: "Načíta posledné Gmail správy a uloží klientské potreby do lokálnej databázy.",
+      description: "Nacita posledne Gmail spravy a ulozi klientske potreby do lokalnej databazy.",
       requiresApproval: false,
     },
     {
       name: "arcigy.get_smartlead_campaign_status",
-      description: "Načíta kampane alebo štatistiky kampane zo Smartlead API.",
+      description: "Nacita kampane alebo statistiky kampane zo Smartlead API.",
       requiresApproval: false,
     },
     {
@@ -179,22 +179,22 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     },
     {
       name: "arcigy.search_serper",
-      description: "Vyhľadá webové výsledky cez Serper pre lead discovery.",
+      description: "Vyhlada webove vysledky cez Serper pre lead discovery.",
       requiresApproval: false,
     },
     {
       name: "arcigy.search_google_places",
-      description: "Vyhľadá firmy cez Google Places Text Search.",
+      description: "Vyhlada firmy cez Google Places Text Search.",
       requiresApproval: false,
     },
     {
       name: "arcigy.discover_leads",
-      description: "Skombinuje Serper a Google Places do normalizovaného zoznamu leadov.",
+      description: "Skombinuje Serper a Google Places do normalizovaneho zoznamu leadov.",
       requiresApproval: false,
     },
     {
       name: "arcigy.append_leads_to_google_sheet",
-      description: "Zapíše pripravené lead rows do Google Sheetu po explicitnom volaní.",
+      description: "Zapise pripravene lead rows do Google Sheetu po explicitnom schvalenom volani.",
       requiresApproval: true,
     },
   ];
