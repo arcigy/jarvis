@@ -256,6 +256,7 @@ function buildCommandTimeline(blockers, bridge, advisories = []) {
 
 function renderReadinessReport(report) {
   const blockers = report.blockers ?? [];
+  const attentionQueue = report.attentionQueue ?? [];
   return [
     report.summary ?? `Status: ${report.status}`,
     `Status: ${report.status}`,
@@ -265,6 +266,11 @@ function renderReadinessReport(report) {
     "",
     blockers.length ? "Blockers:" : "Blockers: none",
     ...blockers.map((blocker) => `- ${blocker.key}: ${blocker.message}`),
+    "",
+    attentionQueue.length ? "Attention queue:" : "Attention queue: clear",
+    ...attentionQueue.map((item) =>
+      [`- [${item.severity}] ${item.title}`, `  Source: ${item.source}`, `  Next: ${item.nextAction}`, `  Validate: ${item.validationCommand}`].join("\n")
+    ),
     "",
     "Next actions:",
     ...(report.nextActions ?? []).map((action) => `- ${action}`),

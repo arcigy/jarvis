@@ -292,6 +292,7 @@ async function getProductionReadiness(payload) {
   const blocking = uniqueBlockers.filter((blocker) => blocker.severity === "blocking").length;
   const status = blocking ? "blocked" : uniqueBlockers.length ? "attention" : "ready";
   const warnings = uniqueBlockers.length - blocking;
+  const fixGuide = buildReadinessFixGuide(uniqueBlockers);
   return {
     status,
     checkedAt: new Date().toISOString(),
@@ -311,10 +312,11 @@ async function getProductionReadiness(payload) {
       approvalRequired: bridge.riskyToolsRequiringApproval,
     },
     blockers: uniqueBlockers,
+    attentionQueue: buildReadinessAttentionQueue(uniqueBlockers, fixGuide),
     nextActions: uniqueBlockers.length
       ? uniqueBlockers.map((blocker) => blocker.nextAction)
       : ["No action needed. Keep secrets out of git and run doctor before changes."],
-    fixGuide: buildReadinessFixGuide(uniqueBlockers),
+    fixGuide,
     diagnostics: diagnostics || undefined,
   };
 }
@@ -359,6 +361,24 @@ function buildReadinessFixGuide(blockers) {
     if (seen.has(step.id)) return false;
     seen.add(step.id);
     return true;
+  });
+}
+
+function buildReadinessAttentionQueue(blockers, fixGuide) {
+  if (!blockers.length) return [];
+  return blockers.map((blocker, index) => {
+    const fixStep = fixGuide.find((step) => step.envKeys.some((key) => blocker.message.includes(key))) || fixGuide[index] || null;
+    return {
+      id: `${blocker.severity}-${blocker.key}-${index + 1}`,
+      key: blocker.key,
+      severity: blocker.severity,
+      source: blocker.message.startsWith("Missing or invalid runtime config") ? "configuration" : "live-diagnostic",
+      title: fixStep?.title || `Review ${blocker.key}`,
+      message: blocker.message,
+      nextAction: blocker.nextAction,
+      envKeys: fixStep?.envKeys || [],
+      validationCommand: fixStep?.validationCommand || "npm run doctor -- --live-integrations",
+    };
   });
 }
 
@@ -501,7 +521,9 @@ async function getRemoteMcpPack(payload = {}) {
           summary: readiness.summary,
           checkedAt: readiness.checkedAt,
           blockers: readiness.blockers,
+          attentionQueue: readiness.attentionQueue,
           nextActions: readiness.nextActions,
+          fixGuide: readiness.fixGuide,
         }
       : undefined,
     agentInstructions: [

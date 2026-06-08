@@ -26,6 +26,7 @@ export type ProductionReadinessReport = {
     approvalRequired: string[];
   };
   blockers: ReadinessBlocker[];
+  attentionQueue: ReadinessAttentionItem[];
   nextActions: string[];
   fixGuide: ReadinessFixStep[];
   diagnostics?: DiagnosticsResult;
@@ -40,6 +41,18 @@ export type ReadinessFixStep = {
   id: string;
   title: string;
   detail: string;
+  envKeys: string[];
+  validationCommand: string;
+};
+
+export type ReadinessAttentionItem = {
+  id: string;
+  key: string;
+  severity: ReadinessBlocker["severity"];
+  source: "configuration" | "live-diagnostic";
+  title: string;
+  message: string;
+  nextAction: string;
   envKeys: string[];
   validationCommand: string;
 };
@@ -60,6 +73,7 @@ export async function buildProductionReadinessReport(
   const blockingCount = uniqueBlockers.filter((blocker) => blocker.severity === "blocking").length;
   const status: ReadinessStatus = blockingCount ? "blocked" : uniqueBlockers.length ? "attention" : "ready";
   const readyIntegrations = health.filter((item) => item.configured).length;
+  const fixGuide = buildFixGuide(uniqueBlockers);
 
   return {
     status,
@@ -75,8 +89,9 @@ export async function buildProductionReadinessReport(
       approvalRequired: tools.filter((tool) => tool.requiresApproval).map((tool) => tool.name),
     },
     blockers: uniqueBlockers,
+    attentionQueue: buildAttentionQueue(uniqueBlockers, fixGuide),
     nextActions: uniqueBlockers.length ? uniqueBlockers.map((blocker) => blocker.nextAction) : ["No action needed. Keep secrets out of git and run doctor before changes."],
-    fixGuide: buildFixGuide(uniqueBlockers),
+    fixGuide,
     diagnostics,
   };
 }
@@ -159,6 +174,24 @@ function buildFixGuide(blockers: ReadinessBlocker[]): ReadinessFixStep[] {
     if (seen.has(step.id)) return false;
     seen.add(step.id);
     return true;
+  });
+}
+
+function buildAttentionQueue(blockers: ReadinessBlocker[], fixGuide: ReadinessFixStep[]): ReadinessAttentionItem[] {
+  if (!blockers.length) return [];
+  return blockers.map((blocker, index) => {
+    const fixStep = fixGuide.find((step) => step.envKeys.some((key) => blocker.message.includes(key))) ?? fixGuide[index] ?? null;
+    return {
+      id: `${blocker.severity}-${blocker.key}-${index + 1}`,
+      key: blocker.key,
+      severity: blocker.severity,
+      source: blocker.message.startsWith("Missing or invalid runtime config") ? "configuration" : "live-diagnostic",
+      title: fixStep?.title ?? `Review ${blocker.key}`,
+      message: blocker.message,
+      nextAction: blocker.nextAction,
+      envKeys: fixStep?.envKeys ?? [],
+      validationCommand: fixStep?.validationCommand ?? "npm run doctor -- --live-integrations",
+    };
   });
 }
 

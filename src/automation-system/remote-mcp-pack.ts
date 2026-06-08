@@ -1,5 +1,7 @@
 import { listJarvisMcpTools, localStateWriteToolNames } from "./mcp-tools.ts";
 import { buildProductionReadinessReport, type ProductionReadinessReport } from "./production-readiness.ts";
+import type { RuntimeEnv } from "./env.ts";
+import type { FetchLike } from "./gemini.ts";
 
 export type RemoteMcpConnectionPackInput = {
   baseUrl?: string;
@@ -63,19 +65,24 @@ export type RemoteMcpConnectionPack = {
     summary: string;
     checkedAt: string;
     blockers: ProductionReadinessReport["blockers"];
+    attentionQueue: ProductionReadinessReport["attentionQueue"];
     nextActions: string[];
+    fixGuide: ProductionReadinessReport["fixGuide"];
   };
   agentInstructions: string[];
 };
 
 export async function buildRemoteMcpConnectionPack(
-  input: RemoteMcpConnectionPackInput = {}
+  input: RemoteMcpConnectionPackInput = {},
+  env: RuntimeEnv = process.env,
+  fetchImpl: FetchLike = fetch
 ): Promise<RemoteMcpConnectionPack> {
   const baseUrl = (input.baseUrl || "http://127.0.0.1:8765").replace(/\/+$/g, "");
   const tools = listJarvisMcpTools();
   const approvalRequired = tools.filter((tool) => tool.requiresApproval).map((tool) => tool.name);
   const localStateWrite = tools.filter((tool) => localStateWriteToolNames.has(tool.name)).map((tool) => tool.name);
-  const readiness = input.includeReadiness === false ? undefined : await buildProductionReadinessReport({ live: input.live === true, dbPath: input.dbPath });
+  const readiness =
+    input.includeReadiness === false ? undefined : await buildProductionReadinessReport({ live: input.live === true, dbPath: input.dbPath }, env, fetchImpl);
 
   return {
     mode: "remote-mcp-connection-pack",
@@ -122,7 +129,9 @@ export async function buildRemoteMcpConnectionPack(
           summary: readiness.summary,
           checkedAt: readiness.checkedAt,
           blockers: readiness.blockers,
+          attentionQueue: readiness.attentionQueue,
           nextActions: readiness.nextActions,
+          fixGuide: readiness.fixGuide,
         }
       : undefined,
     agentInstructions: [

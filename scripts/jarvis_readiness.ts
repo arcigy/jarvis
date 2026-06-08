@@ -58,6 +58,11 @@ function renderReadiness(report: ProductionReadinessReport): string {
     report.blockers.length ? "Findings:" : "Findings: none",
     ...report.blockers.map((blocker) => `- [${blocker.severity}] ${blocker.key}: ${blocker.message}`),
     "",
+    report.attentionQueue.length ? "Attention queue:" : "Attention queue: clear",
+    ...report.attentionQueue.map((item) =>
+      [`- [${item.severity}] ${item.title}`, `  Source: ${item.source}`, `  Next: ${item.nextAction}`, `  Validate: ${item.validationCommand}`].join("\n")
+    ),
+    "",
     "Next actions:",
     ...report.nextActions.map((action) => `- ${action}`),
     "",

@@ -28,6 +28,7 @@ import {
 } from "../src/automation-system/jarvis-voice.ts";
 import { buildProductionReadinessReport } from "../src/automation-system/production-readiness.ts";
 import { buildOperatorBriefing } from "../src/automation-system/operator-briefing.ts";
+import { buildRemoteMcpConnectionPack } from "../src/automation-system/remote-mcp-pack.ts";
 import { runRemoteMcpSmoke } from "../src/automation-system/remote-mcp-smoke.ts";
 
 test("MCP tools expose the requested automation surface", () => {
@@ -80,6 +81,8 @@ test("production readiness report returns blockers and next actions without secr
   assert.ok(report.nextActions.some((action) => action.includes("REDIS_URL")));
   assert.ok(report.fixGuide.some((step) => step.id === "redis-real-password" && step.envKeys.includes("REDIS_URL")));
   assert.ok(report.fixGuide.every((step) => step.validationCommand.includes("doctor")));
+  assert.ok(report.attentionQueue.some((item) => item.key === "redis" && item.source === "configuration"));
+  assert.ok(report.attentionQueue.every((item) => item.validationCommand.includes("doctor")));
   assert.equal(JSON.stringify(report).includes("PASSWORD"), false);
 });
 
@@ -159,7 +162,23 @@ test("production readiness treats unused Redis as non-blocking advisory", async 
 
   assert.equal(report.status, "attention");
   assert.ok(report.blockers.some((blocker) => blocker.key === "redis" && blocker.severity === "warning"));
+  assert.ok(report.attentionQueue.some((item) => item.key === "redis" && item.severity === "warning"));
   assert.match(report.summary, /non-blocking warning/);
+});
+
+test("remote MCP connection pack includes secret-safe readiness attention queue", async () => {
+  const pack = await buildRemoteMcpConnectionPack(
+    { baseUrl: "https://jarvis.example", live: false, includeReadiness: true },
+    {
+      GEMINI_API_KEY: "gemini",
+      REDIS_URL: "redis://default:PASSWORD@example.com:6379",
+    }
+  );
+
+  assert.equal(pack.readiness?.status, "blocked");
+  assert.ok(pack.readiness?.attentionQueue.some((item) => item.key === "redis"));
+  assert.ok(pack.readiness?.fixGuide.some((step) => step.id === "redis-real-password"));
+  assert.equal(JSON.stringify(pack).includes("PASSWORD"), false);
 });
 
 test("operator briefing combines readiness, outreach, client needs, and approvals", () => {
@@ -805,6 +824,7 @@ test("production readiness treats Serper exhaustion as advisory when other lead 
 
     assert.equal(report.status, "attention");
     assert.equal(report.blockers.find((blocker) => blocker.key === "serper")?.severity, "warning");
+    assert.equal(report.attentionQueue.find((item) => item.key === "serper")?.source, "live-diagnostic");
     assert.match(report.summary, /non-blocking warning/);
     assert.equal(JSON.stringify(report).includes("spent-serper"), false);
   } finally {

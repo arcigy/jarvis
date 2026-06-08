@@ -277,15 +277,17 @@ test("local web bridge serves UI and API health", async () => {
       body: JSON.stringify({ live: false }),
     });
     assert.equal(readiness.status, 200);
-    const readinessBody = (await readiness.json()) as { status: string; mcp: { toolCount: number }; nextActions: string[]; fixGuide: unknown[] };
+    const readinessBody = (await readiness.json()) as { status: string; mcp: { toolCount: number }; nextActions: string[]; fixGuide: unknown[]; attentionQueue: unknown[] };
     assert.ok(["ready", "attention", "blocked"].includes(readinessBody.status));
     assert.equal(readinessBody.mcp.toolCount, 27);
     assert.ok(Array.isArray(readinessBody.nextActions));
     assert.ok(Array.isArray(readinessBody.fixGuide));
+    assert.ok(Array.isArray(readinessBody.attentionQueue));
 
     const mcpReadiness = await postJson(`${baseUrl}/api/mcp/arcigy.get_production_readiness`, { live: false });
     assert.equal(mcpReadiness.result.mcp.toolCount, 27);
     assert.ok(Array.isArray(mcpReadiness.result.fixGuide));
+    assert.ok(Array.isArray(mcpReadiness.result.attentionQueue));
 
     const remotePack = await fetch(`${baseUrl}/api/remote-mcp-pack?includeReadiness=false`);
     assert.equal(remotePack.status, 200);

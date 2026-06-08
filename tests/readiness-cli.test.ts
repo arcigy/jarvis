@@ -20,11 +20,13 @@ test("Jarvis readiness CLI reports blockers without leaking secrets", () => {
     status: string;
     blockers: Array<{ key: string }>;
     fixGuide: Array<{ id: string; envKeys: string[] }>;
+    attentionQueue: Array<{ key: string; validationCommand: string }>;
   };
   assert.equal(body.status, "blocked");
   assert.ok(body.blockers.some((blocker) => blocker.key === "postgres"));
   assert.ok(body.blockers.some((blocker) => blocker.key === "redis"));
   assert.ok(body.fixGuide.some((step) => step.id === "redis-real-password" && step.envKeys.includes("REDIS_URL")));
+  assert.ok(body.attentionQueue.some((item) => item.key === "redis" && item.validationCommand.includes("doctor")));
 });
 
 test("Jarvis readiness CLI exits zero with attention when only unused Redis is invalid", () => {
@@ -54,9 +56,11 @@ test("Jarvis readiness CLI exits zero with attention when only unused Redis is i
   const body = JSON.parse(result.stdout) as {
     status: string;
     blockers: Array<{ key: string; severity: string }>;
+    attentionQueue: Array<{ key: string; severity: string }>;
   };
   assert.equal(body.status, "attention");
   assert.ok(body.blockers.some((blocker) => blocker.key === "redis" && blocker.severity === "warning"));
+  assert.ok(body.attentionQueue.some((item) => item.key === "redis" && item.severity === "warning"));
 });
 
 test("Jarvis readiness CLI help is available without env", () => {
