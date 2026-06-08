@@ -526,6 +526,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /buildRemoteMcpHandoffRunbook/);
   assert.match(main, /connectionPackUrl/);
   assert.match(main, /repo-only limits/);
+  assert.match(main, /action-manifest, openapi-schema, cors-preflight, pack-limits/);
   assert.match(main, /approval-shape-gate/);
   assert.match(main, /secret-redaction/);
   assert.match(main, /Identify a client by email and open needs/);

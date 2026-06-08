@@ -435,11 +435,14 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "openapi-schema" && item.url.endsWith("/api/openapi.json")));
     assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "connection-pack" && item.expected.includes("repo-only limits")));
     assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("pack-limits")));
+    assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("cors-preflight")));
+    assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("openapi-schema")));
     assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("approval-shape-gate")));
     assert.ok(remotePackBody.handoff.agentFirstSteps.some((step) => step.includes("secret-redaction")));
     assert.deepEqual(remotePackBody.agentCompatibility.supportedAgents.slice(0, 3), ["Claude", "ChatGPT", "Grok"]);
     assert.ok(remotePackBody.agentCompatibility.requiredBeforeWork.some((step) => step.includes("repo-only limits")));
     assert.ok(remotePackBody.agentCompatibility.requiredBeforeWork.some((step) => step.includes("pack-limits")));
+    assert.ok(remotePackBody.agentCompatibility.requiredBeforeWork.some((step) => step.includes("cors-preflight") && step.includes("action-manifest")));
     assert.ok(remotePackBody.agentCompatibility.safetyRules.some((rule) => rule.includes("family-friendly")));
     assert.match(remotePackBody.agentPromptTemplates.grok, /xAI-compatible agents/);
     assert.match(remotePackBody.agentPromptTemplates.grok, /approvalRequired tools/);

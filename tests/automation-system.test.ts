@@ -831,6 +831,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("openApiSchemaUrl")));
   assert.equal(pack.agentCompatibility.protocol, "HTTP JSON MCP bridge");
   assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("status=ready")));
+  assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("cors-preflight") && step.includes("action-manifest")));
   assert.ok(pack.agentCompatibility.safetyRules.some((rule) => rule.includes("family-friendly")));
   assert.ok(pack.agentCompatibility.safetyRules.some((rule) => rule.includes("approvalRequired")));
   assert.equal(pack.tunnel.statusUrl, "https://jarvis.example/api/secure-tunnel-status");
@@ -840,6 +841,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "action-manifest" && item.url.endsWith("/.well-known/ai-plugin.json")));
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "secure-tunnel-status"));
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "openapi-schema" && item.url.endsWith("/api/openapi.json")));
+  assert.ok(pack.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("cors-preflight") && item.expected.includes("action-manifest")));
   assert.match(pack.agentPromptTemplates.grok, /xAI-compatible agents/);
   assert.match(pack.agentPromptTemplates.grok, /remote smoke/);
   assert.match(pack.agentPromptTemplates.chatgpt, /POST https:\/\/jarvis\.example\/api\/mcp\/\{toolName\}/);

@@ -309,7 +309,7 @@ async function verifyRemoteMcpSmoke(publicUrl: string, token: string | null): Pr
   if (body.status !== "ready") {
     exitWithMessage(`Tunnel opened, but remote MCP smoke is not ready: ${body.summary ?? "unknown smoke failure"}`);
   }
-  const requiredChecks = ["pack-limits", "approval-gate", "approval-shape-gate", "secret-redaction"];
+  const requiredChecks = ["action-manifest", "openapi-schema", "cors-preflight", "pack-limits", "approval-gate", "approval-shape-gate", "secret-redaction"];
   const missingChecks = requiredChecks.filter((key) => !hasReadySmokeCheck(body, key));
   if (missingChecks.length > 0) {
     exitWithMessage(`Tunnel opened, but remote MCP smoke is missing ready safety checks: ${missingChecks.join(", ")}.`);
@@ -357,7 +357,7 @@ function renderTunnelReadySummary(input: {
     `- Connection pack: ${connectionPackUrl}`,
     `- Smoke test: ${smokeUrl}`,
     `- MCP tool call pattern: ${mcpToolPattern}`,
-    "- Required proof before work: manifest HTTP 200, connection pack tokenValueReturned=false with repo-only limits, remote smoke status=ready with pack-limits, approval-gate, approval-shape-gate, and secret-redaction.",
+    "- Required proof before work: action manifest HTTP 200, OpenAPI schema HTTP 200, manifest HTTP 200, connection pack tokenValueReturned=false with repo-only limits, remote smoke status=ready with action-manifest, openapi-schema, cors-preflight, pack-limits, approval-gate, approval-shape-gate, and secret-redaction.",
     "- First MCP call: POST arcigy.get_operator_briefing with {\"periodLabel\":\"poslednych 7 dni\",\"live\":true}.",
     "- Approval rule: never call approval-required tools without your explicit confirmation of the exact payload.",
     "- Local write rule: preview Gmail with dryRun=true before syncing messages into local memory.",
