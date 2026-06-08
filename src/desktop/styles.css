@@ -181,7 +181,8 @@ h2 {
 
 .deckVisual,
 .deckMetric,
-.deckStatus {
+.deckStatus,
+.deckAction {
   border: 1px solid #26302f;
   background:
     linear-gradient(135deg, rgb(67 217 196 / 10%), transparent 42%),
@@ -264,10 +265,18 @@ h2 {
 }
 
 .deckStatus {
-  grid-column: 2 / -1;
+  grid-column: 2 / -2;
   min-height: auto;
   line-height: 1.45;
   color: #c8d6d2;
+}
+
+.deckAction {
+  display: grid;
+  place-items: center;
+  min-height: auto;
+  text-align: center;
+  color: #9cf8ed;
 }
 
 .health {

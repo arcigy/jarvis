@@ -137,6 +137,20 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(diagnosticsBody.live, false);
     assert.ok(diagnosticsBody.checks.some((item) => item.key === "sqlite"));
 
+    const readiness = await fetch(`${baseUrl}/api/production-readiness`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ live: false }),
+    });
+    assert.equal(readiness.status, 200);
+    const readinessBody = (await readiness.json()) as { status: string; mcp: { toolCount: number }; nextActions: string[] };
+    assert.ok(["ready", "attention", "blocked"].includes(readinessBody.status));
+    assert.equal(readinessBody.mcp.toolCount, 20);
+    assert.ok(Array.isArray(readinessBody.nextActions));
+
+    const mcpReadiness = await postJson(`${baseUrl}/api/mcp/arcigy.get_production_readiness`, { live: false });
+    assert.equal(mcpReadiness.result.mcp.toolCount, 20);
+
     const voice = await fetch(`${baseUrl}/api/jarvis/voice-event`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -290,7 +304,7 @@ test("local web bridge preflight reports tunnel readiness without leaking secret
     assert.match(body.manifestUrl, /\/\.well-known\/arcigy-jarvis\.json$/);
     assert.equal(body.tunnelCommand, "npm run web:tunnel");
     assert.equal(body.tunnelProvider, "ngrok");
-    assert.ok(body.mcpToolCount >= 19);
+    assert.ok(body.mcpToolCount >= 20);
     assert.ok(body.riskyToolsRequiringApproval.includes("arcigy.generate_contract_documents"));
     assert.ok(body.riskyToolsRequiringApproval.includes("arcigy.append_leads_to_google_sheet"));
     assert.equal(body.pathPolicy, "repo-only");

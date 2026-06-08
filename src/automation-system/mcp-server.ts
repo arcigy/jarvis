@@ -16,6 +16,7 @@ import {
   getColdOutreachMcpAnswer,
   identifyEmailMcpAnswer,
 } from "./mcp-tools.ts";
+import { buildProductionReadinessReport } from "./production-readiness.ts";
 import { getSmartleadCampaignStatus } from "./smartlead.ts";
 import type { ClientNeedSignal, LocalPerson } from "./types.ts";
 
@@ -380,6 +381,25 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async ({ live, dbPath }) => jsonResult(await runIntegrationDiagnostics({ live, dbPath }))
+  );
+
+  server.registerTool(
+    "arcigy.get_production_readiness",
+    {
+      title: "Production readiness",
+      description: "Return production readiness summary, blockers, next actions, MCP approval locks, and optional live diagnostics.",
+      inputSchema: {
+        live: z.boolean().default(false),
+        dbPath: z.string().optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async ({ live, dbPath }) => jsonResult(await buildProductionReadinessReport({ live, dbPath }))
   );
 
   server.registerTool(

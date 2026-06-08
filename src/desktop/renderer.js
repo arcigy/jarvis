@@ -15,6 +15,7 @@ const elements = {
   approvalLockCount: document.querySelector("#approvalLockCount"),
   liveBlockerCount: document.querySelector("#liveBlockerCount"),
   commandTimeline: document.querySelector("#commandTimeline"),
+  readinessReport: document.querySelector("#readinessReport"),
   listenButton: document.querySelector("#listenButton"),
   transcript: document.querySelector("#transcript"),
   response: document.querySelector("#response"),
@@ -73,6 +74,7 @@ const arcigyApi = window.arcigyDesktop ?? {
   coldOutreachBrief: (payload) => postJson("/api/cold-outreach-brief", payload),
   jarvisVoiceEvent: (payload) => postJson("/api/jarvis/voice-event", payload),
   runDiagnostics: (payload) => postJson("/api/run-diagnostics", payload),
+  productionReadiness: (payload) => postJson("/api/production-readiness", payload),
   identifyEmail: (payload) => postJson("/api/identify-email", payload),
   ingestClientMessage: (payload) => postJson("/api/ingest-client-message", payload),
   generateAiReply: (payload) => postJson("/api/generate-ai-reply", payload),
@@ -175,6 +177,23 @@ function buildCommandTimeline(blockers, bridge) {
     .slice(0, 3)
     .join(" | ");
   return `${blockers.length} integration gate(s) need attention. ${blockerText}. ${bridgeState}`;
+}
+
+function renderReadinessReport(report) {
+  const blockers = report.blockers ?? [];
+  return [
+    report.summary ?? `Status: ${report.status}`,
+    `Status: ${report.status}`,
+    `Integrations: ${report.integrations?.ready ?? "--"}/${report.integrations?.total ?? "--"}`,
+    `MCP tools: ${report.mcp?.toolCount ?? "--"}`,
+    `Approval locks: ${(report.mcp?.approvalRequired ?? []).length}`,
+    "",
+    blockers.length ? "Blockers:" : "Blockers: none",
+    ...blockers.map((blocker) => `- ${blocker.key}: ${blocker.message}`),
+    "",
+    "Next actions:",
+    ...(report.nextActions ?? []).map((action) => `- ${action}`),
+  ].join("\n");
 }
 
 async function refreshHealth() {
@@ -587,6 +606,16 @@ elements.checkWebBridge.addEventListener("click", async () => {
     renderCommandDeck(health, result);
   } catch (error) {
     elements.webBridgeResult.textContent = error instanceof Error ? error.message : String(error);
+  }
+});
+elements.readinessReport.addEventListener("click", async () => {
+  try {
+    elements.commandTimeline.textContent = "Building production readiness report...";
+    const report = await arcigyApi.productionReadiness({ live: false });
+    elements.commandTimeline.textContent = report.summary;
+    elements.response.textContent = renderReadinessReport(report);
+  } catch (error) {
+    elements.commandTimeline.textContent = error instanceof Error ? error.message : String(error);
   }
 });
 elements.discoverLeads.addEventListener("click", async () => {

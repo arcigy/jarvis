@@ -27,6 +27,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(names.includes("arcigy.jarvis_voice_event"));
   assert.ok(names.includes("arcigy.get_system_health"));
   assert.ok(names.includes("arcigy.run_integration_diagnostics"));
+  assert.ok(names.includes("arcigy.get_production_readiness"));
   assert.ok(names.includes("arcigy.generate_ai_reply"));
   assert.ok(names.includes("arcigy.sync_gmail_recent_messages"));
   assert.ok(names.includes("arcigy.get_smartlead_campaign_status"));
@@ -66,6 +67,15 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   const diagnostics = getStructuredResult(diagnosticsResult) as { live: boolean; checks: Array<{ key: string }> };
   assert.equal(diagnostics.live, false);
   assert.ok(diagnostics.checks.some((item) => item.key === "sqlite"));
+
+  const readinessResult = await client.callTool({
+    name: "arcigy.get_production_readiness",
+    arguments: { live: false },
+  });
+  const readiness = getStructuredResult(readinessResult) as { status: string; mcp: { toolCount: number }; nextActions: string[] };
+  assert.ok(["ready", "attention", "blocked"].includes(readiness.status));
+  assert.equal(readiness.mcp.toolCount, 20);
+  assert.ok(Array.isArray(readiness.nextActions));
 
   await client.close();
   await server.close();

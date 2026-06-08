@@ -25,6 +25,7 @@ import {
   createJarvisVoiceSession,
   handleJarvisVoiceEvent,
 } from "../src/automation-system/jarvis-voice.ts";
+import { buildProductionReadinessReport } from "../src/automation-system/production-readiness.ts";
 
 test("MCP tools expose the requested automation surface", () => {
   const names = listJarvisMcpTools().map((tool) => tool.name);
@@ -41,6 +42,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.jarvis_voice_event",
     "arcigy.get_system_health",
     "arcigy.run_integration_diagnostics",
+    "arcigy.get_production_readiness",
     "arcigy.generate_ai_reply",
     "arcigy.sync_gmail_recent_messages",
     "arcigy.get_smartlead_campaign_status",
@@ -49,6 +51,21 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.discover_leads",
     "arcigy.append_leads_to_google_sheet",
   ]);
+});
+
+test("production readiness report returns blockers and next actions without secrets", async () => {
+  const report = await buildProductionReadinessReport({
+    live: false,
+  }, {
+    GEMINI_API_KEY: "gemini",
+    REDIS_URL: "redis://default:PASSWORD@example.com:6379",
+  });
+
+  assert.equal(report.status, "blocked");
+  assert.equal(report.mcp.toolCount, 20);
+  assert.ok(report.blockers.some((blocker) => blocker.key === "redis"));
+  assert.ok(report.nextActions.some((action) => action.includes("REDIS_URL")));
+  assert.equal(JSON.stringify(report).includes("PASSWORD"), false);
 });
 
 test("contract intake draft parses Gemini JSON output", async () => {

@@ -12,6 +12,7 @@ import { listConfiguredGmailAccounts, listRecentGmailMessageEvents } from "../au
 import { containsWakeWord, type JarvisVoiceSession } from "../automation-system/jarvis-voice.ts";
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "../automation-system/lead-discovery.ts";
 import { buildContractGenerationCommand, getColdOutreachMcpAnswer, listJarvisMcpTools } from "../automation-system/mcp-tools.ts";
+import { buildProductionReadinessReport } from "../automation-system/production-readiness.ts";
 import { getSmartleadCampaignStatus } from "../automation-system/smartlead.ts";
 
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
@@ -70,6 +71,12 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
   if (request.method === "POST" && url.pathname === "/api/run-diagnostics") {
     const payload = await readJson(request);
     writeJson(response, 200, await runIntegrationDiagnostics({ live: payload.live === true, dbPath: resolveRepoPath(payload.dbPath, defaultDbPath, "dbPath") }));
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/production-readiness") {
+    const payload = await readJson(request);
+    writeJson(response, 200, await buildProductionReadinessReport({ live: payload.live === true, dbPath: resolveRepoPath(payload.dbPath, defaultDbPath, "dbPath") }));
     return;
   }
 
@@ -298,6 +305,7 @@ function buildWebBridgeManifest(request: IncomingMessage) {
       ui: `${origin}/index.html`,
       systemHealth: `${origin}/api/system-health`,
       diagnostics: `${origin}/api/run-diagnostics`,
+      productionReadiness: `${origin}/api/production-readiness`,
       mcpTools: `${origin}/api/mcp`,
       mcpToolCallPattern: `${mcpBaseUrl}/{toolName}`,
     },
@@ -413,6 +421,12 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
   if (name === "arcigy.run_integration_diagnostics") {
     writeJson(response, 200, {
       result: await runIntegrationDiagnostics({ live: payload.live === true, dbPath: resolveRepoPath(payload.dbPath, defaultDbPath, "dbPath") }),
+    });
+    return;
+  }
+  if (name === "arcigy.get_production_readiness") {
+    writeJson(response, 200, {
+      result: await buildProductionReadinessReport({ live: payload.live === true, dbPath: resolveRepoPath(payload.dbPath, defaultDbPath, "dbPath") }),
     });
     return;
   }

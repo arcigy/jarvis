@@ -32,6 +32,7 @@ Server tools:
 - `arcigy.identify_email`
 - `arcigy.get_system_health`
 - `arcigy.run_integration_diagnostics`
+- `arcigy.get_production_readiness`
 - `arcigy.generate_ai_reply`
 - `arcigy.sync_gmail_recent_messages`
 - `arcigy.get_smartlead_campaign_status`
@@ -120,6 +121,7 @@ It serves the same UI at `http://127.0.0.1:8765` and exposes local HTTP endpoint
 - `GET /api/web-bridge-preflight`
 - `GET /api/system-health`
 - `POST /api/run-diagnostics`
+- `POST /api/production-readiness`
 - `POST /api/jarvis/voice-event`
 - `POST /api/cold-outreach-brief`
 - `POST /api/identify-email`
@@ -135,6 +137,7 @@ It serves the same UI at `http://127.0.0.1:8765` and exposes local HTTP endpoint
 - `POST /api/append-leads-to-google-sheet`
 - `POST /api/mcp/arcigy.get_system_health`
 - `POST /api/mcp/arcigy.run_integration_diagnostics`
+- `POST /api/mcp/arcigy.get_production_readiness`
 - `POST /api/mcp/arcigy.draft_contract_intake`
 - `POST /api/mcp/arcigy.generate_ai_reply`
 - `POST /api/mcp/arcigy.get_cold_outreach_brief_from_db`

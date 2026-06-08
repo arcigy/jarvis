@@ -21,6 +21,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /id="approvalLockCount"/);
   assert.match(html, /id="liveBlockerCount"/);
   assert.match(html, /id="commandTimeline"/);
+  assert.match(html, /id="readinessReport"/);
   assert.match(html, /checkWebBridge/);
   assert.match(html, /webBridgeResult/);
   assert.match(html, /Contract generator/);
@@ -31,6 +32,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /contractProjectGoal/);
   assert.match(html, /contractIntake/);
   assert.match(html, /healthGrid/);
+  assert.match(html, /get_production_readiness/);
   assert.match(html, /draftReply/);
   assert.match(html, /runDiagnostics/);
   assert.match(html, /diagnosticsResult/);
@@ -55,6 +57,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /window\.arcigyDesktop/);
   assert.match(renderer, /arcigyApi\.jarvisVoiceEvent/);
   assert.match(renderer, /arcigyApi\.runDiagnostics/);
+  assert.match(renderer, /arcigyApi\.productionReadiness/);
   assert.match(renderer, /arcigyApi\.webBridgePreflight/);
   assert.match(renderer, /arcigyApi\.coldOutreachBrief/);
   assert.match(renderer, /arcigyApi\.identifyEmail/);
@@ -73,6 +76,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /approvalLockCount/);
   assert.match(renderer, /liveBlockerCount/);
   assert.match(renderer, /Tunnel command/);
+  assert.match(renderer, /renderReadinessReport/);
+  assert.match(renderer, /\/api\/production-readiness/);
   assert.match(renderer, /\/api\/system-health/);
   assert.match(renderer, /\/api\/run-diagnostics/);
   assert.match(renderer, /\/api\/web-bridge-preflight/);
@@ -95,6 +100,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /ipcMain\.handle\("jarvis:ingestClientMessage"/);
   assert.match(main, /ipcMain\.handle\("jarvis:voiceEvent"/);
   assert.match(main, /ipcMain\.handle\("jarvis:runDiagnostics"/);
+  assert.match(main, /ipcMain\.handle\("jarvis:productionReadiness"/);
   assert.match(main, /ipcMain\.handle\("jarvis:webBridgePreflight"/);
   assert.match(main, /getWebBridgePreflight/);
   assert.match(main, /tunnelCommand: "npm run web:tunnel"/);
@@ -132,6 +138,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(preload, /contextBridge\.exposeInMainWorld/);
   assert.match(preload, /jarvisVoiceEvent/);
   assert.match(preload, /runDiagnostics/);
+  assert.match(preload, /productionReadiness/);
   assert.match(preload, /webBridgePreflight/);
   assert.match(preload, /coldOutreachBrief/);
   assert.match(preload, /identifyEmail/);

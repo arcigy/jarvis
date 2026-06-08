@@ -14,6 +14,7 @@ export type JarvisMcpToolName =
   | "arcigy.identify_email"
   | "arcigy.get_system_health"
   | "arcigy.run_integration_diagnostics"
+  | "arcigy.get_production_readiness"
   | "arcigy.generate_ai_reply"
   | "arcigy.sync_gmail_recent_messages"
   | "arcigy.get_smartlead_campaign_status"
@@ -98,6 +99,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.run_integration_diagnostics",
       description: "Spustí konfiguračné alebo live read-only diagnostiky integrácií bez odhalenia secretov.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.get_production_readiness",
+      description: "Vrati produkcny readiness report s blockermi, next actions, MCP stavom a volitelnymi live diagnostikami.",
       requiresApproval: false,
     },
     {

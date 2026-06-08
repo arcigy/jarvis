@@ -107,7 +107,7 @@ function checkMcpToolRegistry(): DoctorCheck {
   const approvalToolSet = new Set<string>(approvalTools);
   const requiredApprovalTools = ["arcigy.generate_contract_documents", "arcigy.append_leads_to_google_sheet"];
   const missingApproval = requiredApprovalTools.filter((name) => !approvalToolSet.has(name));
-  const failed = duplicates.length > 0 || missingApproval.length > 0 || tools.length < 19;
+  const failed = duplicates.length > 0 || missingApproval.length > 0 || tools.length < 20;
 
   return {
     key: "mcpToolRegistry",

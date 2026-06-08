@@ -50,6 +50,7 @@ app.whenReady().then(() => {
   ipcMain.handle("jarvis:voiceEvent", (_event, payload) => handleVoiceEvent(payload));
   ipcMain.handle("jarvis:systemHealth", () => getSystemHealth());
   ipcMain.handle("jarvis:runDiagnostics", (_event, payload) => runDiagnostics(payload));
+  ipcMain.handle("jarvis:productionReadiness", (_event, payload) => getProductionReadiness(payload));
   ipcMain.handle("jarvis:webBridgePreflight", () => getWebBridgePreflight());
   ipcMain.handle("jarvis:identifyEmail", (_event, payload) => identifyEmail(payload));
   ipcMain.handle("jarvis:ingestClientMessage", (_event, payload) => ingestClientMessage(payload));
@@ -247,6 +248,81 @@ async function runDiagnostics(payload) {
   };
 }
 
+async function getProductionReadiness(payload) {
+  const live = payload?.live === true;
+  const health = getSystemHealth();
+  const bridge = getWebBridgePreflight();
+  const diagnostics = live ? await runDiagnostics(payload) : null;
+  const blockers = [
+    ...health.integrations.flatMap((item) =>
+      item.configured
+        ? []
+        : item.missing.map((missing) => ({
+            key: item.key,
+            severity: "blocking",
+            message: `Missing or invalid runtime config: ${missing}`,
+            nextAction: readinessNextAction(item.key, missing),
+          }))
+    ),
+    ...(diagnostics?.checks || [])
+      .filter((check) => check.status !== "ready")
+      .map((check) => ({
+        key: check.key,
+        severity: check.status === "missing" ? "blocking" : "warning",
+        message: check.message,
+        nextAction: readinessNextAction(check.key, check.message),
+      })),
+  ];
+  const uniqueBlockers = dedupeReadinessBlockers(blockers);
+  const ready = health.integrations.filter((item) => item.configured).length;
+  const blocking = uniqueBlockers.filter((blocker) => blocker.severity === "blocking").length;
+  const status = blocking ? "blocked" : uniqueBlockers.length ? "attention" : "ready";
+  return {
+    status,
+    checkedAt: new Date().toISOString(),
+    summary:
+      status === "ready"
+        ? `Production gates ready: ${ready}/${health.integrations.length} integrations configured and ${bridge.mcpToolCount} MCP tools available.`
+        : `Production needs attention: ${ready}/${health.integrations.length} integrations ready, ${bridge.mcpToolCount} MCP tools available, ${blocking} blocker(s), ${uniqueBlockers.length - blocking} warning(s).`,
+    integrations: {
+      ready,
+      total: health.integrations.length,
+      missing: health.integrations.filter((item) => !item.configured).map((item) => ({ key: item.key, missing: item.missing })),
+    },
+    mcp: {
+      toolCount: bridge.mcpToolCount,
+      approvalRequired: bridge.riskyToolsRequiringApproval,
+    },
+    blockers: uniqueBlockers,
+    nextActions: uniqueBlockers.length
+      ? uniqueBlockers.map((blocker) => blocker.nextAction)
+      : ["No action needed. Keep secrets out of git and run doctor before changes."],
+    diagnostics: diagnostics || undefined,
+  };
+}
+
+function readinessNextAction(key, message) {
+  const text = `${key} ${message}`.toLowerCase();
+  if (text.includes("redis") && text.includes("placeholder")) return "Replace REDIS_URL with the real Railway Redis password, then rerun live diagnostics.";
+  if (text.includes("serper") && text.includes("not enough credits")) return "Top up or replace at least one Serper API key; both configured keys were exhausted.";
+  if (text.includes("gmail")) return "Refresh Google OAuth credentials for the configured Gmail accounts.";
+  if (text.includes("google")) return "Verify Google API key, OAuth scopes, and the configured Sheet ID.";
+  if (text.includes("smartlead")) return "Verify Smartlead API key and campaign access.";
+  if (text.includes("gemini")) return "Verify GEMINI_API_KEY and Gemini API quota.";
+  if (text.includes("postgres") || text.includes("database")) return "Verify DATABASE_URL credentials and network access.";
+  return `Fix ${key} runtime configuration and rerun diagnostics.`;
+}
+
+function dedupeReadinessBlockers(blockers) {
+  const seen = new Set();
+  return blockers.filter((blocker) => {
+    const key = `${blocker.key}:${blocker.message}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function getWebBridgePreflight() {
   const tools = listWebMcpTools();
   const riskyToolsRequiringApproval = tools.filter((tool) => tool.requiresApproval).map((tool) => tool.name);
@@ -289,6 +365,7 @@ function listWebMcpTools() {
     { name: "arcigy.jarvis_voice_event", requiresApproval: false },
     { name: "arcigy.get_system_health", requiresApproval: false },
     { name: "arcigy.run_integration_diagnostics", requiresApproval: false },
+    { name: "arcigy.get_production_readiness", requiresApproval: false },
     { name: "arcigy.generate_ai_reply", requiresApproval: false },
     { name: "arcigy.sync_gmail_recent_messages", requiresApproval: false },
     { name: "arcigy.get_smartlead_campaign_status", requiresApproval: false },
