@@ -30,6 +30,11 @@ type RemoteConnectionPack = {
   auth?: {
     tokenValueReturned?: boolean;
   };
+  limits?: {
+    maxJsonBytes?: number;
+    pathPolicy?: string;
+    writesRequireExplicitToolCall?: boolean;
+  };
   tools?: {
     count?: number;
     approvalRequired?: string[];
@@ -263,7 +268,20 @@ async function verifyExternalConnectionPack(publicUrl: string, token: string | n
   if (body.auth?.tokenValueReturned !== false || !body.tools?.count || !body.handoff?.requiredProof?.some((item) => item.key === "remote-smoke")) {
     exitWithMessage("Tunnel opened, but the external Jarvis connection pack is missing secret policy, tool count, or remote-smoke proof.");
   }
+  if (!hasGuardedConnectionPackLimits(body.limits)) {
+    exitWithMessage("Tunnel opened, but the external Jarvis connection pack is missing guarded limits: repo-only paths, bounded JSON, and explicit write tool calls.");
+  }
   return body;
+}
+
+function hasGuardedConnectionPackLimits(value: RemoteConnectionPack["limits"]): boolean {
+  return (
+    typeof value?.maxJsonBytes === "number" &&
+    Number.isFinite(value.maxJsonBytes) &&
+    value.maxJsonBytes > 0 &&
+    value.pathPolicy === "repo-only" &&
+    value.writesRequireExplicitToolCall === true
+  );
 }
 
 async function verifyRemoteMcpSmoke(publicUrl: string, token: string | null): Promise<RemoteMcpSmoke | null> {

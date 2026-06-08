@@ -19,6 +19,10 @@ test("web tunnel script orchestrates protected Jarvis MCP exposure", () => {
   assert.match(script, /includeReadiness=true&live=true/);
   assert.match(script, /\/api\/remote-mcp-smoke/);
   assert.match(script, /verifyExternalConnectionPack/);
+  assert.match(script, /hasGuardedConnectionPackLimits/);
+  assert.match(script, /pathPolicy === "repo-only"/);
+  assert.match(script, /writesRequireExplicitToolCall === true/);
+  assert.match(script, /bounded JSON/);
   assert.match(script, /verifyRemoteMcpSmoke/);
   assert.match(script, /renderTunnelReadySummary/);
   assert.match(script, /Remote agent handoff block/);
