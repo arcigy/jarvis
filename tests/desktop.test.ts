@@ -39,6 +39,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /id="handoffSmokeUrl"/);
   assert.match(html, /id="handoffApprovalTools"/);
   assert.match(html, /id="handoffLocalWriteTools"/);
+  assert.match(html, /id="mcpToolListStatus"/);
+  assert.match(html, /id="mcpToolList"/);
+  assert.match(html, /Live MCP tool registry/);
   assert.match(html, /id="remoteAgentPrompt"/);
   assert.match(html, /id="copyRemotePack"/);
   assert.match(html, /id="runRemoteSmoke"/);
@@ -53,9 +56,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /contractProjectGoal/);
   assert.match(html, /contractIntake/);
   assert.match(html, /healthGrid/);
-  assert.match(html, /get_production_readiness/);
-  assert.match(html, /get_remote_mcp_pack/);
-  assert.match(html, /run_remote_mcp_smoke/);
+  assert.doesNotMatch(html, /<li>generate_contract_documents<\/li>/);
   assert.match(html, /draftReply/);
   assert.match(html, /preparedReplies/);
   assert.match(html, /Smartlead live/);
@@ -63,8 +64,6 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /Manual send lock/);
   assert.match(html, /approvePreparedReply/);
   assert.match(html, /preparedReplyResult/);
-  assert.match(html, /get_prepared_outreach_replies/);
-  assert.match(html, /approve_prepared_outreach_reply/);
   assert.match(html, /runDiagnostics/);
   assert.match(html, /diagnosticsResult/);
   assert.match(html, /Client memory/);
@@ -75,7 +74,6 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /toggleClientNeedWatch/);
   assert.match(html, /clientAlertsResult/);
   assert.match(html, /clientAlertWatchStatus/);
-  assert.match(html, /get_client_need_alerts/);
   assert.match(html, /Operations sync/);
   assert.match(html, /gmailQuery/);
   assert.match(html, /in:inbox newer_than:7d/);
@@ -103,6 +101,10 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /arcigyApi\.remoteMcpSmoke/);
   assert.match(renderer, /renderBridgeCockpit/);
   assert.match(renderer, /renderRemoteMcpPack/);
+  assert.match(renderer, /renderMcpToolList/);
+  assert.match(renderer, /pack\.tools\?\.names/);
+  assert.match(renderer, /read-only\/draft/);
+  assert.match(renderer, /textContent = name/);
   assert.match(renderer, /handoffLocalWriteTools/);
   assert.match(renderer, /Local memory writes:/);
   assert.match(renderer, /preview Gmail with dryRun: true first/);

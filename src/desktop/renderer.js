@@ -77,6 +77,8 @@ const elements = {
   handoffSmokeUrl: document.querySelector("#handoffSmokeUrl"),
   handoffApprovalTools: document.querySelector("#handoffApprovalTools"),
   handoffLocalWriteTools: document.querySelector("#handoffLocalWriteTools"),
+  mcpToolListStatus: document.querySelector("#mcpToolListStatus"),
+  mcpToolList: document.querySelector("#mcpToolList"),
   remoteAgentPrompt: document.querySelector("#remoteAgentPrompt"),
   copyRemotePack: document.querySelector("#copyRemotePack"),
   runRemoteSmoke: document.querySelector("#runRemoteSmoke"),
@@ -618,7 +620,31 @@ function renderRemoteMcpPack(pack) {
   elements.handoffSmokeUrl.textContent = pack.smokeTestUrl ?? "--";
   elements.handoffApprovalTools.textContent = approvalTools.length ? `${approvalTools.length}: ${approvalTools.join(", ")}` : "none";
   elements.handoffLocalWriteTools.textContent = localWriteTools.length ? `${localWriteTools.length}: ${localWriteTools.join(", ")}` : "none";
+  renderMcpToolList(pack);
   elements.remoteAgentPrompt.textContent = buildRemoteAgentPrompt(pack);
+}
+
+function renderMcpToolList(pack) {
+  const tools = pack.tools?.names ?? [];
+  const approvalTools = new Set(pack.tools?.approvalRequired ?? []);
+  const localWriteTools = new Set(pack.tools?.localStateWrite ?? []);
+  const readOnlyTools = new Set(pack.tools?.readOnlyOrDraft ?? []);
+  elements.mcpToolListStatus.textContent = tools.length ? `Live registry: ${tools.length} tools loaded.` : "No MCP tools loaded.";
+  elements.mcpToolList.innerHTML = "";
+  for (const name of tools) {
+    const badges = [];
+    if (approvalTools.has(name)) badges.push("approval");
+    if (localWriteTools.has(name)) badges.push("local write");
+    if (readOnlyTools.has(name)) badges.push("read-only/draft");
+    const node = document.createElement("div");
+    const toolName = document.createElement("code");
+    const toolBadges = document.createElement("span");
+    node.className = "toolRow";
+    toolName.textContent = name;
+    toolBadges.textContent = badges.join(" · ") || "standard";
+    node.append(toolName, toolBadges);
+    elements.mcpToolList.appendChild(node);
+  }
 }
 
 function buildRemoteAgentPrompt(pack) {
