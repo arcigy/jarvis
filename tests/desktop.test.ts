@@ -70,6 +70,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /id="remoteAgentPrompt"/);
   assert.match(html, /id="startSecureTunnel"/);
   assert.match(html, /id="stopSecureTunnel"/);
+  assert.match(html, /id="openTunnelLog"/);
   assert.match(html, /id="copyTunnelCommand"/);
   assert.match(html, /id="copyClaudePrompt"/);
   assert.match(html, /id="copyChatGptPrompt"/);
@@ -133,6 +134,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /scrollIntoView/);
   assert.match(renderer, /window\.arcigyDesktop/);
   assert.match(renderer, /arcigyApi\.jarvisVoiceEvent/);
+  assert.match(renderer, /openPath: async \(\) => "desktop-only"/);
   assert.match(renderer, /arcigyApi\.runDiagnostics/);
   assert.match(renderer, /arcigyApi\.productionReadiness/);
   assert.match(renderer, /arcigyApi\.notifyOperator/);
@@ -140,6 +142,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /arcigyApi\.webBridgePreflight/);
   assert.match(renderer, /arcigyApi\.startSecureTunnel/);
   assert.match(renderer, /arcigyApi\.stopSecureTunnel/);
+  assert.match(renderer, /openTunnelLog: document\.querySelector\("#openTunnelLog"\)/);
   assert.match(renderer, /arcigyApi\.remoteMcpPack/);
   assert.match(renderer, /arcigyApi\.remoteMcpSmoke/);
   assert.match(renderer, /window\.sessionStorage\.setItem\("arcigyJarvisToken", token\)/);
@@ -219,6 +222,12 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /Secure tunnel stop cancelled/);
   assert.match(renderer, /arcigyApi\.stopSecureTunnel\(\)/);
   assert.match(renderer, /No secure tunnel process is tracked in this desktop session/);
+  assert.match(renderer, /secureTunnelLogPath: null/);
+  assert.match(renderer, /state\.secureTunnelLogPath = result\.logPath/);
+  assert.match(renderer, /elements\.openTunnelLog\.addEventListener\("click"/);
+  assert.match(renderer, /Start or stop the secure tunnel first so Jarvis knows which local log to open/);
+  assert.match(renderer, /Open the secure tunnel log\? It can contain a one-time bearer token/);
+  assert.match(renderer, /arcigyApi\.openPath\(state\.secureTunnelLogPath\)/);
   assert.match(renderer, /npm run web:tunnel:secure/);
   assert.match(renderer, /Safety rules:/);
   assert.match(renderer, /copyRemotePack/);
@@ -636,6 +645,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /contextIsolation: true/);
   assert.match(main, /nodeIntegration: false/);
   assert.match(preload, /contextBridge\.exposeInMainWorld/);
+  assert.match(preload, /openPath: \(targetPath\) => ipcRenderer\.invoke\("app:openPath", targetPath\)/);
   assert.match(preload, /jarvisVoiceEvent/);
   assert.match(preload, /runDiagnostics/);
   assert.match(preload, /productionReadiness/);

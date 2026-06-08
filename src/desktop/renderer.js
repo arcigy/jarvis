@@ -21,6 +21,7 @@ const state = {
   lastClientAlertGmailSyncAt: 0,
   lastClientAlertGmailSyncSummary: "Gmail auto-sync pending.",
   contractFormDirty: false,
+  secureTunnelLogPath: null,
 };
 
 const elements = {
@@ -112,6 +113,7 @@ const elements = {
   remoteAgentPrompt: document.querySelector("#remoteAgentPrompt"),
   startSecureTunnel: document.querySelector("#startSecureTunnel"),
   stopSecureTunnel: document.querySelector("#stopSecureTunnel"),
+  openTunnelLog: document.querySelector("#openTunnelLog"),
   copyTunnelCommand: document.querySelector("#copyTunnelCommand"),
   copyClaudePrompt: document.querySelector("#copyClaudePrompt"),
   copyChatGptPrompt: document.querySelector("#copyChatGptPrompt"),
@@ -147,6 +149,7 @@ const elements = {
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const webToken = resolveWebToken();
 const arcigyApi = window.arcigyDesktop ?? {
+  openPath: async () => "desktop-only",
   systemHealth: () => getJson("/api/system-health"),
   coldOutreachBrief: (payload) => postJson("/api/cold-outreach-brief", { ...payload, live: payload?.live ?? true }),
   jarvisVoiceEvent: (payload) => postJson("/api/jarvis/voice-event", payload),
@@ -1685,6 +1688,7 @@ elements.startSecureTunnel.addEventListener("click", async () => {
     }
     elements.remoteAgentPrompt.textContent = "Starting secure Jarvis MCP tunnel...";
     const result = await arcigyApi.startSecureTunnel();
+    if (result.logPath) state.secureTunnelLogPath = result.logPath;
     const status = result.alreadyRunning ? "Secure tunnel is already running." : result.started ? "Secure tunnel launch requested." : "Secure tunnel was not started.";
     elements.remoteAgentPrompt.textContent = [
       status,
@@ -1707,6 +1711,7 @@ elements.stopSecureTunnel.addEventListener("click", async () => {
       return;
     }
     const result = await arcigyApi.stopSecureTunnel();
+    if (result.logPath) state.secureTunnelLogPath = result.logPath;
     elements.remoteAgentPrompt.textContent = [
       result.stopped ? "Secure tunnel stop requested." : "No secure tunnel process is tracked in this desktop session.",
       result.pid ? `Process id: ${result.pid}` : null,
@@ -1715,6 +1720,23 @@ elements.stopSecureTunnel.addEventListener("click", async () => {
     ]
       .filter(Boolean)
       .join("\n");
+  } catch (error) {
+    elements.remoteAgentPrompt.textContent = safeUiErrorText(error);
+  }
+});
+elements.openTunnelLog.addEventListener("click", async () => {
+  try {
+    if (!state.secureTunnelLogPath) {
+      elements.remoteAgentPrompt.textContent = "Start or stop the secure tunnel first so Jarvis knows which local log to open.";
+      return;
+    }
+    const confirmed = window.confirm(`Open the secure tunnel log? It can contain a one-time bearer token and should stay private.`);
+    if (!confirmed) {
+      elements.remoteAgentPrompt.textContent = "Secure tunnel log open cancelled.";
+      return;
+    }
+    const result = await arcigyApi.openPath(state.secureTunnelLogPath);
+    elements.remoteAgentPrompt.textContent = result ? `Tunnel log open result: ${result}` : `Opened tunnel log: ${state.secureTunnelLogPath}`;
   } catch (error) {
     elements.remoteAgentPrompt.textContent = safeUiErrorText(error);
   }
