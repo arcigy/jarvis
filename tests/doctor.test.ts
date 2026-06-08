@@ -58,3 +58,41 @@ test("Jarvis doctor reports local readiness without leaking secrets", () => {
   assert.equal(existsSync((contractGeneration?.details as { outputDir: string }).outputDir), false);
   assert.equal(existsSync(webBridgeDetails.webContractOutputDir ?? ""), false);
 });
+
+test("Jarvis doctor surfaces non-blocking runtime advisories as warnings", () => {
+  const result = spawnSync("node", ["scripts/jarvis_doctor.ts", "--json", "--no-env-file", "--skip-local-db", "--skip-contract-generation", "--skip-web-bridge"], {
+    cwd: process.cwd(),
+    encoding: "utf-8",
+    env: {
+      ...process.env,
+      GEMINI_API_KEY: "gemini",
+      GOOGLE_CLIENT_ID: "client",
+      GOOGLE_CLIENT_SECRET: "secret",
+      GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP: "refresh",
+      GMAIL_REFRESH_TOKEN_BRANISLAV_L_ARCIGY_GROUP: "refresh-2",
+      GMAIL_REFRESH_TOKEN_ANDREJ_ARCIGY_GROUP: "refresh-3",
+      GMAIL_REFRESH_TOKEN_ANDREJ_R_ARCIGY_GROUP: "refresh-4",
+      SMARTLEAD_API_KEY: "smartlead",
+      DATABASE_URL: "postgres://postgres:secret@example.com:5432/db",
+      REDIS_URL: "redis://default:PASSWORD@example.com:6379",
+      GOOGLE_SHEET_ID: "sheet",
+      GOOGLE_MAPS_API_KEY: "maps",
+      SERPER_API_KEY: "serper",
+    },
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout.includes("PASSWORD"), false);
+  const body = JSON.parse(result.stdout) as {
+    ok: boolean;
+    warnings: number;
+    failed: number;
+    checks: Array<{ key: string; status: string; details?: { advisoryMissing?: unknown[] } }>;
+  };
+  assert.equal(body.ok, true);
+  assert.equal(body.failed, 0);
+  assert.equal(body.warnings, 1);
+  const runtimeEnv = body.checks.find((check) => check.key === "runtimeEnv");
+  assert.equal(runtimeEnv?.status, "warning");
+  assert.equal(runtimeEnv?.details?.advisoryMissing?.length, 1);
+});

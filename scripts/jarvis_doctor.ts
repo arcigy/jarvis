@@ -130,7 +130,7 @@ function checkRuntimeEnv(): DoctorCheck {
   const missing = health.filter((item) => !item.configured).map((item) => ({ key: item.key, missing: item.missing, requiredForProduction: item.requiredForProduction }));
   const blockingMissing = missing.filter((item) => item.requiredForProduction);
   const advisoryMissing = missing.filter((item) => !item.requiredForProduction);
-  const status: CheckStatus = blockingMissing.length ? (strictEnv ? "failed" : "warning") : "ready";
+  const status: CheckStatus = blockingMissing.length ? (strictEnv ? "failed" : "warning") : advisoryMissing.length ? "warning" : "ready";
   return {
     key: "runtimeEnv",
     status,
