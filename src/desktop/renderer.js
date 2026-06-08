@@ -780,6 +780,8 @@ async function refreshWebBridge({ loadingText = null } = {}) {
 }
 
 function renderRemoteMcpPack(pack) {
+  const matchingSmoke = state.lastRemoteMcpSmoke?.baseUrl === pack.baseUrl ? state.lastRemoteMcpSmoke : null;
+  if (state.lastRemoteMcpSmoke && !matchingSmoke) state.lastRemoteMcpSmoke = null;
   state.lastRemoteMcpPack = pack;
   const approvalTools = pack.tools?.approvalRequired ?? [];
   const localWriteTools = pack.tools?.localStateWrite ?? [];
@@ -791,10 +793,11 @@ function renderRemoteMcpPack(pack) {
   elements.handoffSmokeUrl.textContent = pack.smokeTestUrl ?? "--";
   elements.handoffApprovalTools.textContent = approvalTools.length ? `${approvalTools.length}: ${approvalTools.join(", ")}` : "none";
   elements.handoffLocalWriteTools.textContent = localWriteTools.length ? `${localWriteTools.length}: ${localWriteTools.join(", ")}` : "none";
-  elements.handoffProofGates.textContent = "smoke not run";
-  elements.handoffProofGates.dataset.state = "attention";
+  const proof = matchingSmoke ? summarizeRemoteProofGates(matchingSmoke) : { ready: false, text: "smoke not run" };
+  elements.handoffProofGates.textContent = proof.text;
+  elements.handoffProofGates.dataset.state = proof.ready ? "ready" : "attention";
   renderMcpToolList(pack);
-  elements.remoteAgentPrompt.textContent = buildRemoteAgentPrompt(pack, state.lastRemoteMcpSmoke);
+  elements.remoteAgentPrompt.textContent = buildRemoteAgentPrompt(pack, matchingSmoke);
 }
 
 function renderMcpToolList(pack) {

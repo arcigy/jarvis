@@ -144,6 +144,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /textContent = name/);
   assert.match(renderer, /handoffLocalWriteTools/);
   assert.match(renderer, /handoffProofGates/);
+  assert.match(renderer, /state\.lastRemoteMcpSmoke\?\.baseUrl === pack\.baseUrl/);
+  assert.match(renderer, /if \(state\.lastRemoteMcpSmoke && !matchingSmoke\) state\.lastRemoteMcpSmoke = null/);
+  assert.match(renderer, /buildRemoteAgentPrompt\(pack, matchingSmoke\)/);
   assert.match(renderer, /summarizeRemoteProofGates/);
   assert.match(renderer, /ready: 4\/4 safety gates/);
   assert.match(renderer, /blocked: \$\{missing\.join\(", "\)\}/);
@@ -153,7 +156,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /buildCopiedHandoffStatus/);
   assert.match(renderer, /HANDOFF STATUS: BLOCKED/);
   assert.match(renderer, /HANDOFF STATUS: READY/);
-  assert.match(renderer, /buildRemoteAgentPrompt\(pack, state\.lastRemoteMcpSmoke\)/);
+  assert.match(renderer, /buildRemoteAgentPrompt\(pack, matchingSmoke\)/);
   assert.match(renderer, /buildRemoteAgentPrompt\(state\.lastRemoteMcpPack, report\)/);
   assert.match(renderer, /buildRemoteAgentPrompt\(state\.lastRemoteMcpPack, state\.lastRemoteMcpSmoke\)/);
   assert.match(renderer, /handoffStatus,/);
