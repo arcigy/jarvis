@@ -418,6 +418,22 @@ test("Smartlead outreach brief normalizes campaign statistics into Jarvis style"
   assert.match(brief.summary, /cez Smartlead napisali 100 ludom/);
   assert.match(brief.summary, /12 ludi odpisalo, z toho 4 pozitivne/);
   assert.match(brief.summary, /poslem ich az na tvoje potvrdenie/);
+  assert.match(brief.summary, /Caka 2 odpovede na schvalenie/);
+});
+
+test("Smartlead outreach brief uses singular reply labels", () => {
+  const brief = buildSmartleadOutreachBrief({
+    campaignId: "123",
+    campaignIds: ["123"],
+    campaignCount: 1,
+    periodLabel: "dnes",
+    statistics: { sent_count: 5, open_count: 3, reply_count: 1, positive_reply_count: 1 },
+    preparedPositiveReplyCount: 1,
+    pendingApprovalCount: 1,
+  });
+
+  assert.match(brief.summary, /Pripravil som ti 1 odpoved na pozitivne reakcie/);
+  assert.match(brief.summary, /Caka 1 odpoved na schvalenie/);
 });
 
 test("Smartlead outreach brief aggregates campaigns when campaignId is omitted", async () => {

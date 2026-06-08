@@ -160,12 +160,12 @@ export function buildSmartleadOutreachBrief(input: {
 
   const prepared = input.preparedPositiveReplyCount ?? 0;
   if (prepared > 0) {
-    summaryParts.push(`Pripravil som ti ${prepared} odpovedi na pozitivne reakcie a poslem ich az na tvoje potvrdenie.`);
+    summaryParts.push(`Pripravil som ti ${smartleadReplyLabel(prepared)} na pozitivne reakcie a poslem ich az na tvoje potvrdenie.`);
   }
 
   const pending = input.pendingApprovalCount ?? 0;
   if (pending > 0) {
-    summaryParts.push(`Caka ${pending} odpovedi na schvalenie.`);
+    summaryParts.push(`Caka ${smartleadReplyLabel(pending)} na schvalenie.`);
   }
 
   return {
@@ -186,6 +186,12 @@ export function buildSmartleadOutreachBrief(input: {
     },
     notes,
   };
+}
+
+function smartleadReplyLabel(count: number): string {
+  if (count === 1) return "1 odpoved";
+  if (count > 1 && count < 5) return `${count} odpovede`;
+  return `${count} odpovedi`;
 }
 
 function clampMaxCampaigns(value: number | undefined): number {

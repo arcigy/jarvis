@@ -42,6 +42,8 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(names.includes("arcigy.search_google_places"));
   assert.ok(names.includes("arcigy.discover_leads"));
   assert.ok(names.includes("arcigy.append_leads_to_google_sheet"));
+  assert.match(readFileSync("src/automation-system/mcp-server.ts", "utf-8"), /preparedPositiveReplyCount: preparedReplyCount/);
+  assert.match(readFileSync("src/automation-system/mcp-server.ts", "utf-8"), /pendingApprovalCount: preparedReplyCount/);
 
   const result = await client.callTool({
     name: "arcigy.get_cold_outreach_brief",

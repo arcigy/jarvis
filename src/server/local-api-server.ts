@@ -758,14 +758,18 @@ async function getOperatorBriefing(payload: Record<string, unknown>) {
   const clientNeeds = getClientNeedAlerts({ dbPath, status: "new", limit: 10 });
   const preparedReplies = runDbTool("list-prepared-replies", { dbPath, status: "pending", limit: 10 });
   const readiness = await buildProductionReadinessReport({ live: payload.live === true, dbPath });
-  const coldOutreachSummary = await getOperatorColdOutreachSummary(payload.live === true, String(payload.periodLabel ?? period.periodLabel), cold.summary);
+  const preparedReplyCount = Number(preparedReplies.count ?? 0);
+  const coldOutreachSummary = await getOperatorColdOutreachSummary(payload.live === true, String(payload.periodLabel ?? period.periodLabel), cold.summary, {
+    preparedPositiveReplyCount: preparedReplyCount,
+    pendingApprovalCount: preparedReplyCount,
+  });
   return buildOperatorBriefing({
     readinessStatus: readiness.status,
     readinessSummary: readiness.summary,
     coldOutreachSummary,
     liveSyncSummary,
     openClientNeedCount: Number(clientNeeds.count ?? 0),
-    preparedReplyCount: Number(preparedReplies.count ?? 0),
+    preparedReplyCount,
     nextActions: readiness.nextActions,
   });
 }
@@ -806,13 +810,21 @@ async function getColdOutreachBriefSummary(payload: Record<string, unknown>, liv
     }),
   ]);
   const local = JSON.parse(result.stdout);
-  return getOperatorColdOutreachSummary(live, String(payload.periodLabel ?? period.periodLabel), local.summary);
+  return getOperatorColdOutreachSummary(live, String(payload.periodLabel ?? period.periodLabel), local.summary, {
+    preparedPositiveReplyCount: Number(local.metrics?.preparedPositiveReplyCount ?? 0),
+    pendingApprovalCount: Number(local.metrics?.pendingApprovalCount ?? 0),
+  });
 }
 
-async function getOperatorColdOutreachSummary(live: boolean, periodLabel: string, localSummary: string): Promise<string> {
+async function getOperatorColdOutreachSummary(
+  live: boolean,
+  periodLabel: string,
+  localSummary: string,
+  approvals: { preparedPositiveReplyCount?: number; pendingApprovalCount?: number } = {}
+): Promise<string> {
   if (!live) return localSummary;
   try {
-    const smartlead = await getSmartleadOutreachBrief({ periodLabel, maxCampaigns: 10 });
+    const smartlead = await getSmartleadOutreachBrief({ periodLabel, maxCampaigns: 10, ...approvals });
     return smartlead.summary;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

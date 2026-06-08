@@ -878,7 +878,10 @@ async function getColdOutreachBrief(payload) {
     }),
   ]);
   const parsed = JSON.parse(result.stdout);
-  return getOperatorColdOutreachSummary(payload?.live !== false, String(payload?.periodLabel || period.periodLabel), parsed.summary);
+  return getOperatorColdOutreachSummary(payload?.live !== false, String(payload?.periodLabel || period.periodLabel), parsed.summary, {
+    preparedPositiveReplyCount: Number(parsed.metrics?.preparedPositiveReplyCount || 0),
+    pendingApprovalCount: Number(parsed.metrics?.pendingApprovalCount || 0),
+  });
 }
 
 function getPreparedOutreachReplies(payload = {}) {
@@ -937,22 +940,26 @@ async function getOperatorBriefing(payload = {}) {
   const clientNeeds = getClientNeedAlerts({ dbPath, status: "new", limit: 10 });
   const preparedReplies = getPreparedOutreachReplies({ dbPath, status: "pending", limit: 10 });
   const readiness = getProductionReadiness({ live: payload?.live === true, dbPath });
-  const coldOutreachSummary = await getOperatorColdOutreachSummary(payload?.live === true, String(payload?.periodLabel || period.periodLabel), cold.summary);
+  const preparedReplyCount = Number(preparedReplies.count || 0);
+  const coldOutreachSummary = await getOperatorColdOutreachSummary(payload?.live === true, String(payload?.periodLabel || period.periodLabel), cold.summary, {
+    preparedPositiveReplyCount: preparedReplyCount,
+    pendingApprovalCount: preparedReplyCount,
+  });
   return buildOperatorBriefing({
     readinessStatus: readiness.status,
     readinessSummary: readiness.summary,
     coldOutreachSummary,
     liveSyncSummary,
     openClientNeedCount: Number(clientNeeds.count || 0),
-    preparedReplyCount: Number(preparedReplies.count || 0),
+    preparedReplyCount,
     nextActions: readiness.nextActions || [],
   });
 }
 
-async function getOperatorColdOutreachSummary(live, periodLabel, localSummary) {
+async function getOperatorColdOutreachSummary(live, periodLabel, localSummary, approvals = {}) {
   if (!live) return localSummary;
   try {
-    const smartlead = await getSmartleadOutreachBrief({ periodLabel, maxCampaigns: 10 });
+    const smartlead = await getSmartleadOutreachBrief({ periodLabel, maxCampaigns: 10, ...approvals });
     return smartlead.summary;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -1374,10 +1381,10 @@ function buildSmartleadOutreachBrief(input) {
   }
 
   if (input.preparedPositiveReplyCount > 0) {
-    summaryParts.push(`Pripravil som ti ${input.preparedPositiveReplyCount} odpovedi na pozitivne reakcie a poslem ich az na tvoje potvrdenie.`);
+    summaryParts.push(`Pripravil som ti ${smartleadReplyLabel(input.preparedPositiveReplyCount)} na pozitivne reakcie a poslem ich az na tvoje potvrdenie.`);
   }
   if (input.pendingApprovalCount > 0) {
-    summaryParts.push(`Caka ${input.pendingApprovalCount} odpovedi na schvalenie.`);
+    summaryParts.push(`Caka ${smartleadReplyLabel(input.pendingApprovalCount)} na schvalenie.`);
   }
 
   return {
@@ -1398,6 +1405,12 @@ function buildSmartleadOutreachBrief(input) {
     },
     notes,
   };
+}
+
+function smartleadReplyLabel(count) {
+  if (count === 1) return "1 odpoved";
+  if (count > 1 && count < 5) return `${count} odpovede`;
+  return `${count} odpovedi`;
 }
 
 function clampMaxCampaigns(value) {

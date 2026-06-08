@@ -561,7 +561,11 @@ export function createJarvisMcpServer(): McpServer {
       const clientNeeds = runDbCommand("list-open-needs", { status: "new", limit: 10 }, dbPath);
       const preparedReplies = runDbCommand("list-prepared-replies", { status: "pending", limit: 10 }, dbPath);
       const readiness = await buildProductionReadinessReport({ live, dbPath });
-      const coldOutreachSummary = await getOperatorColdOutreachSummary(live, periodLabel, localCold.summary);
+      const preparedReplyCount = Number(preparedReplies.count ?? 0);
+      const coldOutreachSummary = await getOperatorColdOutreachSummary(live, periodLabel, localCold.summary, {
+        preparedPositiveReplyCount: preparedReplyCount,
+        pendingApprovalCount: preparedReplyCount,
+      });
       return jsonResult(
         buildOperatorBriefing({
           readinessStatus: readiness.status,
@@ -569,7 +573,7 @@ export function createJarvisMcpServer(): McpServer {
           coldOutreachSummary,
           liveSyncSummary,
           openClientNeedCount: Number(clientNeeds.count ?? 0),
-          preparedReplyCount: Number(preparedReplies.count ?? 0),
+          preparedReplyCount,
           nextActions: readiness.nextActions,
         })
       );
@@ -888,10 +892,15 @@ async function maybeSyncGmailForOperatorBriefing(
   }
 }
 
-async function getOperatorColdOutreachSummary(live: boolean, periodLabel: string, localSummary: string): Promise<string> {
+async function getOperatorColdOutreachSummary(
+  live: boolean,
+  periodLabel: string,
+  localSummary: string,
+  approvals: { preparedPositiveReplyCount?: number; pendingApprovalCount?: number } = {}
+): Promise<string> {
   if (!live) return localSummary;
   try {
-    const smartlead = await getSmartleadOutreachBrief({ periodLabel, maxCampaigns: 10 });
+    const smartlead = await getSmartleadOutreachBrief({ periodLabel, maxCampaigns: 10, ...approvals });
     return smartlead.summary;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

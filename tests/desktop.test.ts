@@ -227,6 +227,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /summarizeLeadsForVoice/);
   assert.match(main, /getOperatorBriefing/);
   assert.match(main, /getOperatorColdOutreachSummary/);
+  assert.match(main, /preparedPositiveReplyCount: preparedReplyCount/);
+  assert.match(main, /pendingApprovalCount: preparedReplyCount/);
   assert.match(main, /maybeSyncGmailForOperatorBriefing/);
   assert.match(main, /Gmail checked/);
   assert.match(main, /payload\?\.live !== false/);
