@@ -217,6 +217,20 @@ test("Jarvis MCP server generates contracts from inline intake payload", async (
   );
   assert.equal(existsSync(join(outputDir, "generation-manifest.json")), false);
 
+  const unfinishedIntake = JSON.parse(JSON.stringify(intake));
+  unfinishedIntake.client.businessName = "[doplnit]";
+  const unfinishedResult = await client.callTool({
+    name: "arcigy.generate_contract_documents",
+    arguments: {
+      intake: unfinishedIntake,
+      outputDir: mkdtempSync(join(tmpdir(), "jarvis-mcp-unfinished-contracts-")),
+      approval: { approved: true },
+    },
+  });
+  assertToolError(unfinishedResult, /Unresolved contract intake placeholder/);
+  const unfinishedText = getToolText(unfinishedResult);
+  assert.doesNotMatch(unfinishedText, /Traceback|generate_contract_documents\.py/);
+
   const result = await client.callTool({
     name: "arcigy.generate_contract_documents",
     arguments: {
@@ -386,6 +400,10 @@ function getStructuredResult(value: unknown): unknown {
 function assertToolError(value: unknown, pattern: RegExp) {
   const result = value as { isError?: boolean; content?: Array<{ type: string; text?: string }> };
   assert.equal(result.isError, true);
-  const text = result.content?.[0]?.type === "text" ? result.content[0].text ?? "" : "";
-  assert.match(text, pattern);
+  assert.match(getToolText(value), pattern);
+}
+
+function getToolText(value: unknown): string {
+  const result = value as { content?: Array<{ type: string; text?: string }> };
+  return result.content?.[0]?.type === "text" ? result.content[0].text ?? "" : "";
 }

@@ -808,12 +808,26 @@ function runPython(args: string[]): { stdout: string; stderr: string } {
     throw result.error;
   }
   if (result.status !== 0) {
-    throw new Error(result.stderr || `Python command failed with status ${result.status}`);
+    throw pythonToolError(result.stderr || `Python command failed with status ${result.status}`);
   }
   return {
     stdout: result.stdout ?? "",
     stderr: result.stderr ?? "",
   };
+}
+
+function pythonToolError(message: string): Error {
+  return new Error(cleanPythonErrorMessage(message));
+}
+
+function cleanPythonErrorMessage(message: string): string {
+  const lines = String(message)
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const valueError = [...lines].reverse().find((line) => /^(ValueError|FileNotFoundError|TypeError|Error):\s*/.test(line));
+  if (valueError) return valueError.replace(/^(ValueError|FileNotFoundError|TypeError|Error):\s*/, "");
+  return lines.at(-1) || String(message);
 }
 
 function jsonDbTool(
