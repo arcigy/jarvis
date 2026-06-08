@@ -1106,9 +1106,16 @@ elements.applyContractForm.addEventListener("click", () => {
 });
 elements.generateContracts.addEventListener("click", async () => {
   try {
-    elements.contractResult.textContent = "Generating...";
     const intake = JSON.parse(elements.contractIntake.value);
-    const result = await arcigyApi.generateContracts({ intake });
+    const clientName = intake.client?.businessName ?? "selected client";
+    const projectName = intake.project?.name ?? "selected project";
+    const approved = window.confirm(`Generate contract DOCX files for ${clientName} / ${projectName}?`);
+    if (!approved) {
+      elements.contractResult.textContent = "Contract generation cancelled before any files were written.";
+      return;
+    }
+    elements.contractResult.textContent = "Generating...";
+    const result = await arcigyApi.generateContracts({ intake, approval: { approved: true } });
     elements.contractResult.textContent = [
       `Generated ${result.generatedFiles.length} files.`,
       `Manifest: ${result.manifestPath}`,

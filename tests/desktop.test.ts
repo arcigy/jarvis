@@ -118,6 +118,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /arcigyApi\.ingestClientMessage/);
   assert.match(renderer, /arcigyApi\.getClientNeedAlerts/);
   assert.match(renderer, /arcigyApi\.generateContracts/);
+  assert.match(renderer, /Generate contract DOCX files for/);
+  assert.match(renderer, /Contract generation cancelled before any files were written/);
   assert.match(renderer, /arcigyApi\.draftContractIntake/);
   assert.match(renderer, /arcigyApi\.systemHealth/);
   assert.match(renderer, /arcigyApi\.generateAiReply/);
@@ -254,6 +256,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /getSerperApiKeys/);
   assert.match(main, /leadProviderStatus/);
   assert.match(main, /ipcMain\.handle\("contracts:generate"/);
+  assert.match(main, /arcigy\.generate_contract_documents requires explicit approval/);
   assert.match(main, /ipcMain\.handle\("contracts:draftIntake"/);
   assert.match(main, /generateGeminiTextForContract/);
   assert.match(main, /parseJsonObject/);

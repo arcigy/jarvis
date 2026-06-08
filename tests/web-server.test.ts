@@ -89,6 +89,16 @@ test("local web bridge serves UI and API health", async () => {
     });
     assert.equal(unapprovedDirectSheetExport.status, 409);
 
+    const unapprovedDirectContract = await fetch(`${baseUrl}/api/generate-contracts`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        intake: JSON.parse(readFileSync("docs/contracts/examples/sample-intake.json", "utf-8")),
+        outputDir: makeRepoTempDir("jarvis-web-direct-contract-"),
+      }),
+    });
+    assert.equal(unapprovedDirectContract.status, 409);
+
     const mcpDbPath = join(makeRepoTempDir("jarvis-web-mcp-"), "memory.db");
     const upsert = await postJson(`${baseUrl}/api/mcp/arcigy.upsert_local_person`, {
       dbPath: mcpDbPath,

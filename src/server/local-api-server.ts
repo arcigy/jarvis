@@ -162,6 +162,11 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
 
   if (request.method === "POST" && url.pathname === "/api/generate-contracts") {
     const payload = await readJson(request);
+    const approvalError = getApprovalError("arcigy.generate_contract_documents", payload);
+    if (approvalError) {
+      writeJson(response, 409, { error: approvalError });
+      return;
+    }
     const outputDir = resolveRepoPath(payload.outputDir, join(repoRoot, "generated", "contracts"), "outputDir");
     const intake = typeof payload.intake === "string" ? JSON.parse(payload.intake) : payload.intake;
     if (!intake || typeof intake !== "object") {

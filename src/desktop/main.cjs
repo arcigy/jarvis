@@ -1756,6 +1756,9 @@ function parseJsonObject(text) {
 }
 
 function generateContracts(payload) {
+  if (payload?.approved !== true && payload?.approval?.approved !== true) {
+    throw new Error('arcigy.generate_contract_documents requires explicit approval. Send {"approval":{"approved":true}} after user confirmation.');
+  }
   const outputDir = payload?.outputDir || path.join(repoRoot, "generated", "contracts");
   const intake = typeof payload?.intake === "string" ? JSON.parse(payload.intake) : payload?.intake;
   if (!intake || typeof intake !== "object") {
