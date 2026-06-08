@@ -223,6 +223,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /Get Smartlead outreach brief/);
   assert.match(main, /maxCampaigns: 10/);
   assert.match(main, /runRemoteMcpSmoke/);
+  assert.match(main, /manifest-local-write-policy/);
+  assert.match(main, /pack-local-write-policy/);
+  assert.match(main, /hasLocalWritePolicy/);
   assert.match(main, /ipcMain\.handle\("jarvis:getPreparedOutreachReplies"/);
   assert.match(main, /ipcMain\.handle\("jarvis:approvePreparedOutreachReply"/);
   assert.match(main, /getWebBridgePreflight/);

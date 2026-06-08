@@ -37,10 +37,24 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
   const manifestTools = Array.isArray(manifest.body?.tools) ? manifest.body.tools : [];
   checks.push(check(manifestTools.length === expectedToolCount, "tool-count", `Manifest exposes ${manifestTools.length}/${expectedToolCount} MCP tools.`));
   checks.push(check(manifest.body?.auth?.header === "Authorization: Bearer <JARVIS_WEB_TOKEN>", "auth-placeholder", "Manifest returns auth placeholder, not the token value."));
+  checks.push(
+    check(
+      hasLocalWritePolicy(manifest.body?.toolPolicy),
+      "manifest-local-write-policy",
+      "Manifest identifies local write tools separately from read-only/draft tools."
+    )
+  );
 
   const pack = await getJson(fetchImpl, `${baseUrl}/api/remote-mcp-pack?includeReadiness=false`, input.bearerToken);
   checks.push(check(pack.ok, "connection-pack", pack.ok ? "Remote MCP connection pack is reachable." : pack.message));
   checks.push(check(pack.body?.auth?.tokenValueReturned === false, "pack-secret-policy", "Connection pack confirms tokenValueReturned=false."));
+  checks.push(
+    check(
+      hasLocalWritePolicy(pack.body?.tools),
+      "pack-local-write-policy",
+      "Connection pack identifies local write tools separately from read-only/draft tools."
+    )
+  );
 
   const health = await postJson(fetchImpl, `${baseUrl}/api/mcp/arcigy.get_system_health`, { format: "json" }, input.bearerToken);
   checks.push(check(health.ok && Array.isArray(health.body?.result?.integrations), "read-only-tool-call", "Read-only MCP tool call returned integration health."));
@@ -59,7 +73,7 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
     baseUrl,
     summary:
       status === "ready"
-        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, read-only call, approval gate, and secret policy passed.`
+        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, local write policy, read-only call, approval gate, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((item) => item.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -73,6 +87,14 @@ function check(ok: boolean, key: string, message: string): RemoteMcpSmokeCheck {
     status: ok ? "ready" : "blocked",
     message,
   };
+}
+
+function hasLocalWritePolicy(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const policy = value as { localStateWrite?: unknown; readOnlyOrDraft?: unknown };
+  const localStateWrite = Array.isArray(policy.localStateWrite) ? policy.localStateWrite : [];
+  const readOnlyOrDraft = Array.isArray(policy.readOnlyOrDraft) ? policy.readOnlyOrDraft : [];
+  return localStateWrite.includes("arcigy.sync_gmail_recent_messages") && !readOnlyOrDraft.includes("arcigy.sync_gmail_recent_messages");
 }
 
 async function getJson(fetchImpl: typeof fetch, url: string, bearerToken?: string) {
