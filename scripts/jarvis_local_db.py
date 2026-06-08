@@ -425,7 +425,21 @@ def ingest_message(db_path: Path, payload: dict[str, Any]) -> dict[str, Any]:
     person_id = identity["person"]["id"] if identity.get("person") else None
     occurred_at = payload.get("occurredAt") or payload.get("occurred_at") or datetime.now(timezone.utc).isoformat()
     activity_id = payload.get("id") or f"email_{uuid.uuid4().hex}"
+    source = payload.get("source", "message")
+    external_id = payload.get("externalId")
     conn = connect(db_path)
+    existing_activity = find_existing_email_activity(conn, source, external_id)
+    if existing_activity is not None:
+        activity = row_to_email_activity(existing_activity)
+        need_signal = find_need_signal_for_activity(conn, activity["id"])
+        return {
+            "status": "duplicate",
+            "identity": identity,
+            "messageActivity": activity,
+            "needSignal": need_signal,
+            "jarvisAlert": build_jarvis_need_alert(identity, need_signal),
+        }
+
     conn.execute(
         """
         insert into local_email_activity
@@ -436,7 +450,7 @@ def ingest_message(db_path: Path, payload: dict[str, Any]) -> dict[str, Any]:
             activity_id,
             person_id,
             email,
-            payload.get("source", "message"),
+            source,
             payload.get("eventType", "message_received"),
             occurred_at,
             json.dumps(
@@ -444,7 +458,7 @@ def ingest_message(db_path: Path, payload: dict[str, Any]) -> dict[str, Any]:
                     "subject": payload.get("subject"),
                     "text": text,
                     "threadId": payload.get("threadId"),
-                    "externalId": payload.get("externalId"),
+                    "externalId": external_id,
                     **(payload.get("data") or {}),
                 },
                 ensure_ascii=False,
@@ -481,6 +495,7 @@ def ingest_message(db_path: Path, payload: dict[str, Any]) -> dict[str, Any]:
         identity = identify(db_path, email)
 
     return {
+        "status": "created",
         "identity": identity,
         "messageActivity": activity,
         "needSignal": need_signal,
@@ -596,6 +611,34 @@ def prepared_reply_label(count: int) -> str:
     if 1 < count < 5:
         return f"{count} odpovede"
     return f"{count} odpovedí"
+
+
+def find_existing_email_activity(conn: sqlite3.Connection, source: str, external_id: Any) -> sqlite3.Row | None:
+    if not external_id:
+        return None
+    return conn.execute(
+        """
+        select * from local_email_activity
+        where source = ?
+          and json_extract(data_json, '$.externalId') = ?
+        order by created_at desc
+        limit 1
+        """,
+        (source, str(external_id)),
+    ).fetchone()
+
+
+def find_need_signal_for_activity(conn: sqlite3.Connection, activity_id: str) -> dict[str, Any] | None:
+    row = conn.execute(
+        """
+        select * from client_need_signals
+        where json_extract(data_json, '$.activityId') = ?
+        order by created_at desc
+        limit 1
+        """,
+        (activity_id,),
+    ).fetchone()
+    return row_to_need_signal(row) if row is not None else None
 
 
 def row_to_person(row: sqlite3.Row) -> dict[str, Any]:

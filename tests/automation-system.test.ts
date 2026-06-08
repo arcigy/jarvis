@@ -913,6 +913,50 @@ test("local SQLite CLI ingests client messages and raises need alerts", () => {
   assert.equal(ingested.identity.openNeedSignals[0].summary, "Potrebujem upraviť onboarding automatizáciu do piatku.");
 });
 
+test("local SQLite CLI deduplicates Gmail messages by external id", () => {
+  const dir = mkdtempSync(join(tmpdir(), "jarvis-message-dedupe-db-"));
+  const dbPath = join(dir, "jarvis.db");
+  const python = process.env.JARVIS_PYTHON || "python";
+  const payload = {
+    fromEmail: "ceo@acme.com",
+    source: "gmail",
+    subject: "Report",
+    text: "Potrebujem novy report pre automatizaciu.",
+    occurredAt: "2026-06-07T10:00:00Z",
+    externalId: "gmail-message-1",
+  };
+
+  const first = runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "ingest-message",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify(payload),
+  ]);
+  const second = runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "ingest-message",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify(payload),
+  ]);
+  const alerts = runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "list-open-needs",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify({ limit: 10 }),
+  ]);
+
+  assert.equal(first.status, "created");
+  assert.equal(second.status, "duplicate");
+  assert.equal(second.messageActivity.id, first.messageActivity.id);
+  assert.equal(alerts.count, 1);
+});
+
 test("local SQLite CLI summarizes cold outreach events by period", () => {
   const dir = mkdtempSync(join(tmpdir(), "jarvis-cold-db-"));
   const dbPath = join(dir, "jarvis.db");

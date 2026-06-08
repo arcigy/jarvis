@@ -24,6 +24,9 @@ CREATE TABLE IF NOT EXISTS local_email_activity (
 CREATE INDEX IF NOT EXISTS idx_local_people_email ON local_people(primary_email);
 CREATE INDEX IF NOT EXISTS idx_local_email_activity_email ON local_email_activity(email);
 CREATE INDEX IF NOT EXISTS idx_local_email_activity_event_time ON local_email_activity(event_type, occurred_at);
+CREATE INDEX IF NOT EXISTS idx_local_email_activity_source_external
+  ON local_email_activity(source, json_extract(data_json, '$.externalId'))
+  WHERE json_extract(data_json, '$.externalId') IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS cold_outreach_events (
   id TEXT PRIMARY KEY,
