@@ -28,6 +28,10 @@ async function main() {
     JARVIS_UI_SMOKE_URL: `${webUrl}/index.html`,
     JARVIS_UI_SMOKE_OUT: "generated/jarvis-ui-smoke.png",
   });
+  runNpm("ui-smoke-narrow", ["run", "ui:smoke", "--", "--width", "390", "--height", "900"], {
+    JARVIS_UI_SMOKE_URL: `${webUrl}/index.html`,
+    JARVIS_UI_SMOKE_OUT: "generated/jarvis-ui-smoke-narrow.png",
+  });
   runSecretScan();
   process.stdout.write(renderSummary());
 }

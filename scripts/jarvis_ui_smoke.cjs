@@ -17,6 +17,7 @@ const viewport = {
   width: Number(args.get("--width") || 1440),
   height: Number(args.get("--height") || 960),
 };
+const isNarrowViewport = viewport.width < 700;
 
 const failures = [];
 const consoleErrors = [];
@@ -24,13 +25,13 @@ const consoleErrors = [];
 process.on("uncaughtException", (error) => {
   console.error(safeErrorText(error));
   process.exitCode = 1;
-  app.quit();
+  app.exit(1);
 });
 
 process.on("unhandledRejection", (error) => {
   console.error(safeErrorText(error));
   process.exitCode = 1;
-  app.quit();
+  app.exit(1);
 });
 
 function redactSensitiveText(value) {
@@ -75,6 +76,16 @@ function assertVisibleStart(name, box, minimum = { width: 24, height: 16 }) {
   }
   if (box.left < 0 || box.top < 0 || box.left > viewport.width || box.top > viewport.height) {
     fail(`${name} does not start inside the first viewport.`);
+  }
+}
+
+function assertSize(name, box, minimum = { width: 24, height: 16 }) {
+  if (!box) {
+    fail(`${name} is missing.`);
+    return;
+  }
+  if (box.width < minimum.width || box.height < minimum.height) {
+    fail(`${name} is too small: ${Math.round(box.width)}x${Math.round(box.height)}.`);
   }
 }
 
@@ -128,6 +139,11 @@ async function run() {
         return {
           title: document.title,
           bodyText: document.body.innerText,
+          clientWidth: document.documentElement.clientWidth,
+          scrollWidth: document.documentElement.scrollWidth,
+          sidebar: box(".sidebar"),
+          nav: box("nav"),
+          header: box("header"),
           rail: box("#missionRail"),
           cortex: box("#cortexMap"),
           deck: box("#commandDeck"),
@@ -155,12 +171,25 @@ async function run() {
     if (dom.visibleMissionSignals !== 5) fail(`Expected 5 mission signals, found ${dom.visibleMissionSignals}.`);
     if (dom.visibleCortexNodes !== 5) fail(`Expected 5 cortex nodes, found ${dom.visibleCortexNodes}.`);
     if (/undefined|null|\[object Object\]/i.test(dom.bodyText)) fail("UI contains raw undefined/null/object text.");
-    assertBox("mission rail", dom.rail, { width: 600, height: 50 });
-    assertBox("cortex map", dom.cortex, { width: 600, height: 80 });
-    assertBox("command deck", dom.deck, { width: 600, height: 90 });
-    assertBox("deck visual", dom.visual, { width: 120, height: 80 });
-    assertVisibleStart("Jarvis panel", dom.jarvisPanel, { width: 280, height: 180 });
-    assertVisibleStart("Jarvis response panel", dom.responsePanel, { width: 260, height: 90 });
+    if (dom.scrollWidth > dom.clientWidth + 2) fail(`UI has horizontal overflow: ${dom.scrollWidth}px > ${dom.clientWidth}px.`);
+    assertBox("sidebar", dom.sidebar, { width: isNarrowViewport ? 300 : 180, height: 60 });
+    assertBox("navigation", dom.nav, { width: isNarrowViewport ? 300 : 150, height: 40 });
+    assertBox("header", dom.header, { width: isNarrowViewport ? 300 : 400, height: 40 });
+    if (isNarrowViewport) {
+      assertVisibleStart("mission rail", dom.rail, { width: 300, height: 50 });
+      assertSize("cortex map", dom.cortex, { width: 300, height: 80 });
+      assertSize("command deck", dom.deck, { width: 300, height: 90 });
+      assertSize("deck visual", dom.visual, { width: 120, height: 80 });
+      assertSize("Jarvis panel", dom.jarvisPanel, { width: 280, height: 180 });
+      assertSize("Jarvis response panel", dom.responsePanel, { width: 260, height: 90 });
+    } else {
+      assertBox("mission rail", dom.rail, { width: 600, height: 50 });
+      assertBox("cortex map", dom.cortex, { width: 600, height: 80 });
+      assertBox("command deck", dom.deck, { width: 600, height: 90 });
+      assertBox("deck visual", dom.visual, { width: 120, height: 80 });
+      assertVisibleStart("Jarvis panel", dom.jarvisPanel, { width: 280, height: 180 });
+      assertVisibleStart("Jarvis response panel", dom.responsePanel, { width: 260, height: 90 });
+    }
     assertBox("mission readiness", dom.missionReadiness, { width: 40, height: 16 });
     assertBox("mission remote", dom.missionRemote, { width: 40, height: 16 });
 
@@ -191,5 +220,10 @@ run()
     process.exitCode = 1;
   })
   .finally(() => {
+    const code = process.exitCode;
+    if (typeof code === "number" && code !== 0) {
+      app.exit(code);
+      return;
+    }
     app.quit();
   });
