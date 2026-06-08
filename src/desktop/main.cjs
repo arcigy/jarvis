@@ -163,7 +163,7 @@ function getSystemHealth() {
     ["smartlead", ["SMARTLEAD_API_KEY"]],
     ["postgres", ["DATABASE_URL"]],
     ["redis", ["REDIS_URL"], false],
-    ["serper", ["SERPER_API_KEY"]],
+    ["serper", ["SERPER_API_KEY"], false],
     ["googleMaps", ["GOOGLE_MAPS_API_KEY"]],
     ["googleSheets", ["GOOGLE_SHEET_ID", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"]],
   ].map(([key, required, requiredForProduction = true]) => {
@@ -276,7 +276,7 @@ async function getProductionReadiness(payload) {
       .filter((check) => check.status !== "ready")
       .map((check) => ({
         key: check.key,
-        severity: check.key === "redis" ? "warning" : "blocking",
+        severity: ["redis", "serper"].includes(check.key) ? "warning" : "blocking",
         message: check.message,
         nextAction: readinessNextAction(check.key, check.message),
       })),
@@ -1041,9 +1041,11 @@ async function discoverLeads(payload) {
   const query = String(payload?.query ?? "").trim();
   if (!query) throw new Error("Lead search query is required.");
   const maxResults = Math.max(1, Math.min(Number(payload?.maxResults ?? 10), 25));
+  const hasSerper = getSerperApiKeys().length > 0;
+  const hasGooglePlaces = presentEnv("GOOGLE_MAPS_API_KEY");
   const [serper, places] = await Promise.allSettled([
-    getSerperApiKeys().length ? searchSerperLeads(query, maxResults) : null,
-    presentEnv("GOOGLE_MAPS_API_KEY") ? searchGooglePlacesLeads(String(payload?.placesQuery ?? query), Math.min(maxResults, 20)) : null,
+    hasSerper ? searchSerperLeads(query, maxResults) : null,
+    hasGooglePlaces ? searchGooglePlacesLeads(String(payload?.placesQuery ?? query), Math.min(maxResults, 20)) : null,
   ]);
   const leads = [
     ...normalizeSerperLeads(serper.status === "fulfilled" ? serper.value : null),
@@ -1055,6 +1057,22 @@ async function discoverLeads(payload) {
       serper.status === "fulfilled" && serper.value ? "serper" : null,
       places.status === "fulfilled" && places.value ? "google_places" : null,
     ].filter(Boolean),
+    providerStatus: [
+      leadProviderStatus("serper", hasSerper, serper),
+      leadProviderStatus("google_places", hasGooglePlaces, places),
+    ],
+  };
+}
+
+function leadProviderStatus(source, configured, result) {
+  if (!configured) return { source, status: "missing", message: `${source} is not configured.` };
+  if (result.status === "fulfilled") {
+    return { source, status: result.value ? "ready" : "missing", message: result.value ? `${source} responded.` : `${source} is not configured.` };
+  }
+  return {
+    source,
+    status: "failed",
+    message: result.reason instanceof Error ? result.reason.message : String(result.reason),
   };
 }
 
@@ -1251,7 +1269,7 @@ async function requestGeminiText(input, apiKey, model) {
 
 function getGeminiModels(input) {
   const primary = input.model || process.env.GEMINI_MODEL || "gemini-2.5-flash";
-  const fallback = process.env.GEMINI_FALLBACK_MODEL || "gemini-2.0-flash";
+  const fallback = process.env.GEMINI_FALLBACK_MODEL || "gemini-2.5-flash-lite";
   return [primary, fallback].filter((model, index, models) => model && models.indexOf(model) === index);
 }
 

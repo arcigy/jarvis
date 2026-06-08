@@ -95,7 +95,7 @@ async function requestGeminiText(input: GeminiTextInput, apiKey: string, model: 
 
 function getGeminiModels(input: GeminiTextInput, env: RuntimeEnv): string[] {
   const primary = input.model ?? env.GEMINI_MODEL ?? "gemini-2.5-flash";
-  const fallback = env.GEMINI_FALLBACK_MODEL ?? "gemini-2.0-flash";
+  const fallback = env.GEMINI_FALLBACK_MODEL ?? "gemini-2.5-flash-lite";
   return [primary, fallback].filter((model, index, models) => model && models.indexOf(model) === index);
 }
 

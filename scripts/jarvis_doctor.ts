@@ -151,15 +151,15 @@ async function checkLiveIntegrationDiagnostics(): Promise<DoctorCheck> {
   const dbPath = safeGeneratedPath(`doctor-live-diagnostics-${Date.now()}-${process.pid}.db`);
   const diagnostics = await runIntegrationDiagnostics({ live: true, dbPath });
   const notReady = diagnostics.checks.filter((check) => check.status !== "ready");
-  const blockingNotReady = notReady.filter((check) => check.key !== "redis");
-  const advisoryNotReady = notReady.filter((check) => check.key === "redis");
+  const blockingNotReady = notReady.filter((check) => !["redis", "serper"].includes(check.key));
+  const advisoryNotReady = notReady.filter((check) => ["redis", "serper"].includes(check.key));
   return {
     key: "liveIntegrationDiagnostics",
     status: blockingNotReady.length ? "failed" : "ready",
     message: blockingNotReady.length
       ? `${blockingNotReady.length} live integration check(s) are not ready.`
       : advisoryNotReady.length
-        ? `${diagnostics.checks.length - advisoryNotReady.length}/${diagnostics.checks.length} live integration check(s) passed; Redis is a non-blocking advisory.`
+        ? `${diagnostics.checks.length - advisoryNotReady.length}/${diagnostics.checks.length} live integration check(s) passed; optional providers have non-blocking advisories.`
         : `${diagnostics.checks.length} live integration check(s) passed.`,
     details: {
       live: diagnostics.live,

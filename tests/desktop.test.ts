@@ -97,6 +97,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /arcigyApi\.getSmartleadCampaignStatus/);
   assert.match(renderer, /arcigyApi\.discoverLeads/);
   assert.match(renderer, /arcigyApi\.appendLeadsToGoogleSheet/);
+  assert.match(renderer, /providerStatus/);
   assert.match(renderer, /renderCommandDeck/);
   assert.match(renderer, /buildCommandTimeline/);
   assert.match(renderer, /readyIntegrations/);
@@ -183,6 +184,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /getSmartleadCampaignStatus/);
   assert.match(main, /searchGooglePlacesLeads/);
   assert.match(main, /getSerperApiKeys/);
+  assert.match(main, /leadProviderStatus/);
   assert.match(main, /ipcMain\.handle\("contracts:generate"/);
   assert.match(main, /ipcMain\.handle\("contracts:draftIntake"/);
   assert.match(main, /generateGeminiTextForContract/);

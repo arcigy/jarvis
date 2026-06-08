@@ -101,6 +101,10 @@ Do not leave placeholder URL credentials such as `PASSWORD`, `changeme`, or `dum
 
 Gemini calls retry transient `429`, `500`, `502`, `503`, and `504` responses before trying `GEMINI_FALLBACK_MODEL`. Auth, quota, and invalid request errors still surface as live-readiness blockers.
 
+Lead discovery returns provider-level status for Serper and Google Places. If Serper credits are exhausted, `discover_leads` can still return Google Places leads and tells Jarvis exactly which provider failed; the direct `search_serper` tool still reports the Serper failure.
+
+Serper is treated as an optional lead provider in readiness because Google Places keeps the shipped lead discovery workflow functional. A failed Serper check remains visible as a warning until credits are restored.
+
 Use `arcigy.get_production_readiness` or `POST /api/production-readiness` for a secret-safe status report. It returns blockers, next actions, and a `fixGuide` with env key names and validation commands, never the secret values.
 
 Tauri is the preferred target for a production desktop build, but this machine currently has no Rust/Cargo toolchain available. Electron is used here as the working desktop fallback.

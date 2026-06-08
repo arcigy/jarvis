@@ -29,6 +29,12 @@ export type LeadDiscoveryInput = {
   maxResults?: number;
 };
 
+export type LeadDiscoveryProviderStatus = {
+  source: "serper" | "google_places";
+  status: "ready" | "missing" | "failed";
+  message: string;
+};
+
 export type NormalizedLead = {
   name: string;
   website?: string;
@@ -145,11 +151,13 @@ export async function discoverLeads(
   input: LeadDiscoveryInput,
   env: RuntimeEnv = process.env,
   fetchImpl: FetchLike = fetch
-): Promise<{ leads: NormalizedLead[]; sources: string[] }> {
+): Promise<{ leads: NormalizedLead[]; sources: string[]; providerStatus: LeadDiscoveryProviderStatus[] }> {
   const maxResults = input.maxResults ?? 10;
+  const hasSerper = getSerperApiKeys(env).length > 0;
+  const hasGooglePlaces = Boolean(getEnv(env, "GOOGLE_MAPS_API_KEY"));
   const [serper, places] = await Promise.allSettled([
-    getSerperApiKeys(env).length ? searchSerper({ query: input.query, num: maxResults }, env, fetchImpl) : null,
-    getEnv(env, "GOOGLE_MAPS_API_KEY")
+    hasSerper ? searchSerper({ query: input.query, num: maxResults }, env, fetchImpl) : null,
+    hasGooglePlaces
       ? searchGooglePlaces({ query: input.placesQuery ?? input.query, maxResultCount: Math.min(maxResults, 20) }, env, fetchImpl)
       : null,
   ]);
@@ -162,7 +170,26 @@ export async function discoverLeads(
     sources: [serper.status === "fulfilled" && serper.value ? "serper" : null, places.status === "fulfilled" && places.value ? "google_places" : null].filter(
       (source): source is string => source !== null
     ),
+    providerStatus: [
+      providerStatus("serper", hasSerper, serper),
+      providerStatus("google_places", hasGooglePlaces, places),
+    ],
   };
+}
+
+function providerStatus(
+  source: LeadDiscoveryProviderStatus["source"],
+  configured: boolean,
+  result: PromiseSettledResult<unknown>
+): LeadDiscoveryProviderStatus {
+  if (!configured) {
+    return { source, status: "missing", message: `${source} is not configured.` };
+  }
+  if (result.status === "fulfilled") {
+    return { source, status: result.value ? "ready" : "missing", message: result.value ? `${source} responded.` : `${source} is not configured.` };
+  }
+  const message = result.reason instanceof Error ? result.reason.message : String(result.reason);
+  return { source, status: "failed", message };
 }
 
 function getSerperApiKeys(env: RuntimeEnv): string[] {

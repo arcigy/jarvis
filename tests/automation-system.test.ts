@@ -392,8 +392,50 @@ test("lead discovery helpers call Serper, Google Places, and Google Sheets", asy
   );
 
   assert.equal(discovered.leads.length, 2);
+  assert.deepEqual(discovered.providerStatus.map((provider) => provider.status), ["ready", "ready"]);
   assert.deepEqual(append, { updates: { updatedRows: 1 } });
   assert.ok(calls.some((url) => url.includes("values/Leads!A1:append")));
+});
+
+test("lead discovery reports provider status and falls back when Serper credits are exhausted", async () => {
+  const fetchImpl = async (url: string | URL | Request) => {
+    const target = String(url);
+    if (target.includes("google.serper.dev")) {
+      return {
+        ok: false,
+        status: 400,
+        text: async () => JSON.stringify({ message: "Not enough credits", statusCode: 400 }),
+      } as Response;
+    }
+    if (target.includes("places.googleapis.com")) {
+      return responseJson({
+        places: [
+          {
+            displayName: { text: "Fallback Place" },
+            formattedAddress: "Bratislava",
+            websiteUri: "https://fallback-place.example",
+          },
+        ],
+      });
+    }
+    throw new Error(`Unexpected URL: ${target}`);
+  };
+
+  const discovered = await discoverLeads(
+    { query: "automation agency Bratislava", maxResults: 5 },
+    {
+      SERPER_API_KEY: "spent-key",
+      SERPER_API_KEY_2: "spent-key-2",
+      GOOGLE_MAPS_API_KEY: "maps-key",
+    },
+    fetchImpl as typeof fetch
+  );
+
+  assert.equal(discovered.leads.length, 1);
+  assert.deepEqual(discovered.sources, ["google_places"]);
+  assert.equal(discovered.providerStatus.find((provider) => provider.source === "serper")?.status, "failed");
+  assert.equal(discovered.providerStatus.find((provider) => provider.source === "google_places")?.status, "ready");
+  assert.equal(JSON.stringify(discovered).includes("spent-key"), false);
 });
 
 test("integration diagnostics run live read-only checks with mocked providers", async () => {
@@ -448,6 +490,67 @@ test("integration diagnostics run live read-only checks with mocked providers", 
     assert.equal(result.checks.find((check) => check.key === "redis")?.status, "ready");
     assert.equal(result.checks.find((check) => check.key === "serper")?.status, "ready");
     assert.ok(calls.some((url) => url.includes("sheets.googleapis.com")));
+  } finally {
+    await postgres.close();
+    await redis.close();
+  }
+});
+
+test("production readiness treats Serper exhaustion as advisory when other lead provider works", async () => {
+  const fetchImpl = async (url: string | URL | Request) => {
+    const target = String(url);
+    if (target.includes("generativelanguage.googleapis.com")) {
+      return responseJson({ candidates: [{ content: { parts: [{ text: "OK" }] } }] });
+    }
+    if (target.includes("oauth2.googleapis.com")) return responseJson({ access_token: "access-token" });
+    if (target.includes("server.smartlead.ai")) return responseJson([{ id: 1, name: "Campaign" }]);
+    if (target.includes("places.googleapis.com")) return responseJson({ places: [] });
+    if (target.includes("google.serper.dev")) {
+      return {
+        ok: false,
+        status: 400,
+        text: async () => JSON.stringify({ message: "Not enough credits", statusCode: 400 }),
+      } as Response;
+    }
+    if (target.includes("sheets.googleapis.com")) return responseJson({ spreadsheetId: "sheet-id" });
+    throw new Error(`Unexpected URL: ${target}`);
+  };
+
+  const postgres = await startTcpServer();
+  const redis = await startTcpServer((socket) => {
+    socket.on("data", (chunk: Buffer) => {
+      const text = chunk.toString("utf-8");
+      if (text.includes("AUTH")) socket.write("+OK\r\n");
+      if (text.includes("PING")) socket.write("+PONG\r\n");
+    });
+  });
+
+  try {
+    const report = await buildProductionReadinessReport(
+      { live: true, dbPath: "missing.db" },
+      {
+        GEMINI_API_KEY: "gemini",
+        GOOGLE_CLIENT_ID: "client",
+        GOOGLE_CLIENT_SECRET: "secret",
+        GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP: "refresh",
+        GMAIL_REFRESH_TOKEN_BRANISLAV_L_ARCIGY_GROUP: "refresh-2",
+        GMAIL_REFRESH_TOKEN_ANDREJ_ARCIGY_GROUP: "refresh-3",
+        GMAIL_REFRESH_TOKEN_ANDREJ_R_ARCIGY_GROUP: "refresh-4",
+        SMARTLEAD_API_KEY: "smartlead",
+        DATABASE_URL: `postgres://user:pass@127.0.0.1:${postgres.port}/db`,
+        REDIS_URL: `redis://default:secret@127.0.0.1:${redis.port}`,
+        GOOGLE_SHEET_ID: "sheet-id",
+        GOOGLE_MAPS_API_KEY: "maps",
+        SERPER_API_KEY: "spent-serper",
+        SERPER_API_KEY_2: "spent-serper-2",
+      },
+      fetchImpl as typeof fetch
+    );
+
+    assert.equal(report.status, "ready");
+    assert.equal(report.blockers.find((blocker) => blocker.key === "serper")?.severity, "warning");
+    assert.match(report.summary, /non-blocking warning/);
+    assert.equal(JSON.stringify(report).includes("spent-serper"), false);
   } finally {
     await postgres.close();
     await redis.close();

@@ -285,11 +285,13 @@ async function refreshHealth() {
 function renderLeadDiscovery(result) {
   const leads = result.leads ?? [];
   const sources = (result.sources ?? []).join(", ") || "none";
+  const providerLines = (result.providerStatus ?? []).map((provider) => `${provider.source}: ${provider.status}${provider.message ? ` - ${provider.message}` : ""}`);
   if (!leads.length) {
-    return `No leads found. Sources checked: ${sources}.`;
+    return [`No leads found. Sources checked: ${sources}.`, ...providerLines].join("\n");
   }
   return [
     `Found ${leads.length} leads. Sources: ${sources}.`,
+    ...providerLines,
     "",
     ...leads.map((lead, index) =>
       [

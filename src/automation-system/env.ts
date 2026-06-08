@@ -35,7 +35,7 @@ const integrations: Array<{ key: IntegrationKey; required: string[]; requiredFor
   { key: "redis", required: ["REDIS_URL"], requiredForProduction: false },
   { key: "googleSheets", required: ["GOOGLE_SHEET_ID", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"] },
   { key: "googleMaps", required: ["GOOGLE_MAPS_API_KEY"] },
-  { key: "serper", required: ["SERPER_API_KEY"] },
+  { key: "serper", required: ["SERPER_API_KEY"], requiredForProduction: false },
 ];
 
 export function getEnv(env: RuntimeEnv, key: string): string | null {

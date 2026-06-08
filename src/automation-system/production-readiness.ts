@@ -93,7 +93,7 @@ function integrationHealthBlockers(item: IntegrationHealth): ReadinessBlocker[] 
 
 function diagnosticBlockers(check: DiagnosticCheck): ReadinessBlocker[] {
   if (check.status === "ready") return [];
-  const requiredForProduction = check.key !== "redis";
+  const requiredForProduction = !["redis", "serper"].includes(check.key);
   return [
     {
       key: check.key,
