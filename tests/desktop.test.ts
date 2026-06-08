@@ -56,6 +56,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /run_remote_mcp_smoke/);
   assert.match(html, /draftReply/);
   assert.match(html, /preparedReplies/);
+  assert.match(html, /Smartlead live/);
+  assert.match(html, /Live \+ SQLite fallback/);
+  assert.match(html, /Manual send lock/);
   assert.match(html, /approvePreparedReply/);
   assert.match(html, /preparedReplyResult/);
   assert.match(html, /get_prepared_outreach_replies/);
@@ -140,7 +143,10 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /sections\.liveSync/);
   assert.match(renderer, /refreshOperatorBriefing/);
   assert.match(renderer, /live: true/);
+  assert.match(renderer, /live = true/);
+  assert.match(renderer, /productionReadiness\(\{ live: true \}\)/);
   assert.match(renderer, /Building live operator briefing/);
+  assert.match(renderer, /Building live production readiness report/);
   assert.match(renderer, /startOperatorBriefingWatch/);
   assert.match(renderer, /operatorBriefingPollMs: 300000/);
   assert.match(renderer, /Fix guide/);
@@ -206,6 +212,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /buildReadinessFixGuide/);
   assert.match(main, /readinessFixStepFor/);
   assert.match(main, /updateDiagnosticCheck/);
+  assert.match(main, /runWithTransientRetry/);
+  assert.match(main, /isTransientNetworkError/);
   assert.match(main, /parseServiceUrl/);
   assert.match(main, /pingRedis/);
   assert.match(main, /Redis PING succeeded/);

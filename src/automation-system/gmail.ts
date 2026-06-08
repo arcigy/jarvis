@@ -3,6 +3,7 @@ import type { FetchLike } from "./gemini.ts";
 
 export const defaultGmailSyncQuery = "in:inbox newer_than:7d";
 export const defaultGmailBriefingQuery = "in:inbox newer_than:2d";
+const googleOAuthTokenUrls = ["https://oauth2.googleapis.com/token", "https://www.googleapis.com/oauth2/v4/token"];
 
 export type GmailAccount = {
   envKey: string;
@@ -55,25 +56,36 @@ export async function refreshGoogleAccessToken(
   env: RuntimeEnv = process.env,
   fetchImpl: FetchLike = fetch
 ): Promise<string> {
-  const body = new URLSearchParams({
-    client_id: requireEnv(env, "GOOGLE_CLIENT_ID"),
-    client_secret: requireEnv(env, "GOOGLE_CLIENT_SECRET"),
-    refresh_token: refreshToken,
-    grant_type: "refresh_token",
-  });
-  const response = await fetchImpl("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body,
-  });
-  if (!response.ok) {
-    throw new Error(`Google OAuth refresh failed: ${response.status}`);
+  const clientId = requireEnv(env, "GOOGLE_CLIENT_ID");
+  const clientSecret = requireEnv(env, "GOOGLE_CLIENT_SECRET");
+  let lastError: Error | null = null;
+  for (const url of googleOAuthTokenUrls) {
+    try {
+      const body = new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: refreshToken,
+        grant_type: "refresh_token",
+      });
+      const response = await fetchImpl(url, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body,
+      });
+      if (!response.ok) {
+        throw new Error(`status ${response.status}`);
+      }
+      const data = (await response.json()) as { access_token?: string };
+      if (!data.access_token) {
+        throw new Error("missing access token");
+      }
+      return data.access_token;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      lastError = new Error(`${new URL(url).hostname}: ${message}`);
+    }
   }
-  const data = (await response.json()) as { access_token?: string };
-  if (!data.access_token) {
-    throw new Error("Google OAuth refresh did not return an access token.");
-  }
-  return data.access_token;
+  throw new Error(`Google OAuth refresh failed after ${googleOAuthTokenUrls.length} endpoint(s): ${lastError?.message ?? "unknown error"}`);
 }
 
 export async function listRecentGmailMessageEvents(

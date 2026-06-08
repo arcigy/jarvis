@@ -11,7 +11,7 @@ import { draftContractIntake, parseJsonObject } from "../src/automation-system/c
 import { runIntegrationDiagnostics } from "../src/automation-system/diagnostics.ts";
 import { getIntegrationHealth } from "../src/automation-system/env.ts";
 import { buildClientReplyPrompt, generateGeminiText } from "../src/automation-system/gemini.ts";
-import { defaultGmailSyncQuery, listRecentGmailMessageEvents, parseFromHeader } from "../src/automation-system/gmail.ts";
+import { defaultGmailSyncQuery, listRecentGmailMessageEvents, parseFromHeader, refreshGoogleAccessToken } from "../src/automation-system/gmail.ts";
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "../src/automation-system/lead-discovery.ts";
 import {
   buildContractGenerationCommand,
@@ -358,6 +358,26 @@ test("Gmail helper defaults to inbox sync query", async () => {
   assert.equal(new URL(listUrl).searchParams.get("q"), defaultGmailSyncQuery);
 });
 
+test("Gmail OAuth refresh falls back to the secondary Google token endpoint", async () => {
+  const calls: string[] = [];
+  const fetchImpl = async (url: string | URL | Request) => {
+    const target = String(url);
+    calls.push(target);
+    if (target.includes("oauth2.googleapis.com")) throw new Error("fetch failed");
+    if (target.includes("www.googleapis.com/oauth2/v4/token")) return responseJson({ access_token: "fallback-access-token" });
+    throw new Error(`Unexpected URL: ${target}`);
+  };
+
+  const accessToken = await refreshGoogleAccessToken(
+    "refresh",
+    { GOOGLE_CLIENT_ID: "client", GOOGLE_CLIENT_SECRET: "secret" },
+    fetchImpl as typeof fetch
+  );
+
+  assert.equal(accessToken, "fallback-access-token");
+  assert.deepEqual(calls, ["https://oauth2.googleapis.com/token", "https://www.googleapis.com/oauth2/v4/token"]);
+});
+
 test("Smartlead helper fetches campaign statistics", async () => {
   const seenUrls: string[] = [];
   const fetchImpl = async (url: string | URL | Request) => {
@@ -608,6 +628,25 @@ test("integration diagnostics run live read-only checks with mocked providers", 
     await postgres.close();
     await redis.close();
   }
+});
+
+test("integration diagnostics retry transient fetch failures", async () => {
+  let geminiAttempts = 0;
+  const fetchImpl = async (url: string | URL | Request) => {
+    const target = String(url);
+    if (target.includes("generativelanguage.googleapis.com")) {
+      geminiAttempts += 1;
+      if (geminiAttempts === 1) throw new Error("fetch failed");
+      return responseJson({ candidates: [{ content: { parts: [{ text: "OK" }] } }] });
+    }
+    throw new Error(`Unexpected URL: ${target}`);
+  };
+
+  const diagnostics = await runIntegrationDiagnostics({ live: true }, { GEMINI_API_KEY: "gemini" }, fetchImpl as typeof fetch);
+  const gemini = diagnostics.checks.find((check) => check.key === "gemini");
+
+  assert.equal(geminiAttempts, 2);
+  assert.equal(gemini?.status, "ready");
 });
 
 test("production readiness treats Serper exhaustion as advisory when other lead provider works", async () => {

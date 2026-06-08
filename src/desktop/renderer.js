@@ -264,7 +264,7 @@ function renderOperatorBriefing(briefing) {
     .join("\n");
 }
 
-async function refreshOperatorBriefing({ speakResult = false, loadingText = null, live = false } = {}) {
+async function refreshOperatorBriefing({ speakResult = false, loadingText = null, live = true } = {}) {
   if (loadingText) elements.commandTimeline.textContent = loadingText;
   const briefing = await arcigyApi.operatorBriefing({ periodLabel: "poslednych 7 dni", live });
   elements.commandTimeline.textContent = briefing.sections?.nextAction ?? briefing.summary;
@@ -846,7 +846,7 @@ elements.listenButton.addEventListener("click", () => {
 elements.simulateWake.addEventListener("click", () => void handleTranscript("Jarvis"));
 elements.submitTranscript.addEventListener("click", () => void handleTranscript(elements.transcript.value));
 elements.coldBrief.addEventListener("click", async () => {
-  speak(await arcigyApi.coldOutreachBrief({ text: "cold outreach za posledných 7 dní" }));
+  speak(await arcigyApi.coldOutreachBrief({ text: "cold outreach za poslednych 7 dni" }));
 });
 elements.preparedReplies.addEventListener("click", async () => {
   try {
@@ -1002,8 +1002,8 @@ elements.runRemoteSmoke.addEventListener("click", async () => {
 });
 elements.readinessReport.addEventListener("click", async () => {
   try {
-    elements.commandTimeline.textContent = "Building production readiness report...";
-    const report = await arcigyApi.productionReadiness({ live: false });
+    elements.commandTimeline.textContent = "Building live production readiness report...";
+    const report = await arcigyApi.productionReadiness({ live: true });
     elements.commandTimeline.textContent = report.summary;
     elements.response.textContent = renderReadinessReport(report);
   } catch (error) {

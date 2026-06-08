@@ -70,12 +70,34 @@ async function updateLiveCheck(checks: DiagnosticCheck[], key: string, run: () =
   const check = checks.find((item) => item.key === key);
   if (!check || check.status === "missing") return;
   try {
-    check.message = await run();
+    check.message = await runWithTransientRetry(run);
     check.status = "ready";
   } catch (error) {
     check.status = "failed";
     check.message = error instanceof Error ? error.message : String(error);
   }
+}
+
+async function runWithTransientRetry(run: () => Promise<string>, maxRetries = 2): Promise<string> {
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    try {
+      return await run();
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      if (!isTransientNetworkError(lastError) || attempt === maxRetries) break;
+      await sleep(350 * (attempt + 1));
+    }
+  }
+  throw lastError ?? new Error("Live diagnostic failed.");
+}
+
+function isTransientNetworkError(error: Error): boolean {
+  return /fetch failed|network|timeout|timed out|ECONNRESET|ETIMEDOUT|EAI_AGAIN|ENOTFOUND|socket hang up/i.test(error.message);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function checkGemini(env: RuntimeEnv, fetchImpl: FetchLike) {

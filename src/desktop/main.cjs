@@ -11,6 +11,7 @@ const repoRoot = path.resolve(__dirname, "..", "..");
 const defaultDbPath = path.join(repoRoot, "data", "jarvis-local.db");
 const defaultGmailSyncQuery = "in:inbox newer_than:7d";
 const defaultGmailBriefingQuery = "in:inbox newer_than:2d";
+const googleOAuthTokenUrls = ["https://oauth2.googleapis.com/token", "https://www.googleapis.com/oauth2/v4/token"];
 loadLocalEnv();
 
 function createWindow() {
@@ -677,12 +678,34 @@ async function updateDiagnosticCheck(checks, key, run) {
   const check = checks.find((item) => item.key === key);
   if (!check || check.status === "missing") return;
   try {
-    check.message = await run();
+    check.message = await runWithTransientRetry(run);
     check.status = "ready";
   } catch (error) {
     check.status = "failed";
     check.message = error instanceof Error ? error.message : String(error);
   }
+}
+
+async function runWithTransientRetry(run, maxRetries = 2) {
+  let lastError = null;
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    try {
+      return await run();
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      if (!isTransientNetworkError(lastError) || attempt === maxRetries) break;
+      await sleep(350 * (attempt + 1));
+    }
+  }
+  throw lastError || new Error("Live diagnostic failed.");
+}
+
+function isTransientNetworkError(error) {
+  return /fetch failed|network|timeout|timed out|ECONNRESET|ETIMEDOUT|EAI_AGAIN|ENOTFOUND|socket hang up/i.test(error.message);
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function checkGoogleSheetsAccess() {
@@ -1221,21 +1244,32 @@ async function listRecentGmailMessageEvents(account, options) {
 }
 
 async function refreshGoogleAccessToken(refreshToken) {
-  const body = new URLSearchParams({
-    client_id: requireRuntimeEnv("GOOGLE_CLIENT_ID"),
-    client_secret: requireRuntimeEnv("GOOGLE_CLIENT_SECRET"),
-    refresh_token: refreshToken,
-    grant_type: "refresh_token",
-  });
-  const response = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body,
-  });
-  if (!response.ok) throw new Error(`Google OAuth refresh failed: ${response.status}`);
-  const data = await response.json();
-  if (!data.access_token) throw new Error("Google OAuth refresh did not return an access token.");
-  return data.access_token;
+  const clientId = requireRuntimeEnv("GOOGLE_CLIENT_ID");
+  const clientSecret = requireRuntimeEnv("GOOGLE_CLIENT_SECRET");
+  let lastError = null;
+  for (const url of googleOAuthTokenUrls) {
+    try {
+      const body = new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: refreshToken,
+        grant_type: "refresh_token",
+      });
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body,
+      });
+      if (!response.ok) throw new Error(`status ${response.status}`);
+      const data = await response.json();
+      if (!data.access_token) throw new Error("missing access token");
+      return data.access_token;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      lastError = `${new URL(url).hostname}: ${message}`;
+    }
+  }
+  throw new Error(`Google OAuth refresh failed after ${googleOAuthTokenUrls.length} endpoint(s): ${lastError || "unknown error"}`);
 }
 
 async function gmailFetch(url, accessToken) {
