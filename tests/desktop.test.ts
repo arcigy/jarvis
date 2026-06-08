@@ -77,6 +77,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /liveBlockerCount/);
   assert.match(renderer, /Tunnel command/);
   assert.match(renderer, /renderReadinessReport/);
+  assert.match(renderer, /Fix guide/);
+  assert.match(renderer, /validationCommand/);
   assert.match(renderer, /\/api\/production-readiness/);
   assert.match(renderer, /\/api\/system-health/);
   assert.match(renderer, /\/api\/run-diagnostics/);
@@ -107,6 +109,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /tunnelProvider: "ngrok"/);
   assert.match(main, /getRuntimeEnvIssue/);
   assert.match(main, /hasPlaceholderUrlCredential/);
+  assert.match(main, /buildReadinessFixGuide/);
+  assert.match(main, /readinessFixStepFor/);
   assert.match(main, /updateDiagnosticCheck/);
   assert.match(main, /parseServiceUrl/);
   assert.match(main, /pingRedis/);

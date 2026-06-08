@@ -65,6 +65,8 @@ test("production readiness report returns blockers and next actions without secr
   assert.equal(report.mcp.toolCount, 20);
   assert.ok(report.blockers.some((blocker) => blocker.key === "redis"));
   assert.ok(report.nextActions.some((action) => action.includes("REDIS_URL")));
+  assert.ok(report.fixGuide.some((step) => step.id === "redis-real-password" && step.envKeys.includes("REDIS_URL")));
+  assert.ok(report.fixGuide.every((step) => step.validationCommand.includes("doctor")));
   assert.equal(JSON.stringify(report).includes("PASSWORD"), false);
 });
 

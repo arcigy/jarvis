@@ -143,13 +143,15 @@ test("local web bridge serves UI and API health", async () => {
       body: JSON.stringify({ live: false }),
     });
     assert.equal(readiness.status, 200);
-    const readinessBody = (await readiness.json()) as { status: string; mcp: { toolCount: number }; nextActions: string[] };
+    const readinessBody = (await readiness.json()) as { status: string; mcp: { toolCount: number }; nextActions: string[]; fixGuide: unknown[] };
     assert.ok(["ready", "attention", "blocked"].includes(readinessBody.status));
     assert.equal(readinessBody.mcp.toolCount, 20);
     assert.ok(Array.isArray(readinessBody.nextActions));
+    assert.ok(Array.isArray(readinessBody.fixGuide));
 
     const mcpReadiness = await postJson(`${baseUrl}/api/mcp/arcigy.get_production_readiness`, { live: false });
     assert.equal(mcpReadiness.result.mcp.toolCount, 20);
+    assert.ok(Array.isArray(mcpReadiness.result.fixGuide));
 
     const voice = await fetch(`${baseUrl}/api/jarvis/voice-event`, {
       method: "POST",

@@ -297,6 +297,7 @@ async function getProductionReadiness(payload) {
     nextActions: uniqueBlockers.length
       ? uniqueBlockers.map((blocker) => blocker.nextAction)
       : ["No action needed. Keep secrets out of git and run doctor before changes."],
+    fixGuide: buildReadinessFixGuide(uniqueBlockers),
     diagnostics: diagnostics || undefined,
   };
 }
@@ -321,6 +322,86 @@ function dedupeReadinessBlockers(blockers) {
     seen.add(key);
     return true;
   });
+}
+
+function buildReadinessFixGuide(blockers) {
+  const steps = blockers.map(readinessFixStepFor).filter(Boolean);
+  if (!steps.length) {
+    return [
+      {
+        id: "verify-before-change",
+        title: "Keep production proof green",
+        detail: "Run the local doctor before changes and keep real secret values only in .env.local.",
+        envKeys: [],
+        validationCommand: "npm run doctor",
+      },
+    ];
+  }
+  const seen = new Set();
+  return steps.filter((step) => {
+    if (seen.has(step.id)) return false;
+    seen.add(step.id);
+    return true;
+  });
+}
+
+function readinessFixStepFor(blocker) {
+  const text = `${blocker.key} ${blocker.message}`.toLowerCase();
+  if (text.includes("redis") && text.includes("placeholder")) {
+    return {
+      id: "redis-real-password",
+      title: "Replace Redis placeholder password",
+      detail: "Set REDIS_URL to the real Railway Redis URL. The report never returns the secret value; it only flags placeholder credentials.",
+      envKeys: ["REDIS_URL"],
+      validationCommand: "npm run doctor -- --live-integrations",
+    };
+  }
+  if (text.includes("serper") && text.includes("not enough credits")) {
+    return {
+      id: "serper-credits",
+      title: "Restore Serper search credits",
+      detail: "Top up or replace at least one Serper key. The live check already tries SERPER_API_KEY and SERPER_API_KEY_2 before reporting exhaustion.",
+      envKeys: ["SERPER_API_KEY", "SERPER_API_KEY_2"],
+      validationCommand: "npm run doctor -- --live-integrations",
+    };
+  }
+  if (text.includes("gmail") || text.includes("google")) {
+    return {
+      id: "google-oauth",
+      title: "Verify Google OAuth and API access",
+      detail: "Refresh OAuth credentials, confirm Sheets access, and keep Google keys in .env.local only.",
+      envKeys: ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_SHEET_ID", "GOOGLE_MAPS_API_KEY"],
+      validationCommand: "npm run doctor -- --live-integrations",
+    };
+  }
+  if (text.includes("smartlead")) {
+    return {
+      id: "smartlead-access",
+      title: "Verify Smartlead access",
+      detail: "Confirm the Smartlead API key has access to campaigns used by Jarvis.",
+      envKeys: ["SMARTLEAD_API_KEY"],
+      validationCommand: "npm run doctor -- --live-integrations",
+    };
+  }
+  if (text.includes("gemini")) {
+    return {
+      id: "gemini-access",
+      title: "Verify Gemini access",
+      detail: "Confirm Gemini API key and quota for AI drafting features.",
+      envKeys: ["GEMINI_API_KEY"],
+      validationCommand: "npm run doctor -- --live-integrations",
+    };
+  }
+  if (text.includes("postgres") || text.includes("database")) {
+    return {
+      id: "postgres-access",
+      title: "Verify Postgres access",
+      detail: "Confirm DATABASE_URL credentials and network access.",
+      envKeys: ["DATABASE_URL"],
+      validationCommand: "npm run doctor -- --live-integrations",
+    };
+  }
+  return null;
 }
 
 function getWebBridgePreflight() {

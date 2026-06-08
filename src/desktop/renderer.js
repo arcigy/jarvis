@@ -193,6 +193,11 @@ function renderReadinessReport(report) {
     "",
     "Next actions:",
     ...(report.nextActions ?? []).map((action) => `- ${action}`),
+    "",
+    "Fix guide:",
+    ...(report.fixGuide ?? []).map((step) =>
+      [`- ${step.title}`, `  Env: ${(step.envKeys ?? []).join(", ") || "none"}`, `  Validate: ${step.validationCommand}`, `  ${step.detail}`].join("\n")
+    ),
   ].join("\n");
 }
 
