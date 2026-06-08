@@ -21,6 +21,7 @@ export type RemoteMcpConnectionPack = {
   generatedAt: string;
   baseUrl: string;
   manifestUrl: string;
+  actionManifestUrl: string;
   openApiSchemaUrl: string;
   smokeTestUrl: string;
   mcpBaseUrl: string;
@@ -122,6 +123,7 @@ export async function buildRemoteMcpConnectionPack(
     generatedAt: new Date().toISOString(),
     baseUrl,
     manifestUrl: `${baseUrl}/.well-known/arcigy-jarvis.json`,
+    actionManifestUrl: `${baseUrl}/.well-known/ai-plugin.json`,
     openApiSchemaUrl: `${baseUrl}/api/openapi.json`,
     smokeTestUrl: `${baseUrl}/api/remote-mcp-smoke`,
     mcpBaseUrl: `${baseUrl}/api/mcp`,
@@ -179,6 +181,7 @@ export async function buildRemoteMcpConnectionPack(
       : undefined,
     agentInstructions: [
       "Fetch the manifestUrl first to list live tools and schemas.",
+      "Fetch actionManifestUrl when the remote agent supports ai-plugin/action manifests.",
       "Import openApiSchemaUrl when the remote agent supports ChatGPT custom actions, Grok actions, or OpenAPI-based HTTP tool setup.",
       "Run the smokeTestUrl before handoff and require ready checks for pack-limits, approval-gate, approval-shape-gate, and secret-redaction.",
       "Call MCP tools with POST JSON to mcpToolCallPattern.",
@@ -194,7 +197,7 @@ export async function buildRemoteMcpConnectionPack(
 function buildAgentPromptTemplates(baseUrl: string): RemoteMcpConnectionPack["agentPromptTemplates"] {
   const shared =
     `Use Arcigy Jarvis remote MCP at ${baseUrl}. ` +
-    "First fetch the connection pack, manifest, and OpenAPI schema with Authorization: Bearer <JARVIS_WEB_TOKEN>, then run remote smoke. " +
+    "First fetch the connection pack, action manifest, manifest, and OpenAPI schema with Authorization: Bearer <JARVIS_WEB_TOKEN>, then run remote smoke. " +
     "Do not ask for or reveal secrets. Start with arcigy.get_operator_briefing. Use read-only/draft tools first. " +
     "Never call approvalRequired tools until the operator confirms the exact payload.";
   return {
@@ -212,6 +215,7 @@ function buildAgentCompatibility(): RemoteMcpConnectionPack["agentCompatibility"
     authentication: "Authorization bearer header",
     requiredBeforeWork: [
       "Fetch manifestUrl.",
+      "Fetch actionManifestUrl if the agent supports ai-plugin/action manifests.",
       "Import openApiSchemaUrl if the agent supports OpenAPI or custom actions.",
       "Fetch handoff.connectionPackUrl and confirm tokenValueReturned=false plus repo-only limits.",
       "Run smokeTestUrl and require status=ready with pack-limits, approval-gate, approval-shape-gate, and secret-redaction ready.",
@@ -233,13 +237,14 @@ function buildHandoffRunbook(baseUrl: string): RemoteMcpConnectionPack["handoff"
     operatorChecklist: [
       "Run npm run web:tunnel:secure and keep the process open while the remote agent works.",
       "If using browser mode, configure a strong JARVIS_WEB_TOKEN first, then use Start tunnel or POST /api/start-secure-tunnel.",
-      "Give the remote agent the external manifest, connection pack, smoke test URL, MCP base URL, and bearer auth header placeholder.",
+      "Give the remote agent the external action manifest, Jarvis manifest, connection pack, smoke test URL, MCP base URL, and bearer auth header placeholder.",
       "For ChatGPT custom actions or Grok-compatible OpenAPI setup, give the remote agent the external openApiSchemaUrl too.",
       "Approve approvalRequired tools only after reviewing the exact payload the agent will send.",
       "Run the smoke test again after any tunnel restart because ngrok URLs can change.",
     ],
     agentFirstSteps: [
       "Fetch connectionPackUrl with Authorization: Bearer <JARVIS_WEB_TOKEN>.",
+      "Fetch actionManifestUrl if the agent supports ai-plugin/action manifests.",
       "Fetch openApiSchemaUrl if the agent supports OpenAPI/custom actions.",
       "Run smokeTestUrl and require status=ready with pack-limits, approval-gate, approval-shape-gate, and secret-redaction ready before using MCP tools.",
       "Fetch tunnel.statusUrl if the operator needs the current public tunnel URLs; token values must remain redacted.",
@@ -248,6 +253,11 @@ function buildHandoffRunbook(baseUrl: string): RemoteMcpConnectionPack["handoff"
       "Never call approvalRequired tools until the operator confirms the exact action.",
     ],
     requiredProof: [
+      {
+        key: "action-manifest",
+        url: `${baseUrl}/.well-known/ai-plugin.json`,
+        expected: "HTTP 200 action manifest, bearer user_http auth, OpenAPI URL, tokenValueReturned=false.",
+      },
       {
         key: "openapi-schema",
         url: `${baseUrl}/api/openapi.json`,

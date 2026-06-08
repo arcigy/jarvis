@@ -325,6 +325,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /Browser tunnel stop:/);
   assert.match(renderer, /Tool call pattern/);
   assert.match(renderer, /OpenAPI schema/);
+  assert.match(renderer, /Action manifest/);
   assert.match(renderer, /Connection pack:/);
   assert.match(renderer, /Limits: pathPolicy=\$\{pack\.limits\.pathPolicy\}/);
   assert.match(renderer, /Required proof:/);
@@ -337,9 +338,14 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /arcigy\.get_remote_mcp_pack/);
   assert.match(renderer, /arcigy\.run_remote_mcp_smoke/);
   assert.match(renderer, /openApiSchemaUrl/);
+  assert.match(renderer, /actionManifestUrl/);
+  assert.match(main, /actionManifestUrl/);
   assert.match(main, /openApiSchemaUrl/);
+  assert.match(main, /hasValidActionManifest/);
   assert.match(main, /api\/openapi\.json/);
+  assert.match(main, /\.well-known\/ai-plugin\.json/);
   assert.match(main, /openapi-schema/);
+  assert.match(main, /action-manifest/);
   assert.match(main, /hasValidOpenApiSchema/);
   assert.match(main, /hasSafeOpenApiExample/);
   assert.match(main, /OpenAPI action schema/);

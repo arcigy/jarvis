@@ -68,13 +68,14 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(manifestResponse.status, 200);
     const manifest = (await manifestResponse.json()) as {
       auth: { type: string; requiredForExternalHosts: boolean };
-      endpoints: { mcpToolCallPattern: string; openApiSchema: string };
+      endpoints: { mcpToolCallPattern: string; actionManifest: string; openApiSchema: string };
       toolPolicy: { approvalRequired: string[]; localStateWrite: string[]; readOnlyOrDraft: string[] };
       tools: Array<{ name: string; method: string; url: string; approval: { required: boolean; field?: string }; localStateWrite: boolean; readOnlyOrDraft: boolean }>;
     };
     assert.equal(manifest.auth.type, "bearer");
     assert.equal(manifest.auth.requiredForExternalHosts, true);
     assert.match(manifest.endpoints.mcpToolCallPattern, /\/api\/mcp\/\{toolName\}$/);
+    assert.match(manifest.endpoints.actionManifest, /\/\.well-known\/ai-plugin\.json$/);
     assert.match(manifest.endpoints.openApiSchema, /\/api\/openapi\.json$/);
     assert.ok(manifest.toolPolicy.approvalRequired.includes("arcigy.generate_contract_documents"));
     assert.ok(manifest.toolPolicy.approvalRequired.includes("arcigy.send_approved_outreach_reply"));
@@ -348,6 +349,27 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(mcpReadiness.result.launchChecklist.some((item: { id: string }) => item.id === "mcp-registry"));
     assert.ok(mcpReadiness.result.launchEvidence.proofGates.some((gate: { id: string }) => gate.id === "approval-locks"));
 
+    const actionManifest = await fetch(`${baseUrl}/.well-known/ai-plugin.json`);
+    assert.equal(actionManifest.status, 200);
+    const actionManifestText = await actionManifest.text();
+    assert.equal(actionManifestText.includes("preflight-secret-token"), false);
+    const actionManifestBody = JSON.parse(actionManifestText) as {
+      schema_version: string;
+      name_for_model: string;
+      auth: { type: string; authorization_type: string };
+      api: { type: string; url: string; is_user_authenticated: boolean };
+      "x-arcigy-policy": { tokenValueReturned: boolean; familyFriendly: boolean };
+    };
+    assert.equal(actionManifestBody.schema_version, "v1");
+    assert.equal(actionManifestBody.name_for_model, "arcigy_jarvis");
+    assert.equal(actionManifestBody.auth.type, "user_http");
+    assert.equal(actionManifestBody.auth.authorization_type, "bearer");
+    assert.equal(actionManifestBody.api.type, "openapi");
+    assert.equal(actionManifestBody.api.url, `${baseUrl}/api/openapi.json`);
+    assert.equal(actionManifestBody.api.is_user_authenticated, true);
+    assert.equal(actionManifestBody["x-arcigy-policy"].tokenValueReturned, false);
+    assert.equal(actionManifestBody["x-arcigy-policy"].familyFriendly, true);
+
     const openApi = await fetch(`${baseUrl}/api/openapi.json`);
     assert.equal(openApi.status, 200);
     const openApiText = await openApi.text();
@@ -378,6 +400,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(remotePackText.includes("preflight-secret-token"), false);
     const remotePackBody = JSON.parse(remotePackText) as {
       manifestUrl: string;
+      actionManifestUrl: string;
       openApiSchemaUrl: string;
       smokeTestUrl: string;
       mcpToolCallPattern: string;
@@ -391,6 +414,7 @@ test("local web bridge serves UI and API health", async () => {
       tunnel: { secureCommand: string; statusUrl: string; startUrl: string; stopUrl: string; browserStartRequiresStrongToken: boolean };
     };
     assert.match(remotePackBody.manifestUrl, /\/\.well-known\/arcigy-jarvis\.json$/);
+    assert.match(remotePackBody.actionManifestUrl, /\/\.well-known\/ai-plugin\.json$/);
     assert.match(remotePackBody.openApiSchemaUrl, /\/api\/openapi\.json$/);
     assert.match(remotePackBody.smokeTestUrl, /\/api\/remote-mcp-smoke$/);
     assert.match(remotePackBody.mcpToolCallPattern, /\/api\/mcp\/\{toolName\}$/);
@@ -402,6 +426,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(remotePackBody.limits.writesRequireExplicitToolCall, true);
     assert.equal(remotePackBody.tools.count, listJarvisMcpTools().length);
     assert.match(remotePackBody.handoff.connectionPackUrl, /\/api\/remote-mcp-pack\?includeReadiness=true&live=true$/);
+    assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "action-manifest" && item.url.endsWith("/.well-known/ai-plugin.json")));
     assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "connection-pack" && item.url.includes("includeReadiness=true")));
     assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "secure-tunnel-status" && item.url.endsWith("/api/secure-tunnel-status")));
     assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "openapi-schema" && item.url.endsWith("/api/openapi.json")));
@@ -459,6 +484,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(smokeBody.status, "ready");
     assert.equal(smokeBody.expectedToolCount, listJarvisMcpTools().length);
     assert.ok(smokeBody.checks.some((check) => check.key === "approval-gate" && check.status === "ready"));
+    assert.ok(smokeBody.checks.some((check) => check.key === "action-manifest" && check.status === "ready"));
     assert.ok(smokeBody.checks.some((check) => check.key === "openapi-schema" && check.status === "ready"));
     assert.ok(smokeBody.checks.some((check) => check.key === "secure-tunnel-status" && check.status === "ready"));
     assert.ok(smokeBody.checks.some((check) => check.key === "manifest-local-write-policy" && check.status === "ready"));
@@ -679,6 +705,22 @@ test("local web bridge requires bearer auth on external hosts", async () => {
     const manifest = (await allowedManifest.json()) as { baseUrl: string; endpoints: { mcpTools: string } };
     assert.equal(manifest.baseUrl, "https://jarvis.example.ngrok-free.app");
     assert.equal(manifest.endpoints.mcpTools, "https://jarvis.example.ngrok-free.app/api/mcp");
+
+    const deniedActionManifest = await fetch(`${baseUrl}/.well-known/ai-plugin.json`, {
+      headers: { "x-forwarded-host": "jarvis.example.ngrok-free.app" },
+    });
+    assert.equal(deniedActionManifest.status, 401);
+
+    const allowedActionManifest = await fetch(`${baseUrl}/.well-known/ai-plugin.json`, {
+      headers: {
+        "x-forwarded-host": "jarvis.example.ngrok-free.app",
+        "x-forwarded-proto": "https",
+        authorization: "Bearer test-token",
+      },
+    });
+    assert.equal(allowedActionManifest.status, 200);
+    const actionManifest = (await allowedActionManifest.json()) as { api: { url: string } };
+    assert.equal(actionManifest.api.url, "https://jarvis.example.ngrok-free.app/api/openapi.json");
   } finally {
     if (previousToken === undefined) delete process.env.JARVIS_WEB_TOKEN;
     else process.env.JARVIS_WEB_TOKEN = previousToken;
@@ -728,6 +770,7 @@ test("local web bridge preflight reports tunnel readiness without leaking secret
       tokenStrong: boolean;
       readyForTunnel: boolean;
       manifestUrl: string;
+      actionManifestUrl: string;
       openApiSchemaUrl: string;
       tunnelCommand: string;
       tunnelProvider: string;
@@ -740,6 +783,7 @@ test("local web bridge preflight reports tunnel readiness without leaking secret
     assert.equal(body.tokenStrong, true);
     assert.equal(body.readyForTunnel, true);
     assert.match(body.manifestUrl, /\/\.well-known\/arcigy-jarvis\.json$/);
+    assert.match(body.actionManifestUrl, /\/\.well-known\/ai-plugin\.json$/);
     assert.match(body.openApiSchemaUrl, /\/api\/openapi\.json$/);
     assert.equal(body.tunnelCommand, "npm run web:tunnel");
     assert.equal(body.tunnelProvider, "ngrok");
@@ -794,6 +838,7 @@ test("local web bridge reports secure tunnel status without leaking one-time tok
       tokenPresent: boolean;
       publicUrl: string;
       manifestUrl: string;
+      actionManifestUrl: string;
       openApiSchemaUrl: string;
       connectionPackUrl: string;
       smokeUrl: string;
@@ -804,6 +849,7 @@ test("local web bridge reports secure tunnel status without leaking one-time tok
     assert.equal(body.tokenPresent, true);
     assert.equal(body.publicUrl, publicUrl);
     assert.equal(body.manifestUrl, `${publicUrl}/.well-known/arcigy-jarvis.json`);
+    assert.equal(body.actionManifestUrl, `${publicUrl}/.well-known/ai-plugin.json`);
     assert.equal(body.openApiSchemaUrl, `${publicUrl}/api/openapi.json`);
     assert.equal(body.connectionPackUrl, `${publicUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`);
     assert.equal(body.smokeUrl, `${publicUrl}/api/remote-mcp-smoke`);

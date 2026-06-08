@@ -823,6 +823,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.readiness?.launchEvidence.proofGates.some((gate) => gate.id === "live-diagnostics" && gate.validationCommand.includes("doctor")));
   assert.equal(pack.readiness?.launchEvidence.remoteHandoff.tunnelCommand, "npm run web:tunnel:secure");
   assert.ok(pack.readiness?.fixGuide.some((step) => step.id === "redis-real-password"));
+  assert.equal(pack.actionManifestUrl, "https://jarvis.example/.well-known/ai-plugin.json");
   assert.equal(pack.openApiSchemaUrl, "https://jarvis.example/api/openapi.json");
   assert.deepEqual(pack.agentCompatibility.supportedAgents.slice(0, 3), ["Claude", "ChatGPT", "Grok"]);
   assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("openApiSchemaUrl")));
@@ -834,6 +835,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.equal(pack.tunnel.startUrl, "https://jarvis.example/api/start-secure-tunnel");
   assert.equal(pack.tunnel.stopUrl, "https://jarvis.example/api/stop-secure-tunnel");
   assert.equal(pack.tunnel.browserStartRequiresStrongToken, true);
+  assert.ok(pack.handoff.requiredProof.some((item) => item.key === "action-manifest" && item.url.endsWith("/.well-known/ai-plugin.json")));
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "secure-tunnel-status"));
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "openapi-schema" && item.url.endsWith("/api/openapi.json")));
   assert.match(pack.agentPromptTemplates.grok, /xAI-compatible agents/);

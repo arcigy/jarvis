@@ -60,6 +60,15 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
     )
   );
 
+  const actionManifest = await getJson(fetchImpl, `${baseUrl}/.well-known/ai-plugin.json`, input.bearerToken);
+  checks.push(
+    check(
+      actionManifest.ok && hasValidActionManifest(actionManifest.body, baseUrl),
+      "action-manifest",
+      "Remote action manifest is reachable and points to the bearer-protected OpenAPI schema."
+    )
+  );
+
   const openApi = await getJson(fetchImpl, `${baseUrl}/api/openapi.json`, input.bearerToken);
   checks.push(
     check(
@@ -174,7 +183,7 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
   checks.push(check(topLevelApprovalGate.ok, "approval-shape-gate", 'All approval-required write tools rejected top-level {"approved":true}.'));
 
   const leakedSecret = hasSensitiveLeak(
-    { manifest: manifest.body, openApi: openApi.body, pack: pack.body, tunnelStatus: tunnelStatus.body, health: health.body, approvalGate: approvalGate.bodies, topLevelApprovalGate: topLevelApprovalGate.bodies },
+    { manifest: manifest.body, actionManifest: actionManifest.body, openApi: openApi.body, pack: pack.body, tunnelStatus: tunnelStatus.body, health: health.body, approvalGate: approvalGate.bodies, topLevelApprovalGate: topLevelApprovalGate.bodies },
     input.bearerToken
   );
   checks.push(check(!leakedSecret, "secret-redaction", "Smoke responses did not echo bearer tokens, API keys, OAuth tokens, or database URLs."));
@@ -187,7 +196,7 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
     baseUrl,
     summary:
       status === "ready"
-        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, OpenAPI action schema, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
+        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, action manifest, OpenAPI action schema, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((item) => item.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -296,6 +305,28 @@ function hasExactManifestRegistry(value: unknown): boolean {
   return sameStringArray(
     value.map((item) => (item && typeof item === "object" ? (item as { name?: unknown }).name : null)),
     expectedToolNames()
+  );
+}
+
+function hasValidActionManifest(value: unknown, baseUrl: string): boolean {
+  if (!value || typeof value !== "object") return false;
+  const manifest = value as {
+    schema_version?: unknown;
+    name_for_model?: unknown;
+    auth?: { type?: unknown; authorization_type?: unknown; verification_tokens?: unknown };
+    api?: { type?: unknown; url?: unknown; is_user_authenticated?: unknown };
+    "x-arcigy-policy"?: { tokenValueReturned?: unknown; familyFriendly?: unknown };
+  };
+  return (
+    manifest.schema_version === "v1" &&
+    manifest.name_for_model === "arcigy_jarvis" &&
+    manifest.auth?.type === "user_http" &&
+    manifest.auth.authorization_type === "bearer" &&
+    manifest.api?.type === "openapi" &&
+    manifest.api.url === `${baseUrl}/api/openapi.json` &&
+    manifest.api.is_user_authenticated === true &&
+    manifest["x-arcigy-policy"]?.tokenValueReturned === false &&
+    manifest["x-arcigy-policy"]?.familyFriendly === true
   );
 }
 
@@ -464,6 +495,7 @@ function hasHandoffProof(value: unknown, baseUrl: string): boolean {
   const agentFirstSteps = Array.isArray(handoff.agentFirstSteps) ? handoff.agentFirstSteps : [];
   const proofKeys = new Set(requiredProof.map((item) => (item && typeof item === "object" ? (item as { key?: unknown }).key : null)));
   return (
+    proofKeys.has("action-manifest") &&
     proofKeys.has("openapi-schema") &&
     proofKeys.has("manifest") &&
     proofKeys.has("connection-pack") &&

@@ -48,7 +48,7 @@ export function createLocalApiServer() {
 async function routeRequest(request: IncomingMessage, response: ServerResponse) {
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
 
-  if ((url.pathname.startsWith("/api/") || url.pathname === "/.well-known/arcigy-jarvis.json") && !isApiAuthorized(request)) {
+  if ((url.pathname.startsWith("/api/") || url.pathname === "/.well-known/arcigy-jarvis.json" || url.pathname === "/.well-known/ai-plugin.json" || url.pathname === "/ai-plugin.json") && !isApiAuthorized(request)) {
     writeJson(response, 401, {
       error: "Jarvis web API is locked. Provide a bearer token using JARVIS_WEB_TOKEN or API_SECRET_KEY.",
     });
@@ -57,6 +57,11 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
 
   if (request.method === "GET" && (url.pathname === "/api/mcp" || url.pathname === "/.well-known/arcigy-jarvis.json")) {
     writeJson(response, 200, buildWebBridgeManifest(request));
+    return;
+  }
+
+  if (request.method === "GET" && (url.pathname === "/.well-known/ai-plugin.json" || url.pathname === "/ai-plugin.json")) {
+    writeJson(response, 200, buildRemoteActionManifest(request));
     return;
   }
 
@@ -420,6 +425,7 @@ function buildWebBridgeManifest(request: IncomingMessage) {
       diagnostics: `${origin}/api/run-diagnostics`,
       productionReadiness: `${origin}/api/production-readiness`,
       secureTunnelStatus: `${origin}/api/secure-tunnel-status`,
+      actionManifest: `${origin}/.well-known/ai-plugin.json`,
       openApiSchema: `${origin}/api/openapi.json`,
       mcpTools: `${origin}/api/mcp`,
       mcpToolCallPattern: `${mcpBaseUrl}/{toolName}`,
@@ -444,6 +450,35 @@ function buildWebBridgeManifest(request: IncomingMessage) {
   };
 }
 
+function buildRemoteActionManifest(request: IncomingMessage) {
+  const origin = getRequestOrigin(request);
+  return {
+    schema_version: "v1",
+    name_for_human: "Arcigy Jarvis",
+    name_for_model: "arcigy_jarvis",
+    description_for_human: "Secret-safe remote action manifest for Arcigy Jarvis MCP tools.",
+    description_for_model:
+      "Use Arcigy Jarvis for operator briefing, production readiness, contracts, cold outreach, client memory, Gemini drafts, and lead discovery. Always run remote smoke first and never call approval-required actions until the operator confirms the exact payload.",
+    auth: {
+      type: "user_http",
+      authorization_type: "bearer",
+      verification_tokens: {},
+    },
+    api: {
+      type: "openapi",
+      url: `${origin}/api/openapi.json`,
+      is_user_authenticated: true,
+    },
+    contact_email: "hello@arcigy.com",
+    legal_info_url: `${origin}/index.html`,
+    "x-arcigy-policy": {
+      tokenValueReturned: false,
+      familyFriendly: true,
+      approvalRule: "Never call approval-required actions until the operator confirms the exact payload.",
+    },
+  };
+}
+
 function buildWebBridgePreflight(request: IncomingMessage) {
   const origin = getRequestOrigin(request);
   const tools = listJarvisMcpTools();
@@ -463,6 +498,7 @@ function buildWebBridgePreflight(request: IncomingMessage) {
     host: getRequestHost(request),
     origin,
     manifestUrl: `${origin}/.well-known/arcigy-jarvis.json`,
+    actionManifestUrl: `${origin}/.well-known/ai-plugin.json`,
     openApiSchemaUrl: `${origin}/api/openapi.json`,
     tunnelCommand: "npm run web:tunnel",
     tunnelProvider: "ngrok",
@@ -507,6 +543,7 @@ function getSecureTunnelStatus() {
     logPath,
     publicUrl,
     manifestUrl: publicUrl ? `${publicUrl}/.well-known/arcigy-jarvis.json` : null,
+    actionManifestUrl: publicUrl ? `${publicUrl}/.well-known/ai-plugin.json` : null,
     openApiSchemaUrl: publicUrl ? `${publicUrl}/api/openapi.json` : null,
     connectionPackUrl: publicUrl ? `${publicUrl}/api/remote-mcp-pack?includeReadiness=true&live=true` : null,
     smokeUrl: publicUrl ? `${publicUrl}/api/remote-mcp-smoke` : null,

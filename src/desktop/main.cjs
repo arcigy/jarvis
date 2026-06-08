@@ -143,6 +143,7 @@ function getSecureTunnelStatus() {
     logPath,
     publicUrl,
     manifestUrl: publicUrl ? `${publicUrl}/.well-known/arcigy-jarvis.json` : null,
+    actionManifestUrl: publicUrl ? `${publicUrl}/.well-known/ai-plugin.json` : null,
     openApiSchemaUrl: publicUrl ? `${publicUrl}/api/openapi.json` : null,
     connectionPackUrl: publicUrl ? `${publicUrl}/api/remote-mcp-pack?includeReadiness=true&live=true` : null,
     smokeUrl: publicUrl ? `${publicUrl}/api/remote-mcp-smoke` : null,
@@ -741,6 +742,7 @@ function getWebBridgePreflight() {
     mode: "desktop-preflight",
     host: process.env.JARVIS_WEB_HOST || "127.0.0.1",
     manifestUrl: `http://${process.env.JARVIS_WEB_HOST || "127.0.0.1"}:${process.env.JARVIS_WEB_PORT || "8765"}/.well-known/arcigy-jarvis.json`,
+    actionManifestUrl: `http://${process.env.JARVIS_WEB_HOST || "127.0.0.1"}:${process.env.JARVIS_WEB_PORT || "8765"}/.well-known/ai-plugin.json`,
     openApiSchemaUrl: `http://${process.env.JARVIS_WEB_HOST || "127.0.0.1"}:${process.env.JARVIS_WEB_PORT || "8765"}/api/openapi.json`,
     tunnelCommand: "npm run web:tunnel",
     tunnelProvider: "ngrok",
@@ -770,6 +772,7 @@ async function getRemoteMcpPack(payload = {}) {
     generatedAt: new Date().toISOString(),
     baseUrl,
     manifestUrl: `${baseUrl}/.well-known/arcigy-jarvis.json`,
+    actionManifestUrl: `${baseUrl}/.well-known/ai-plugin.json`,
     openApiSchemaUrl: `${baseUrl}/api/openapi.json`,
     smokeTestUrl: `${baseUrl}/api/remote-mcp-smoke`,
     mcpBaseUrl: `${baseUrl}/api/mcp`,
@@ -827,6 +830,7 @@ async function getRemoteMcpPack(payload = {}) {
       : undefined,
     agentInstructions: [
       "Fetch the manifestUrl first to list live tools and schemas.",
+      "Fetch actionManifestUrl when the remote agent supports ai-plugin/action manifests.",
       "Import openApiSchemaUrl when the remote agent supports ChatGPT custom actions, Grok actions, or OpenAPI-based HTTP tool setup.",
       "Run the smokeTestUrl before handoff and require ready checks for pack-limits, approval-gate, approval-shape-gate, and secret-redaction.",
       "Call MCP tools with POST JSON to mcpToolCallPattern.",
@@ -842,7 +846,7 @@ async function getRemoteMcpPack(payload = {}) {
 function buildRemoteMcpAgentPromptTemplates(baseUrl) {
   const shared =
     `Use Arcigy Jarvis remote MCP at ${baseUrl}. ` +
-    "First fetch the connection pack, manifest, and OpenAPI schema with Authorization: Bearer <JARVIS_WEB_TOKEN>, then run remote smoke. " +
+    "First fetch the connection pack, action manifest, manifest, and OpenAPI schema with Authorization: Bearer <JARVIS_WEB_TOKEN>, then run remote smoke. " +
     "Do not ask for or reveal secrets. Start with arcigy.get_operator_briefing. Use read-only/draft tools first. " +
     "Never call approvalRequired tools until the operator confirms the exact payload.";
   return {
@@ -860,6 +864,7 @@ function buildRemoteMcpAgentCompatibility() {
     authentication: "Authorization bearer header",
     requiredBeforeWork: [
       "Fetch manifestUrl.",
+      "Fetch actionManifestUrl if the agent supports ai-plugin/action manifests.",
       "Import openApiSchemaUrl if the agent supports OpenAPI or custom actions.",
       "Fetch handoff.connectionPackUrl and confirm tokenValueReturned=false plus repo-only limits.",
       "Run smokeTestUrl and require status=ready with pack-limits, approval-gate, approval-shape-gate, and secret-redaction ready.",
@@ -881,13 +886,14 @@ function buildRemoteMcpHandoffRunbook(baseUrl) {
     operatorChecklist: [
       "Run npm run web:tunnel:secure and keep the process open while the remote agent works.",
       "If using browser mode, configure a strong JARVIS_WEB_TOKEN first, then use Start tunnel or POST /api/start-secure-tunnel.",
-      "Give the remote agent the external manifest, connection pack, smoke test URL, MCP base URL, and bearer auth header placeholder.",
+      "Give the remote agent the external action manifest, Jarvis manifest, connection pack, smoke test URL, MCP base URL, and bearer auth header placeholder.",
       "For ChatGPT custom actions or Grok-compatible OpenAPI setup, give the remote agent the external openApiSchemaUrl too.",
       "Approve approvalRequired tools only after reviewing the exact payload the agent will send.",
       "Run the smoke test again after any tunnel restart because ngrok URLs can change.",
     ],
     agentFirstSteps: [
       "Fetch connectionPackUrl with Authorization: Bearer <JARVIS_WEB_TOKEN>.",
+      "Fetch actionManifestUrl if the agent supports ai-plugin/action manifests.",
       "Fetch openApiSchemaUrl if the agent supports OpenAPI/custom actions.",
       "Run smokeTestUrl and require status=ready with pack-limits, approval-gate, approval-shape-gate, and secret-redaction ready before using MCP tools.",
       "Fetch tunnel.statusUrl if the operator needs the current public tunnel URLs; token values must remain redacted.",
@@ -896,6 +902,11 @@ function buildRemoteMcpHandoffRunbook(baseUrl) {
       "Never call approvalRequired tools until the operator confirms the exact action.",
     ],
     requiredProof: [
+      {
+        key: "action-manifest",
+        url: `${baseUrl}/.well-known/ai-plugin.json`,
+        expected: "HTTP 200 action manifest, bearer user_http auth, OpenAPI URL, tokenValueReturned=false.",
+      },
       {
         key: "openapi-schema",
         url: `${baseUrl}/api/openapi.json`,
@@ -1169,6 +1180,14 @@ async function runRemoteMcpSmoke(payload = {}) {
       "Manifest exposes exact approval, local-write, and read-only/draft tool policy."
     )
   );
+  const actionManifest = await fetchJson(`${baseUrl}/.well-known/ai-plugin.json`, token);
+  checks.push(
+    smokeCheck(
+      actionManifest.ok && hasValidActionManifest(actionManifest.body, baseUrl),
+      "action-manifest",
+      "Remote action manifest is reachable and points to the bearer-protected OpenAPI schema."
+    )
+  );
   const openApi = await fetchJson(`${baseUrl}/api/openapi.json`, token);
   checks.push(
     smokeCheck(
@@ -1278,7 +1297,7 @@ async function runRemoteMcpSmoke(payload = {}) {
   checks.push(smokeCheck(approvalGate.ok, "approval-gate", "All approval-required write tools rejected unapproved calls."));
   const topLevelApprovalGate = await checkApprovalGates(baseUrl, token, true);
   checks.push(smokeCheck(topLevelApprovalGate.ok, "approval-shape-gate", 'All approval-required write tools rejected top-level {"approved":true}.'));
-  const leakedSecret = hasSensitiveLeak({ manifest: manifest.body, openApi: openApi.body, pack: pack.body, tunnelStatus: tunnelStatus.body, health: health.body, approvalGate: approvalGate.bodies, topLevelApprovalGate: topLevelApprovalGate.bodies }, token);
+  const leakedSecret = hasSensitiveLeak({ manifest: manifest.body, actionManifest: actionManifest.body, openApi: openApi.body, pack: pack.body, tunnelStatus: tunnelStatus.body, health: health.body, approvalGate: approvalGate.bodies, topLevelApprovalGate: topLevelApprovalGate.bodies }, token);
   checks.push(smokeCheck(!leakedSecret, "secret-redaction", "Smoke responses did not echo bearer tokens, API keys, OAuth tokens, or database URLs."));
   const status = checks.every((check) => check.status === "ready") ? "ready" : "blocked";
   return {
@@ -1288,7 +1307,7 @@ async function runRemoteMcpSmoke(payload = {}) {
     baseUrl,
     summary:
       status === "ready"
-        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, OpenAPI action schema, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
+        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, action manifest, OpenAPI action schema, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((check) => check.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -1381,6 +1400,21 @@ function hasExactManifestRegistry(value) {
   return sameStringArray(
     value.map((item) => (item && typeof item === "object" ? item.name : null)),
     expectedToolNames()
+  );
+}
+
+function hasValidActionManifest(value, baseUrl) {
+  if (!value || typeof value !== "object") return false;
+  return (
+    value.schema_version === "v1" &&
+    value.name_for_model === "arcigy_jarvis" &&
+    value.auth?.type === "user_http" &&
+    value.auth.authorization_type === "bearer" &&
+    value.api?.type === "openapi" &&
+    value.api.url === `${baseUrl}/api/openapi.json` &&
+    value.api.is_user_authenticated === true &&
+    value["x-arcigy-policy"]?.tokenValueReturned === false &&
+    value["x-arcigy-policy"]?.familyFriendly === true
   );
 }
 
@@ -1519,6 +1553,7 @@ function hasHandoffProof(value, baseUrl) {
   const agentFirstSteps = Array.isArray(value.agentFirstSteps) ? value.agentFirstSteps : [];
   const proofKeys = new Set(requiredProof.map((item) => item?.key));
   return (
+    proofKeys.has("action-manifest") &&
     proofKeys.has("openapi-schema") &&
     proofKeys.has("manifest") &&
     proofKeys.has("connection-pack") &&

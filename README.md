@@ -153,6 +153,8 @@ It serves the same UI at `http://127.0.0.1:8765` and exposes local HTTP endpoint
 
 - `GET /api/mcp`
 - `GET /.well-known/arcigy-jarvis.json`
+- `GET /.well-known/ai-plugin.json`
+- `GET /api/openapi.json`
 - `GET /api/web-bridge-preflight`
 - `GET /api/remote-mcp-pack`
 - `GET /api/remote-mcp-smoke`
@@ -208,10 +210,10 @@ External agent setup flow:
 1. Set `JARVIS_WEB_TOKEN` to a non-dummy secret with at least 32 characters in `.env.local`.
 2. Run `npm run web:tunnel:secure` for a one-time token, or `npm run web:tunnel` when `JARVIS_WEB_TOKEN` is already configured. Browser UI can also call `POST /api/start-secure-tunnel` after a strong `JARVIS_WEB_TOKEN` is set.
 3. The runner starts `npm run web` if needed, checks `/api/web-bridge-preflight`, starts ngrok, finds the public HTTPS URL, verifies the protected manifest, and runs `/api/remote-mcp-smoke`.
-4. Give Claude, ChatGPT, Grok, or another remote agent the printed external manifest URL, `/api/openapi.json`, `/api/remote-mcp-pack`, `/api/remote-mcp-smoke`, `/api/secure-tunnel-status`, plus `Authorization: Bearer <JARVIS_WEB_TOKEN>`.
-5. For ChatGPT custom actions or Grok-compatible OpenAPI setup, import `/api/openapi.json`. Otherwise use the returned `tools[].url` values for web MCP-style calls. Each tool expects JSON in the POST body and returns `{ "result": ... }`.
+4. Give Claude, ChatGPT, Grok, or another remote agent the printed external action manifest URL, Jarvis manifest URL, `/api/openapi.json`, `/api/remote-mcp-pack`, `/api/remote-mcp-smoke`, `/api/secure-tunnel-status`, plus `Authorization: Bearer <JARVIS_WEB_TOKEN>`.
+5. For agents that expect plugin/action manifests, import `/.well-known/ai-plugin.json`. For ChatGPT custom actions or Grok-compatible OpenAPI setup, import `/api/openapi.json`. Otherwise use the returned `tools[].url` values for web MCP-style calls. Each tool expects JSON in the POST body and returns `{ "result": ... }`.
 6. Use `quickStartCalls[]` from the connection pack for safe first calls: smoke proof, operator briefing, audit review, Smartlead outreach brief, Gemini reply draft, lead discovery, and approval-gated contract generation.
-7. Run `arcigy.run_remote_mcp_smoke` or `GET /api/remote-mcp-smoke` before handoff when you need proof that manifest, tunnel controls, exact tool registry, read-only calls, audit quick-start, approval gates, and token redaction work.
+7. Run `arcigy.run_remote_mcp_smoke` or `GET /api/remote-mcp-smoke` before handoff when you need proof that action manifest, OpenAPI schema, Jarvis manifest, tunnel controls, exact tool registry, read-only calls, audit quick-start, approval gates, and token redaction work.
 8. For manifest tools with `requiresApproval: true`, include `"approval": { "approved": true }` only after explicit user confirmation.
 
 Remote smoke can also be run without opening the UI:
