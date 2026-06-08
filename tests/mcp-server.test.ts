@@ -76,6 +76,13 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   const diagnostics = getStructuredResult(diagnosticsResult) as { live: boolean; checks: Array<{ key: string }> };
   assert.equal(diagnostics.live, false);
   assert.ok(diagnostics.checks.some((item) => item.key === "sqlite"));
+  assertToolError(
+    await client.callTool({
+      name: "arcigy.run_integration_diagnostics",
+      arguments: { live: false, dbPath: join(tmpdir(), "outside-jarvis-diagnostics.sqlite") },
+    }),
+    /dbPath must stay inside the Jarvis repository/
+  );
 
   const readinessResult = await client.callTool({
     name: "arcigy.get_production_readiness",
@@ -86,6 +93,13 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.equal(readiness.mcp.toolCount, 27);
   assert.ok(Array.isArray(readiness.nextActions));
   assert.ok(Array.isArray(readiness.fixGuide));
+  assertToolError(
+    await client.callTool({
+      name: "arcigy.get_production_readiness",
+      arguments: { live: false, dbPath: join(tmpdir(), "outside-jarvis-readiness.sqlite") },
+    }),
+    /dbPath must stay inside the Jarvis repository/
+  );
 
   const packResult = await client.callTool({
     name: "arcigy.get_remote_mcp_pack",
@@ -122,6 +136,13 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(contractIntake?.pricing);
   assert.doesNotMatch(JSON.stringify(contractQuickStart?.body), /dopln|todo|tbd|xxx|\?\?\?/i);
   assert.equal(pack.tunnel.secureCommand, "npm run web:tunnel:secure");
+  assertToolError(
+    await client.callTool({
+      name: "arcigy.get_remote_mcp_pack",
+      arguments: { includeReadiness: true, dbPath: join(tmpdir(), "outside-jarvis-pack.sqlite") },
+    }),
+    /dbPath must stay inside the Jarvis repository/
+  );
 
   assertToolError(
     await client.callTool({
@@ -410,6 +431,13 @@ test("Jarvis MCP server summarizes cold outreach from local SQLite events", asyn
   const operatorBody = getStructuredResult(operatorBriefing) as { speechText: string; sections: { coldOutreach: string } };
   assert.match(operatorBody.speechText, /Jarvis briefing/);
   assert.match(operatorBody.sections.coldOutreach, /Cold outreach/);
+  assertToolError(
+    await client.callTool({
+      name: "arcigy.get_operator_briefing",
+      arguments: { dbPath: join(tmpdir(), "outside-jarvis-operator.sqlite") },
+    }),
+    /dbPath must stay inside the Jarvis repository/
+  );
 
   await client.close();
   await server.close();

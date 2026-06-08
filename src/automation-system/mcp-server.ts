@@ -459,7 +459,7 @@ export function createJarvisMcpServer(): McpServer {
         openWorldHint: true,
       },
     },
-    async ({ live, dbPath }) => jsonResult(await runIntegrationDiagnostics({ live, dbPath }))
+    async ({ live, dbPath }) => jsonResult(await runIntegrationDiagnostics({ live, dbPath: resolveOptionalRepoPath(dbPath, "dbPath") }))
   );
 
   server.registerTool(
@@ -478,7 +478,7 @@ export function createJarvisMcpServer(): McpServer {
         openWorldHint: true,
       },
     },
-    async ({ live, dbPath }) => jsonResult(await buildProductionReadinessReport({ live, dbPath }))
+    async ({ live, dbPath }) => jsonResult(await buildProductionReadinessReport({ live, dbPath: resolveOptionalRepoPath(dbPath, "dbPath") }))
   );
 
   server.registerTool(
@@ -505,7 +505,7 @@ export function createJarvisMcpServer(): McpServer {
           baseUrl,
           live,
           includeReadiness,
-          dbPath,
+          dbPath: resolveOptionalRepoPath(dbPath, "dbPath"),
           tokenConfigured: hasConfiguredWebToken(),
           localhostBypass: process.env.JARVIS_WEB_REQUIRE_AUTH !== "true",
           source: "mcp",
@@ -556,13 +556,14 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async ({ dbPath, since, until, periodLabel, live, syncGmail, accountEnvKey, gmailQuery, gmailMaxResults }) => {
+      const safeDbPath = resolveOptionalRepoPath(dbPath, "dbPath");
       const now = new Date();
       const defaultSince = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
-      const liveSyncSummary = await maybeSyncGmailForOperatorBriefing({ live, syncGmail, accountEnvKey, gmailQuery, gmailMaxResults }, dbPath);
-      const localCold = runDbCommand("cold-brief", { since: since ?? defaultSince, until: until ?? now.toISOString(), periodLabel }, dbPath);
-      const clientNeeds = runDbCommand("list-open-needs", { status: "new", limit: 10 }, dbPath);
-      const preparedReplies = runDbCommand("list-prepared-replies", { status: "pending", limit: 10 }, dbPath);
-      const readiness = await buildProductionReadinessReport({ live, dbPath });
+      const liveSyncSummary = await maybeSyncGmailForOperatorBriefing({ live, syncGmail, accountEnvKey, gmailQuery, gmailMaxResults }, safeDbPath);
+      const localCold = runDbCommand("cold-brief", { since: since ?? defaultSince, until: until ?? now.toISOString(), periodLabel }, safeDbPath);
+      const clientNeeds = runDbCommand("list-open-needs", { status: "new", limit: 10 }, safeDbPath);
+      const preparedReplies = runDbCommand("list-prepared-replies", { status: "pending", limit: 10 }, safeDbPath);
+      const readiness = await buildProductionReadinessReport({ live, dbPath: safeDbPath });
       const preparedReplyCount = Number(preparedReplies.count ?? 0);
       const coldOutreachSummary = await getOperatorColdOutreachSummary(live, periodLabel, localCold.summary, {
         preparedPositiveReplyCount: preparedReplyCount,
@@ -843,6 +844,10 @@ function resolveRepoPath(value: unknown, fallback: string, label: string): strin
     throw new Error(`${label} must stay inside the Jarvis repository.`);
   }
   return resolved;
+}
+
+function resolveOptionalRepoPath(value: unknown, label: string): string | undefined {
+  return typeof value === "string" && value.trim() ? resolveRepoPath(value, "", label) : undefined;
 }
 
 function jsonDbTool(
