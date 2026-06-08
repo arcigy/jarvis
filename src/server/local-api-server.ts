@@ -12,6 +12,7 @@ import { listConfiguredGmailAccounts, listRecentGmailMessageEvents } from "../au
 import { containsWakeWord, type JarvisVoiceSession } from "../automation-system/jarvis-voice.ts";
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "../automation-system/lead-discovery.ts";
 import { buildContractGenerationCommand, getColdOutreachMcpAnswer, listJarvisMcpTools } from "../automation-system/mcp-tools.ts";
+import { buildOperatorBriefing } from "../automation-system/operator-briefing.ts";
 import { buildProductionReadinessReport } from "../automation-system/production-readiness.ts";
 import { getSmartleadCampaignStatus } from "../automation-system/smartlead.ts";
 
@@ -77,6 +78,12 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
   if (request.method === "POST" && url.pathname === "/api/production-readiness") {
     const payload = await readJson(request);
     writeJson(response, 200, await buildProductionReadinessReport({ live: payload.live === true, dbPath: resolveRepoPath(payload.dbPath, defaultDbPath, "dbPath") }));
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/operator-briefing") {
+    const payload = await readJson(request);
+    writeJson(response, 200, await getOperatorBriefing(payload));
     return;
   }
 
@@ -464,6 +471,10 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
     });
     return;
   }
+  if (name === "arcigy.get_operator_briefing") {
+    writeJson(response, 200, { result: await getOperatorBriefing(payload) });
+    return;
+  }
   if (name === "arcigy.draft_contract_intake") {
     writeJson(response, 200, {
       result: await draftContractIntake({
@@ -676,6 +687,36 @@ function getClientNeedAlerts(payload: Record<string, unknown>) {
   );
 }
 
+async function getOperatorBriefing(payload: Record<string, unknown>) {
+  const period = resolveColdOutreachPeriod(String(payload.text ?? payload.periodLabel ?? ""));
+  const dbPath = resolveRepoPath(payload.dbPath, defaultDbPath, "dbPath");
+  const cold = JSON.parse(
+    runPython([
+      "scripts/jarvis_local_db.py",
+      "cold-brief",
+      "--db",
+      dbPath,
+      "--payload",
+      JSON.stringify({
+        since: payload.since ?? period.since,
+        until: payload.until ?? period.until,
+        periodLabel: payload.periodLabel ?? period.periodLabel,
+      }),
+    ]).stdout
+  );
+  const clientNeeds = getClientNeedAlerts({ dbPath, status: "new", limit: 10 });
+  const preparedReplies = runDbTool("list-prepared-replies", { dbPath, status: "pending", limit: 10 });
+  const readiness = await buildProductionReadinessReport({ live: payload.live === true, dbPath });
+  return buildOperatorBriefing({
+    readinessStatus: readiness.status,
+    readinessSummary: readiness.summary,
+    coldOutreachSummary: cold.summary,
+    openClientNeedCount: Number(clientNeeds.count ?? 0),
+    preparedReplyCount: Number(preparedReplies.count ?? 0),
+    nextActions: readiness.nextActions,
+  });
+}
+
 function serveStatic(pathname: string, response: ServerResponse, headOnly: boolean) {
   const relative = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
   const filePath = normalize(join(desktopRoot, relative));
@@ -779,6 +820,11 @@ async function handleWebVoiceEvent(payload: Record<string, unknown>) {
     };
   }
 
+  if (lowered.includes("briefing") || lowered.includes("prehlad") || lowered.includes("prehľad") || lowered.includes("co sa deje") || lowered.includes("čo sa deje")) {
+    const briefing = await getOperatorBriefing({ ...payload, text });
+    return voiceDone(session, text, briefing.speechText);
+  }
+
   if (lowered.includes("cold") || lowered.includes("outreach")) {
     const period = resolveColdOutreachPeriod(text);
     const result = runPython([
@@ -824,7 +870,7 @@ async function handleWebVoiceEvent(payload: Record<string, unknown>) {
   return voiceDone(
     session,
     text,
-    "Rozumiem. Viem hlasom skontrolovat cold outreach, integracie, identifikovat email, vyhladat leady alebo pripravit Gemini odpoved."
+    "Rozumiem. Viem hlasom pripravit briefing, skontrolovat cold outreach, integracie, identifikovat email, vyhladat leady alebo pripravit Gemini odpoved."
   );
 }
 

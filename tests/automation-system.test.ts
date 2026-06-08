@@ -26,6 +26,7 @@ import {
   handleJarvisVoiceEvent,
 } from "../src/automation-system/jarvis-voice.ts";
 import { buildProductionReadinessReport } from "../src/automation-system/production-readiness.ts";
+import { buildOperatorBriefing } from "../src/automation-system/operator-briefing.ts";
 
 test("MCP tools expose the requested automation surface", () => {
   const names = listJarvisMcpTools().map((tool) => tool.name);
@@ -46,6 +47,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.get_system_health",
     "arcigy.run_integration_diagnostics",
     "arcigy.get_production_readiness",
+    "arcigy.get_operator_briefing",
     "arcigy.generate_ai_reply",
     "arcigy.sync_gmail_recent_messages",
     "arcigy.get_smartlead_campaign_status",
@@ -65,12 +67,29 @@ test("production readiness report returns blockers and next actions without secr
   });
 
   assert.equal(report.status, "blocked");
-  assert.equal(report.mcp.toolCount, 23);
+  assert.equal(report.mcp.toolCount, 24);
   assert.ok(report.blockers.some((blocker) => blocker.key === "redis"));
   assert.ok(report.nextActions.some((action) => action.includes("REDIS_URL")));
   assert.ok(report.fixGuide.some((step) => step.id === "redis-real-password" && step.envKeys.includes("REDIS_URL")));
   assert.ok(report.fixGuide.every((step) => step.validationCommand.includes("doctor")));
   assert.equal(JSON.stringify(report).includes("PASSWORD"), false);
+});
+
+test("operator briefing combines readiness, outreach, client needs, and approvals", () => {
+  const briefing = buildOperatorBriefing({
+    readinessStatus: "blocked",
+    readinessSummary: "Production needs attention.",
+    coldOutreachSummary: "Za dnes sme napisali 10 ludom.",
+    openClientNeedCount: 2,
+    preparedReplyCount: 1,
+    nextActions: ["Replace REDIS_URL."],
+  });
+
+  assert.match(briefing.speechText, /Jarvis briefing/);
+  assert.match(briefing.speechText, /Cold outreach/);
+  assert.match(briefing.speechText, /Klientske poziadavky: 2/);
+  assert.match(briefing.speechText, /Pripravene odpovede: 1/);
+  assert.equal(briefing.sections.nextAction, "Najblizsi krok: Replace REDIS_URL.");
 });
 
 test("contract intake draft parses Gemini JSON output", async () => {

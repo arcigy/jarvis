@@ -31,6 +31,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(names.includes("arcigy.get_system_health"));
   assert.ok(names.includes("arcigy.run_integration_diagnostics"));
   assert.ok(names.includes("arcigy.get_production_readiness"));
+  assert.ok(names.includes("arcigy.get_operator_briefing"));
   assert.ok(names.includes("arcigy.generate_ai_reply"));
   assert.ok(names.includes("arcigy.sync_gmail_recent_messages"));
   assert.ok(names.includes("arcigy.get_smartlead_campaign_status"));
@@ -77,7 +78,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   });
   const readiness = getStructuredResult(readinessResult) as { status: string; mcp: { toolCount: number }; nextActions: string[]; fixGuide: unknown[] };
   assert.ok(["ready", "attention", "blocked"].includes(readiness.status));
-  assert.equal(readiness.mcp.toolCount, 23);
+  assert.equal(readiness.mcp.toolCount, 24);
   assert.ok(Array.isArray(readiness.nextActions));
   assert.ok(Array.isArray(readiness.fixGuide));
 
@@ -286,6 +287,19 @@ test("Jarvis MCP server summarizes cold outreach from local SQLite events", asyn
   const approvedBody = getStructuredResult(approvedReply) as { status: string; approvedEvent: { eventType: string } };
   assert.equal(approvedBody.status, "approved");
   assert.equal(approvedBody.approvedEvent.eventType, "approved_reply_sent");
+
+  const operatorBriefing = await client.callTool({
+    name: "arcigy.get_operator_briefing",
+    arguments: {
+      dbPath,
+      since: "2026-06-01T00:00:00Z",
+      until: "2026-06-08T00:00:00Z",
+      periodLabel: "poslednych 7 dni",
+    },
+  });
+  const operatorBody = getStructuredResult(operatorBriefing) as { speechText: string; sections: { coldOutreach: string } };
+  assert.match(operatorBody.speechText, /Jarvis briefing/);
+  assert.match(operatorBody.sections.coldOutreach, /Cold outreach/);
 
   await client.close();
   await server.close();

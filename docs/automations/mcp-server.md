@@ -49,6 +49,7 @@ External hosts require `Authorization: Bearer <JARVIS_WEB_TOKEN>`. The manifest 
 - `arcigy.get_system_health`: checks runtime configuration without exposing secrets.
 - `arcigy.run_integration_diagnostics`: runs configured checks or explicit live read-only probes, including Postgres TCP and Redis PING.
 - `arcigy.get_production_readiness`: summarizes production readiness, blockers, next actions, MCP tool count, approval locks, and optional live diagnostics.
+- `arcigy.get_operator_briefing`: combines readiness, cold outreach, open client requests, and prepared reply approvals into one Jarvis briefing.
 - `arcigy.generate_ai_reply`: uses Gemini to draft a client reply without sending it.
 - `arcigy.sync_gmail_recent_messages`: fetches Gmail messages and ingests client requests into SQLite.
 - `arcigy.get_smartlead_campaign_status`: reads Smartlead campaigns or campaign statistics.

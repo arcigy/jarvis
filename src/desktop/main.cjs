@@ -51,6 +51,7 @@ app.whenReady().then(() => {
   ipcMain.handle("jarvis:systemHealth", () => getSystemHealth());
   ipcMain.handle("jarvis:runDiagnostics", (_event, payload) => runDiagnostics(payload));
   ipcMain.handle("jarvis:productionReadiness", (_event, payload) => getProductionReadiness(payload));
+  ipcMain.handle("jarvis:operatorBriefing", (_event, payload) => getOperatorBriefing(payload));
   ipcMain.handle("jarvis:webBridgePreflight", () => getWebBridgePreflight());
   ipcMain.handle("jarvis:getPreparedOutreachReplies", (_event, payload) => getPreparedOutreachReplies(payload));
   ipcMain.handle("jarvis:approvePreparedOutreachReply", (_event, payload) => approvePreparedOutreachReply(payload));
@@ -102,6 +103,10 @@ async function handleVoiceEvent(payload) {
     };
   }
 
+  if (lowered.includes("briefing") || lowered.includes("prehlad") || lowered.includes("prehľad") || lowered.includes("co sa deje") || lowered.includes("čo sa deje")) {
+    return voiceDone(session, text, getOperatorBriefing({ ...payload, text }).speechText);
+  }
+
   if (lowered.includes("cold") || lowered.includes("outreach")) {
     return voiceDone(session, text, getColdOutreachBrief({ text, dbPath: payload?.dbPath }));
   }
@@ -134,7 +139,7 @@ async function handleVoiceEvent(payload) {
   return voiceDone(
     session,
     text,
-    "Rozumiem. Viem hlasom skontrolovat cold outreach, integracie, identifikovat email, vyhladat leady alebo pripravit Gemini odpoved."
+    "Rozumiem. Viem hlasom pripravit briefing, skontrolovat cold outreach, integracie, identifikovat email, vyhladat leady alebo pripravit Gemini odpoved."
   );
 }
 
@@ -453,6 +458,7 @@ function listWebMcpTools() {
     { name: "arcigy.get_system_health", requiresApproval: false },
     { name: "arcigy.run_integration_diagnostics", requiresApproval: false },
     { name: "arcigy.get_production_readiness", requiresApproval: false },
+    { name: "arcigy.get_operator_briefing", requiresApproval: false },
     { name: "arcigy.generate_ai_reply", requiresApproval: false },
     { name: "arcigy.sync_gmail_recent_messages", requiresApproval: false },
     { name: "arcigy.get_smartlead_campaign_status", requiresApproval: false },
@@ -715,6 +721,64 @@ function approvePreparedOutreachReply(payload = {}) {
     }),
   ]);
   return JSON.parse(result.stdout);
+}
+
+function getOperatorBriefing(payload = {}) {
+  const period = resolveColdOutreachPeriod(String(payload?.text ?? payload?.periodLabel ?? ""));
+  const coldResult = runPython([
+    "scripts/jarvis_local_db.py",
+    "cold-brief",
+    "--db",
+    payload?.dbPath || defaultDbPath,
+    "--payload",
+    JSON.stringify({
+      since: payload?.since || period.since,
+      until: payload?.until || period.until,
+      periodLabel: payload?.periodLabel || period.periodLabel,
+    }),
+  ]);
+  const cold = JSON.parse(coldResult.stdout);
+  const clientNeeds = getClientNeedAlerts({ dbPath: payload?.dbPath || defaultDbPath, status: "new", limit: 10 });
+  const preparedReplies = getPreparedOutreachReplies({ dbPath: payload?.dbPath || defaultDbPath, status: "pending", limit: 10 });
+  const readiness = getProductionReadiness({ live: payload?.live === true, dbPath: payload?.dbPath || defaultDbPath });
+  return buildOperatorBriefing({
+    readinessStatus: readiness.status,
+    readinessSummary: readiness.summary,
+    coldOutreachSummary: cold.summary,
+    openClientNeedCount: Number(clientNeeds.count || 0),
+    preparedReplyCount: Number(preparedReplies.count || 0),
+    nextActions: readiness.nextActions || [],
+  });
+}
+
+function buildOperatorBriefing(input) {
+  const nextAction = input.nextActions?.[0] || "Ziadny urgentny krok.";
+  const sections = {
+    readiness: `Readiness: ${input.readinessStatus}. ${input.readinessSummary}`,
+    coldOutreach: `Cold outreach: ${input.coldOutreachSummary}`,
+    clientNeeds:
+      input.openClientNeedCount > 0
+        ? `Klientske poziadavky: ${input.openClientNeedCount} otvorenych.`
+        : "Klientske poziadavky: ziadne otvorene.",
+    preparedReplies:
+      input.preparedReplyCount > 0
+        ? `Pripravene odpovede: ${input.preparedReplyCount} caka na schvalenie.`
+        : "Pripravene odpovede: nic necaka na schvalenie.",
+    nextAction: `Najblizsi krok: ${nextAction}`,
+  };
+  const speechText = [
+    "Jarvis briefing.",
+    sections.readiness,
+    sections.coldOutreach,
+    sections.clientNeeds,
+    sections.preparedReplies,
+    sections.nextAction,
+  ].join(" ");
+  return {
+    summary: speechText,
+    speechText,
+    sections,
+  };
 }
 
 function identifyEmail(payload) {

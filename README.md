@@ -36,6 +36,7 @@ Server tools:
 - `arcigy.get_system_health`
 - `arcigy.run_integration_diagnostics`
 - `arcigy.get_production_readiness`
+- `arcigy.get_operator_briefing`
 - `arcigy.generate_ai_reply`
 - `arcigy.sync_gmail_recent_messages`
 - `arcigy.get_smartlead_campaign_status`
@@ -71,6 +72,7 @@ The Electron shell opens a local Arcigy Jarvis console with:
 - text transcript fallback
 - Slovak TTS via `speechSynthesis`
 - local Electron IPC bridge for Jarvis voice events and cold outreach briefs
+- first-screen operator briefing combining readiness, outreach, client requests, and pending approvals
 - voice cold outreach answers backed by `data\jarvis-local.db`
 - prepared cold outreach reply inbox with explicit approval before marking a reply ready to send
 - client need alerts inbox backed by local SQLite memory
@@ -138,6 +140,7 @@ It serves the same UI at `http://127.0.0.1:8765` and exposes local HTTP endpoint
 - `GET /api/system-health`
 - `POST /api/run-diagnostics`
 - `POST /api/production-readiness`
+- `POST /api/operator-briefing`
 - `POST /api/jarvis/voice-event`
 - `POST /api/cold-outreach-brief`
 - `POST /api/prepared-outreach-replies`
@@ -157,6 +160,7 @@ It serves the same UI at `http://127.0.0.1:8765` and exposes local HTTP endpoint
 - `POST /api/mcp/arcigy.get_system_health`
 - `POST /api/mcp/arcigy.run_integration_diagnostics`
 - `POST /api/mcp/arcigy.get_production_readiness`
+- `POST /api/mcp/arcigy.get_operator_briefing`
 - `POST /api/mcp/arcigy.draft_contract_intake`
 - `POST /api/mcp/arcigy.generate_ai_reply`
 - `POST /api/mcp/arcigy.get_cold_outreach_brief_from_db`

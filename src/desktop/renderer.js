@@ -21,6 +21,7 @@ const elements = {
   liveBlockerCount: document.querySelector("#liveBlockerCount"),
   commandTimeline: document.querySelector("#commandTimeline"),
   readinessReport: document.querySelector("#readinessReport"),
+  operatorBriefing: document.querySelector("#operatorBriefing"),
   listenButton: document.querySelector("#listenButton"),
   transcript: document.querySelector("#transcript"),
   response: document.querySelector("#response"),
@@ -87,6 +88,7 @@ const arcigyApi = window.arcigyDesktop ?? {
   jarvisVoiceEvent: (payload) => postJson("/api/jarvis/voice-event", payload),
   runDiagnostics: (payload) => postJson("/api/run-diagnostics", payload),
   productionReadiness: (payload) => postJson("/api/production-readiness", payload),
+  operatorBriefing: (payload) => postJson("/api/operator-briefing", payload),
   getPreparedOutreachReplies: (payload) => postJson("/api/prepared-outreach-replies", payload),
   approvePreparedOutreachReply: (payload) => postJson("/api/approve-prepared-outreach-reply", payload),
   identifyEmail: (payload) => postJson("/api/identify-email", payload),
@@ -214,6 +216,21 @@ function renderReadinessReport(report) {
       [`- ${step.title}`, `  Env: ${(step.envKeys ?? []).join(", ") || "none"}`, `  Validate: ${step.validationCommand}`, `  ${step.detail}`].join("\n")
     ),
   ].join("\n");
+}
+
+function renderOperatorBriefing(briefing) {
+  const sections = briefing.sections ?? {};
+  return [
+    briefing.summary ?? briefing.speechText ?? "Jarvis briefing is ready.",
+    "",
+    sections.readiness,
+    sections.coldOutreach,
+    sections.clientNeeds,
+    sections.preparedReplies,
+    sections.nextAction,
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 async function refreshHealth() {
@@ -768,6 +785,17 @@ elements.readinessReport.addEventListener("click", async () => {
     const report = await arcigyApi.productionReadiness({ live: false });
     elements.commandTimeline.textContent = report.summary;
     elements.response.textContent = renderReadinessReport(report);
+  } catch (error) {
+    elements.commandTimeline.textContent = error instanceof Error ? error.message : String(error);
+  }
+});
+elements.operatorBriefing.addEventListener("click", async () => {
+  try {
+    elements.commandTimeline.textContent = "Building operator briefing...";
+    const briefing = await arcigyApi.operatorBriefing({ periodLabel: "poslednych 7 dni" });
+    elements.commandTimeline.textContent = briefing.sections?.nextAction ?? briefing.summary;
+    elements.response.textContent = renderOperatorBriefing(briefing);
+    speak(briefing.speechText ?? briefing.summary);
   } catch (error) {
     elements.commandTimeline.textContent = error instanceof Error ? error.message : String(error);
   }

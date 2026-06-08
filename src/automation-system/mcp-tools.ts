@@ -18,6 +18,7 @@ export type JarvisMcpToolName =
   | "arcigy.get_system_health"
   | "arcigy.run_integration_diagnostics"
   | "arcigy.get_production_readiness"
+  | "arcigy.get_operator_briefing"
   | "arcigy.generate_ai_reply"
   | "arcigy.sync_gmail_recent_messages"
   | "arcigy.get_smartlead_campaign_status"
@@ -122,6 +123,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.get_production_readiness",
       description: "Vrati produkcny readiness report s blockermi, next actions, MCP stavom a volitelnymi live diagnostikami.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.get_operator_briefing",
+      description: "Spoji readiness, cold outreach, klientske poziadavky a pripravene odpovede do jedneho Jarvis briefingu.",
       requiresApproval: false,
     },
     {

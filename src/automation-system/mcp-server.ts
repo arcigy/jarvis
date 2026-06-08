@@ -16,6 +16,7 @@ import {
   getColdOutreachMcpAnswer,
   identifyEmailMcpAnswer,
 } from "./mcp-tools.ts";
+import { buildOperatorBriefing } from "./operator-briefing.ts";
 import { buildProductionReadinessReport } from "./production-readiness.ts";
 import { getSmartleadCampaignStatus } from "./smartlead.ts";
 import type { ClientNeedSignal, LocalPerson } from "./types.ts";
@@ -464,6 +465,45 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async ({ live, dbPath }) => jsonResult(await buildProductionReadinessReport({ live, dbPath }))
+  );
+
+  server.registerTool(
+    "arcigy.get_operator_briefing",
+    {
+      title: "Operator briefing",
+      description: "Return one Jarvis briefing across readiness, cold outreach, client requests, and prepared replies.",
+      inputSchema: {
+        dbPath: z.string().optional(),
+        since: z.string().optional(),
+        until: z.string().optional(),
+        periodLabel: z.string().default("poslednych 7 dni"),
+        live: z.boolean().default(false),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async ({ dbPath, since, until, periodLabel, live }) => {
+      const now = new Date();
+      const defaultSince = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const cold = runDbCommand("cold-brief", { since: since ?? defaultSince, until: until ?? now.toISOString(), periodLabel }, dbPath);
+      const clientNeeds = runDbCommand("list-open-needs", { status: "new", limit: 10 }, dbPath);
+      const preparedReplies = runDbCommand("list-prepared-replies", { status: "pending", limit: 10 }, dbPath);
+      const readiness = await buildProductionReadinessReport({ live, dbPath });
+      return jsonResult(
+        buildOperatorBriefing({
+          readinessStatus: readiness.status,
+          readinessSummary: readiness.summary,
+          coldOutreachSummary: cold.summary,
+          openClientNeedCount: Number(clientNeeds.count ?? 0),
+          preparedReplyCount: Number(preparedReplies.count ?? 0),
+          nextActions: readiness.nextActions,
+        })
+      );
+    }
   );
 
   server.registerTool(

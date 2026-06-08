@@ -25,6 +25,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /id="liveBlockerCount"/);
   assert.match(html, /id="commandTimeline"/);
   assert.match(html, /id="readinessReport"/);
+  assert.match(html, /id="operatorBriefing"/);
   assert.match(html, /checkWebBridge/);
   assert.match(html, /webBridgeResult/);
   assert.match(html, /Contract generator/);
@@ -71,6 +72,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /arcigyApi\.jarvisVoiceEvent/);
   assert.match(renderer, /arcigyApi\.runDiagnostics/);
   assert.match(renderer, /arcigyApi\.productionReadiness/);
+  assert.match(renderer, /arcigyApi\.operatorBriefing/);
   assert.match(renderer, /arcigyApi\.webBridgePreflight/);
   assert.match(renderer, /arcigyApi\.coldOutreachBrief/);
   assert.match(renderer, /arcigyApi\.getPreparedOutreachReplies/);
@@ -93,9 +95,11 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /liveBlockerCount/);
   assert.match(renderer, /Tunnel command/);
   assert.match(renderer, /renderReadinessReport/);
+  assert.match(renderer, /renderOperatorBriefing/);
   assert.match(renderer, /Fix guide/);
   assert.match(renderer, /validationCommand/);
   assert.match(renderer, /\/api\/production-readiness/);
+  assert.match(renderer, /\/api\/operator-briefing/);
   assert.match(renderer, /\/api\/prepared-outreach-replies/);
   assert.match(renderer, /\/api\/approve-prepared-outreach-reply/);
   assert.match(renderer, /\/api\/system-health/);
@@ -135,6 +139,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /ipcMain\.handle\("jarvis:voiceEvent"/);
   assert.match(main, /ipcMain\.handle\("jarvis:runDiagnostics"/);
   assert.match(main, /ipcMain\.handle\("jarvis:productionReadiness"/);
+  assert.match(main, /ipcMain\.handle\("jarvis:operatorBriefing"/);
   assert.match(main, /ipcMain\.handle\("jarvis:webBridgePreflight"/);
   assert.match(main, /ipcMain\.handle\("jarvis:getPreparedOutreachReplies"/);
   assert.match(main, /ipcMain\.handle\("jarvis:approvePreparedOutreachReply"/);
@@ -153,6 +158,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /summarizeHealthForVoice/);
   assert.match(main, /summarizeIdentityForVoice/);
   assert.match(main, /summarizeLeadsForVoice/);
+  assert.match(main, /getOperatorBriefing/);
   assert.match(main, /cleanVoiceQuery/);
   assert.match(main, /ipcMain\.handle\("jarvis:systemHealth"/);
   assert.match(main, /ipcMain\.handle\("jarvis:generateAiReply"/);
@@ -180,6 +186,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(preload, /jarvisVoiceEvent/);
   assert.match(preload, /runDiagnostics/);
   assert.match(preload, /productionReadiness/);
+  assert.match(preload, /operatorBriefing/);
   assert.match(preload, /webBridgePreflight/);
   assert.match(preload, /getPreparedOutreachReplies/);
   assert.match(preload, /approvePreparedOutreachReply/);
