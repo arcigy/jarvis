@@ -41,6 +41,7 @@ const elements = {
   approvalLockCount: document.querySelector("#approvalLockCount"),
   liveBlockerCount: document.querySelector("#liveBlockerCount"),
   commandTimeline: document.querySelector("#commandTimeline"),
+  briefingGrid: document.querySelector("#briefingGrid"),
   launchQueue: document.querySelector("#launchQueue"),
   launchStatus: document.querySelector("#launchStatus"),
   launchNextAction: document.querySelector("#launchNextAction"),
@@ -454,6 +455,33 @@ function renderOperatorBriefing(briefing) {
     .join("\n");
 }
 
+function renderOperatorBriefingCards(briefing) {
+  const sections = briefing.sections ?? {};
+  const cards = [
+    { key: "readiness", label: "Readiness", value: sections.readiness ?? briefing.summary, state: briefing.status === "blocked" ? "blocked" : "ready" },
+    { key: "coldOutreach", label: "Outreach", value: sections.coldOutreach, state: textHasAttention(sections.coldOutreach) ? "attention" : "ready" },
+    { key: "clientNeeds", label: "Client needs", value: sections.clientNeeds, state: textHasAttention(sections.clientNeeds) ? "attention" : "ready" },
+    { key: "preparedReplies", label: "Approvals", value: sections.preparedReplies, state: textHasAttention(sections.preparedReplies) ? "attention" : "ready" },
+    { key: "nextAction", label: "Next action", value: sections.nextAction, state: "attention" },
+  ];
+  elements.briefingGrid.replaceChildren();
+  for (const card of cards) {
+    const node = document.createElement("div");
+    const label = document.createElement("span");
+    const value = document.createElement("strong");
+    node.className = "briefingCard";
+    node.setAttribute("data-state", card.state);
+    label.textContent = card.label;
+    value.textContent = card.value || "No signal yet.";
+    node.append(label, value);
+    elements.briefingGrid.appendChild(node);
+  }
+}
+
+function textHasAttention(value) {
+  return /([1-9]\d*\s*(open|reply|positive|alert|need|request|approval|blok|warning|attention|odpoved|pozitiv|poziadav))/i.test(String(value ?? ""));
+}
+
 function trackReadinessNoticeFromBriefing(briefing) {
   const readiness = briefing.sections?.readiness ?? "";
   const nextAction = briefing.sections?.nextAction ?? "";
@@ -474,6 +502,7 @@ async function refreshOperatorBriefing({ speakResult = false, loadingText = null
   const briefing = await arcigyApi.operatorBriefing({ periodLabel: "poslednych 7 dni", live });
   elements.commandTimeline.textContent = briefing.sections?.nextAction ?? briefing.summary;
   elements.response.textContent = renderOperatorBriefing(briefing);
+  renderOperatorBriefingCards(briefing);
   trackReadinessNoticeFromBriefing(briefing);
   if (speakResult) speak(briefing.speechText ?? briefing.summary);
   return briefing;
@@ -1687,6 +1716,16 @@ elements.memoryMessage.value = "Potrebujem upravit onboarding automatizaciu do p
 elements.clientMessage.value = "Potrebujem upravit onboarding automatizaciu do piatku.";
 elements.gmailQuery.value = "in:inbox newer_than:7d";
 elements.leadQuery.value = "automation agency Bratislava";
+renderOperatorBriefingCards({
+  summary: "Loading operator briefing...",
+  sections: {
+    readiness: "Readiness is checking.",
+    coldOutreach: "Outreach brief is loading.",
+    clientNeeds: "Client memory watch is starting.",
+    preparedReplies: "Approval queue is loading.",
+    nextAction: "Loading next action.",
+  },
+});
 void refreshHealth();
 startWebBridgeWatch();
 startOperatorBriefingWatch();

@@ -381,6 +381,69 @@ h2 {
   color: #9cf8ed;
 }
 
+.briefingGrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.briefingCard {
+  position: relative;
+  overflow: hidden;
+  min-height: 98px;
+  border: 1px solid #26302f;
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgb(67 217 196 / 10%), transparent 52%),
+    rgb(9 15 16 / 88%);
+  padding: 12px;
+}
+
+.briefingCard::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgb(67 217 196 / 10%), transparent);
+  transform: translateX(-105%);
+  animation: briefingSweep 7s ease-in-out infinite;
+}
+
+.briefingCard span,
+.briefingCard strong {
+  position: relative;
+  z-index: 1;
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.briefingCard span {
+  color: #91a19d;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.briefingCard strong {
+  margin-top: 8px;
+  color: #eef4f2;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.briefingCard[data-state="ready"] {
+  border-color: rgb(67 217 196 / 45%);
+}
+
+.briefingCard[data-state="attention"],
+.briefingCard[data-state="blocked"] {
+  border-color: rgb(240 184 79 / 58%);
+}
+
+.briefingCard[data-state="attention"] strong,
+.briefingCard[data-state="blocked"] strong {
+  color: #ffd893;
+}
+
 .launchQueue {
   display: grid;
   grid-template-columns: 140px minmax(220px, 1.4fr) minmax(160px, 0.9fr) minmax(240px, 1.2fr);
@@ -971,6 +1034,7 @@ h2 {
   body::after,
   .deckVisual::before,
   .bridgeCockpit div::before,
+  .briefingCard::before,
   .missionSignal::before,
   .cortexMap::before,
   .cortexNode::after,
@@ -1036,6 +1100,13 @@ h2 {
   48%,
   100% {
     transform: translateX(110%);
+  }
+}
+
+@keyframes briefingSweep {
+  52%,
+  100% {
+    transform: translateX(105%);
   }
 }
 
@@ -1178,6 +1249,7 @@ ul {
   .statusGrid,
   .missionRail,
   .commandDeck,
+  .briefingGrid,
   .launchQueue,
   .cortexMap,
   .bridgeCockpit,

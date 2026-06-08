@@ -37,6 +37,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /id="approvalLockCount"/);
   assert.match(html, /id="liveBlockerCount"/);
   assert.match(html, /id="commandTimeline"/);
+  assert.match(html, /id="briefingGrid"/);
   assert.match(html, /id="launchQueue"/);
   assert.match(html, /id="launchStatus"/);
   assert.match(html, /id="launchNextAction"/);
@@ -273,6 +274,11 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /Launch checklist/);
   assert.match(renderer, /launchChecklist/);
   assert.match(renderer, /renderOperatorBriefing/);
+  assert.match(renderer, /function renderOperatorBriefingCards/);
+  assert.match(renderer, /elements\.briefingGrid\.replaceChildren\(\)/);
+  assert.match(renderer, /elements\.briefingGrid\.appendChild\(node\)/);
+  assert.match(renderer, /function textHasAttention/);
+  assert.match(renderer, /Loading operator briefing/);
   assert.match(renderer, /sections\.liveSync/);
   assert.match(renderer, /sections\.readinessAttention/);
   assert.match(renderer, /refreshOperatorBriefing/);
@@ -331,6 +337,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /announceNew/);
   assert.match(styles, /\.missionRail/);
   assert.match(styles, /\.missionSignal\[data-state="ready"\]/);
+  assert.match(styles, /\.briefingGrid/);
+  assert.match(styles, /\.briefingCard\[data-state="attention"\]/);
+  assert.match(styles, /\.briefingGrid,\s+\.launchQueue/s);
   assert.match(styles, /\.launchQueue/);
   assert.match(styles, /\.launchQueue\[data-state="ready"\]/);
   assert.match(styles, /\.launchQueue li\[data-state="blocked"\]/);
