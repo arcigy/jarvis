@@ -99,3 +99,32 @@ test("Jarvis doctor surfaces non-blocking runtime advisories as warnings", () =>
   assert.equal(runtimeEnv?.status, "warning");
   assert.equal(runtimeEnv?.details?.advisoryMissing?.length, 1);
 });
+
+test("Jarvis doctor human output names advisory next actions without leaking placeholder credentials", () => {
+  const result = spawnSync("node", ["scripts/jarvis_doctor.ts", "--no-env-file", "--skip-local-db", "--skip-contract-generation", "--skip-web-bridge"], {
+    cwd: process.cwd(),
+    encoding: "utf-8",
+    env: {
+      ...process.env,
+      GEMINI_API_KEY: "gemini",
+      GOOGLE_CLIENT_ID: "client",
+      GOOGLE_CLIENT_SECRET: "secret",
+      GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP: "refresh",
+      GMAIL_REFRESH_TOKEN_BRANISLAV_L_ARCIGY_GROUP: "refresh-2",
+      GMAIL_REFRESH_TOKEN_ANDREJ_ARCIGY_GROUP: "refresh-3",
+      GMAIL_REFRESH_TOKEN_ANDREJ_R_ARCIGY_GROUP: "refresh-4",
+      SMARTLEAD_API_KEY: "smartlead",
+      DATABASE_URL: "postgres://postgres:secret@example.com:5432/db",
+      REDIS_URL: "redis://default:PASSWORD@example.com:6379",
+      GOOGLE_SHEET_ID: "sheet",
+      GOOGLE_MAPS_API_KEY: "maps",
+      SERPER_API_KEY: "serper",
+    },
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout.includes("PASSWORD"), false);
+  assert.match(result.stdout, /\[WARN\] runtimeEnv/);
+  assert.match(result.stdout, /redis: REDIS_URL contains a placeholder credential/);
+  assert.match(result.stdout, /Next: Replace REDIS_URL with the real Redis password/);
+});

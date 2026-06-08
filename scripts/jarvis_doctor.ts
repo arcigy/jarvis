@@ -596,10 +596,61 @@ function renderHumanSummary(summary: DoctorSummary): string {
     "Arcigy Jarvis doctor",
     `Status: ${summary.ok ? "ready" : "failed"} (${summary.ready} ready, ${summary.warnings} warning, ${summary.failed} failed)`,
     "",
-    ...summary.checks.map((check) => `${label(check.status)} ${check.key}: ${check.message}`),
+    ...summary.checks.flatMap(renderHumanCheck),
     "",
   ];
   return lines.join("\n");
+}
+
+function renderHumanCheck(check: DoctorCheck): string[] {
+  const lines = [`${label(check.status)} ${check.key}: ${check.message}`];
+  if (check.status === "ready") return lines;
+  lines.push(...renderHumanCheckDetails(check));
+  return lines;
+}
+
+function renderHumanCheckDetails(check: DoctorCheck): string[] {
+  if (check.key === "runtimeEnv" && isRecord(check.details)) {
+    const missing = Array.isArray(check.details.advisoryMissing) ? check.details.advisoryMissing : check.details.missing;
+    return renderRuntimeEnvIssues(missing);
+  }
+  if (check.key === "liveIntegrationDiagnostics" && isRecord(check.details)) {
+    const notReady = Array.isArray(check.details.advisoryNotReady) && check.details.advisoryNotReady.length ? check.details.advisoryNotReady : check.details.notReady;
+    return renderDiagnosticIssues(notReady);
+  }
+  return [];
+}
+
+function renderRuntimeEnvIssues(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 5).flatMap((item) => {
+    if (!isRecord(item)) return [];
+    const key = String(item.key ?? "runtimeEnv");
+    const missing = Array.isArray(item.missing) ? item.missing.map(String).join(", ") : "configuration issue";
+    return [`  - ${key}: ${missing}`, `    Next: ${runtimeEnvNextAction(key, missing)}`];
+  });
+}
+
+function renderDiagnosticIssues(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 5).flatMap((item) => {
+    if (!isRecord(item)) return [];
+    const key = String(item.key ?? "diagnostic");
+    const message = String(item.message ?? "not ready");
+    return [`  - ${key}: ${message}`, `    Next: ${runtimeEnvNextAction(key, message)}`];
+  });
+}
+
+function runtimeEnvNextAction(key: string, message: string): string {
+  const text = `${key} ${message}`.toLowerCase();
+  if (text.includes("redis") && text.includes("placeholder")) return "Replace REDIS_URL with the real Redis password, then rerun npm run doctor -- --live-integrations.";
+  if (text.includes("redis") && text.includes("rediss")) return "Change REDIS_URL to rediss:// if the provider requires TLS.";
+  if (text.includes("serper") && text.includes("not enough credits")) return "Top up or replace at least one Serper API key.";
+  return `Fix ${key} and rerun npm run doctor -- --live-integrations.`;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
 
 function label(status: CheckStatus): string {
