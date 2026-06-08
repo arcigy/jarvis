@@ -478,6 +478,23 @@ def local_memory_snapshot(db_path: Path, payload: dict[str, Any]) -> dict[str, A
     return redact_secrets(snapshot)
 
 
+def export_local_memory_snapshot(db_path: Path, payload: dict[str, Any]) -> dict[str, Any]:
+    output_path = resolve_repo_output_path(
+        payload.get("outputPath") or payload.get("outputFile") or ROOT / "generated" / "local-memory" / "local-memory-snapshot.json",
+        "outputPath",
+    )
+    snapshot = local_memory_snapshot(db_path, payload)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {
+        "status": "exported",
+        "outputPath": str(output_path),
+        "redacted": True,
+        "counts": snapshot["counts"],
+        "summary": f"Jarvis: redigovany local memory snapshot je ulozeny v {output_path}.",
+    }
+
+
 def approve_prepared_reply(db_path: Path, payload: dict[str, Any]) -> dict[str, Any]:
     init_db(db_path)
     prepared_id = required(payload, "preparedEventId")
@@ -1169,6 +1186,19 @@ def load_payload(raw: str | None) -> dict[str, Any]:
     return json.loads(raw)
 
 
+def resolve_repo_output_path(raw_path: Any, label: str) -> Path:
+    path = Path(raw_path)
+    if not path.is_absolute():
+        path = ROOT / path
+    resolved = path.resolve()
+    root = ROOT.resolve()
+    if resolved != root and root not in resolved.parents:
+        raise ValueError(f"{label} must stay inside the Jarvis repository.")
+    if resolved.suffix.lower() != ".json":
+        raise ValueError(f"{label} must be a .json file.")
+    return resolved
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Jarvis local SQLite DB helper.")
     parser.add_argument(
@@ -1188,6 +1218,7 @@ def main() -> None:
             "update-need-status",
             "list-approval-queue",
             "local-memory-snapshot",
+            "export-local-memory-snapshot",
             "add-audit-event",
             "list-audit-events",
         ],
@@ -1224,6 +1255,8 @@ def main() -> None:
             result = list_approval_queue(args.db, load_payload(args.payload))
         elif args.command == "local-memory-snapshot":
             result = local_memory_snapshot(args.db, load_payload(args.payload))
+        elif args.command == "export-local-memory-snapshot":
+            result = export_local_memory_snapshot(args.db, load_payload(args.payload))
         elif args.command == "add-audit-event":
             result = add_audit_event(args.db, load_payload(args.payload))
         elif args.command == "list-audit-events":

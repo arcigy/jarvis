@@ -54,6 +54,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.update_client_need_status",
     "arcigy.get_audit_events",
     "arcigy.get_local_memory_snapshot",
+    "arcigy.export_local_memory_snapshot",
     "arcigy.jarvis_voice_event",
     "arcigy.get_system_health",
     "arcigy.run_integration_diagnostics",
@@ -74,6 +75,7 @@ test("MCP tools expose the requested automation surface", () => {
   assert.ok(localStateWriteToolNames.has("arcigy.ingest_client_message"));
   assert.ok(localStateWriteToolNames.has("arcigy.prepare_positive_outreach_reply"));
   assert.ok(localStateWriteToolNames.has("arcigy.update_client_need_status"));
+  assert.ok(localStateWriteToolNames.has("arcigy.export_local_memory_snapshot"));
   assert.equal(localStateWriteToolNames.has("arcigy.generate_contract_documents"), false);
   for (const tool of listJarvisMcpTools()) {
     assert.equal(tool.description.length > 20, true);
@@ -143,6 +145,7 @@ test("remote MCP smoke checks every response for bearer token leaks", async () =
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
+      url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
     ) {
       return responseJson({ error: `token leaked ${token}` }, 409);
@@ -198,6 +201,7 @@ test("remote MCP smoke requires valid quick-start URLs", async () => {
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
+      url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
     ) {
       return responseJson({ error: "approval required" }, 409);
@@ -253,6 +257,7 @@ test("remote MCP smoke requires quick-start approval policy parity", async () =>
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
+      url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
     ) {
       return responseJson({ error: "approval required" }, 409);
@@ -328,6 +333,7 @@ test("remote MCP smoke blocks generic secret patterns in response bodies", async
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
+      url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
     ) {
       return responseJson({ error: "approval required" }, 409);
@@ -382,6 +388,7 @@ test("remote MCP smoke requires exact manifest and pack tool registries", async 
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
+      url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
     ) {
       return responseJson({ error: "approval required" }, 409);
@@ -438,6 +445,7 @@ test("remote MCP smoke requires valid manifest tool metadata", async () => {
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
+      url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
     ) {
       return responseJson({ error: "approval required" }, 409);
@@ -491,6 +499,7 @@ test("remote MCP smoke requires exact manifest and pack tool policies", async ()
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
+      url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
     ) {
       return responseJson({ error: "approval required" }, 409);
@@ -545,6 +554,7 @@ test("remote MCP smoke requires guarded connection pack limits", async () => {
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
+      url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
     ) {
       return responseJson({ error: "approval required" }, 409);
@@ -728,6 +738,7 @@ test("remote MCP smoke requires the audit trail quick-start", async () => {
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
+      url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
     ) {
       return responseJson({ error: "approval required" }, 409);
@@ -2572,6 +2583,21 @@ test("local SQLite CLI exports a redacted local memory snapshot", () => {
   assert.equal(snapshot.counts.emailActivities, 1);
   assert.equal(output.includes(googleKey), false);
   assert.match(output, /\[redacted-google-api-key\]/);
+
+  const outputPath = join(process.cwd(), "generated", "test-runs", `memory-snapshot-${Date.now()}.json`);
+  const exported = runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "export-local-memory-snapshot",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify({ limit: 5, outputPath }),
+  ]);
+  const exportedText = readFileSync(outputPath, "utf-8");
+  assert.equal(exported.status, "exported");
+  assert.equal(exported.redacted, true);
+  assert.equal(exportedText.includes(googleKey), false);
+  assert.match(exportedText, /\[redacted-google-api-key\]/);
 });
 
 function runPythonJson(python: string, args: string[]) {

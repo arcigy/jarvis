@@ -174,6 +174,7 @@ async function checkApprovalGates(fetchImpl: typeof fetch, baseUrl: string, bear
     ["arcigy.approve_prepared_outreach_reply", { preparedEventId: "smoke-prepared-reply" }],
     ["arcigy.send_approved_outreach_reply", { preparedEventId: "smoke-prepared-reply" }],
     ["arcigy.update_client_need_status", { needSignalId: "smoke-client-need", status: "resolved" }],
+    ["arcigy.export_local_memory_snapshot", { outputPath: "generated/local-memory/smoke.json" }],
     ["arcigy.append_leads_to_google_sheet", { rows: [["Smoke", "https://example.com"]] }],
   ];
   const bodies = [];

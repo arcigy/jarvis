@@ -531,6 +531,31 @@ export function createJarvisMcpServer(): McpServer {
   );
 
   server.registerTool(
+    "arcigy.export_local_memory_snapshot",
+    {
+      title: "Export local memory snapshot",
+      description: "Write a redacted local memory snapshot JSON file inside the repository after explicit operator confirmation.",
+      inputSchema: {
+        dbPath: z.string().optional(),
+        outputPath: z.string().optional(),
+        limit: z.number().int().min(1).max(50).default(10),
+        approval: approvalSchema,
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+    },
+    async ({ dbPath, approval, outputPath, ...payload }) => {
+      requireExplicitApproval("arcigy.export_local_memory_snapshot", { approval });
+      const safeOutputPath = outputPath ? resolveRepoPath(outputPath, "", "outputPath") : undefined;
+      return jsonDbTool("export-local-memory-snapshot", { ...payload, outputPath: safeOutputPath }, dbPath);
+    }
+  );
+
+  server.registerTool(
     "arcigy.jarvis_voice_event",
     {
       title: "Jarvis voice event",
@@ -1010,7 +1035,8 @@ function jsonDbTool(
     | "update-need-status"
     | "add-audit-event"
     | "list-audit-events"
-    | "local-memory-snapshot",
+    | "local-memory-snapshot"
+    | "export-local-memory-snapshot",
   payload: Record<string, unknown>,
   dbPath?: string
 ) {
@@ -1032,7 +1058,8 @@ function runDbCommand(
     | "update-need-status"
     | "add-audit-event"
     | "list-audit-events"
-    | "local-memory-snapshot",
+    | "local-memory-snapshot"
+    | "export-local-memory-snapshot",
   payload: Record<string, unknown>,
   dbPath?: string
 ) {

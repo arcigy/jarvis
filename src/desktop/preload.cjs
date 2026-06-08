@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld("arcigyDesktop", {
   updateClientNeedStatus: (payload) => ipcRenderer.invoke("jarvis:updateClientNeedStatus", payload),
   getAuditEvents: (payload) => ipcRenderer.invoke("jarvis:getAuditEvents", payload),
   getLocalMemorySnapshot: (payload) => ipcRenderer.invoke("jarvis:getLocalMemorySnapshot", payload),
+  exportLocalMemorySnapshot: (payload) => ipcRenderer.invoke("jarvis:exportLocalMemorySnapshot", payload),
   generateAiReply: (payload) => ipcRenderer.invoke("jarvis:generateAiReply", payload),
   syncGmailRecentMessages: (payload) => ipcRenderer.invoke("jarvis:syncGmailRecentMessages", payload),
   getSmartleadCampaignStatus: (payload) => ipcRenderer.invoke("jarvis:getSmartleadCampaignStatus", payload),

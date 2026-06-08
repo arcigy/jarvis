@@ -73,6 +73,7 @@ The desktop MCP panel now runs an automatic preflight watch every two minutes. I
 - `arcigy.update_client_need_status`: marks a client request as `seen`, `resolved`, or `ignored` after explicit confirmation.
 - `arcigy.identify_email`: exact email/domain identity lookup with open need signals.
 - `arcigy.get_local_memory_snapshot`: returns a secret-safe read-only snapshot of local people, email activity, client needs, and audit events.
+- `arcigy.export_local_memory_snapshot`: writes a redacted local memory snapshot JSON file inside the repository after explicit confirmation.
 - `arcigy.get_system_health`: checks runtime configuration without exposing secrets.
 - `arcigy.run_integration_diagnostics`: runs configured checks or explicit live read-only probes, including Postgres TCP and Redis PING.
 - `arcigy.get_production_readiness`: summarizes production readiness, blockers, next actions, MCP tool count, approval locks, and optional live diagnostics.

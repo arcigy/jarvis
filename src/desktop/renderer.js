@@ -90,6 +90,7 @@ const elements = {
   diagnosticsResult: document.querySelector("#diagnosticsResult"),
   auditEvents: document.querySelector("#auditEvents"),
   localMemorySnapshot: document.querySelector("#localMemorySnapshot"),
+  exportLocalMemorySnapshot: document.querySelector("#exportLocalMemorySnapshot"),
   auditResult: document.querySelector("#auditResult"),
   gmailQuery: document.querySelector("#gmailQuery"),
   previewGmail: document.querySelector("#previewGmail"),
@@ -175,6 +176,7 @@ const arcigyApi = window.arcigyDesktop ?? {
   updateClientNeedStatus: (payload) => postJson("/api/update-client-need-status", payload),
   getAuditEvents: (payload) => postJson("/api/audit-events", payload),
   getLocalMemorySnapshot: (payload) => postJson("/api/local-memory-snapshot", payload),
+  exportLocalMemorySnapshot: (payload) => postJson("/api/export-local-memory-snapshot", payload),
   generateAiReply: (payload) => postJson("/api/generate-ai-reply", payload),
   webBridgePreflight: () => getJson("/api/web-bridge-preflight"),
   remoteMcpPack: (payload) =>
@@ -1692,6 +1694,30 @@ elements.localMemorySnapshot.addEventListener("click", async () => {
     elements.auditResult.textContent = "Loading redacted local memory snapshot...";
     const result = await arcigyApi.getLocalMemorySnapshot({ limit: 10 });
     elements.auditResult.textContent = renderLocalMemorySnapshot(result);
+  } catch (error) {
+    elements.auditResult.textContent = safeUiErrorText(error);
+  }
+});
+elements.exportLocalMemorySnapshot.addEventListener("click", async () => {
+  try {
+    const approved = window.confirm("Export a redacted local memory snapshot to generated/local-memory/local-memory-snapshot.json?");
+    if (!approved) {
+      elements.auditResult.textContent = "Local memory snapshot export cancelled before any file write.";
+      return;
+    }
+    elements.auditResult.textContent = "Exporting redacted local memory snapshot...";
+    const result = await arcigyApi.exportLocalMemorySnapshot({
+      outputPath: "generated/local-memory/local-memory-snapshot.json",
+      limit: 10,
+      approval: { approved: true },
+    });
+    elements.auditResult.textContent = [
+      result.summary ?? "Local memory snapshot exported.",
+      `Output: ${result.outputPath}`,
+      `People: ${result.counts?.people ?? 0}`,
+      `Open client needs: ${result.counts?.openClientNeeds ?? 0}`,
+      "Secrets are redacted.",
+    ].join("\n");
   } catch (error) {
     elements.auditResult.textContent = safeUiErrorText(error);
   }

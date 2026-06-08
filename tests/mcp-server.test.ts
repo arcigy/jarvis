@@ -40,6 +40,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(names.includes("arcigy.get_client_need_alerts"));
   assert.ok(names.includes("arcigy.get_audit_events"));
   assert.ok(names.includes("arcigy.get_local_memory_snapshot"));
+  assert.ok(names.includes("arcigy.export_local_memory_snapshot"));
   assert.ok(names.includes("arcigy.jarvis_voice_event"));
   assert.ok(names.includes("arcigy.get_system_health"));
   assert.ok(names.includes("arcigy.run_integration_diagnostics"));
@@ -303,6 +304,29 @@ test("Jarvis MCP server persists and identifies local people through SQLite tool
   assert.equal(snapshotBody.redacted, true);
   assert.equal(snapshotBody.counts.people, 1);
   assert.equal(snapshotBody.counts.clientNeedSignals, 1);
+
+  assertToolError(
+    await client.callTool({
+      name: "arcigy.export_local_memory_snapshot",
+      arguments: {
+        dbPath,
+        outputPath: join("generated", "test-runs", "mcp-memory-snapshot-unapproved.json"),
+      },
+    }),
+    /requires explicit approval/
+  );
+  const exportedSnapshot = await client.callTool({
+    name: "arcigy.export_local_memory_snapshot",
+    arguments: {
+      dbPath,
+      outputPath: join("generated", "test-runs", "mcp-memory-snapshot.json"),
+      approval: { approved: true },
+    },
+  });
+  const exportedSnapshotBody = getStructuredResult(exportedSnapshot) as { status: string; redacted: boolean; outputPath: string };
+  assert.equal(exportedSnapshotBody.status, "exported");
+  assert.equal(exportedSnapshotBody.redacted, true);
+  assert.equal(existsSync(exportedSnapshotBody.outputPath), true);
 
   assertToolError(
     await client.callTool({

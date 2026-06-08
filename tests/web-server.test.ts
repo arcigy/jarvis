@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdirSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -505,6 +505,28 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(memorySnapshotBody.redacted, true);
     assert.equal(memorySnapshotBody.counts.people, 1);
     assert.equal(memorySnapshotBody.counts.openClientNeeds, 1);
+
+    const rejectedSnapshotExport = await fetch(`${baseUrl}/api/export-local-memory-snapshot`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ dbPath, outputPath: join("generated", "test-runs", "web-memory-snapshot-unapproved.json") }),
+    });
+    assert.equal(rejectedSnapshotExport.status, 409);
+
+    const approvedSnapshotExport = await fetch(`${baseUrl}/api/export-local-memory-snapshot`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        dbPath,
+        outputPath: join("generated", "test-runs", "web-memory-snapshot.json"),
+        approval: { approved: true },
+      }),
+    });
+    assert.equal(approvedSnapshotExport.status, 200);
+    const approvedSnapshotExportBody = (await approvedSnapshotExport.json()) as { status: string; redacted: boolean; outputPath: string };
+    assert.equal(approvedSnapshotExportBody.status, "exported");
+    assert.equal(approvedSnapshotExportBody.redacted, true);
+    assert.equal(existsSync(approvedSnapshotExportBody.outputPath), true);
 
     const voiceApprovalQueue = await fetch(`${baseUrl}/api/jarvis/voice-event`, {
       method: "POST",

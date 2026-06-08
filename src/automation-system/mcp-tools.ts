@@ -20,6 +20,7 @@ export type JarvisMcpToolName =
   | "arcigy.update_client_need_status"
   | "arcigy.get_audit_events"
   | "arcigy.get_local_memory_snapshot"
+  | "arcigy.export_local_memory_snapshot"
   | "arcigy.identify_email"
   | "arcigy.get_system_health"
   | "arcigy.run_integration_diagnostics"
@@ -51,6 +52,7 @@ export const localStateWriteToolNames = new Set<JarvisMcpToolName>([
   "arcigy.add_client_need_signal",
   "arcigy.ingest_client_message",
   "arcigy.update_client_need_status",
+  "arcigy.export_local_memory_snapshot",
   "arcigy.sync_gmail_recent_messages",
 ]);
 
@@ -153,6 +155,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
       name: "arcigy.get_local_memory_snapshot",
       description: "Vrati secret-safe snapshot lokalnej klientovej pamate, email aktivit, klientskych poziadaviek a audit eventov.",
       requiresApproval: false,
+    },
+    {
+      name: "arcigy.export_local_memory_snapshot",
+      description: "Ulozi redigovany local memory snapshot do JSON suboru v repozitari az po explicitnom potvrdeni operatorom.",
+      requiresApproval: true,
     },
     {
       name: "arcigy.jarvis_voice_event",

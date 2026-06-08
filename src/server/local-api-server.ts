@@ -177,6 +177,22 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
     return;
   }
 
+  if (request.method === "POST" && url.pathname === "/api/export-local-memory-snapshot") {
+    const payload = await readJson(request);
+    const approvalError = getApprovalError("arcigy.export_local_memory_snapshot", payload);
+    if (approvalError) {
+      writeJson(response, 409, { error: approvalError });
+      return;
+    }
+    const result = runDbTool("export-local-memory-snapshot", {
+      ...payload,
+      outputPath: resolveRepoPath(payload.outputPath, join(repoRoot, "generated", "local-memory", "local-memory-snapshot.json"), "outputPath"),
+    });
+    addAuditEvent("arcigy.export_local_memory_snapshot", "exported", payload, result, true);
+    writeJson(response, 200, result);
+    return;
+  }
+
   if (request.method === "POST" && url.pathname === "/api/generate-ai-reply") {
     const payload = await readJson(request);
     const result = await generateGeminiText(buildClientReplyPrompt(toClientReplyDraftInput(payload)));
@@ -534,6 +550,15 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
   }
   if (name === "arcigy.get_local_memory_snapshot") {
     writeJson(response, 200, { result: runDbTool("local-memory-snapshot", payload) });
+    return;
+  }
+  if (name === "arcigy.export_local_memory_snapshot") {
+    const result = runDbTool("export-local-memory-snapshot", {
+      ...payload,
+      outputPath: resolveRepoPath(payload.outputPath, join(repoRoot, "generated", "local-memory", "local-memory-snapshot.json"), "outputPath"),
+    });
+    addAuditEvent("arcigy.export_local_memory_snapshot", "exported", payload, result, true);
+    writeJson(response, 200, { result });
     return;
   }
   if (name === "arcigy.jarvis_voice_event") {

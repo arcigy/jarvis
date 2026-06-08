@@ -141,6 +141,7 @@ app.whenReady().then(() => {
   ipcMain.handle("jarvis:updateClientNeedStatus", (_event, payload) => updateClientNeedStatus(payload));
   ipcMain.handle("jarvis:getAuditEvents", (_event, payload) => getAuditEvents(payload));
   ipcMain.handle("jarvis:getLocalMemorySnapshot", (_event, payload) => getLocalMemorySnapshot(payload));
+  ipcMain.handle("jarvis:exportLocalMemorySnapshot", (_event, payload) => exportLocalMemorySnapshot(payload));
   ipcMain.handle("jarvis:generateAiReply", (_event, payload) => generateAiReply(payload));
   ipcMain.handle("jarvis:syncGmailRecentMessages", (_event, payload) => syncGmailRecentMessages(payload));
   ipcMain.handle("jarvis:getSmartleadCampaignStatus", (_event, payload) => getSmartleadCampaignStatus(payload));
@@ -896,6 +897,14 @@ function buildRemoteMcpQuickStartCalls(baseUrl) {
       approvalRequired: false,
     },
     {
+      label: "Export redacted local memory snapshot after approval",
+      tool: "arcigy.export_local_memory_snapshot",
+      method: "POST",
+      url: toolUrl("arcigy.export_local_memory_snapshot"),
+      body: { outputPath: "generated/local-memory/local-memory-snapshot.json", limit: 10, approval: { approved: true } },
+      approvalRequired: true,
+    },
+    {
       label: "Get Smartlead outreach brief",
       tool: "arcigy.get_smartlead_outreach_brief",
       method: "POST",
@@ -1180,6 +1189,7 @@ async function checkApprovalGates(baseUrl, token, topLevelApproved) {
     ["arcigy.approve_prepared_outreach_reply", { preparedEventId: "smoke-prepared-reply" }],
     ["arcigy.send_approved_outreach_reply", { preparedEventId: "smoke-prepared-reply" }],
     ["arcigy.update_client_need_status", { needSignalId: "smoke-client-need", status: "resolved" }],
+    ["arcigy.export_local_memory_snapshot", { outputPath: "generated/local-memory/smoke.json" }],
     ["arcigy.append_leads_to_google_sheet", { rows: [["Smoke", "https://example.com"]] }],
   ];
   const bodies = [];
@@ -1398,6 +1408,7 @@ function listWebMcpTools() {
     { name: "arcigy.update_client_need_status", requiresApproval: true },
     { name: "arcigy.get_audit_events", requiresApproval: false },
     { name: "arcigy.get_local_memory_snapshot", requiresApproval: false },
+    { name: "arcigy.export_local_memory_snapshot", requiresApproval: true },
     { name: "arcigy.jarvis_voice_event", requiresApproval: false },
     { name: "arcigy.get_system_health", requiresApproval: false },
     { name: "arcigy.run_integration_diagnostics", requiresApproval: false },
@@ -3028,6 +3039,26 @@ function getLocalMemorySnapshot(payload = {}) {
     }),
   ]);
   return JSON.parse(result.stdout);
+}
+
+function exportLocalMemorySnapshot(payload = {}) {
+  if (payload?.approval?.approved !== true) {
+    throw new Error('arcigy.export_local_memory_snapshot requires explicit approval. Send {"approval":{"approved":true}} after user confirmation.');
+  }
+  const result = runPython([
+    "scripts/jarvis_local_db.py",
+    "export-local-memory-snapshot",
+    "--db",
+    payload?.dbPath || defaultDbPath,
+    "--payload",
+    JSON.stringify({
+      limit: payload?.limit || 10,
+      outputPath: payload?.outputPath || path.join(repoRoot, "generated", "local-memory", "local-memory-snapshot.json"),
+    }),
+  ]);
+  const parsed = JSON.parse(result.stdout);
+  addAuditEvent("arcigy.export_local_memory_snapshot", "exported", payload, parsed, true);
+  return parsed;
 }
 
 function addAuditEvent(automationKey, status, input, output, requiresApproval) {
