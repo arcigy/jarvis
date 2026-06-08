@@ -37,6 +37,13 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
 
   const manifestTools = Array.isArray(manifest.body?.tools) ? manifest.body.tools : [];
   checks.push(check(manifestTools.length === expectedToolCount, "tool-count", `Manifest exposes ${manifestTools.length}/${expectedToolCount} MCP tools.`));
+  checks.push(
+    check(
+      hasExactManifestRegistry(manifestTools),
+      "manifest-tool-registry",
+      "Manifest exposes the exact Jarvis MCP tool registry."
+    )
+  );
   checks.push(check(manifest.body?.auth?.header === "Authorization: Bearer <JARVIS_WEB_TOKEN>", "auth-placeholder", "Manifest returns auth placeholder, not the token value."));
   checks.push(
     check(
@@ -54,6 +61,13 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
       hasLocalWritePolicy(pack.body?.tools),
       "pack-local-write-policy",
       "Connection pack identifies local write tools separately from read-only/draft tools."
+    )
+  );
+  checks.push(
+    check(
+      hasExactPackRegistry(pack.body?.tools),
+      "pack-tool-registry",
+      "Connection pack exposes the exact Jarvis MCP tool registry."
     )
   );
   checks.push(
@@ -161,6 +175,28 @@ function hasLocalWritePolicy(value: unknown): boolean {
   const localStateWrite = Array.isArray(policy.localStateWrite) ? policy.localStateWrite : [];
   const readOnlyOrDraft = Array.isArray(policy.readOnlyOrDraft) ? policy.readOnlyOrDraft : [];
   return localStateWrite.includes("arcigy.sync_gmail_recent_messages") && !readOnlyOrDraft.includes("arcigy.sync_gmail_recent_messages");
+}
+
+function hasExactManifestRegistry(value: unknown): boolean {
+  if (!Array.isArray(value)) return false;
+  return sameStringArray(
+    value.map((item) => (item && typeof item === "object" ? (item as { name?: unknown }).name : null)),
+    expectedToolNames()
+  );
+}
+
+function hasExactPackRegistry(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const names = (value as { names?: unknown }).names;
+  return Array.isArray(names) && sameStringArray(names, expectedToolNames());
+}
+
+function expectedToolNames(): string[] {
+  return listJarvisMcpTools().map((tool) => tool.name);
+}
+
+function sameStringArray(actual: unknown[], expected: string[]): boolean {
+  return actual.length === expected.length && actual.every((item, index) => item === expected[index]);
 }
 
 function hasUsableContractQuickStart(value: unknown): boolean {
