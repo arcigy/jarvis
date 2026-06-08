@@ -857,6 +857,55 @@ h2 {
   text-transform: uppercase;
 }
 
+.diagnosticsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.diagnosticCard {
+  min-width: 0;
+  border: 1px solid #263634;
+  border-radius: 8px;
+  background: rgb(9 15 16 / 84%);
+  padding: 10px;
+}
+
+.diagnosticCard strong,
+.diagnosticCard span {
+  display: block;
+}
+
+.diagnosticCard strong {
+  color: #eef4f2;
+  font-size: 13px;
+}
+
+.diagnosticCard span {
+  margin-top: 5px;
+  color: #91a19d;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.diagnosticCard p {
+  margin: 8px 0 0;
+  color: #c8d6d2;
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.diagnosticCard[data-state="ready"] {
+  border-color: rgb(67 217 196 / 44%);
+}
+
+.diagnosticCard[data-state="attention"],
+.diagnosticCard[data-state="blocked"] {
+  border-color: rgb(240 184 79 / 55%);
+}
+
 .orb {
   position: relative;
   width: 150px;
@@ -1090,6 +1139,7 @@ ul {
   .cortexMap,
   .bridgeCockpit,
   .handoffGrid,
+  .diagnosticsGrid,
   .toolMatrix,
   .grid {
     grid-template-columns: 1fr;

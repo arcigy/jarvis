@@ -77,6 +77,7 @@ const elements = {
   draftReply: document.querySelector("#draftReply"),
   draftResult: document.querySelector("#draftResult"),
   runDiagnostics: document.querySelector("#runDiagnostics"),
+  diagnosticsGrid: document.querySelector("#diagnosticsGrid"),
   diagnosticsResult: document.querySelector("#diagnosticsResult"),
   auditEvents: document.querySelector("#auditEvents"),
   auditResult: document.querySelector("#auditResult"),
@@ -599,6 +600,25 @@ function renderDiagnostics(result) {
     "",
     ...checks.map((check) => `${check.status.toUpperCase()} ${check.key}: ${check.message}`),
   ].join("\n");
+}
+
+function renderDiagnosticsGrid(result) {
+  const checks = result.checks ?? [];
+  elements.diagnosticsGrid.replaceChildren();
+  for (const check of checks) {
+    const node = document.createElement("div");
+    const key = document.createElement("strong");
+    const status = document.createElement("span");
+    const message = document.createElement("p");
+    const stateName = check.status === "ready" ? "ready" : check.status === "warning" ? "attention" : "blocked";
+    node.className = "diagnosticCard";
+    node.setAttribute("data-state", stateName);
+    key.textContent = check.key;
+    status.textContent = check.status;
+    message.textContent = check.message ?? "-";
+    node.append(key, status, message);
+    elements.diagnosticsGrid.appendChild(node);
+  }
 }
 
 function renderAuditEvents(result) {
@@ -1421,7 +1441,9 @@ elements.draftReply.addEventListener("click", async () => {
 elements.runDiagnostics.addEventListener("click", async () => {
   try {
     elements.diagnosticsResult.textContent = "Running live diagnostics...";
+    elements.diagnosticsGrid.replaceChildren();
     const result = await arcigyApi.runDiagnostics({ live: true });
+    renderDiagnosticsGrid(result);
     elements.diagnosticsResult.textContent = renderDiagnostics(result);
   } catch (error) {
     elements.diagnosticsResult.textContent = safeUiErrorText(error);

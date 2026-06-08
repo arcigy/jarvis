@@ -96,6 +96,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /sendApprovedReply/);
   assert.match(html, /preparedReplyResult/);
   assert.match(html, /runDiagnostics/);
+  assert.match(html, /diagnosticsGrid/);
   assert.match(html, /diagnosticsResult/);
   assert.match(html, /auditEvents/);
   assert.match(html, /auditResult/);
@@ -151,6 +152,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /function renderLaunchQueue/);
   assert.match(renderer, /elements\.launchChecklist\.replaceChildren\(\)/);
   assert.match(renderer, /arcigyApi\.productionReadiness\(\{ live: false \}\)/);
+  assert.match(renderer, /function renderDiagnosticsGrid/);
+  assert.match(renderer, /elements\.diagnosticsGrid\.replaceChildren\(\)/);
+  assert.match(renderer, /node\.setAttribute\("data-state", stateName\)/);
   assert.match(renderer, /renderBridgeCockpit/);
   assert.match(renderer, /renderRemoteMcpPack/);
   assert.match(renderer, /renderMcpToolList/);
@@ -327,6 +331,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(styles, /\.launchQueue\[data-state="ready"\]/);
   assert.match(styles, /\.launchQueue li\[data-state="blocked"\]/);
   assert.match(styles, /\.launchQueue,\s+\.cortexMap/s);
+  assert.match(styles, /\.diagnosticsGrid/);
+  assert.match(styles, /\.diagnosticCard\[data-state="ready"\]/);
+  assert.match(styles, /\.diagnosticsGrid,\s+\.toolMatrix/s);
   assert.match(styles, /\.cortexMap/);
   assert.match(styles, /\.cortexNode\[data-state="ready"\]/);
   assert.match(styles, /@keyframes cortexSweep/);
