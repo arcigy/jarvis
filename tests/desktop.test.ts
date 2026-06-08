@@ -334,7 +334,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /hasDraftContractIntakeQuickStart/);
   assert.match(main, /hasHandoffProof/);
   assert.match(main, /hasClientMemoryQuickStarts/);
-  assert.match(main, /approvalGate: approvalGate\.body/);
+  assert.match(main, /approvalGate: approvalGate\.bodies/);
   assert.match(main, /ipcMain\.handle\("jarvis:getPreparedOutreachReplies"/);
   assert.match(main, /ipcMain\.handle\("jarvis:approvePreparedOutreachReply"/);
   assert.match(main, /getWebBridgePreflight/);
@@ -409,6 +409,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /leadProviderStatus/);
   assert.match(main, /ipcMain\.handle\("contracts:generate"/);
   assert.match(main, /arcigy\.generate_contract_documents requires explicit approval/);
+  assert.match(main, /async function checkApprovalGates/);
+  assert.match(main, /arcigy\.approve_prepared_outreach_reply/);
   assert.match(main, /approval-shape-gate/);
   assert.match(main, /top-level \{"approved":true\}/);
   assert.match(main, /cleanPythonErrorMessage/);

@@ -95,12 +95,14 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
   const health = await postJson(fetchImpl, `${baseUrl}/api/mcp/arcigy.get_system_health`, { format: "json" }, input.bearerToken);
   checks.push(check(health.ok && Array.isArray(health.body?.result?.integrations), "read-only-tool-call", "Read-only MCP tool call returned integration health."));
 
-  const approvalGate = await postJson(fetchImpl, `${baseUrl}/api/mcp/arcigy.generate_contract_documents`, { intake: {} }, input.bearerToken);
-  checks.push(check(approvalGate.status === 409, "approval-gate", "Approval-required write tool rejected an unapproved call."));
-  const topLevelApprovalGate = await postJson(fetchImpl, `${baseUrl}/api/mcp/arcigy.generate_contract_documents`, { approved: true, intake: {} }, input.bearerToken);
-  checks.push(check(topLevelApprovalGate.status === 409, "approval-shape-gate", 'Approval-required write tool rejected top-level {"approved":true}.'));
+  const approvalGate = await checkApprovalGates(fetchImpl, baseUrl, input.bearerToken, false);
+  checks.push(check(approvalGate.ok, "approval-gate", "All approval-required write tools rejected unapproved calls."));
+  const topLevelApprovalGate = await checkApprovalGates(fetchImpl, baseUrl, input.bearerToken, true);
+  checks.push(check(topLevelApprovalGate.ok, "approval-shape-gate", 'All approval-required write tools rejected top-level {"approved":true}.'));
 
-  const leakedToken = input.bearerToken ? JSON.stringify({ manifest: manifest.body, pack: pack.body, health: health.body, approvalGate: approvalGate.body }).includes(input.bearerToken) : false;
+  const leakedToken = input.bearerToken
+    ? JSON.stringify({ manifest: manifest.body, pack: pack.body, health: health.body, approvalGate: approvalGate.bodies, topLevelApprovalGate: topLevelApprovalGate.bodies }).includes(input.bearerToken)
+    : false;
   checks.push(check(!leakedToken, "secret-redaction", "Smoke responses did not echo the bearer token."));
 
   const status: RemoteMcpSmokeStatus = checks.every((item) => item.status === "ready") ? "ready" : "blocked";
@@ -117,6 +119,21 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
     expectedToolCount,
     checks,
   };
+}
+
+async function checkApprovalGates(fetchImpl: typeof fetch, baseUrl: string, bearerToken: string | undefined, topLevelApproved: boolean): Promise<{ ok: boolean; bodies: unknown[] }> {
+  const payloads: Array<[string, Record<string, unknown>]> = [
+    ["arcigy.generate_contract_documents", { intake: {} }],
+    ["arcigy.approve_prepared_outreach_reply", { preparedEventId: "smoke-prepared-reply" }],
+    ["arcigy.append_leads_to_google_sheet", { rows: [["Smoke", "https://example.com"]] }],
+  ];
+  const bodies = [];
+  for (const [tool, payload] of payloads) {
+    const response = await postJson(fetchImpl, `${baseUrl}/api/mcp/${tool}`, topLevelApproved ? { ...payload, approved: true } : payload, bearerToken);
+    bodies.push(response.body);
+    if (response.status !== 409) return { ok: false, bodies };
+  }
+  return { ok: true, bodies };
 }
 
 function check(ok: boolean, key: string, message: string): RemoteMcpSmokeCheck {

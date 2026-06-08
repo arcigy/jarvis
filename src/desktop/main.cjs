@@ -916,12 +916,12 @@ async function runRemoteMcpSmoke(payload = {}) {
   );
   const health = await fetchJson(`${baseUrl}/api/mcp/arcigy.get_system_health`, token, { format: "json" });
   checks.push(smokeCheck(health.ok && Array.isArray(health.body?.result?.integrations), "read-only-tool-call", "Read-only MCP tool call returned integration health."));
-  const approvalGate = await fetchJson(`${baseUrl}/api/mcp/arcigy.generate_contract_documents`, token, { intake: {} });
-  checks.push(smokeCheck(approvalGate.status === 409, "approval-gate", "Approval-required write tool rejected an unapproved call."));
-  const topLevelApprovalGate = await fetchJson(`${baseUrl}/api/mcp/arcigy.generate_contract_documents`, token, { approved: true, intake: {} });
-  checks.push(smokeCheck(topLevelApprovalGate.status === 409, "approval-shape-gate", 'Approval-required write tool rejected top-level {"approved":true}.'));
+  const approvalGate = await checkApprovalGates(baseUrl, token, false);
+  checks.push(smokeCheck(approvalGate.ok, "approval-gate", "All approval-required write tools rejected unapproved calls."));
+  const topLevelApprovalGate = await checkApprovalGates(baseUrl, token, true);
+  checks.push(smokeCheck(topLevelApprovalGate.ok, "approval-shape-gate", 'All approval-required write tools rejected top-level {"approved":true}.'));
   const leakedToken = token
-    ? JSON.stringify({ manifest: manifest.body, pack: pack.body, health: health.body, approvalGate: approvalGate.body }).includes(token)
+    ? JSON.stringify({ manifest: manifest.body, pack: pack.body, health: health.body, approvalGate: approvalGate.bodies, topLevelApprovalGate: topLevelApprovalGate.bodies }).includes(token)
     : false;
   checks.push(smokeCheck(!leakedToken, "secret-redaction", "Smoke responses did not echo the bearer token."));
   const status = checks.every((check) => check.status === "ready") ? "ready" : "blocked";
@@ -942,6 +942,21 @@ async function runRemoteMcpSmoke(payload = {}) {
 
 function smokeCheck(ok, key, message) {
   return { key, status: ok ? "ready" : "blocked", message };
+}
+
+async function checkApprovalGates(baseUrl, token, topLevelApproved) {
+  const payloads = [
+    ["arcigy.generate_contract_documents", { intake: {} }],
+    ["arcigy.approve_prepared_outreach_reply", { preparedEventId: "smoke-prepared-reply" }],
+    ["arcigy.append_leads_to_google_sheet", { rows: [["Smoke", "https://example.com"]] }],
+  ];
+  const bodies = [];
+  for (const [tool, payload] of payloads) {
+    const response = await fetchJson(`${baseUrl}/api/mcp/${tool}`, token, topLevelApproved ? { ...payload, approved: true } : payload);
+    bodies.push(response.body);
+    if (response.status !== 409) return { ok: false, bodies };
+  }
+  return { ok: true, bodies };
 }
 
 function hasLocalWritePolicy(value) {

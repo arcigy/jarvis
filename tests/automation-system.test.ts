@@ -158,7 +158,11 @@ test("remote MCP smoke checks every response for bearer token leaks", async () =
       assert.equal((init?.headers as Record<string, string>).authorization, `Bearer ${token}`);
       return responseJson({ result: { integrations: [] } });
     }
-    if (url.endsWith("/api/mcp/arcigy.generate_contract_documents")) {
+    if (
+      url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
+      url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
+    ) {
       return responseJson({ error: `token leaked ${token}` }, 409);
     }
     return responseJson({ error: "unexpected URL" }, 404);
