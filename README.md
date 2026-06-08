@@ -100,6 +100,13 @@ Run the local production smoke first:
 npm run doctor
 ```
 
+For a concise secret-safe production readiness report with blockers and fix steps:
+
+```powershell
+npm run readiness
+npm run readiness -- --live
+```
+
 Default doctor is a local/read-only smoke: required files, MCP registry, runtime env presence, local DB, contract generation, and the web bridge. It does not call live Gemini, Gmail, Smartlead, Google, Serper, Postgres, or Redis APIs.
 
 Run explicit live read-only probes only when you want to test configured providers and accept provider/network quota use:

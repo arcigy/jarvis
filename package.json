@@ -8,6 +8,7 @@
     "web:tunnel": "node scripts/start_web_tunnel.ts",
     "mcp": "node src/automation-system/mcp-server.ts",
     "doctor": "node scripts/jarvis_doctor.ts",
+    "readiness": "node scripts/jarvis_readiness.ts",
     "typecheck": "tsc --noEmit",
     "test": "node --test tests/*.test.ts"
   },
