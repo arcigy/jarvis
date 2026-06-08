@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { extname, join, normalize, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { redactSensitiveText } from "../automation-system/ai-safety.ts";
 import { draftContractIntake } from "../automation-system/contract-intake-draft.ts";
 import { runIntegrationDiagnostics } from "../automation-system/diagnostics.ts";
 import { getIntegrationHealth, loadLocalEnv } from "../automation-system/env.ts";
@@ -36,7 +37,7 @@ export function createLocalApiServer() {
       await routeRequest(request, response);
     } catch (error) {
       writeJson(response, getErrorStatus(error), {
-        error: error instanceof Error ? error.message : String(error),
+        error: safeErrorMessage(error),
       });
     }
   });
@@ -855,7 +856,7 @@ async function maybeSyncGmailForOperatorBriefing(payload: Record<string, unknown
     const alerts = result.synced.reduce((sum, item) => sum + item.alerts.length, 0);
     return `Gmail checked ${result.synced.length} account(s), fetched ${fetched} message(s), created ${created} new record(s), skipped ${duplicates} duplicate(s), raised ${alerts} alert(s).`;
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = safeErrorMessage(error);
     return `Gmail live sync unavailable: ${message}`;
   }
 }
@@ -892,9 +893,13 @@ async function getOperatorColdOutreachSummary(
     const smartlead = await getSmartleadOutreachBrief({ periodLabel, maxCampaigns: 10, ...approvals });
     return smartlead.summary;
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = safeErrorMessage(error);
     return `${localSummary} Live Smartlead summary unavailable: ${message}`;
   }
+}
+
+function safeErrorMessage(error: unknown): string {
+  return redactSensitiveText(error instanceof Error ? error.message : String(error));
 }
 
 function serveStatic(pathname: string, response: ServerResponse, headOnly: boolean) {

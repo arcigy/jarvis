@@ -599,3 +599,66 @@ test("local web bridge rejects malformed or oversized JSON bodies", async () => 
     await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   }
 });
+
+test("local web bridge redacts secrets from API error responses", async () => {
+  const googleKey = "AI" + "za" + "S" + "y" + "C".repeat(32);
+  const providerKey = ["aaaaaaaa", "bbbb", "cccc", "dddd", "eeeeeeeeeeee"].join("-") + "_ehpdn6s";
+  const databaseUrl = "postgresql://postgres:super-private@example.com:5432/db";
+  const envKeys = [
+    "GEMINI_API_KEY",
+    "GOOGLE_CLIENT_ID",
+    "GOOGLE_CLIENT_SECRET",
+    "GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP",
+    "GMAIL_REFRESH_TOKEN_BRANISLAV_L_ARCIGY_GROUP",
+    "GMAIL_REFRESH_TOKEN_ANDREJ_ARCIGY_GROUP",
+    "GMAIL_REFRESH_TOKEN_ANDREJ_R_ARCIGY_GROUP",
+    "SMARTLEAD_API_KEY",
+    "DATABASE_URL",
+    "REDIS_URL",
+    "GOOGLE_SHEET_ID",
+    "GOOGLE_MAPS_API_KEY",
+    "GOOGLE_MAPS_API_KEYS",
+    "SERPER_API_KEY",
+    "SERPER_API_KEY_2",
+  ];
+  const previousEnv = new Map(envKeys.map((key) => [key, process.env[key]]));
+  const originalFetch = globalThis.fetch.bind(globalThis);
+  for (const key of envKeys) delete process.env[key];
+  process.env.GEMINI_API_KEY = "gemini";
+  globalThis.fetch = async (input: string | URL | Request, init?: RequestInit) => {
+    const target = String(input);
+    if (target.includes("generativelanguage.googleapis.com")) {
+      throw new Error(`provider failed with ${googleKey} ${providerKey} ${databaseUrl}`);
+    }
+    return originalFetch(input, init);
+  };
+
+  const server = createLocalApiServer();
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  const baseUrl = `http://127.0.0.1:${address.port}`;
+
+  try {
+    const response = await fetch(`${baseUrl}/api/run-diagnostics`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ live: true }),
+    });
+    assert.equal(response.status, 200);
+    const text = await response.text();
+    assert.equal(text.includes(googleKey), false);
+    assert.equal(text.includes(providerKey), false);
+    assert.equal(text.includes("super-private"), false);
+    assert.match(text, /\[redacted-google-api-key\]/);
+    assert.match(text, /\[redacted-provider-key\]/);
+    assert.match(text, /postgresql:\/\/postgres:\[redacted\]@example\.com/);
+  } finally {
+    globalThis.fetch = originalFetch;
+    for (const [key, value] of previousEnv) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
