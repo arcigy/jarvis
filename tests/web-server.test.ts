@@ -605,6 +605,51 @@ test("local web bridge rejects malformed or oversized JSON bodies", async () => 
   }
 });
 
+test("local web bridge MCP AI reply preserves prompt options", async () => {
+  const previousGeminiKey = process.env.GEMINI_API_KEY;
+  const originalFetch = globalThis.fetch.bind(globalThis);
+  const geminiBodies: unknown[] = [];
+  process.env.GEMINI_API_KEY = "gemini";
+  globalThis.fetch = async (input: string | URL | Request, init?: RequestInit) => {
+    const target = String(input);
+    if (target.includes("generativelanguage.googleapis.com")) {
+      geminiBodies.push(JSON.parse(String(init?.body)));
+      return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "Prepared reply." }] } }] }), {
+        headers: { "content-type": "application/json" },
+      });
+    }
+    return originalFetch(input, init);
+  };
+
+  const server = createLocalApiServer();
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  const baseUrl = `http://127.0.0.1:${address.port}`;
+
+  try {
+    const reply = await postJson(`${baseUrl}/api/mcp/arcigy.generate_ai_reply`, {
+      clientName: "ACME Board",
+      message: "Please send a concise update.",
+      context: "Renewal conversation.",
+      language: "en",
+      tone: "warm",
+    });
+
+    assert.equal(reply.result.text, "Prepared reply.");
+    const requestText = JSON.stringify(geminiBodies[0]);
+    assert.match(requestText, /Klient: ACME Board/);
+    assert.match(requestText, /Jazyk odpovede: en/);
+    assert.match(requestText, /Ton: warm/);
+    assert.match(requestText, /Kontext: Renewal conversation/);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (previousGeminiKey === undefined) delete process.env.GEMINI_API_KEY;
+    else process.env.GEMINI_API_KEY = previousGeminiKey;
+    await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
 test("local web bridge redacts secrets from API error responses", async () => {
   const googleKey = "AI" + "za" + "S" + "y" + "C".repeat(32);
   const providerKey = ["aaaaaaaa", "bbbb", "cccc", "dddd", "eeeeeeeeeeee"].join("-") + "_ehpdn6s";

@@ -154,15 +154,7 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
 
   if (request.method === "POST" && url.pathname === "/api/generate-ai-reply") {
     const payload = await readJson(request);
-    const result = await generateGeminiText(
-      buildClientReplyPrompt({
-        clientName: optionalString(payload.clientName),
-        message: String(payload.message ?? ""),
-        context: optionalString(payload.context),
-        language: payload.language === "en" ? "en" : "sk",
-        tone: payload.tone === "direct" || payload.tone === "warm" ? payload.tone : "executive",
-      })
-    );
+    const result = await generateGeminiText(buildClientReplyPrompt(toClientReplyDraftInput(payload)));
     writeJson(response, 200, result);
     return;
   }
@@ -545,7 +537,7 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
   }
   if (name === "arcigy.generate_ai_reply") {
     writeJson(response, 200, {
-      result: await generateGeminiText(buildClientReplyPrompt({ message: String(payload.message ?? ""), context: optionalString(payload.context) })),
+      result: await generateGeminiText(buildClientReplyPrompt(toClientReplyDraftInput(payload))),
     });
     return;
   }
@@ -1161,6 +1153,16 @@ function parseContractIntake(value: unknown): unknown {
 
 function optionalString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+function toClientReplyDraftInput(payload: Record<string, unknown>) {
+  return {
+    clientName: optionalString(payload.clientName),
+    message: String(payload.message ?? ""),
+    context: optionalString(payload.context),
+    language: payload.language === "en" ? "en" : "sk",
+    tone: payload.tone === "direct" || payload.tone === "warm" ? payload.tone : "executive",
+  } as const;
 }
 
 function toSmartleadOutreachBriefInput(payload: Record<string, unknown>) {
