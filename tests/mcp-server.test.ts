@@ -88,12 +88,20 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
     name: "arcigy.get_production_readiness",
     arguments: { live: false },
   });
-  const readiness = getStructuredResult(readinessResult) as { status: string; mcp: { toolCount: number }; nextActions: string[]; fixGuide: unknown[]; attentionQueue: unknown[] };
+  const readiness = getStructuredResult(readinessResult) as {
+    status: string;
+    mcp: { toolCount: number };
+    nextActions: string[];
+    fixGuide: unknown[];
+    attentionQueue: unknown[];
+    launchChecklist: Array<{ id: string; status: string }>;
+  };
   assert.ok(["ready", "attention", "blocked"].includes(readiness.status));
   assert.equal(readiness.mcp.toolCount, 27);
   assert.ok(Array.isArray(readiness.nextActions));
   assert.ok(Array.isArray(readiness.fixGuide));
   assert.ok(Array.isArray(readiness.attentionQueue));
+  assert.ok(readiness.launchChecklist.some((item) => item.id === "mcp-registry" && item.status === "ready"));
   assertToolError(
     await client.callTool({
       name: "arcigy.get_production_readiness",

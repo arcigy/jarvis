@@ -313,12 +313,65 @@ async function getProductionReadiness(payload) {
     },
     blockers: uniqueBlockers,
     attentionQueue: buildReadinessAttentionQueue(uniqueBlockers, fixGuide),
+    launchChecklist: buildReadinessLaunchChecklist(health.integrations, bridge, uniqueBlockers, diagnostics),
     nextActions: uniqueBlockers.length
       ? uniqueBlockers.map((blocker) => blocker.nextAction)
       : ["No action needed. Keep secrets out of git and run doctor before changes."],
     fixGuide,
     diagnostics: diagnostics || undefined,
   };
+}
+
+function buildReadinessLaunchChecklist(integrations, bridge, blockers, diagnostics) {
+  const requiredIntegrations = integrations.filter((item) => item.requiredForProduction !== false);
+  const readyRequired = requiredIntegrations.filter((item) => item.configured);
+  const warnings = blockers.filter((blocker) => blocker.severity === "warning");
+  const blocking = blockers.filter((blocker) => blocker.severity === "blocking");
+  const approvalTools = bridge.riskyToolsRequiringApproval || [];
+  const requiredApprovalTools = ["arcigy.generate_contract_documents", "arcigy.approve_prepared_outreach_reply", "arcigy.append_leads_to_google_sheet"];
+  const approvalReady = requiredApprovalTools.every((tool) => approvalTools.includes(tool));
+  const liveChecks = diagnostics?.checks || [];
+  const liveBlocking = liveChecks.filter((check) => check.status === "failed" && !["redis", "serper"].includes(check.key));
+  const liveWarnings = liveChecks.filter((check) => check.status !== "ready" && ["redis", "serper"].includes(check.key));
+  return [
+    {
+      id: "required-integrations",
+      title: "Required integrations",
+      status: blocking.length ? "blocked" : "ready",
+      proof: `${readyRequired.length}/${requiredIntegrations.length} required integration group(s) configured.`,
+      nextAction: blocking[0]?.nextAction || "Keep required integration secrets in .env.local and rerun doctor before live work.",
+    },
+    {
+      id: "optional-advisories",
+      title: "Optional advisories",
+      status: warnings.length ? "attention" : "ready",
+      proof: warnings.length ? `${warnings.length} non-blocking warning(s): ${warnings.map((item) => item.key).join(", ")}.` : "No non-blocking warnings.",
+      nextAction: warnings[0]?.nextAction || "No action needed.",
+    },
+    {
+      id: "mcp-registry",
+      title: "MCP tool registry",
+      status: bridge.mcpToolCount >= 27 ? "ready" : "blocked",
+      proof: `${bridge.mcpToolCount} MCP tool(s) registered.`,
+      nextAction: bridge.mcpToolCount >= 27 ? "Run npm run remote:mcp:smoke before remote agent handoff." : "Restore missing MCP tools, then rerun npm test.",
+    },
+    {
+      id: "approval-locks",
+      title: "Approval locks",
+      status: approvalReady ? "ready" : "blocked",
+      proof: approvalReady ? `${approvalTools.length} approval-gated tool(s), including contract, prepared reply, and Sheet writes.` : "One or more required approval gates are missing.",
+      nextAction: approvalReady ? "Review exact payloads before approving write tools." : "Restore approval gates for write tools before live use.",
+    },
+    {
+      id: "live-diagnostics",
+      title: "Live diagnostics",
+      status: diagnostics ? (liveBlocking.length ? "blocked" : liveWarnings.length ? "attention" : "ready") : "attention",
+      proof: diagnostics
+        ? `${liveChecks.filter((check) => check.status === "ready").length}/${liveChecks.length} live diagnostic check(s) ready.`
+        : "Live diagnostics were not requested for this report.",
+      nextAction: diagnostics ? liveBlocking[0]?.message || liveWarnings[0]?.message || "Live diagnostics are ready." : "Run npm run doctor -- --live-integrations.",
+    },
+  ];
 }
 
 function readinessNextAction(key, message) {
@@ -523,6 +576,7 @@ async function getRemoteMcpPack(payload = {}) {
           checkedAt: readiness.checkedAt,
           blockers: readiness.blockers,
           attentionQueue: readiness.attentionQueue,
+          launchChecklist: readiness.launchChecklist,
           nextActions: readiness.nextActions,
           fixGuide: readiness.fixGuide,
         }

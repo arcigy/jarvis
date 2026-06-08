@@ -83,6 +83,8 @@ test("production readiness report returns blockers and next actions without secr
   assert.ok(report.fixGuide.every((step) => step.validationCommand.includes("doctor")));
   assert.ok(report.attentionQueue.some((item) => item.key === "redis" && item.source === "configuration"));
   assert.ok(report.attentionQueue.every((item) => item.validationCommand.includes("doctor")));
+  assert.ok(report.launchChecklist.some((item) => item.id === "required-integrations" && item.status === "blocked"));
+  assert.ok(report.launchChecklist.some((item) => item.id === "approval-locks" && item.status === "ready"));
   assert.equal(JSON.stringify(report).includes("PASSWORD"), false);
 });
 
@@ -309,6 +311,7 @@ test("production readiness treats unused Redis as non-blocking advisory", async 
   assert.equal(report.status, "attention");
   assert.ok(report.blockers.some((blocker) => blocker.key === "redis" && blocker.severity === "warning"));
   assert.ok(report.attentionQueue.some((item) => item.key === "redis" && item.severity === "warning"));
+  assert.ok(report.launchChecklist.some((item) => item.id === "optional-advisories" && item.status === "attention"));
   assert.match(report.summary, /non-blocking warning/);
 });
 
@@ -323,6 +326,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
 
   assert.equal(pack.readiness?.status, "blocked");
   assert.ok(pack.readiness?.attentionQueue.some((item) => item.key === "redis"));
+  assert.ok(pack.readiness?.launchChecklist.some((item) => item.id === "mcp-registry" && item.status === "ready"));
   assert.ok(pack.readiness?.fixGuide.some((step) => step.id === "redis-real-password"));
   assert.equal(JSON.stringify(pack).includes("PASSWORD"), false);
 });
@@ -989,6 +993,7 @@ test("production readiness treats Serper exhaustion as advisory when other lead 
     assert.equal(report.status, "attention");
     assert.equal(report.blockers.find((blocker) => blocker.key === "serper")?.severity, "warning");
     assert.equal(report.attentionQueue.find((item) => item.key === "serper")?.source, "live-diagnostic");
+    assert.ok(report.launchChecklist.some((item) => item.id === "live-diagnostics" && item.status === "attention"));
     assert.match(report.summary, /non-blocking warning/);
     assert.equal(JSON.stringify(report).includes("spent-serper"), false);
   } finally {

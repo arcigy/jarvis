@@ -283,12 +283,16 @@ function renderMissionSignals(health, bridge = null) {
 function renderReadinessReport(report) {
   const blockers = report.blockers ?? [];
   const attentionQueue = report.attentionQueue ?? [];
+  const launchChecklist = report.launchChecklist ?? [];
   return [
     report.summary ?? `Status: ${report.status}`,
     `Status: ${report.status}`,
     `Integrations: ${report.integrations?.ready ?? "--"}/${report.integrations?.total ?? "--"}`,
     `MCP tools: ${report.mcp?.toolCount ?? "--"}`,
     `Approval locks: ${(report.mcp?.approvalRequired ?? []).length}`,
+    "",
+    launchChecklist.length ? "Launch checklist:" : "Launch checklist: not loaded",
+    ...launchChecklist.map((item) => [`- [${item.status}] ${item.title}`, `  Proof: ${item.proof}`, `  Next: ${item.nextAction}`].join("\n")),
     "",
     blockers.length ? "Blockers:" : "Blockers: none",
     ...blockers.map((blocker) => `- ${blocker.key}: ${blocker.message}`),
