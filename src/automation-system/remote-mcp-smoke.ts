@@ -79,6 +79,13 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
   );
   checks.push(
     check(
+      hasQuickStartApprovalParity(pack.body?.quickStartCalls),
+      "pack-quick-start-approval-policy",
+      "Connection pack quick-start calls match the MCP registry approval policy."
+    )
+  );
+  checks.push(
+    check(
       hasUsableContractQuickStart(pack.body?.quickStartCalls),
       "pack-contract-quick-start",
       "Connection pack includes a usable approval-gated contract quick-start payload."
@@ -139,7 +146,7 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
     baseUrl,
     summary:
       status === "ready"
-        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, local write policy, quick-start URLs, contract draft, contract quick-start, client memory quick-start, audit quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
+        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, local write policy, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((item) => item.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -225,6 +232,16 @@ function hasValidQuickStartUrls(value: unknown, baseUrl: string): boolean {
       call.method === "POST" &&
       call.url === `${baseUrl}/api/mcp/${call.tool}`
     );
+  });
+}
+
+function hasQuickStartApprovalParity(value: unknown): boolean {
+  if (!Array.isArray(value) || value.length === 0) return false;
+  const policy = new Map<string, boolean>(listJarvisMcpTools().map((tool) => [tool.name, tool.requiresApproval]));
+  return value.every((item) => {
+    if (!item || typeof item !== "object") return false;
+    const call = item as { tool?: unknown; approvalRequired?: unknown };
+    return typeof call.tool === "string" && policy.has(call.tool) && call.approvalRequired === policy.get(call.tool);
   });
 }
 

@@ -902,6 +902,13 @@ async function runRemoteMcpSmoke(payload = {}) {
   );
   checks.push(
     smokeCheck(
+      hasQuickStartApprovalParity(pack.body?.quickStartCalls),
+      "pack-quick-start-approval-policy",
+      "Connection pack quick-start calls match the MCP registry approval policy."
+    )
+  );
+  checks.push(
+    smokeCheck(
       hasUsableContractQuickStart(pack.body?.quickStartCalls),
       "pack-contract-quick-start",
       "Connection pack includes a usable approval-gated contract quick-start payload."
@@ -958,7 +965,7 @@ async function runRemoteMcpSmoke(payload = {}) {
     baseUrl,
     summary:
       status === "ready"
-        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, local write policy, quick-start URLs, contract draft, contract quick-start, client memory quick-start, audit quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
+        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, local write policy, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((check) => check.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -1038,6 +1045,15 @@ function hasValidQuickStartUrls(value, baseUrl) {
       item.method === "POST" &&
       item.url === `${baseUrl}/api/mcp/${item.tool}`
     );
+  });
+}
+
+function hasQuickStartApprovalParity(value) {
+  if (!Array.isArray(value) || value.length === 0) return false;
+  const policy = new Map(listWebMcpTools().map((tool) => [tool.name, tool.requiresApproval]));
+  return value.every((item) => {
+    if (!item || typeof item !== "object") return false;
+    return typeof item.tool === "string" && policy.has(item.tool) && item.approvalRequired === policy.get(item.tool);
   });
 }
 
