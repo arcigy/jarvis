@@ -1139,6 +1139,14 @@ async function runRemoteMcpSmoke(payload = {}) {
       "Connection pack exposes secure tunnel status/start/stop URLs with browser token requirements."
     )
   );
+  const tunnelStatus = await fetchJson(`${baseUrl}/api/secure-tunnel-status`, token);
+  checks.push(
+    smokeCheck(
+      tunnelStatus.ok && hasSafeTunnelStatus(tunnelStatus.body),
+      "secure-tunnel-status",
+      "Secure tunnel status endpoint is reachable and returns redacted log metadata."
+    )
+  );
   checks.push(
     smokeCheck(
       hasExactToolPolicy(pack.body?.tools),
@@ -1215,7 +1223,7 @@ async function runRemoteMcpSmoke(payload = {}) {
   checks.push(smokeCheck(approvalGate.ok, "approval-gate", "All approval-required write tools rejected unapproved calls."));
   const topLevelApprovalGate = await checkApprovalGates(baseUrl, token, true);
   checks.push(smokeCheck(topLevelApprovalGate.ok, "approval-shape-gate", 'All approval-required write tools rejected top-level {"approved":true}.'));
-  const leakedSecret = hasSensitiveLeak({ manifest: manifest.body, pack: pack.body, health: health.body, approvalGate: approvalGate.bodies, topLevelApprovalGate: topLevelApprovalGate.bodies }, token);
+  const leakedSecret = hasSensitiveLeak({ manifest: manifest.body, pack: pack.body, tunnelStatus: tunnelStatus.body, health: health.body, approvalGate: approvalGate.bodies, topLevelApprovalGate: topLevelApprovalGate.bodies }, token);
   checks.push(smokeCheck(!leakedSecret, "secret-redaction", "Smoke responses did not echo bearer tokens, API keys, OAuth tokens, or database URLs."));
   const status = checks.every((check) => check.status === "ready") ? "ready" : "blocked";
   return {
@@ -1225,7 +1233,7 @@ async function runRemoteMcpSmoke(payload = {}) {
     baseUrl,
     summary:
       status === "ready"
-        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, manifest metadata, local write policy, tunnel controls, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
+        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((check) => check.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -1302,6 +1310,15 @@ function hasTunnelControls(value, baseUrl) {
     value.stopUrl === `${baseUrl}/api/stop-secure-tunnel` &&
     value.browserStartRequiresStrongToken === true
   );
+}
+
+function hasSafeTunnelStatus(value) {
+  if (!value || typeof value !== "object") return false;
+  if (typeof value.ready !== "boolean") return false;
+  if (value.logPath !== undefined && typeof value.logPath !== "string") return false;
+  if (value.tokenPresent !== undefined && typeof value.tokenPresent !== "boolean") return false;
+  if (typeof value.redactedTail === "string" && /One-time token:\s+(?!\[redacted\])\S+/i.test(value.redactedTail)) return false;
+  return value.publicUrl === undefined || value.publicUrl === null || /^https:\/\/[^/\s]+/.test(String(value.publicUrl));
 }
 
 function hasExactManifestRegistry(value) {

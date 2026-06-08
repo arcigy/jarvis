@@ -426,6 +426,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(smokeBody.status, "ready");
     assert.equal(smokeBody.expectedToolCount, listJarvisMcpTools().length);
     assert.ok(smokeBody.checks.some((check) => check.key === "approval-gate" && check.status === "ready"));
+    assert.ok(smokeBody.checks.some((check) => check.key === "secure-tunnel-status" && check.status === "ready"));
     assert.ok(smokeBody.checks.some((check) => check.key === "manifest-local-write-policy" && check.status === "ready"));
     assert.ok(smokeBody.checks.some((check) => check.key === "pack-local-write-policy" && check.status === "ready"));
     assert.ok(smokeBody.checks.some((check) => check.key === "pack-limits" && check.status === "ready"));

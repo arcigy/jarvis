@@ -564,7 +564,10 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /stopUrl: `\$\{baseUrl\}\/api\/stop-secure-tunnel`/);
   assert.match(main, /browserStartRequiresStrongToken: true/);
   assert.match(main, /pack-tunnel-controls/);
+  assert.match(main, /secure-tunnel-status/);
+  assert.match(main, /hasSafeTunnelStatus/);
   assert.match(main, /tunnel controls/);
+  assert.match(main, /secure tunnel status/);
   assert.match(main, /getRuntimeEnvIssue/);
   assert.match(main, /hasPlaceholderUrlCredential/);
   assert.match(main, /buildReadinessFixGuide/);
