@@ -24,10 +24,13 @@ type Preflight = {
 type RemoteMcpSmoke = {
   status?: string;
   summary?: string;
+  checks?: Array<{ key?: string; status?: string }>;
 };
 
 type RemoteConnectionPack = {
+  mcpToolCallPattern?: string;
   auth?: {
+    header?: string;
     tokenValueReturned?: boolean;
   };
   limits?: {
@@ -41,6 +44,7 @@ type RemoteConnectionPack = {
     localStateWrite?: string[];
   };
   handoff?: {
+    connectionPackUrl?: string;
     requiredProof?: Array<{ key?: string }>;
     agentFirstSteps?: string[];
   };
@@ -268,6 +272,12 @@ async function verifyExternalConnectionPack(publicUrl: string, token: string | n
   if (body.auth?.tokenValueReturned !== false || !body.tools?.count || !body.handoff?.requiredProof?.some((item) => item.key === "remote-smoke")) {
     exitWithMessage("Tunnel opened, but the external Jarvis connection pack is missing secret policy, tool count, or remote-smoke proof.");
   }
+  if (body.auth?.header !== "Authorization: Bearer <JARVIS_WEB_TOKEN>" || body.mcpToolCallPattern !== `${publicUrl}/api/mcp/{toolName}`) {
+    exitWithMessage("Tunnel opened, but the external Jarvis connection pack is missing the bearer auth placeholder or exact MCP tool call pattern.");
+  }
+  if (body.handoff?.connectionPackUrl !== `${publicUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`) {
+    exitWithMessage("Tunnel opened, but the external Jarvis connection pack handoff URL does not match the public tunnel URL.");
+  }
   if (!hasGuardedConnectionPackLimits(body.limits)) {
     exitWithMessage("Tunnel opened, but the external Jarvis connection pack is missing guarded limits: repo-only paths, bounded JSON, and explicit write tool calls.");
   }
@@ -299,7 +309,16 @@ async function verifyRemoteMcpSmoke(publicUrl: string, token: string | null): Pr
   if (body.status !== "ready") {
     exitWithMessage(`Tunnel opened, but remote MCP smoke is not ready: ${body.summary ?? "unknown smoke failure"}`);
   }
+  const requiredChecks = ["pack-limits", "approval-gate", "secret-redaction"];
+  const missingChecks = requiredChecks.filter((key) => !hasReadySmokeCheck(body, key));
+  if (missingChecks.length > 0) {
+    exitWithMessage(`Tunnel opened, but remote MCP smoke is missing ready safety checks: ${missingChecks.join(", ")}.`);
+  }
   return body;
+}
+
+function hasReadySmokeCheck(value: RemoteMcpSmoke, key: string): boolean {
+  return Array.isArray(value.checks) && value.checks.some((check) => check.key === key && check.status === "ready");
 }
 
 function renderTunnelReadySummary(input: {
@@ -338,7 +357,7 @@ function renderTunnelReadySummary(input: {
     `- Connection pack: ${connectionPackUrl}`,
     `- Smoke test: ${smokeUrl}`,
     `- MCP tool call pattern: ${mcpToolPattern}`,
-    "- Required proof before work: manifest HTTP 200, connection pack tokenValueReturned=false, remote smoke status=ready.",
+    "- Required proof before work: manifest HTTP 200, connection pack tokenValueReturned=false with repo-only limits, remote smoke status=ready with pack-limits, approval-gate, and secret-redaction.",
     "- First MCP call: POST arcigy.get_operator_briefing with {\"periodLabel\":\"poslednych 7 dni\",\"live\":true}.",
     "- Approval rule: never call approval-required tools without your explicit confirmation of the exact payload.",
     "- Local write rule: preview Gmail with dryRun=true before syncing messages into local memory.",
