@@ -1058,7 +1058,7 @@ async function updateDiagnosticCheck(checks, key, run) {
     check.status = "ready";
   } catch (error) {
     check.status = "failed";
-    check.message = error instanceof Error ? error.message : String(error);
+    check.message = redactSensitiveText(error instanceof Error ? error.message : String(error));
   }
 }
 
