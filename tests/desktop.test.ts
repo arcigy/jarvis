@@ -176,6 +176,10 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /startClientNeedWatch/);
   assert.match(renderer, /stopClientNeedWatch/);
   assert.match(renderer, /clientAlertPollMs: 60000/);
+  assert.match(renderer, /clientAlertGmailSyncPollMs: 300000/);
+  assert.match(renderer, /maybeSyncGmailForClientAlerts/);
+  assert.match(renderer, /Gmail auto-sync checked/);
+  assert.match(renderer, /in:inbox newer_than:2d/);
   assert.match(renderer, /seenClientNeedAlertIds/);
   assert.match(renderer, /window\.setInterval/);
   assert.match(renderer, /announceNew/);

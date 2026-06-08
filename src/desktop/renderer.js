@@ -15,6 +15,9 @@ const state = {
   clientAlertPollTimer: null,
   seenClientNeedAlertIds: new Set(),
   clientAlertPollMs: 60000,
+  clientAlertGmailSyncPollMs: 300000,
+  lastClientAlertGmailSyncAt: 0,
+  lastClientAlertGmailSyncSummary: "Gmail auto-sync pending.",
 };
 
 const elements = {
@@ -431,6 +434,7 @@ function clientAlertKey(alert) {
 
 async function refreshClientNeedAlerts({ announceNew = false, loadingText = null } = {}) {
   if (loadingText) elements.clientAlertsResult.textContent = loadingText;
+  await maybeSyncGmailForClientAlerts();
   const result = await arcigyApi.getClientNeedAlerts({ limit: 10 });
   const alerts = result.alerts ?? [];
   const newAlerts = alerts.filter((alert) => {
@@ -445,13 +449,35 @@ async function refreshClientNeedAlerts({ announceNew = false, loadingText = null
   }
 
   elements.clientAlertWatchStatus.textContent = state.clientAlertWatchEnabled
-    ? `Client alert watch active. Open requests: ${result.count ?? alerts.length}.`
-    : `Client alert watch paused. Open requests: ${result.count ?? alerts.length}.`;
+    ? `Client alert watch active. Open requests: ${result.count ?? alerts.length}. ${state.lastClientAlertGmailSyncSummary}`
+    : `Client alert watch paused. Open requests: ${result.count ?? alerts.length}. ${state.lastClientAlertGmailSyncSummary}`;
 
   if (announceNew && newAlerts.length) {
     speak(newAlerts[0].jarvisAlert ?? result.summary ?? "Jarvis: Mas novu klientsku poziadavku.");
   }
   return result;
+}
+
+async function maybeSyncGmailForClientAlerts({ force = false } = {}) {
+  const now = Date.now();
+  if (!force && now - state.lastClientAlertGmailSyncAt < state.clientAlertGmailSyncPollMs) return;
+  state.lastClientAlertGmailSyncAt = now;
+  try {
+    const result = await arcigyApi.syncGmailRecentMessages({
+      query: "in:inbox newer_than:2d",
+      maxResults: 3,
+      dryRun: false,
+    });
+    const synced = result.synced ?? [];
+    const fetched = synced.reduce((sum, item) => sum + Number(item.fetched ?? 0), 0);
+    const created = synced.reduce((sum, item) => sum + Number(item.created ?? item.ingested ?? 0), 0);
+    const duplicates = synced.reduce((sum, item) => sum + Number(item.duplicates ?? 0), 0);
+    const alerts = synced.reduce((sum, item) => sum + (item.alerts ?? []).length, 0);
+    state.lastClientAlertGmailSyncSummary = `Gmail auto-sync checked ${synced.length} account(s), fetched ${fetched}, created ${created}, skipped ${duplicates} duplicate(s), raised ${alerts} alert(s).`;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    state.lastClientAlertGmailSyncSummary = `Gmail auto-sync unavailable: ${message}`;
+  }
 }
 
 function startClientNeedWatch() {
@@ -906,6 +932,7 @@ elements.ingestClientMessage.addEventListener("click", async () => {
 });
 elements.clientNeedAlerts.addEventListener("click", async () => {
   try {
+    await maybeSyncGmailForClientAlerts({ force: true });
     const result = await refreshClientNeedAlerts({ announceNew: false, loadingText: "Loading client alerts..." });
     if (result.count > 0 && result.summary) speak(result.summary);
   } catch (error) {
