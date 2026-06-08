@@ -107,7 +107,7 @@ test("production readiness report returns blockers and next actions without secr
   assert.ok(report.launchEvidence.proofGates.some((gate) => gate.id === "approval-locks" && gate.validationCommand === "npm test"));
   assert.match(report.launchEvidence.remoteHandoff.smokeCommand, /remote:mcp:smoke/);
   assert.ok(report.launchEvidence.remoteHandoff.requiredBeforeExternalAgent.some((step) => step.includes("/.well-known/ai-plugin.json") && step.includes("/api/openapi.json")));
-  assert.ok(report.launchEvidence.remoteHandoff.requiredBeforeExternalAgent.some((step) => step.includes("cors-preflight") && step.includes("secret-redaction")));
+  assert.ok(report.launchEvidence.remoteHandoff.requiredBeforeExternalAgent.some((step) => step.includes("cors-preflight") && step.includes("external-auth-gate") && step.includes("secret-redaction")));
   assert.equal(JSON.stringify(report).includes("PASSWORD"), false);
 });
 
@@ -831,7 +831,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("openApiSchemaUrl")));
   assert.equal(pack.agentCompatibility.protocol, "HTTP JSON MCP bridge");
   assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("status=ready")));
-  assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("cors-preflight") && step.includes("action-manifest")));
+  assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("cors-preflight") && step.includes("external-auth-gate") && step.includes("action-manifest")));
   assert.ok(pack.agentCompatibility.safetyRules.some((rule) => rule.includes("family-friendly")));
   assert.ok(pack.agentCompatibility.safetyRules.some((rule) => rule.includes("approvalRequired")));
   assert.equal(pack.tunnel.statusUrl, "https://jarvis.example/api/secure-tunnel-status");
@@ -841,7 +841,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "action-manifest" && item.url.endsWith("/.well-known/ai-plugin.json")));
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "secure-tunnel-status"));
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "openapi-schema" && item.url.endsWith("/api/openapi.json")));
-  assert.ok(pack.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("cors-preflight") && item.expected.includes("action-manifest")));
+  assert.ok(pack.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("cors-preflight") && item.expected.includes("external-auth-gate") && item.expected.includes("action-manifest")));
   assert.match(pack.agentPromptTemplates.grok, /xAI-compatible agents/);
   assert.match(pack.agentPromptTemplates.grok, /remote smoke/);
   assert.match(pack.agentPromptTemplates.chatgpt, /POST https:\/\/jarvis\.example\/api\/mcp\/\{toolName\}/);

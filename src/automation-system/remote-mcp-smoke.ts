@@ -87,6 +87,9 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
     )
   );
 
+  const externalAuthGate = await checkExternalAuthGate(fetchImpl, baseUrl, input.bearerToken);
+  checks.push(check(externalAuthGate.ok, "external-auth-gate", externalAuthGate.message));
+
   const pack = await getJson(fetchImpl, `${baseUrl}/api/remote-mcp-pack?includeReadiness=false`, input.bearerToken);
   checks.push(check(pack.ok, "connection-pack", pack.ok ? "Remote MCP connection pack is reachable." : pack.message));
   checks.push(check(pack.body?.auth?.tokenValueReturned === false, "pack-secret-policy", "Connection pack confirms tokenValueReturned=false."));
@@ -205,7 +208,7 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
     baseUrl,
     summary:
       status === "ready"
-        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, action manifest, OpenAPI action schema, CORS preflight, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
+        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, action manifest, OpenAPI action schema, CORS preflight, external auth gate, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((item) => item.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -503,6 +506,10 @@ function hasHandoffProof(value: unknown, baseUrl: string): boolean {
   const requiredProof = Array.isArray(handoff.requiredProof) ? handoff.requiredProof : [];
   const agentFirstSteps = Array.isArray(handoff.agentFirstSteps) ? handoff.agentFirstSteps : [];
   const proofKeys = new Set(requiredProof.map((item) => (item && typeof item === "object" ? (item as { key?: unknown }).key : null)));
+  const remoteSmokeProof = requiredProof.find((item) => item && typeof item === "object" && (item as { key?: unknown }).key === "remote-smoke") as
+    | { expected?: unknown }
+    | undefined;
+  const remoteSmokeExpected = typeof remoteSmokeProof?.expected === "string" ? remoteSmokeProof.expected : "";
   return (
     proofKeys.has("action-manifest") &&
     proofKeys.has("openapi-schema") &&
@@ -510,6 +517,7 @@ function hasHandoffProof(value: unknown, baseUrl: string): boolean {
     proofKeys.has("connection-pack") &&
     proofKeys.has("secure-tunnel-status") &&
     proofKeys.has("remote-smoke") &&
+    ["action-manifest", "openapi-schema", "cors-preflight", "external-auth-gate", "approval-shape-gate", "secret-redaction"].every((key) => remoteSmokeExpected.includes(key)) &&
     agentFirstSteps.some((step) => typeof step === "string" && step.includes("arcigy.get_operator_briefing")) &&
     agentFirstSteps.some((step) => typeof step === "string" && step.includes("status=ready"))
   );
@@ -601,6 +609,31 @@ async function optionsRequest(fetchImpl: typeof fetch, url: string) {
     return { ok, status: response.status, message: ok ? "OK" : `HTTP ${response.status} missing required CORS headers` };
   } catch (error) {
     return { ok: false, status: 0, message: safeErrorMessage(error) };
+  }
+}
+
+async function checkExternalAuthGate(fetchImpl: typeof fetch, baseUrl: string, bearerToken?: string) {
+  if (isLocalBaseUrl(baseUrl)) {
+    return { ok: true, message: "Localhost smoke uses the desktop/local auth bypass; external tunnel auth is enforced when the public URL is tested." };
+  }
+  if (!bearerToken) {
+    return { ok: false, message: "External smoke requires a bearer token to prove unauthenticated requests are rejected." };
+  }
+  const manifest = await getJson(fetchImpl, `${baseUrl}/.well-known/arcigy-jarvis.json`);
+  const toolCall = await postJson(fetchImpl, `${baseUrl}/api/mcp/arcigy.get_system_health`, { format: "json" });
+  const ok = manifest.status === 401 && toolCall.status === 401;
+  return {
+    ok,
+    message: ok ? "External manifest and MCP POST reject missing bearer tokens with HTTP 401." : `Expected HTTP 401 without bearer token, got manifest=${manifest.status}, mcpPost=${toolCall.status}.`,
+  };
+}
+
+function isLocalBaseUrl(baseUrl: string): boolean {
+  try {
+    const hostname = new URL(baseUrl).hostname.toLowerCase();
+    return hostname === "127.0.0.1" || hostname === "localhost" || hostname === "::1" || hostname === "[::1]";
+  } catch {
+    return false;
   }
 }
 

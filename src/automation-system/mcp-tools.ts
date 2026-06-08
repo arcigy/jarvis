@@ -188,7 +188,7 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     },
     {
       name: "arcigy.run_remote_mcp_smoke",
-      description: "Overi remote MCP manifest, connection pack, read-only tool call a approval gate bez zapisu.",
+      description: "Overi remote MCP manifest, action manifest, OpenAPI, CORS preflight, external auth gate, connection pack, read-only tool call a approval gate bez zapisu.",
       requiresApproval: false,
     },
     {
