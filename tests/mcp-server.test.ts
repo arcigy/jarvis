@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -199,7 +199,7 @@ test("Jarvis MCP server generates contracts from inline intake payload", async (
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   const server = createJarvisMcpServer();
   const client = new Client({ name: "test-client", version: "0.1.0" });
-  const outputDir = mkdtempSync(join(tmpdir(), "jarvis-mcp-contracts-"));
+  const outputDir = makeRepoTempDir("jarvis-mcp-contracts-");
   const intake = JSON.parse(readFileSync("docs/contracts/examples/sample-intake.json", "utf-8"));
 
   await server.connect(serverTransport);
@@ -217,13 +217,25 @@ test("Jarvis MCP server generates contracts from inline intake payload", async (
   );
   assert.equal(existsSync(join(outputDir, "generation-manifest.json")), false);
 
+  assertToolError(
+    await client.callTool({
+      name: "arcigy.generate_contract_documents",
+      arguments: {
+        intake,
+        outputDir: join(tmpdir(), "outside-jarvis-mcp-contracts"),
+        approval: { approved: true },
+      },
+    }),
+    /outputDir must stay inside the Jarvis repository/
+  );
+
   const unfinishedIntake = JSON.parse(JSON.stringify(intake));
   unfinishedIntake.client.businessName = "[doplnit]";
   const unfinishedResult = await client.callTool({
     name: "arcigy.generate_contract_documents",
     arguments: {
       intake: unfinishedIntake,
-      outputDir: mkdtempSync(join(tmpdir(), "jarvis-mcp-unfinished-contracts-")),
+      outputDir: makeRepoTempDir("jarvis-mcp-unfinished-contracts-"),
       approval: { approved: true },
     },
   });
@@ -406,4 +418,10 @@ function assertToolError(value: unknown, pattern: RegExp) {
 function getToolText(value: unknown): string {
   const result = value as { content?: Array<{ type: string; text?: string }> };
   return result.content?.[0]?.type === "text" ? result.content[0].text ?? "" : "";
+}
+
+function makeRepoTempDir(prefix: string) {
+  const base = join(process.cwd(), "generated", "test-runs");
+  mkdirSync(base, { recursive: true });
+  return mkdtempSync(join(base, prefix));
 }

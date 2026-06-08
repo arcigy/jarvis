@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -59,14 +60,15 @@ export function createJarvisMcpServer(): McpServer {
         throw new Error("Provide either inputJsonPath or inline intake payload.");
       }
 
+      const safeOutputDir = resolveRepoPath(outputDir, "generated/contracts", "outputDir");
       const args = inputJsonPath
-        ? buildContractGenerationCommand(inputJsonPath, outputDir).args
+        ? buildContractGenerationCommand(resolveRepoPath(inputJsonPath, "", "inputJsonPath"), safeOutputDir).args
         : [
             "scripts/generate_contract_documents.py",
             "--payload",
             JSON.stringify(intake),
             "--output-dir",
-            outputDir ?? "generated/contracts",
+            safeOutputDir,
           ];
       const result = runPython(args);
       return textResult(result.stdout.trim() || "Contract documents generated.");
@@ -828,6 +830,19 @@ function cleanPythonErrorMessage(message: string): string {
   const valueError = [...lines].reverse().find((line) => /^(ValueError|FileNotFoundError|TypeError|Error):\s*/.test(line));
   if (valueError) return valueError.replace(/^(ValueError|FileNotFoundError|TypeError|Error):\s*/, "");
   return lines.at(-1) || String(message);
+}
+
+function resolveRepoPath(value: unknown, fallback: string, label: string): string {
+  const candidate = typeof value === "string" && value.trim() ? value : fallback;
+  if (!candidate) throw new Error(`${label} is required.`);
+  const resolved = resolve(repoRoot, candidate);
+  const root = resolve(repoRoot);
+  const normalizedResolved = process.platform === "win32" ? resolved.toLowerCase() : resolved;
+  const normalizedRoot = process.platform === "win32" ? root.toLowerCase() : root;
+  if (normalizedResolved !== normalizedRoot && !normalizedResolved.startsWith(`${normalizedRoot}${sep}`)) {
+    throw new Error(`${label} must stay inside the Jarvis repository.`);
+  }
+  return resolved;
 }
 
 function jsonDbTool(
