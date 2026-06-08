@@ -28,13 +28,14 @@ test("web tunnel script orchestrates protected Jarvis MCP exposure", () => {
   assert.match(script, /body\.handoff\?\.connectionPackUrl !== `\$\{publicUrl\}\/api\/remote-mcp-pack\?includeReadiness=true&live=true`/);
   assert.match(script, /verifyRemoteMcpSmoke/);
   assert.match(script, /hasReadySmokeCheck/);
-  assert.match(script, /"pack-limits", "approval-gate", "secret-redaction"/);
+  assert.match(script, /"pack-limits", "approval-gate", "approval-shape-gate", "secret-redaction"/);
   assert.match(script, /renderTunnelReadySummary/);
   assert.match(script, /Remote agent handoff block/);
   assert.match(script, /Required proof before work/);
   assert.match(script, /arcigy\.get_operator_briefing/);
   assert.match(script, /dryRun=true/);
   assert.match(script, /tokenValueReturned=false with repo-only limits/);
+  assert.match(script, /remote smoke status=ready with pack-limits, approval-gate, approval-shape-gate, and secret-redaction/);
   assert.match(script, /Authorization: Bearer <JARVIS_WEB_TOKEN>/);
   assert.match(script, /--no-start-web/);
   assert.match(script, /--generate-token/);
