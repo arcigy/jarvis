@@ -115,7 +115,7 @@ async function run() {
 
   try {
     await window.loadURL(targetUrl);
-    await new Promise((resolveDone) => setTimeout(resolveDone, 1400));
+    await waitForCommandDeck(window);
 
     const dom = await window.webContents.executeJavaScript(`
       (() => {
@@ -152,6 +152,9 @@ async function run() {
           responsePanel: box("#jarvisPanel + .panel"),
           missionReadiness: box("#missionReadiness"),
           missionRemote: box("#missionRemote"),
+          readyIntegrationsText: document.querySelector("#readyIntegrations")?.textContent.trim() || "",
+          mcpToolCountText: document.querySelector("#mcpToolCount")?.textContent.trim() || "",
+          approvalLockCountText: document.querySelector("#approvalLockCount")?.textContent.trim() || "",
           coreImageComplete: document.querySelector(".coreVisual")?.complete === true,
           coreImageNaturalWidth: document.querySelector(".coreVisual")?.naturalWidth || 0,
           visibleMissionSignals: [...document.querySelectorAll(".missionSignal")].filter((node) => {
@@ -172,6 +175,9 @@ async function run() {
     if (dom.visibleCortexNodes !== 5) fail(`Expected 5 cortex nodes, found ${dom.visibleCortexNodes}.`);
     if (/undefined|null|\[object Object\]/i.test(dom.bodyText)) fail("UI contains raw undefined/null/object text.");
     if (dom.scrollWidth > dom.clientWidth + 2) fail(`UI has horizontal overflow: ${dom.scrollWidth}px > ${dom.clientWidth}px.`);
+    if (!/^[0-9]+\/[0-9]+$/.test(dom.readyIntegrationsText)) fail(`Ready integration count is not loaded: ${dom.readyIntegrationsText}.`);
+    if (!/^[0-9]+$/.test(dom.mcpToolCountText) || Number(dom.mcpToolCountText) < 28) fail(`MCP tool count is not loaded: ${dom.mcpToolCountText}.`);
+    if (!/^[0-9]+$/.test(dom.approvalLockCountText) || Number(dom.approvalLockCountText) < 3) fail(`Approval lock count is not loaded: ${dom.approvalLockCountText}.`);
     assertBox("sidebar", dom.sidebar, { width: isNarrowViewport ? 300 : 180, height: 60 });
     assertBox("navigation", dom.nav, { width: isNarrowViewport ? 300 : 150, height: 40 });
     assertBox("header", dom.header, { width: isNarrowViewport ? 300 : 400, height: 40 });
@@ -193,6 +199,7 @@ async function run() {
     assertBox("mission readiness", dom.missionReadiness, { width: 40, height: 16 });
     assertBox("mission remote", dom.missionRemote, { width: 40, height: 16 });
 
+    await waitForPaint(window);
     const image = await window.webContents.capturePage();
     const png = image.toPNG();
     mkdirSync(dirname(outputPath), { recursive: true });
@@ -212,6 +219,41 @@ async function run() {
     console.log(`Jarvis UI smoke ready: ${targetUrl}`);
     console.log(`Screenshot: ${outputPath}`);
   }
+}
+
+async function waitForPaint(window) {
+  await window.webContents.executeJavaScript(`
+    new Promise((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(resolve));
+    })
+  `);
+}
+
+async function waitForCommandDeck(window) {
+  const deadline = Date.now() + 5000;
+  let lastState = {};
+  let lastSignature = "";
+  let stableReads = 0;
+  while (Date.now() < deadline) {
+    lastState = await window.webContents.executeJavaScript(`
+      (() => ({
+        ready: document.querySelector("#readyIntegrations")?.textContent.trim() || "",
+        tools: document.querySelector("#mcpToolCount")?.textContent.trim() || "",
+        locks: document.querySelector("#approvalLockCount")?.textContent.trim() || ""
+      }))()
+    `);
+    const signature = `${lastState.ready}|${lastState.tools}|${lastState.locks}`;
+    if (/^[0-9]+\/[0-9]+$/.test(lastState.ready) && /^[0-9]+$/.test(lastState.tools) && /^[0-9]+$/.test(lastState.locks)) {
+      stableReads = signature === lastSignature ? stableReads + 1 : 1;
+      lastSignature = signature;
+      if (stableReads >= 3) return;
+    } else {
+      stableReads = 0;
+      lastSignature = signature;
+    }
+    await new Promise((resolveDone) => setTimeout(resolveDone, 200));
+  }
+  fail(`Command deck did not finish loading: ${JSON.stringify(lastState)}.`);
 }
 
 run()
