@@ -1431,13 +1431,7 @@ elements.approvePreparedReply.addEventListener("click", async () => {
 });
 elements.sendApprovedReply.addEventListener("click", async () => {
   try {
-    if (!state.lastPreparedReplies.length) {
-      if (!state.lastApprovedPreparedReply) {
-        elements.preparedReplyResult.textContent = "Approve a prepared reply before sending.";
-        return;
-      }
-    }
-    const first = state.lastApprovedPreparedReply ?? state.lastPreparedReplies[0];
+    const first = state.lastApprovedPreparedReply;
     if (!first) {
       elements.preparedReplyResult.textContent = "Approve a prepared reply before sending.";
       return;

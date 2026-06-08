@@ -247,7 +247,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /window\.confirm\(`Approve prepared reply to \$\{first\.leadEmail\}/);
   assert.match(renderer, /window\.confirm\(`Send approved reply to \$\{first\.leadEmail\}/);
   assert.match(renderer, /state\.lastApprovedPreparedReply = result\.preparedReply \?\? first/);
-  assert.match(renderer, /const first = state\.lastApprovedPreparedReply \?\? state\.lastPreparedReplies\[0\]/);
+  assert.match(renderer, /const first = state\.lastApprovedPreparedReply;/);
+  assert.doesNotMatch(renderer, /state\.lastApprovedPreparedReply \?\? state\.lastPreparedReplies\[0\]/);
   assert.match(renderer, /Approve a prepared reply before sending/);
   assert.match(renderer, /state\.lastApprovedPreparedReply = null/);
   assert.match(renderer, /Prepared reply approval cancelled before any write/);
