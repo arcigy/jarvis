@@ -27,7 +27,7 @@ test("Jarvis readiness CLI reports blockers without leaking secrets", () => {
   assert.ok(body.fixGuide.some((step) => step.id === "redis-real-password" && step.envKeys.includes("REDIS_URL")));
 });
 
-test("Jarvis readiness CLI exits ready when only unused Redis is invalid", () => {
+test("Jarvis readiness CLI exits zero with attention when only unused Redis is invalid", () => {
   const result = spawnSync("node", ["scripts/jarvis_readiness.ts", "--json", "--no-env-file"], {
     cwd: process.cwd(),
     encoding: "utf-8",
@@ -55,7 +55,7 @@ test("Jarvis readiness CLI exits ready when only unused Redis is invalid", () =>
     status: string;
     blockers: Array<{ key: string; severity: string }>;
   };
-  assert.equal(body.status, "ready");
+  assert.equal(body.status, "attention");
   assert.ok(body.blockers.some((blocker) => blocker.key === "redis" && blocker.severity === "warning"));
 });
 

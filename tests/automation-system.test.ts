@@ -102,7 +102,7 @@ test("production readiness treats unused Redis as non-blocking advisory", async 
     }
   );
 
-  assert.equal(report.status, "ready");
+  assert.equal(report.status, "attention");
   assert.ok(report.blockers.some((blocker) => blocker.key === "redis" && blocker.severity === "warning"));
   assert.match(report.summary, /non-blocking warning/);
 });
@@ -720,7 +720,7 @@ test("production readiness treats Serper exhaustion as advisory when other lead 
       fetchImpl as typeof fetch
     );
 
-    assert.equal(report.status, "ready");
+    assert.equal(report.status, "attention");
     assert.equal(report.blockers.find((blocker) => blocker.key === "serper")?.severity, "warning");
     assert.match(report.summary, /non-blocking warning/);
     assert.equal(JSON.stringify(report).includes("spent-serper"), false);

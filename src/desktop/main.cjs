@@ -290,16 +290,16 @@ async function getProductionReadiness(payload) {
   const uniqueBlockers = dedupeReadinessBlockers(blockers);
   const ready = health.integrations.filter((item) => item.configured).length;
   const blocking = uniqueBlockers.filter((blocker) => blocker.severity === "blocking").length;
-  const status = blocking ? "blocked" : "ready";
+  const status = blocking ? "blocked" : uniqueBlockers.length ? "attention" : "ready";
   const warnings = uniqueBlockers.length - blocking;
   return {
     status,
     checkedAt: new Date().toISOString(),
     summary:
       status === "ready"
-        ? warnings
-          ? `Production gates ready: ${ready}/${health.integrations.length} integrations configured, ${bridge.mcpToolCount} MCP tools available, ${warnings} non-blocking warning(s).`
-          : `Production gates ready: ${ready}/${health.integrations.length} integrations configured and ${bridge.mcpToolCount} MCP tools available.`
+        ? `Production gates ready: ${ready}/${health.integrations.length} integrations configured and ${bridge.mcpToolCount} MCP tools available.`
+        : status === "attention"
+          ? `Production gates need attention: ${ready}/${health.integrations.length} integrations configured, ${bridge.mcpToolCount} MCP tools available, ${warnings} non-blocking warning(s).`
         : `Production needs attention: ${ready}/${health.integrations.length} integrations ready, ${bridge.mcpToolCount} MCP tools available, ${blocking} blocker(s), ${warnings} warning(s).`,
     integrations: {
       ready,

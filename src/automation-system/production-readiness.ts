@@ -58,7 +58,7 @@ export async function buildProductionReadinessReport(
   ];
   const uniqueBlockers = dedupeBlockers(blockers);
   const blockingCount = uniqueBlockers.filter((blocker) => blocker.severity === "blocking").length;
-  const status: ReadinessStatus = blockingCount ? "blocked" : "ready";
+  const status: ReadinessStatus = blockingCount ? "blocked" : uniqueBlockers.length ? "attention" : "ready";
   const readyIntegrations = health.filter((item) => item.configured).length;
 
   return {
@@ -131,9 +131,12 @@ function buildSummary(status: ReadinessStatus, ready: number, total: number, too
   const blocking = blockers.filter((blocker) => blocker.severity === "blocking").length;
   const warnings = blockers.length - blocking;
   if (status === "ready") {
+    return `Production gates ready: ${ready}/${total} integrations configured and ${toolCount} MCP tools available.`;
+  }
+  if (status === "attention") {
     return warnings
-      ? `Production gates ready: ${ready}/${total} integrations configured, ${toolCount} MCP tools available, ${warnings} non-blocking warning(s).`
-      : `Production gates ready: ${ready}/${total} integrations configured and ${toolCount} MCP tools available.`;
+      ? `Production gates need attention: ${ready}/${total} integrations configured, ${toolCount} MCP tools available, ${warnings} non-blocking warning(s).`
+      : `Production gates need attention: ${ready}/${total} integrations configured and ${toolCount} MCP tools available.`;
   }
   return `Production needs attention: ${ready}/${total} integrations ready, ${toolCount} MCP tools available, ${blocking} blocker(s), ${warnings} warning(s).`;
 }

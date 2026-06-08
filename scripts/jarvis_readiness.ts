@@ -26,7 +26,7 @@ if (args.has("--help") || args.has("-h")) {
       "  --live-integrations Alias for --live.",
       "  --no-env-file       Do not load .env.local or .env.",
       "",
-      "Exit code is 0 only when the readiness status is ready.",
+      "Exit code is 0 when readiness is ready or attention; blocked exits 1.",
       "",
     ].join("\n")
   );
@@ -43,7 +43,7 @@ if (jsonOutput) {
   process.stdout.write(renderReadiness(report));
 }
 
-process.exitCode = report.status === "ready" ? 0 : 1;
+process.exitCode = report.status === "blocked" ? 1 : 0;
 
 function renderReadiness(report: ProductionReadinessReport): string {
   return [
