@@ -22,16 +22,31 @@ const failures = [];
 const consoleErrors = [];
 
 process.on("uncaughtException", (error) => {
-  console.error(error instanceof Error ? error.stack || error.message : String(error));
+  console.error(safeErrorText(error));
   process.exitCode = 1;
   app.quit();
 });
 
 process.on("unhandledRejection", (error) => {
-  console.error(error instanceof Error ? error.stack || error.message : String(error));
+  console.error(safeErrorText(error));
   process.exitCode = 1;
   app.quit();
 });
+
+function redactSensitiveText(value) {
+  return String(value ?? "")
+    .replace(/(postgres(?:ql)?|redis):\/\/([^:\s/@]+):([^@\s]+)@/gi, "$1://$2:[redacted]@")
+    .replace(/Bearer\s+[A-Za-z0-9._~+/=-]{16,}/gi, "Bearer [redacted]")
+    .replace(/AIza[0-9A-Za-z_-]{20,}/g, "[redacted-google-api-key]")
+    .replace(/GOCSPX-[0-9A-Za-z_-]{10,}/g, "[redacted-google-client-secret]")
+    .replace(/1\/\/[0-9A-Za-z_-]{20,}/g, "[redacted-google-refresh-token]")
+    .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_[A-Za-z0-9_-]{8,}\b/gi, "[redacted-provider-key]")
+    .replace(/\b[0-9a-f]{32,}\b/gi, "[redacted-hex-secret]");
+}
+
+function safeErrorText(error) {
+  return redactSensitiveText(error instanceof Error ? error.stack || error.message : String(error));
+}
 
 function fail(message) {
   failures.push(message);
@@ -79,7 +94,7 @@ async function run() {
 
   window.webContents.on("console-message", (_event, details) => {
     if (details.level >= 2 && !String(details.message).includes("Autofill.enable")) {
-      consoleErrors.push(details.message);
+      consoleErrors.push(redactSensitiveText(details.message));
     }
   });
 
@@ -160,8 +175,8 @@ async function run() {
 
   if (consoleErrors.length) fail(`Renderer console errors: ${consoleErrors.slice(0, 5).join(" | ")}`);
   if (failures.length) {
-    console.error(`Jarvis UI smoke failed for ${targetUrl}`);
-    for (const item of failures) console.error(`- ${item}`);
+    console.error(`Jarvis UI smoke failed for ${redactSensitiveText(targetUrl)}`);
+    for (const item of failures) console.error(`- ${redactSensitiveText(item)}`);
     process.exitCode = 1;
     app.exit(1);
   } else {
@@ -172,7 +187,7 @@ async function run() {
 
 run()
   .catch((error) => {
-    console.error(error instanceof Error ? error.stack || error.message : String(error));
+    console.error(safeErrorText(error));
     process.exitCode = 1;
   })
   .finally(() => {

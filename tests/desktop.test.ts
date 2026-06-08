@@ -258,6 +258,11 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.equal(packageJson.scripts["verify:production"], "node scripts/verify_production.ts");
   assert.match(uiSmoke, /capturePage/);
   assert.match(uiSmoke, /JARVIS_UI_SMOKE_URL/);
+  assert.match(uiSmoke, /function redactSensitiveText/);
+  assert.match(uiSmoke, /function safeErrorText/);
+  assert.match(uiSmoke, /console\.error\(safeErrorText\(error\)\)/);
+  assert.match(uiSmoke, /consoleErrors\.push\(redactSensitiveText\(details\.message\)\)/);
+  assert.match(uiSmoke, /Jarvis UI smoke failed for \$\{redactSensitiveText\(targetUrl\)\}/);
   assert.match(uiSmoke, /#missionRail/);
   assert.match(uiSmoke, /#cortexMap/);
   assert.match(uiSmoke, /visibleCortexNodes/);
