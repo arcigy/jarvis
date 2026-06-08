@@ -14,6 +14,7 @@ import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerpe
 import { buildContractGenerationCommand, getColdOutreachMcpAnswer, listJarvisMcpTools } from "../automation-system/mcp-tools.ts";
 import { buildOperatorBriefing } from "../automation-system/operator-briefing.ts";
 import { buildProductionReadinessReport } from "../automation-system/production-readiness.ts";
+import { buildRemoteMcpConnectionPack } from "../automation-system/remote-mcp-pack.ts";
 import { getSmartleadCampaignStatus } from "../automation-system/smartlead.ts";
 
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
@@ -57,6 +58,11 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
 
   if (request.method === "GET" && url.pathname === "/api/web-bridge-preflight") {
     writeJson(response, 200, buildWebBridgePreflight(request));
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/remote-mcp-pack") {
+    writeJson(response, 200, await getRemoteMcpPack(request, url));
     return;
   }
 
@@ -471,6 +477,10 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
     });
     return;
   }
+  if (name === "arcigy.get_remote_mcp_pack") {
+    writeJson(response, 200, { result: await getRemoteMcpPack(request, null, payload) });
+    return;
+  }
   if (name === "arcigy.get_operator_briefing") {
     writeJson(response, 200, { result: await getOperatorBriefing(payload) });
     return;
@@ -570,6 +580,22 @@ function getApprovalError(name: string, payload: Record<string, unknown>): strin
   const approval = payload.approval as { approved?: unknown } | undefined;
   if (approval?.approved === true || payload.approved === true) return null;
   return `${name} requires explicit approval. Send {"approval":{"approved":true}} after user confirmation.`;
+}
+
+async function getRemoteMcpPack(request: IncomingMessage, url: URL | null, payload: Record<string, unknown> = {}) {
+  const baseUrl = optionalString(payload.baseUrl) ?? getRequestOrigin(request);
+  const live = payload.live === true || url?.searchParams.get("live") === "true";
+  const includeReadiness = payload.includeReadiness !== false && url?.searchParams.get("includeReadiness") !== "false";
+  return buildRemoteMcpConnectionPack({
+    baseUrl,
+    live,
+    includeReadiness,
+    dbPath: resolveRepoPath(payload.dbPath, defaultDbPath, "dbPath"),
+    tokenConfigured: getWebToken() !== null,
+    localhostBypass: process.env.JARVIS_WEB_REQUIRE_AUTH !== "true",
+    maxJsonBytes: getMaxJsonBytes(),
+    source: "web",
+  });
 }
 
 function runDbTool(command: string, payload: Record<string, unknown>) {

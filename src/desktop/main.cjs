@@ -461,6 +461,7 @@ function listWebMcpTools() {
     { name: "arcigy.get_system_health", requiresApproval: false },
     { name: "arcigy.run_integration_diagnostics", requiresApproval: false },
     { name: "arcigy.get_production_readiness", requiresApproval: false },
+    { name: "arcigy.get_remote_mcp_pack", requiresApproval: false },
     { name: "arcigy.get_operator_briefing", requiresApproval: false },
     { name: "arcigy.generate_ai_reply", requiresApproval: false },
     { name: "arcigy.sync_gmail_recent_messages", requiresApproval: false },

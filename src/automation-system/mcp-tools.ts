@@ -18,6 +18,7 @@ export type JarvisMcpToolName =
   | "arcigy.get_system_health"
   | "arcigy.run_integration_diagnostics"
   | "arcigy.get_production_readiness"
+  | "arcigy.get_remote_mcp_pack"
   | "arcigy.get_operator_briefing"
   | "arcigy.generate_ai_reply"
   | "arcigy.sync_gmail_recent_messages"
@@ -123,6 +124,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.get_production_readiness",
       description: "Vrati produkcny readiness report s blockermi, next actions, MCP stavom a volitelnymi live diagnostikami.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.get_remote_mcp_pack",
+      description: "Vrati secret-safe connection pack pre Claude, ChatGPT, Grok alebo iny remote MCP agent.",
       requiresApproval: false,
     },
     {

@@ -18,6 +18,7 @@ import {
 } from "./mcp-tools.ts";
 import { buildOperatorBriefing } from "./operator-briefing.ts";
 import { buildProductionReadinessReport } from "./production-readiness.ts";
+import { buildRemoteMcpConnectionPack } from "./remote-mcp-pack.ts";
 import { getSmartleadCampaignStatus } from "./smartlead.ts";
 import type { ClientNeedSignal, LocalPerson } from "./types.ts";
 
@@ -468,6 +469,38 @@ export function createJarvisMcpServer(): McpServer {
   );
 
   server.registerTool(
+    "arcigy.get_remote_mcp_pack",
+    {
+      title: "Remote MCP connection pack",
+      description: "Return a secret-safe connection pack for remote agents using the Jarvis web bridge.",
+      inputSchema: {
+        baseUrl: z.string().url().optional(),
+        live: z.boolean().default(false),
+        includeReadiness: z.boolean().default(true),
+        dbPath: z.string().optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async ({ baseUrl, live, includeReadiness, dbPath }) =>
+      jsonResult(
+        await buildRemoteMcpConnectionPack({
+          baseUrl,
+          live,
+          includeReadiness,
+          dbPath,
+          tokenConfigured: hasConfiguredWebToken(),
+          localhostBypass: process.env.JARVIS_WEB_REQUIRE_AUTH !== "true",
+          source: "mcp",
+        })
+      )
+  );
+
+  server.registerTool(
     "arcigy.get_operator_briefing",
     {
       title: "Operator briefing",
@@ -757,6 +790,11 @@ function jsonResult(value: unknown) {
     content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }],
     structuredContent: { result: value },
   };
+}
+
+function hasConfiguredWebToken() {
+  const value = (process.env.JARVIS_WEB_TOKEN || process.env.API_SECRET_KEY || "").trim();
+  return value !== "" && value !== "dummy";
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
