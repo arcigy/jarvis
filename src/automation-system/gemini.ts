@@ -1,4 +1,5 @@
 import { requireEnv, type RuntimeEnv } from "./env.ts";
+import { redactSensitiveText, safeAiPromptPart, withAiSafetySystemInstruction } from "./ai-safety.ts";
 
 export type FetchLike = typeof fetch;
 
@@ -53,21 +54,23 @@ export async function generateGeminiText(
 }
 
 async function requestGeminiText(input: GeminiTextInput, apiKey: string, model: string, fetchImpl: FetchLike): Promise<string> {
+  const safePrompt = safeAiPromptPart(input.prompt);
+  const safeSystemInstruction = withAiSafetySystemInstruction(input.systemInstruction);
   const response = await fetchImpl(
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
     {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        systemInstruction: input.systemInstruction
+        systemInstruction: safeSystemInstruction
           ? {
-              parts: [{ text: input.systemInstruction }],
+              parts: [{ text: safeSystemInstruction }],
             }
           : undefined,
         contents: [
           {
             role: "user",
-            parts: [{ text: input.prompt }],
+            parts: [{ text: safePrompt }],
           },
         ],
         generationConfig: {
@@ -90,7 +93,7 @@ async function requestGeminiText(input: GeminiTextInput, apiKey: string, model: 
   if (!text) {
     throw new Error("Gemini returned an empty response.");
   }
-  return text;
+  return redactSensitiveText(text);
 }
 
 function getGeminiModels(input: GeminiTextInput, env: RuntimeEnv): string[] {
@@ -120,14 +123,14 @@ export function buildClientReplyPrompt(input: ClientReplyDraftInput): GeminiText
   const client = input.clientName ? `Klient: ${input.clientName}` : "Klient: neznámy";
   return {
     systemInstruction:
-      "Si Arcigy Jarvis. Pripravuješ profesionálne, vecné a family-friendly odpovede klientom. Nikdy nesľubuj odoslanie bez schválenia používateľom.",
+      "Si Arcigy Jarvis. Pripravuješ profesionálne, vecné a family-friendly odpovede klientom. Nikdy nesľubuj odoslanie bez schválenia používateľom. Ak správa obsahuje citlivé údaje, nereprodukuj ich.",
     prompt: [
       client,
       `Jazyk odpovede: ${language}.`,
       `Tón: ${tone}.`,
-      input.context ? `Kontext: ${input.context}` : null,
+      input.context ? `Kontext: ${safeAiPromptPart(input.context)}` : null,
       "Správa klienta:",
-      input.message,
+      safeAiPromptPart(input.message),
       "Vytvor krátky návrh odpovede. Uveď aj 1 vetu, čo má používateľ schváliť pred odoslaním.",
     ]
       .filter(Boolean)

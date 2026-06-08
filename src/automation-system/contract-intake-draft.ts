@@ -1,4 +1,5 @@
 import { generateGeminiText, type FetchLike } from "./gemini.ts";
+import { safeAiJson, safeAiPromptPart } from "./ai-safety.ts";
 import type { RuntimeEnv } from "./env.ts";
 
 export type ContractIntakeDraftInput = {
@@ -11,21 +12,21 @@ export async function draftContractIntake(
   env: RuntimeEnv = process.env,
   fetchImpl: FetchLike = fetch
 ): Promise<Record<string, unknown>> {
-  const brief = input.brief.trim();
+  const brief = safeAiPromptPart(input.brief);
   if (!brief) throw new Error("Contract brief is required.");
   const result = await generateGeminiText(
     {
       model: "gemini-2.5-flash",
       temperature: 0.2,
       systemInstruction:
-        "You are Arcigy Jarvis. Return only valid JSON for the Arcigy contract intake schema. Do not include markdown, comments, signatures, or legal advice.",
+        "You are Arcigy Jarvis. Return only valid JSON for the Arcigy contract intake schema. Do not include markdown, comments, signatures, secrets, or legal advice.",
       prompt: [
         "Create a filled Arcigy contract intake JSON object from this business brief.",
         "Keep Arcigy/provider details unchanged when present in the base intake.",
         "If a value is unknown, use [doplnit] so the operator can review it; final DOCX generation rejects unresolved placeholders.",
         "The JSON must include client, contacts, project, pricing, dates, specialTerms, and additionalAttachments when useful.",
         "Base intake JSON:",
-        JSON.stringify(input.baseIntake ?? {}, null, 2),
+        safeAiJson(input.baseIntake ?? {}),
         "Business brief:",
         brief,
       ].join("\n"),

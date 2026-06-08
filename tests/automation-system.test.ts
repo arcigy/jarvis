@@ -7,6 +7,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { matchLocalIdentity } from "../src/automation-system/identity-matching.ts";
+import { redactSensitiveText } from "../src/automation-system/ai-safety.ts";
 import { draftContractIntake, parseJsonObject } from "../src/automation-system/contract-intake-draft.ts";
 import { runIntegrationDiagnostics } from "../src/automation-system/diagnostics.ts";
 import { getIntegrationHealth } from "../src/automation-system/env.ts";
@@ -547,6 +548,33 @@ test("Gemini reply helper calls generateContent and extracts text", async () => 
   assert.equal(result.model, "gemini-2.5-flash");
   assert.equal(result.text, "Návrh odpovede");
   assert.match(calls[0].url, /generateContent/);
+});
+
+test("AI safety redacts secrets before Gemini prompts and after model output", async () => {
+  const googleKey = "AI" + "za" + "S" + "y" + "A".repeat(32);
+  const refreshToken = "1" + "//" + "A".repeat(34);
+  const smartleadKey = ["aaaaaaaa", "bbbb", "cccc", "dddd", "eeeeeeeeeeee"].join("-") + "_abcdefgh";
+  const databaseUrl = "postgres://postgres:super-private@example.com:5432/db";
+  const rawMessage = `Client sent ${googleKey} and ${refreshToken} and ${smartleadKey} and ${databaseUrl}`;
+  const calls: Array<{ body: { contents?: Array<{ parts?: Array<{ text?: string }> }>; systemInstruction?: { parts?: Array<{ text?: string }> } } }> = [];
+  const fetchImpl = async (_url: string | URL | Request, init?: RequestInit) => {
+    calls.push({ body: JSON.parse(String(init?.body)) });
+    return responseJson({
+      candidates: [{ content: { parts: [{ text: `Do not echo ${googleKey}` }] } }],
+    });
+  };
+
+  const result = await generateGeminiText(buildClientReplyPrompt({ message: rawMessage }), { GEMINI_API_KEY: "gemini-key" }, fetchImpl as typeof fetch);
+  const sentBody = JSON.stringify(calls[0].body);
+
+  assert.equal(sentBody.includes(googleKey), false);
+  assert.equal(sentBody.includes(refreshToken), false);
+  assert.equal(sentBody.includes(smartleadKey), false);
+  assert.equal(sentBody.includes("super-private"), false);
+  assert.match(sentBody, /Arcigy Jarvis AI safety rules/);
+  assert.equal(result.text.includes(googleKey), false);
+  assert.match(result.text, /\[redacted-google-api-key\]/);
+  assert.match(redactSensitiveText(rawMessage), /\[redacted-google-refresh-token\]/);
 });
 
 test("Gemini helper retries transient failures and falls back to the secondary model", async () => {

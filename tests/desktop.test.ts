@@ -371,6 +371,11 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /ValueError\|FileNotFoundError\|TypeError\|Error/);
   assert.match(main, /ipcMain\.handle\("contracts:draftIntake"/);
   assert.match(main, /generateGeminiTextForContract/);
+  assert.match(main, /aiSafetySystemRules/);
+  assert.match(main, /safeAiPromptPart/);
+  assert.match(main, /redactSensitiveText/);
+  assert.match(main, /withAiSafetySystemInstruction/);
+  assert.match(main, /Never copy secrets, API keys, OAuth tokens/);
   assert.match(main, /parseJsonObject/);
   assert.match(main, /jarvis_local_db\.py/);
   assert.match(main, /list-prepared-replies/);

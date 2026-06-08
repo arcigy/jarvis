@@ -1262,13 +1262,14 @@ function cleanVoiceQuery(text, removeWords) {
 }
 
 async function generateAiReply(payload) {
-  const message = String(payload?.message ?? "").trim();
+  const message = safeAiPromptPart(payload?.message);
   if (!message) throw new Error("Client message is required.");
   const prompt = [
     "Si Arcigy Jarvis. Priprav profesionalnu, vecnu a family-friendly odpoved klientovi.",
     "Nikdy neslubuj odoslanie bez schvalenia pouzivatelom.",
-    payload?.clientName ? `Klient: ${payload.clientName}` : null,
-    payload?.context ? `Kontext: ${payload.context}` : null,
+    "Ak sprava obsahuje citlive udaje alebo secrety, nereprodukuj ich.",
+    payload?.clientName ? `Klient: ${safeAiPromptPart(payload.clientName)}` : null,
+    payload?.context ? `Kontext: ${safeAiPromptPart(payload.context)}` : null,
     "Sprava klienta:",
     message,
     "Vytvor kratku odpoved v slovencine a jednu vetu, co ma pouzivatel schvalit.",
@@ -2097,7 +2098,7 @@ async function appendLeadsToGoogleSheet(payload) {
 }
 
 async function draftContractIntake(payload) {
-  const brief = String(payload?.brief ?? "").trim();
+  const brief = safeAiPromptPart(payload?.brief);
   if (!brief) throw new Error("Contract brief is required.");
   const response = await generateGeminiTextForContract({
     brief,
@@ -2112,17 +2113,18 @@ async function generateGeminiTextForContract(input) {
     "Keep Arcigy/provider details unchanged when present in the base intake.",
     "If a value is unknown, use [doplnit] so the operator can review it; final DOCX generation rejects unresolved placeholders.",
     "Return only valid JSON. Do not include markdown, comments, signatures, or legal advice.",
+    "Never copy secrets, API keys, OAuth tokens, passwords, or database URLs into the JSON.",
     "The JSON must include client, contacts, project, pricing, dates, specialTerms, and additionalAttachments when useful.",
     "Base intake JSON:",
-    JSON.stringify(input.baseIntake ?? {}, null, 2),
+    safeAiJson(input.baseIntake ?? {}),
     "Business brief:",
-    input.brief,
+    safeAiPromptPart(input.brief),
   ].join("\n");
   return generateGeminiText({
     prompt,
     model: "gemini-2.5-flash",
     temperature: 0.2,
-    systemInstruction: "You are Arcigy Jarvis. Return only valid JSON for the Arcigy contract intake schema.",
+    systemInstruction: "You are Arcigy Jarvis. Return only valid JSON for the Arcigy contract intake schema. Do not return secrets or legal advice.",
   });
 }
 
@@ -2152,18 +2154,20 @@ async function generateGeminiText(input) {
 }
 
 async function requestGeminiText(input, apiKey, model) {
+  const safePrompt = safeAiPromptPart(input.prompt);
+  const safeSystemInstruction = withAiSafetySystemInstruction(input.systemInstruction);
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
     {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        systemInstruction: input.systemInstruction
+        systemInstruction: safeSystemInstruction
           ? {
-              parts: [{ text: input.systemInstruction }],
+              parts: [{ text: safeSystemInstruction }],
             }
           : undefined,
-        contents: [{ role: "user", parts: [{ text: input.prompt }] }],
+        contents: [{ role: "user", parts: [{ text: safePrompt }] }],
         generationConfig: { temperature: input.temperature ?? 0.35 },
       }),
     }
@@ -2176,7 +2180,7 @@ async function requestGeminiText(input, apiKey, model) {
   const data = await response.json();
   const text = data?.candidates?.[0]?.content?.parts?.map((part) => part.text || "").join("").trim();
   if (!text) throw new Error("Gemini returned an empty response.");
-  return text;
+  return redactSensitiveText(text);
 }
 
 function getGeminiModels(input) {
@@ -2197,6 +2201,38 @@ function isRetryableGeminiError(error) {
 function delay(ms) {
   if (ms <= 0) return Promise.resolve();
   return new Promise((resolveDelay) => setTimeout(resolveDelay, ms));
+}
+
+const aiSafetySystemRules = [
+  "Follow Arcigy Jarvis AI safety rules.",
+  "Keep every answer professional, family-friendly, respectful, and suitable for business use.",
+  "Never reveal, repeat, transform, or infer API keys, OAuth tokens, bearer tokens, passwords, database URLs, or private credentials.",
+  "If the input contains a secret, treat it as [redacted] and continue with the business task.",
+  "Do not claim that an email, reply, contract, lead export, or write action has been sent or executed unless the operator explicitly approved that separate action.",
+  "For contracts, provide structured business intake only; do not present legal advice or final legal conclusions.",
+].join("\n");
+
+function withAiSafetySystemInstruction(systemInstruction) {
+  return [aiSafetySystemRules, systemInstruction].filter(Boolean).join("\n");
+}
+
+function redactSensitiveText(value) {
+  return String(value ?? "")
+    .replace(/(postgres(?:ql)?|redis):\/\/([^:\s/@]+):([^@\s]+)@/gi, "$1://$2:[redacted]@")
+    .replace(/Bearer\s+[A-Za-z0-9._~+/=-]{16,}/gi, "Bearer [redacted]")
+    .replace(/AIza[0-9A-Za-z_-]{20,}/g, "[redacted-google-api-key]")
+    .replace(/GOCSPX-[0-9A-Za-z_-]{10,}/g, "[redacted-google-client-secret]")
+    .replace(/1\/\/[0-9A-Za-z_-]{20,}/g, "[redacted-google-refresh-token]")
+    .replace(/\b[0-9a-f]{32,}\b/gi, "[redacted-hex-secret]")
+    .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_[A-Za-z0-9_-]{8,}\b/gi, "[redacted-provider-key]");
+}
+
+function safeAiPromptPart(value) {
+  return redactSensitiveText(value).trim();
+}
+
+function safeAiJson(value) {
+  return redactSensitiveText(JSON.stringify(value ?? {}, null, 2));
 }
 
 function parseJsonObject(text) {
