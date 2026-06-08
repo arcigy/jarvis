@@ -770,9 +770,9 @@ function sampleContractIntake() {
       invoiceDueDays: 14,
     },
     dates: {
-      frameworkAgreementDate: "[dátum]",
-      projectAppendixDate: "[dátum]",
-      plannedLaunchDate: "[dátum]",
+      frameworkAgreementDate: "2026-06-08",
+      projectAppendixDate: "2026-06-08",
+      plannedLaunchDate: "2026-07-15",
     },
   };
 }

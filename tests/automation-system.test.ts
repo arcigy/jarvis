@@ -173,6 +173,7 @@ test("contract generator rejects unresolved intake placeholders", () => {
   const intake = JSON.parse(readFileSync("docs/contracts/examples/sample-intake.json", "utf-8"));
   intake.client.businessName = "[doplnit]";
   intake.project.outputs.push("TODO");
+  intake.dates.frameworkAgreementDate = "[dátum]";
   const result = spawnSync(
     python,
     ["scripts/generate_contract_documents.py", "--payload", JSON.stringify(intake), "--output-dir", dir],
@@ -190,6 +191,7 @@ test("contract generator rejects unresolved intake placeholders", () => {
   assert.match(result.stderr, /Unresolved contract intake placeholder/);
   assert.match(result.stderr, /\$\.client\.businessName/);
   assert.match(result.stderr, /\$\.project\.outputs/);
+  assert.match(result.stderr, /\$\.dates\.frameworkAgreementDate/);
   assert.equal(existsSync(join(dir, "generation-manifest.json")), false);
 });
 

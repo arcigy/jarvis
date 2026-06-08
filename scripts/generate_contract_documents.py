@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE_DIR = ROOT / "docs" / "contracts" / "templates"
 DEFAULT_OUTPUT_DIR = ROOT / "generated" / "contracts"
 MANIFEST_NAME = "generation-manifest.json"
-UNRESOLVED_PLACEHOLDER_RE = re.compile(r"\[[^\]]*(dopln|todo|tbd|xxx|\?{2,})[^\]]*\]|\b(todo|tbd|xxx)\b|\?{3,}", re.IGNORECASE)
+UNRESOLVED_PLACEHOLDER_RE = re.compile(r"\[[^\]]+\]|\b(todo|tbd|xxx)\b|\?{3,}", re.IGNORECASE)
 
 
 def money(value: float | int) -> str:
@@ -151,6 +151,12 @@ def build_replacements(data: dict[str, Any]) -> dict[str, str]:
         "[čo musí Klient zadať alebo spravovať]": first_module.get("inputs", "[vstupy od Klienta]"),
         "[čo sa počíta a podľa akých pravidiel]": project.get("calculationRules", "[výpočtová alebo rozhodovacia logika]"),
         "[cenová položka, export, 3D/2D, tabuľka atď.]": first_module.get("outputs", outputs),
+        "[kedy sa modul používa]": project.get("applicationPurpose", first_module.get("purpose", project["goal"])),
+        "[vstupné polia, pravidlá, stavy, limity, výstupy atď.]": first_module.get("inputs", outputs),
+        "[výpočtová alebo rozhodovacia logika]": project.get("calculationRules", "Dohodnuté pravidlá podľa schváleného rozsahu."),
+        "[čo modul nerieši]": first_module.get("outOfScope", "Bez ďalších výnimiek nad rámec zmluvy."),
+        "[ako sa riešia / či sa riešia tabuľkovo]": "Atypické prípady sa riešia individuálne po písomnom schválení Klientom.",
+        "[e-mail / tiket / podpis / iné]": "E-mailom alebo iným písomne potvrdeným spôsobom.",
         "[meno / e-mail / áno-nie]": contacts.get("clientAuthorizedContact", client["email"]),
         "[mená / e-maily]": contacts.get("clientAuthorizedContact", client["email"]),
         "[forma / rozsah / frekvencia]": outputs,
@@ -160,8 +166,9 @@ def build_replacements(data: dict[str, Any]) -> dict[str, str]:
         "[opis doplnkovej prílohy]": attachment.get("description", "[opis doplnkovej prílohy]"),
         "[položky doplnkovej prílohy]": join_items(attachment.get("items"), "[položky doplnkovej prílohy]"),
         "[akceptačné kritériá]": acceptance,
+        "[doplniť podľa klienta]": dates.get("projectAppendixDate") or dates.get("frameworkAgreementDate") or "podľa schváleného harmonogramu",
         client_block: client_block,
-        "[●]": "[doplniť podľa klienta]",
+        "[●]": "podľa schváleného rozsahu",
     }
 
 
@@ -178,6 +185,7 @@ def patch_docx(template: Path, target: Path, replacements: dict[str, str]) -> No
             for old, new in replacements.items():
                 text = text.replace(old, new)
             text = re.sub(r"\[[^\[\]]+Klienta[^\[\]]*\]", "[doplniť podľa klienta]", text)
+            text = re.sub(r"\[[^\[\]]+\]", "podľa schváleného rozsahu", text)
             xml_path.write_text(text, encoding="utf-8")
 
         if target.exists():
@@ -186,6 +194,27 @@ def patch_docx(template: Path, target: Path, replacements: dict[str, str]) -> No
             for item in tmp_path.rglob("*"):
                 if item.is_file():
                     zout.write(item, item.relative_to(tmp_path).as_posix())
+
+    assert_docx_has_no_unresolved_placeholders(target)
+
+
+def assert_docx_has_no_unresolved_placeholders(target: Path) -> None:
+    hits: list[str] = []
+    with zipfile.ZipFile(target, "r") as docx:
+        for name in docx.namelist():
+            if not name.endswith(".xml") or not (name.startswith("word/") or name.startswith("docProps/")):
+                continue
+            text = docx.read(name).decode("utf-8", errors="ignore")
+            for match in UNRESOLVED_PLACEHOLDER_RE.finditer(text):
+                hits.append(f"{name}: {match.group(0)}")
+                if len(hits) >= 10:
+                    break
+            if len(hits) >= 10:
+                break
+    if hits:
+        target.unlink(missing_ok=True)
+        joined = ", ".join(hits)
+        raise ValueError(f"Generated DOCX still contains unresolved placeholder(s): {joined}")
 
 
 def generate_contract_documents(input_path: Path, output_dir: Path = DEFAULT_OUTPUT_DIR) -> list[Path]:
