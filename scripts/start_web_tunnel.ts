@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 
+import { redactSensitiveText } from "../src/automation-system/ai-safety.ts";
 import { loadLocalEnv } from "../src/automation-system/env.ts";
 
 type Tunnel = {
@@ -84,7 +85,7 @@ try {
   await main();
 } catch (error) {
   if (error instanceof TunnelExit) {
-    process.stderr.write(`${error.message}\n`);
+    process.stderr.write(`${redactSensitiveText(error.message)}\n`);
     process.exitCode = 1;
   } else {
     throw error;
@@ -346,8 +347,8 @@ function getWebToken(): string | null {
 }
 
 function pipeChild(label: string, child: ChildProcess) {
-  child.stdout?.on("data", (chunk) => process.stdout.write(`[${label}] ${chunk}`));
-  child.stderr?.on("data", (chunk) => process.stderr.write(`[${label}] ${chunk}`));
+  child.stdout?.on("data", (chunk) => process.stdout.write(`[${label}] ${redactSensitiveText(String(chunk))}`));
+  child.stderr?.on("data", (chunk) => process.stderr.write(`[${label}] ${redactSensitiveText(String(chunk))}`));
 }
 
 async function waitUntilStopped(children: Array<ChildProcess | null>): Promise<void> {

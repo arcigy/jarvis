@@ -33,5 +33,9 @@ test("web tunnel script orchestrates protected Jarvis MCP exposure", () => {
   assert.match(script, /--help/);
   assert.match(script, /ngrok-skip-browser-warning/);
   assert.match(script, /npx/);
+  assert.match(script, /redactSensitiveText/);
+  assert.match(script, /process\.stderr\.write\(`\$\{redactSensitiveText\(error\.message\)\}\\n`\)/);
+  assert.match(script, /process\.stdout\.write\(`\[\$\{label\}\] \$\{redactSensitiveText\(String\(chunk\)\)\}`\)/);
+  assert.match(script, /process\.stderr\.write\(`\[\$\{label\}\] \$\{redactSensitiveText\(String\(chunk\)\)\}`\)/);
   assert.doesNotMatch(script, /API_SECRET_KEY=dummy/);
 });
