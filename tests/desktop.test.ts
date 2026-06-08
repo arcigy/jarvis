@@ -328,8 +328,13 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /\/api\/append-leads-to-google-sheet/);
   assert.match(renderer, /\/api\/draft-contract-intake/);
   assert.match(renderer, /sampleContractIntake/);
+  assert.match(renderer, /contractFormDirty: false/);
+  assert.match(renderer, /function setupContractFormDirtyTracking/);
+  assert.match(renderer, /function contractFormElements/);
   assert.match(renderer, /buildContractIntakeFromForm/);
   assert.match(renderer, /fillContractForm/);
+  assert.match(renderer, /Apply the contract form before generating so the visible form and intake JSON match/);
+  assert.match(renderer, /state\.contractFormDirty = false/);
   assert.match(renderer, /renderClientNeedAlerts/);
   assert.match(renderer, /function renderClientAlertGrid/);
   assert.match(renderer, /elements\.clientAlertGrid\.replaceChildren\(\)/);

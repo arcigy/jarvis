@@ -20,6 +20,7 @@ const state = {
   clientAlertGmailSyncPollMs: 300000,
   lastClientAlertGmailSyncAt: 0,
   lastClientAlertGmailSyncSummary: "Gmail auto-sync pending.",
+  contractFormDirty: false,
 };
 
 const elements = {
@@ -1249,6 +1250,32 @@ function fillContractForm(intake) {
   elements.contractTermMonths.value = String(intake.pricing.initialTermMonths ?? "");
 }
 
+function setupContractFormDirtyTracking() {
+  for (const element of contractFormElements()) {
+    element.addEventListener("input", () => {
+      state.contractFormDirty = true;
+    });
+  }
+}
+
+function contractFormElements() {
+  return [
+    elements.contractBusinessName,
+    elements.contractAddress,
+    elements.contractCompanyId,
+    elements.contractTaxId,
+    elements.contractRepresentativeName,
+    elements.contractRepresentativeRole,
+    elements.contractEmail,
+    elements.contractPhone,
+    elements.contractProjectName,
+    elements.contractProjectGoal,
+    elements.contractImplementationFee,
+    elements.contractMonthlyFee,
+    elements.contractTermMonths,
+  ].filter(Boolean);
+}
+
 function buildContractIntakeFromForm() {
   const current = safeParseContractIntake();
   const representative = elements.contractRepresentativeName.value.trim();
@@ -1702,6 +1729,7 @@ elements.draftContractIntake.addEventListener("click", async () => {
     });
     fillContractForm(intake);
     elements.contractIntake.value = JSON.stringify(intake, null, 2);
+    state.contractFormDirty = false;
     elements.contractResult.textContent = "AI contract intake draft applied. Review it before generating DOCX files.";
   } catch (error) {
     elements.contractResult.textContent = safeUiErrorText(error);
@@ -1711,6 +1739,7 @@ elements.applyContractForm.addEventListener("click", () => {
   try {
     const intake = buildContractIntakeFromForm();
     elements.contractIntake.value = JSON.stringify(intake, null, 2);
+    state.contractFormDirty = false;
     elements.contractResult.textContent = "Contract form applied to intake JSON.";
   } catch (error) {
     elements.contractResult.textContent = safeUiErrorText(error);
@@ -1718,6 +1747,10 @@ elements.applyContractForm.addEventListener("click", () => {
 });
 elements.generateContracts.addEventListener("click", async () => {
   try {
+    if (state.contractFormDirty) {
+      elements.contractResult.textContent = "Apply the contract form before generating so the visible form and intake JSON match.";
+      return;
+    }
     const intake = JSON.parse(elements.contractIntake.value);
     const clientName = intake.client?.businessName ?? "selected client";
     const projectName = intake.project?.name ?? "selected project";
@@ -1740,8 +1773,10 @@ elements.generateContracts.addEventListener("click", async () => {
 
 const initialContractIntake = sampleContractIntake();
 setupNavigation();
+setupContractFormDirtyTracking();
 fillContractForm(initialContractIntake);
 elements.contractIntake.value = JSON.stringify(initialContractIntake, null, 2);
+state.contractFormDirty = false;
 elements.contractBrief.value =
   "Klient Test Klient s. r. o. chce klientsky automatizacny portal na spracovanie leadov, internych uloh a reportov. Implementacia 2000 EUR, mesacne 200 EUR, trvanie 6 mesiacov.";
 elements.memoryEmail.value = "client@example.com";
