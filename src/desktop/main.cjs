@@ -93,6 +93,28 @@ function startSecureTunnel() {
   };
 }
 
+function stopSecureTunnel() {
+  const logPath = path.join(repoRoot, "generated", "jarvis-secure-tunnel.log");
+  if (!tunnelProcess || tunnelProcess.exitCode !== null || tunnelProcess.killed || !tunnelProcess.pid) {
+    return { stopped: false, wasRunning: false, logPath };
+  }
+
+  const pid = tunnelProcess.pid;
+  fs.mkdirSync(path.dirname(logPath), { recursive: true });
+  fs.appendFileSync(logPath, `[${new Date().toISOString()}] Stopping secure tunnel process ${pid}\n`, "utf-8");
+  try {
+    if (process.platform === "win32") {
+      spawnSync("taskkill", ["/pid", String(pid), "/T", "/F"], { windowsHide: true });
+    } else {
+      process.kill(-pid, "SIGTERM");
+    }
+  } catch (error) {
+    fs.appendFileSync(logPath, `[${new Date().toISOString()}] Tunnel stop warning: ${redactSensitiveText(error.message)}\n`, "utf-8");
+  }
+  tunnelProcess = null;
+  return { stopped: true, wasRunning: true, pid, logPath };
+}
+
 app.whenReady().then(() => {
   ipcMain.handle("app:version", () => app.getVersion());
   ipcMain.handle("app:openPath", (_event, targetPath) => shell.openPath(targetPath));
@@ -105,6 +127,7 @@ app.whenReady().then(() => {
   ipcMain.handle("jarvis:operatorBriefing", (_event, payload) => getOperatorBriefing(payload));
   ipcMain.handle("jarvis:webBridgePreflight", () => getWebBridgePreflight());
   ipcMain.handle("jarvis:startSecureTunnel", () => startSecureTunnel());
+  ipcMain.handle("jarvis:stopSecureTunnel", () => stopSecureTunnel());
   ipcMain.handle("jarvis:remoteMcpPack", (_event, payload) => getRemoteMcpPack(payload));
   ipcMain.handle("jarvis:remoteMcpSmoke", (_event, payload) => runRemoteMcpSmoke(payload));
   ipcMain.handle("jarvis:getPreparedOutreachReplies", (_event, payload) => getPreparedOutreachReplies(payload));

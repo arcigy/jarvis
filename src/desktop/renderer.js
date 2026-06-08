@@ -111,6 +111,7 @@ const elements = {
   mcpToolList: document.querySelector("#mcpToolList"),
   remoteAgentPrompt: document.querySelector("#remoteAgentPrompt"),
   startSecureTunnel: document.querySelector("#startSecureTunnel"),
+  stopSecureTunnel: document.querySelector("#stopSecureTunnel"),
   copyTunnelCommand: document.querySelector("#copyTunnelCommand"),
   copyClaudePrompt: document.querySelector("#copyClaudePrompt"),
   copyChatGptPrompt: document.querySelector("#copyChatGptPrompt"),
@@ -154,6 +155,7 @@ const arcigyApi = window.arcigyDesktop ?? {
   notifyOperator: async () => ({ delivered: false }),
   operatorBriefing: (payload) => postJson("/api/operator-briefing", payload),
   startSecureTunnel: async () => ({ started: false, reason: "desktop-only" }),
+  stopSecureTunnel: async () => ({ stopped: false, reason: "desktop-only" }),
   getPreparedOutreachReplies: (payload) => postJson("/api/prepared-outreach-replies", payload),
   preparePositiveOutreachReply: (payload) => postJson("/api/mcp/arcigy.prepare_positive_outreach_reply", payload).then((value) => value.result),
   approvePreparedOutreachReply: (payload) => postJson("/api/approve-prepared-outreach-reply", payload),
@@ -1690,6 +1692,26 @@ elements.startSecureTunnel.addEventListener("click", async () => {
       result.pid ? `Process id: ${result.pid}` : null,
       result.logPath ? `Log: ${result.logPath}` : null,
       "After the tunnel prints ready, run smoke before giving the MCP pack to Claude, ChatGPT, or Grok.",
+    ]
+      .filter(Boolean)
+      .join("\n");
+  } catch (error) {
+    elements.remoteAgentPrompt.textContent = safeUiErrorText(error);
+  }
+});
+elements.stopSecureTunnel.addEventListener("click", async () => {
+  try {
+    const confirmed = window.confirm(`Stop the secure Jarvis MCP tunnel started from this desktop session? Remote agents will lose access immediately.`);
+    if (!confirmed) {
+      elements.remoteAgentPrompt.textContent = "Secure tunnel stop cancelled.";
+      return;
+    }
+    const result = await arcigyApi.stopSecureTunnel();
+    elements.remoteAgentPrompt.textContent = [
+      result.stopped ? "Secure tunnel stop requested." : "No secure tunnel process is tracked in this desktop session.",
+      result.pid ? `Process id: ${result.pid}` : null,
+      result.logPath ? `Log: ${result.logPath}` : null,
+      "Run Preflight before starting a new remote MCP handoff.",
     ]
       .filter(Boolean)
       .join("\n");

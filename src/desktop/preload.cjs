@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld("arcigyDesktop", {
   operatorBriefing: (payload) => ipcRenderer.invoke("jarvis:operatorBriefing", payload),
   webBridgePreflight: () => ipcRenderer.invoke("jarvis:webBridgePreflight"),
   startSecureTunnel: () => ipcRenderer.invoke("jarvis:startSecureTunnel"),
+  stopSecureTunnel: () => ipcRenderer.invoke("jarvis:stopSecureTunnel"),
   remoteMcpPack: (payload) => ipcRenderer.invoke("jarvis:remoteMcpPack", payload),
   remoteMcpSmoke: (payload) => ipcRenderer.invoke("jarvis:remoteMcpSmoke", payload),
   getPreparedOutreachReplies: (payload) => ipcRenderer.invoke("jarvis:getPreparedOutreachReplies", payload),
