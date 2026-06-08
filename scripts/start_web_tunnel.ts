@@ -24,6 +24,21 @@ type RemoteMcpSmoke = {
   summary?: string;
 };
 
+type RemoteConnectionPack = {
+  auth?: {
+    tokenValueReturned?: boolean;
+  };
+  tools?: {
+    count?: number;
+    approvalRequired?: string[];
+    localStateWrite?: string[];
+  };
+  handoff?: {
+    requiredProof?: Array<{ key?: string }>;
+    agentFirstSteps?: string[];
+  };
+};
+
 class TunnelExit extends Error {}
 
 const repoRoot = fileURLToPath(new URL("../", import.meta.url));
@@ -108,27 +123,17 @@ async function main() {
     ngrokChild = startNgrok();
     const publicUrl = await waitForPublicTunnel();
     await verifyExternalManifest(publicUrl, token);
+    const pack = await verifyExternalConnectionPack(publicUrl, token);
     const smoke = await verifyRemoteMcpSmoke(publicUrl, token);
 
     process.stdout.write(
-      [
-        "",
-        "Arcigy Jarvis tunnel is ready.",
-        `Local UI: ${origin}/index.html`,
-        `External manifest: ${publicUrl}/.well-known/arcigy-jarvis.json`,
-        `External connection pack: ${publicUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`,
-        `External smoke test: ${publicUrl}/api/remote-mcp-smoke`,
-        `External MCP tools: ${publicUrl}/api/mcp`,
-        `MCP tool count: ${preflight.mcpToolCount ?? "unknown"}`,
-        smoke?.summary ? `Smoke: ${smoke.summary}` : "Smoke: skipped because no bearer token was available.",
-        "Auth header: Authorization: Bearer <JARVIS_WEB_TOKEN>",
-        generatedToken ? `One-time token: ${generatedToken}` : "Token source: JARVIS_WEB_TOKEN",
-        generatedToken ? "This token exists only for this running tunnel session." : "Keep the token only in local secrets.",
-        "",
-        "Keep this process running while Claude, ChatGPT, or another remote agent uses the tunnel.",
-        "Press Ctrl+C to stop Jarvis web bridge and ngrok.",
-        "",
-      ].join("\n")
+      renderTunnelReadySummary({
+        publicUrl,
+        preflight,
+        pack,
+        smoke,
+        generatedToken,
+      })
     );
 
     await waitUntilStopped([ngrokChild, webChild]);
@@ -241,6 +246,24 @@ async function verifyExternalManifest(publicUrl: string, token: string | null) {
   }
 }
 
+async function verifyExternalConnectionPack(publicUrl: string, token: string | null): Promise<RemoteConnectionPack | null> {
+  if (!token) return null;
+  const response = await fetch(`${publicUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`, {
+    headers: {
+      authorization: `Bearer ${token}`,
+      "ngrok-skip-browser-warning": "true",
+    },
+  });
+  if (!response.ok) {
+    exitWithMessage(`Tunnel opened, but the external Jarvis connection pack returned HTTP ${response.status}.`);
+  }
+  const body = (await response.json()) as RemoteConnectionPack;
+  if (body.auth?.tokenValueReturned !== false || !body.tools?.count || !body.handoff?.requiredProof?.some((item) => item.key === "remote-smoke")) {
+    exitWithMessage("Tunnel opened, but the external Jarvis connection pack is missing secret policy, tool count, or remote-smoke proof.");
+  }
+  return body;
+}
+
 async function verifyRemoteMcpSmoke(publicUrl: string, token: string | null): Promise<RemoteMcpSmoke | null> {
   if (!token) return null;
   const response = await fetch(`${publicUrl}/api/remote-mcp-smoke`, {
@@ -257,6 +280,53 @@ async function verifyRemoteMcpSmoke(publicUrl: string, token: string | null): Pr
     exitWithMessage(`Tunnel opened, but remote MCP smoke is not ready: ${body.summary ?? "unknown smoke failure"}`);
   }
   return body;
+}
+
+function renderTunnelReadySummary(input: {
+  publicUrl: string;
+  preflight: Preflight;
+  pack: RemoteConnectionPack | null;
+  smoke: RemoteMcpSmoke | null;
+  generatedToken: string | null;
+}): string {
+  const connectionPackUrl = `${input.publicUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`;
+  const smokeUrl = `${input.publicUrl}/api/remote-mcp-smoke`;
+  const mcpToolPattern = `${input.publicUrl}/api/mcp/{toolName}`;
+  const toolCount = input.pack?.tools?.count ?? input.preflight.mcpToolCount ?? "unknown";
+  const approvalLocks = input.pack?.tools?.approvalRequired?.length ?? "unknown";
+  const localWrites = input.pack?.tools?.localStateWrite?.length ?? "unknown";
+  const tokenLine = input.generatedToken ? `One-time token: ${input.generatedToken}` : "Token source: JARVIS_WEB_TOKEN";
+  const tokenRule = input.generatedToken ? "This token exists only for this running tunnel session." : "Keep the token only in local secrets.";
+  return [
+    "",
+    "Arcigy Jarvis tunnel is ready.",
+    `Local UI: ${origin}/index.html`,
+    `External manifest: ${input.publicUrl}/.well-known/arcigy-jarvis.json`,
+    `External connection pack: ${connectionPackUrl}`,
+    `External smoke test: ${smokeUrl}`,
+    `External MCP tool pattern: ${mcpToolPattern}`,
+    `MCP tool count: ${toolCount}`,
+    `Approval locks: ${approvalLocks}`,
+    `Local memory write tools: ${localWrites}`,
+    input.smoke?.summary ? `Smoke: ${input.smoke.summary}` : "Smoke: skipped because no bearer token was available.",
+    "Auth header: Authorization: Bearer <JARVIS_WEB_TOKEN>",
+    tokenLine,
+    tokenRule,
+    "",
+    "Remote agent handoff block:",
+    `- Manifest: ${input.publicUrl}/.well-known/arcigy-jarvis.json`,
+    `- Connection pack: ${connectionPackUrl}`,
+    `- Smoke test: ${smokeUrl}`,
+    `- MCP tool call pattern: ${mcpToolPattern}`,
+    "- Required proof before work: manifest HTTP 200, connection pack tokenValueReturned=false, remote smoke status=ready.",
+    "- First MCP call: POST arcigy.get_operator_briefing with {\"periodLabel\":\"poslednych 7 dni\",\"live\":true}.",
+    "- Approval rule: never call approval-required tools without your explicit confirmation of the exact payload.",
+    "- Local write rule: preview Gmail with dryRun=true before syncing messages into local memory.",
+    "",
+    "Keep this process running while Claude, ChatGPT, or another remote agent uses the tunnel.",
+    "Press Ctrl+C to stop Jarvis web bridge and ngrok.",
+    "",
+  ].join("\n");
 }
 
 async function fetchJson<T>(url: string, token: string | null = null): Promise<T> {
