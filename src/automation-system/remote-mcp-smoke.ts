@@ -694,10 +694,26 @@ function hasProductionEvidenceQuickStart(value: unknown, baseUrl: string): boole
   const pack = value as { productionVerificationEvidenceUrl?: unknown; quickStartCalls?: unknown };
   if (pack.productionVerificationEvidenceUrl !== `${baseUrl}/api/production-verification-evidence`) return false;
   if (!Array.isArray(pack.quickStartCalls)) return false;
-  const call = pack.quickStartCalls.find((item) => item && typeof item === "object" && (item as { tool?: unknown }).tool === "arcigy.get_production_verification_evidence") as
+  const evidenceCall = pack.quickStartCalls.find((item) => item && typeof item === "object" && (item as { tool?: unknown }).tool === "arcigy.get_production_verification_evidence") as
     | { approvalRequired?: unknown; method?: unknown; url?: unknown; body?: unknown }
     | undefined;
-  return call?.approvalRequired === false && call.method === "POST" && call.url === `${baseUrl}/api/mcp/arcigy.get_production_verification_evidence` && isEmptyRecord(call.body);
+  const voiceCall = pack.quickStartCalls.find((item) => {
+    if (!item || typeof item !== "object") return false;
+    const call = item as { tool?: unknown; body?: { text?: unknown } };
+    return call.tool === "arcigy.jarvis_voice_event" && call.body?.text === "Jarvis production evidence";
+  }) as { approvalRequired?: unknown; method?: unknown; url?: unknown; body?: { session?: { state?: unknown; wakeWord?: unknown }; approval?: unknown } } | undefined;
+  return (
+    evidenceCall?.approvalRequired === false &&
+    evidenceCall.method === "POST" &&
+    evidenceCall.url === `${baseUrl}/api/mcp/arcigy.get_production_verification_evidence` &&
+    isEmptyRecord(evidenceCall.body) &&
+    voiceCall?.approvalRequired === false &&
+    voiceCall.method === "POST" &&
+    voiceCall.url === `${baseUrl}/api/mcp/arcigy.jarvis_voice_event` &&
+    voiceCall.body?.session?.state === "idle" &&
+    voiceCall.body.session.wakeWord === "jarvis" &&
+    !("approval" in (voiceCall.body ?? {}))
+  );
 }
 
 function hasSafeVoiceWakeResult(value: unknown): boolean {

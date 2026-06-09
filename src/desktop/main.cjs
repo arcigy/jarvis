@@ -1947,8 +1947,20 @@ function hasProductionEvidenceQuickStart(value, baseUrl) {
   if (!value || typeof value !== "object") return false;
   if (value.productionVerificationEvidenceUrl !== `${baseUrl}/api/production-verification-evidence`) return false;
   if (!Array.isArray(value.quickStartCalls)) return false;
-  const call = value.quickStartCalls.find((item) => item?.tool === "arcigy.get_production_verification_evidence");
-  return call?.approvalRequired === false && call?.method === "POST" && call?.url === `${baseUrl}/api/mcp/arcigy.get_production_verification_evidence` && isEmptyRecord(call.body);
+  const evidenceCall = value.quickStartCalls.find((item) => item?.tool === "arcigy.get_production_verification_evidence");
+  const voiceCall = value.quickStartCalls.find((item) => item?.tool === "arcigy.jarvis_voice_event" && item?.body?.text === "Jarvis production evidence");
+  return (
+    evidenceCall?.approvalRequired === false &&
+    evidenceCall?.method === "POST" &&
+    evidenceCall?.url === `${baseUrl}/api/mcp/arcigy.get_production_verification_evidence` &&
+    isEmptyRecord(evidenceCall.body) &&
+    voiceCall?.approvalRequired === false &&
+    voiceCall?.method === "POST" &&
+    voiceCall?.url === `${baseUrl}/api/mcp/arcigy.jarvis_voice_event` &&
+    voiceCall?.body?.session?.state === "idle" &&
+    voiceCall.body.session?.wakeWord === "jarvis" &&
+    !("approval" in (voiceCall.body ?? {}))
+  );
 }
 
 function hasSafeProductionEvidenceResult(value) {
