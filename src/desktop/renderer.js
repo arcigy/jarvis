@@ -1047,8 +1047,17 @@ function renderApprovalQueueGrid(items) {
     const summary = document.createElement("p");
     const payload = document.createElement("code");
     const copyButton = document.createElement("button");
+    const copyCallButton = document.createElement("button");
     const alternatePayloads = Array.isArray(item.alternateApprovalPayloads) ? item.alternateApprovalPayloads : [];
     const payloadText = JSON.stringify(item.approvalPayload ?? {}, null, 2);
+    const mcpCallText = JSON.stringify(
+      {
+        tool: item.approvalTool ?? item.type ?? "approval_required_tool",
+        body: item.approvalPayload ?? {},
+      },
+      null,
+      2
+    );
     card.className = "approvalQueueCard";
     card.dataset.priority = item.priority ?? "normal";
     title.textContent = item.title ?? item.type ?? "Approval item";
@@ -1066,7 +1075,18 @@ function renderApprovalQueueGrid(items) {
         copyButton.textContent = "Copy payload";
       }, 1400);
     });
-    card.append(title, meta, summary, payload, copyButton);
+    copyCallButton.type = "button";
+    copyCallButton.className = "approvalQueueCopy";
+    copyCallButton.textContent = "Copy MCP call";
+    copyCallButton.setAttribute("aria-label", `Copy exact MCP call for ${item.approvalTool ?? item.title ?? item.type ?? "approval item"}`);
+    copyCallButton.addEventListener("click", async () => {
+      await writeClipboardText(mcpCallText);
+      copyCallButton.textContent = "Copied";
+      window.setTimeout(() => {
+        copyCallButton.textContent = "Copy MCP call";
+      }, 1400);
+    });
+    card.append(title, meta, summary, payload, copyButton, copyCallButton);
     for (const alternate of alternatePayloads.slice(0, 2)) {
       const alternateCode = document.createElement("code");
       alternateCode.textContent = `alternate: ${JSON.stringify(alternate, null, 2)}`;
