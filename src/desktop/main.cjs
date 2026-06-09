@@ -2203,6 +2203,7 @@ function hasValidOpenApiSchema(value, baseUrl) {
   if (value.components.securitySchemes.bearerAuth.scheme !== "bearer") return false;
   if (value.components.securitySchemes.bearerAuth.bearerFormat !== "JARVIS_WEB_TOKEN") return false;
   if (value["x-arcigy-policy"]?.tokenValueReturned !== false || value["x-arcigy-policy"]?.familyFriendly !== true) return false;
+  if (!hasValidOpenApiAgentSetup(value["x-arcigy-agent-setup"], baseUrl)) return false;
   const names = expectedToolNames();
   if (!sameStringArray(Object.keys(paths), names.map((name) => `/api/mcp/${name}`))) return false;
   const approvalPolicy = new Map(listWebMcpTools().map((tool) => [tool.name, tool.requiresApproval]));
@@ -2217,6 +2218,33 @@ function hasValidOpenApiSchema(value, baseUrl) {
       hasSafeOpenApiExample(name, jsonContent?.examples?.quickStart?.value)
     );
   });
+}
+
+function hasValidOpenApiAgentSetup(value, baseUrl) {
+  if (!value || typeof value !== "object") return false;
+  const supportedAgents = Array.isArray(value.supportedAgents) ? value.supportedAgents : [];
+  const firstTools = Array.isArray(value.firstTools) ? value.firstTools : [];
+  const beforeAnyWork = Array.isArray(value.proofPolicy?.beforeAnyWork) ? value.proofPolicy.beforeAnyWork : [];
+  const beforeWrites = Array.isArray(value.proofPolicy?.beforeWrites) ? value.proofPolicy.beforeWrites : [];
+  const safetyRails = Array.isArray(value.safetyRails) ? value.safetyRails : [];
+  return (
+    ["Claude", "ChatGPT", "Grok"].every((agent) => supportedAgents.includes(agent)) &&
+    value.recommendedImports?.actionManifestUrl === `${baseUrl}/.well-known/ai-plugin.json` &&
+    value.recommendedImports?.openApiSchemaUrl === `${baseUrl}/api/openapi.json` &&
+    value.recommendedImports?.connectionPackUrl === `${baseUrl}/api/remote-mcp-pack?includeReadiness=true&live=true` &&
+    value.recommendedImports?.smokeTestUrl === `${baseUrl}/api/remote-mcp-smoke` &&
+    value.recommendedImports?.productionVerificationEvidenceUrl === `${baseUrl}/api/production-verification-evidence` &&
+    value.recommendedImports?.mcpToolCallPattern === `${baseUrl}/api/mcp/{toolName}` &&
+    firstTools.includes("arcigy.get_operator_briefing") &&
+    firstTools.includes("arcigy.get_jarvis_capability_audit") &&
+    firstTools.includes("arcigy.get_production_verification_evidence") &&
+    value.proofPolicy?.freshnessMaxAgeHours === 24 &&
+    beforeAnyWork.some((step) => typeof step === "string" && step.includes("smokeTestUrl") && step.includes("status=ready")) &&
+    beforeAnyWork.some((step) => typeof step === "string" && step.includes("productionVerificationEvidenceUrl") && step.includes("freshness.fresh=true")) &&
+    beforeWrites.some((step) => typeof step === "string" && step.includes("approval.approved=true")) &&
+    safetyRails.some((rail) => typeof rail === "string" && rail.includes("family-friendly")) &&
+    safetyRails.some((rail) => typeof rail === "string" && rail.includes("OAuth refresh tokens"))
+  );
 }
 
 function hasSafeOpenApiExample(toolName, value) {

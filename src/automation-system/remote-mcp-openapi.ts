@@ -26,6 +26,24 @@ export type RemoteMcpOpenApiDocument = {
     familyFriendly: true;
     approvalRule: string;
   };
+  "x-arcigy-agent-setup": {
+    supportedAgents: Array<"Claude" | "ChatGPT" | "Grok" | "Generic HTTP agent">;
+    recommendedImports: {
+      actionManifestUrl: string;
+      openApiSchemaUrl: string;
+      connectionPackUrl: string;
+      smokeTestUrl: string;
+      productionVerificationEvidenceUrl: string;
+      mcpToolCallPattern: string;
+    };
+    firstTools: Array<"arcigy.get_operator_briefing" | "arcigy.get_jarvis_capability_audit" | "arcigy.get_production_verification_evidence">;
+    proofPolicy: {
+      freshnessMaxAgeHours: 24;
+      beforeAnyWork: string[];
+      beforeWrites: string[];
+    };
+    safetyRails: string[];
+  };
 };
 
 export function buildRemoteMcpOpenApiDocument(baseUrl = "http://127.0.0.1:8765"): RemoteMcpOpenApiDocument {
@@ -143,6 +161,41 @@ export function buildRemoteMcpOpenApiDocument(baseUrl = "http://127.0.0.1:8765")
       familyFriendly: true,
       approvalRule: "Never call approval-required operations until the operator confirms the exact payload.",
     },
+    "x-arcigy-agent-setup": buildOpenApiAgentSetup(normalizedBaseUrl),
+  };
+}
+
+function buildOpenApiAgentSetup(baseUrl: string): RemoteMcpOpenApiDocument["x-arcigy-agent-setup"] {
+  return {
+    supportedAgents: ["Claude", "ChatGPT", "Grok", "Generic HTTP agent"],
+    recommendedImports: {
+      actionManifestUrl: `${baseUrl}/.well-known/ai-plugin.json`,
+      openApiSchemaUrl: `${baseUrl}/api/openapi.json`,
+      connectionPackUrl: `${baseUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`,
+      smokeTestUrl: `${baseUrl}/api/remote-mcp-smoke`,
+      productionVerificationEvidenceUrl: `${baseUrl}/api/production-verification-evidence`,
+      mcpToolCallPattern: `${baseUrl}/api/mcp/{toolName}`,
+    },
+    firstTools: ["arcigy.get_operator_briefing", "arcigy.get_jarvis_capability_audit", "arcigy.get_production_verification_evidence"],
+    proofPolicy: {
+      freshnessMaxAgeHours: 24,
+      beforeAnyWork: [
+        "Load connectionPackUrl and require auth.tokenValueReturned=false.",
+        "Run smokeTestUrl and require status=ready with all remote MCP smoke gates ready.",
+        "Call arcigy.get_jarvis_capability_audit and require status=ready or explicit operator attention.",
+        "Call productionVerificationEvidenceUrl and require status=ready, dirty=false, freshness.fresh=true.",
+      ],
+      beforeWrites: [
+        "Show the exact approval-required payload to the operator.",
+        "Only call write tools after the operator confirms approval.approved=true.",
+        "Never send Gmail, export Sheets, update client status, or generate DOCX from an implicit approval.",
+      ],
+    },
+    safetyRails: [
+      "Keep all outputs family-friendly and client-safe.",
+      "Never reveal bearer tokens, OAuth refresh tokens, API keys, database URLs, or local private paths.",
+      "Use dry-run or read-only tools before local writes whenever available.",
+    ],
   };
 }
 

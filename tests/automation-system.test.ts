@@ -222,6 +222,13 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.equal(document.servers[0].url, "https://jarvis.example");
   assert.equal(document.components.securitySchemes.bearerAuth.bearerFormat, "JARVIS_WEB_TOKEN");
   assert.equal(document["x-arcigy-policy"].tokenValueReturned, false);
+  assert.deepEqual(document["x-arcigy-agent-setup"].supportedAgents.slice(0, 3), ["Claude", "ChatGPT", "Grok"]);
+  assert.equal(document["x-arcigy-agent-setup"].recommendedImports.openApiSchemaUrl, "https://jarvis.example/api/openapi.json");
+  assert.equal(document["x-arcigy-agent-setup"].recommendedImports.connectionPackUrl, "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true");
+  assert.equal(document["x-arcigy-agent-setup"].proofPolicy.freshnessMaxAgeHours, 24);
+  assert.ok(document["x-arcigy-agent-setup"].firstTools.includes("arcigy.get_jarvis_capability_audit"));
+  assert.ok(document["x-arcigy-agent-setup"].proofPolicy.beforeAnyWork.some((step) => step.includes("smokeTestUrl") && step.includes("status=ready")));
+  assert.ok(document["x-arcigy-agent-setup"].proofPolicy.beforeWrites.some((step) => step.includes("approval.approved=true")));
   assert.equal(paths.length, listJarvisMcpTools().length);
   assert.ok(paths.includes("/api/mcp/arcigy.get_operator_briefing"));
   assert.ok(paths.includes("/api/mcp/arcigy.generate_contract_documents"));

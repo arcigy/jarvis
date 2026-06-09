@@ -517,10 +517,21 @@ test("local web bridge serves UI and API health", async () => {
       servers: Array<{ url: string }>;
       paths: Record<string, unknown>;
       components: { securitySchemes: { bearerAuth: { bearerFormat: string } } };
+      "x-arcigy-agent-setup": {
+        supportedAgents: string[];
+        recommendedImports: { openApiSchemaUrl: string; connectionPackUrl: string; smokeTestUrl: string };
+        proofPolicy: { freshnessMaxAgeHours: number; beforeAnyWork: string[]; beforeWrites: string[] };
+      };
     };
     assert.equal(openApiBody.openapi, "3.1.0");
     assert.equal(openApiBody.servers[0].url, baseUrl);
     assert.equal(openApiBody.components.securitySchemes.bearerAuth.bearerFormat, "JARVIS_WEB_TOKEN");
+    assert.deepEqual(openApiBody["x-arcigy-agent-setup"].supportedAgents.slice(0, 3), ["Claude", "ChatGPT", "Grok"]);
+    assert.equal(openApiBody["x-arcigy-agent-setup"].recommendedImports.openApiSchemaUrl, `${baseUrl}/api/openapi.json`);
+    assert.equal(openApiBody["x-arcigy-agent-setup"].recommendedImports.connectionPackUrl, `${baseUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`);
+    assert.equal(openApiBody["x-arcigy-agent-setup"].proofPolicy.freshnessMaxAgeHours, 24);
+    assert.ok(openApiBody["x-arcigy-agent-setup"].proofPolicy.beforeAnyWork.some((step) => step.includes("smokeTestUrl") && step.includes("status=ready")));
+    assert.ok(openApiBody["x-arcigy-agent-setup"].proofPolicy.beforeWrites.some((step) => step.includes("approval.approved=true")));
     assert.equal(Object.keys(openApiBody.paths).length, listJarvisMcpTools().length);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.get_operator_briefing"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.generate_contract_documents"]);
