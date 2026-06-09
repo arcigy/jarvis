@@ -272,7 +272,7 @@ h2 {
 
 .commandDeck {
   display: grid;
-  grid-template-columns: 190px repeat(4, minmax(112px, 1fr)) repeat(3, minmax(118px, 0.45fr));
+  grid-template-columns: 160px repeat(4, minmax(96px, 1fr)) repeat(3, minmax(100px, 0.45fr));
   gap: 12px;
   align-items: stretch;
   margin-bottom: 16px;
@@ -470,7 +470,7 @@ h2 {
 
 .launchQueue {
   display: grid;
-  grid-template-columns: 140px minmax(220px, 1.4fr) minmax(150px, 0.8fr) minmax(230px, 1.1fr) minmax(240px, 1.2fr);
+  grid-template-columns: 120px minmax(180px, 1.4fr) minmax(130px, 0.8fr) minmax(190px, 1.1fr) minmax(200px, 1.2fr);
   gap: 12px;
   margin-bottom: 16px;
 }
@@ -542,6 +542,90 @@ h2 {
 
 .launchQueue li[data-state="attention"] span,
 .launchQueue li[data-state="blocked"] span {
+  border-color: rgb(240 184 79 / 55%);
+  color: #ffd893;
+}
+
+.workflowProofGrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(150px, 1fr));
+  gap: 12px;
+  margin: 0 0 16px;
+}
+
+.workflowProofCard {
+  position: relative;
+  min-height: 128px;
+  border: 1px solid rgb(145 161 157 / 24%);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 50% 0%, rgb(67 217 196 / 14%), transparent 48%),
+    linear-gradient(180deg, rgb(13 22 24 / 96%), rgb(7 11 12 / 96%));
+  padding: 14px;
+  overflow: hidden;
+}
+
+.workflowProofCard::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgb(67 217 196 / 16%), transparent);
+  transform: translateX(-105%);
+  animation: signalSweep 5.8s linear infinite;
+}
+
+.workflowProofCard span,
+.workflowProofCard strong,
+.workflowProofCard p {
+  position: relative;
+  z-index: 1;
+}
+
+.workflowProofCard span {
+  display: inline-grid;
+  min-width: 72px;
+  min-height: 22px;
+  align-items: center;
+  border: 1px solid rgb(145 161 157 / 36%);
+  border-radius: 999px;
+  color: #91a19d;
+  font-size: 10px;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.workflowProofCard strong {
+  display: block;
+  margin-top: 12px;
+  color: #eef4f2;
+  font-size: 14px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.workflowProofCard p {
+  margin: 8px 0 0;
+  color: #a9b8b4;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.workflowProofCard[data-state="ready"] {
+  border-color: rgb(67 217 196 / 48%);
+}
+
+.workflowProofCard[data-state="ready"] span {
+  border-color: rgb(67 217 196 / 55%);
+  color: #9cf8ed;
+}
+
+.workflowProofCard[data-state="attention"],
+.workflowProofCard[data-state="blocked"] {
+  border-color: rgb(240 184 79 / 58%);
+}
+
+.workflowProofCard[data-state="attention"] span,
+.workflowProofCard[data-state="blocked"] span {
   border-color: rgb(240 184 79 / 55%);
   color: #ffd893;
 }
@@ -1841,6 +1925,7 @@ ul {
   .commandDeck,
   .briefingGrid,
   .launchQueue,
+  .workflowProofGrid,
   .operationsRadar,
   .cortexMap,
   .bridgeCockpit,

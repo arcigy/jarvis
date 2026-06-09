@@ -220,6 +220,12 @@ async function run() {
           readyIntegrationsText: document.querySelector("#readyIntegrations")?.textContent.trim() || "",
           mcpToolCountText: document.querySelector("#mcpToolCount")?.textContent.trim() || "",
           approvalLockCountText: document.querySelector("#approvalLockCount")?.textContent.trim() || "",
+          workflowProofCards: [...document.querySelectorAll("#workflowProofGrid .workflowProofCard")].map((node) => ({
+            state: node.getAttribute("data-state") || "",
+            text: node.textContent.trim(),
+            width: node.getBoundingClientRect().width,
+            height: node.getBoundingClientRect().height
+          })),
           handoffProofGatesText: document.querySelector("#handoffProofGates")?.textContent.trim() || "",
           agentSetupProfilesText: document.querySelector("#agentSetupProfiles")?.textContent.trim() || "",
           voiceModeText: document.querySelector("#voiceMode")?.textContent.trim() || "",
@@ -266,6 +272,15 @@ async function run() {
     if (displayedToolCount !== preflight.mcpToolCount) fail(`MCP tool count mismatch: UI ${displayedToolCount}, preflight ${preflight.mcpToolCount}.`);
     if (displayedApprovalLockCount !== preflight.riskyToolsRequiringApproval.length) {
       fail(`Approval lock count mismatch: UI ${displayedApprovalLockCount}, preflight ${preflight.riskyToolsRequiringApproval.length}.`);
+    }
+    const workflowProofCards = Array.isArray(dom.workflowProofCards) ? dom.workflowProofCards : [];
+    if (workflowProofCards.length !== 5) fail(`Workflow proof matrix is incomplete: ${workflowProofCards.length}/5 cards.`);
+    for (const expected of ["Contract automation workflow", "Cold outreach workflow", "Client memory workflow", "Jarvis voice workflow", "Remote agent workflow"]) {
+      const card = workflowProofCards.find((item) => item.text.includes(expected));
+      if (!card) fail(`Workflow proof matrix is missing ${expected}.`);
+      if (card.state !== "ready" || card.width < 100 || card.height < 80) {
+        fail(`Workflow proof card is not ready or visible: ${expected} (${card.state}, ${Math.round(card.width)}x${Math.round(card.height)}).`);
+      }
     }
     const remoteSmokeUi = await runRemoteSmokeFromUi(window);
     const proofGateText = String(remoteSmokeUi.handoffProofGatesText ?? "");

@@ -58,6 +58,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /Verifikacia/);
   assert.match(html, /latest evidence nie je nacitana/);
   assert.match(html, /id="launchChecklist"/);
+  assert.match(html, /id="workflowProofGrid"/);
+  assert.match(html, /Core Jarvis workflow proof/);
+  assert.match(html, /Kontrakty, outreach, klienti, hlas a remote agent/);
   assert.match(html, /id="operationsRadar"/);
   assert.match(html, /id="radarRemoteProof"/);
   assert.match(html, /smoke caka/);
@@ -329,6 +332,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.doesNotMatch(renderer, /node\.innerHTML/);
   assert.match(renderer, /function renderLaunchQueue/);
   assert.match(renderer, /elements\.launchChecklist\.replaceChildren\(\)/);
+  assert.match(renderer, /function renderWorkflowProofMatrix/);
+  assert.match(renderer, /endsWith\("-workflow"\)/);
   assert.match(renderer, /arcigyApi\.productionReadiness\(\{ live: false \}\)/);
   assert.match(renderer, /function renderDiagnosticsGrid/);
   assert.match(renderer, /elements\.diagnosticsGrid\.replaceChildren\(\)/);
@@ -750,6 +755,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(styles, /\.launchQueue/);
   assert.match(styles, /\.launchQueue\[data-state="ready"\]/);
   assert.match(styles, /\.launchQueue li\[data-state="blocked"\]/);
+  assert.match(styles, /\.workflowProofGrid/);
+  assert.match(styles, /\.workflowProofCard\[data-state="ready"\]/);
+  assert.match(styles, /\.workflowProofCard::before/);
   assert.match(styles, /\.releaseProof/);
   assert.match(styles, /\.releaseProof\[data-state="ready"\]/);
   assert.match(styles, /\.operationsRadar/);
@@ -758,7 +766,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(styles, /\.radarNode\[data-state="attention"\]/);
   assert.match(styles, /@keyframes radarSweep/);
   assert.match(styles, /@keyframes radarPanelSweep/);
-  assert.match(styles, /\.launchQueue,\s+\.operationsRadar,\s+\.cortexMap/s);
+  assert.match(styles, /\.launchQueue,\s+\.workflowProofGrid,\s+\.operationsRadar,\s+\.cortexMap/s);
   assert.match(styles, /\.diagnosticsGrid/);
   assert.match(styles, /\.diagnosticCard\[data-state="ready"\]/);
   assert.match(styles, /\.providerFallbackGrid/);
@@ -794,6 +802,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(uiSmoke, /\/api\/web-bridge-preflight/);
   assert.match(uiSmoke, /displayedToolCount !== preflight\.mcpToolCount/);
   assert.match(uiSmoke, /displayedApprovalLockCount !== preflight\.riskyToolsRequiringApproval\.length/);
+  assert.match(uiSmoke, /Workflow proof matrix is incomplete/);
+  assert.match(uiSmoke, /Workflow proof matrix is missing/);
   assert.match(uiSmoke, /mcpToolCount < 35/);
   assert.match(uiSmoke, /riskyToolsRequiringApproval\.length < 6/);
   assert.match(uiSmoke, /console\.error\(safeErrorText\(error\)\)/);

@@ -98,6 +98,7 @@ const elements = {
   verificationEvidence: document.querySelector("#verificationEvidence"),
   releaseProofGrid: document.querySelector("#releaseProofGrid"),
   launchChecklist: document.querySelector("#launchChecklist"),
+  workflowProofGrid: document.querySelector("#workflowProofGrid"),
   operationsRadar: document.querySelector("#operationsRadar"),
   radarRemoteProof: document.querySelector("#radarRemoteProof"),
   radarLiveChecks: document.querySelector("#radarLiveChecks"),
@@ -496,7 +497,41 @@ function renderLaunchQueue(report) {
     node.append(statusNode, titleNode);
     elements.launchChecklist.appendChild(node);
   }
+  renderWorkflowProofMatrix(launchChecklist);
   updateOperationsRadar();
+}
+
+function renderWorkflowProofMatrix(launchChecklist) {
+  if (!elements.workflowProofGrid) return;
+  const workflowItems = launchChecklist.filter((item) => String(item.id ?? "").endsWith("-workflow"));
+  elements.workflowProofGrid.replaceChildren();
+  if (!workflowItems.length) {
+    const empty = document.createElement("div");
+    empty.className = "workflowProofCard";
+    empty.dataset.state = "attention";
+    const label = document.createElement("span");
+    const title = document.createElement("strong");
+    const detail = document.createElement("p");
+    label.textContent = "Workflow proof";
+    title.textContent = "readiness gates nenacitane";
+    detail.textContent = "Spusti readiness report alebo production verification.";
+    empty.append(label, title, detail);
+    elements.workflowProofGrid.appendChild(empty);
+    return;
+  }
+  for (const item of workflowItems) {
+    const card = document.createElement("div");
+    const label = document.createElement("span");
+    const title = document.createElement("strong");
+    const detail = document.createElement("p");
+    card.className = "workflowProofCard";
+    card.dataset.state = item.status === "ready" ? "ready" : item.status === "blocked" ? "blocked" : "attention";
+    label.textContent = item.status === "ready" ? "verified" : item.status ?? "attention";
+    title.textContent = item.title ?? item.id;
+    detail.textContent = item.proof ?? item.nextAction ?? "Workflow proof caka na readiness.";
+    card.append(label, title, detail);
+    elements.workflowProofGrid.appendChild(card);
+  }
 }
 
 function renderProductionVerificationEvidence(evidence) {
