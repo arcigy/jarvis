@@ -1575,6 +1575,74 @@ h2 {
   border-color: rgb(240 184 79 / 68%);
 }
 
+.approvalQueueGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.approvalQueueCard {
+  min-width: 0;
+  border: 1px solid rgb(67 217 196 / 34%);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgb(67 217 196 / 9%), transparent 52%),
+    rgb(9 15 16 / 84%);
+  padding: 10px;
+}
+
+.approvalQueueCard[data-priority="high"] {
+  border-color: rgb(240 184 79 / 52%);
+}
+
+.approvalQueueCard strong,
+.approvalQueueCard span,
+.approvalQueueCard p,
+.approvalQueueCard code {
+  display: block;
+}
+
+.approvalQueueCard strong {
+  color: #eef4f2;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.approvalQueueCard span {
+  margin-top: 5px;
+  color: #91a19d;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.approvalQueueCard p {
+  margin: 8px 0;
+  color: #c8d6d2;
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.approvalQueueCard code {
+  max-height: 96px;
+  overflow: auto;
+  border: 1px solid rgb(145 161 157 / 24%);
+  border-radius: 6px;
+  background: rgb(4 8 9 / 82%);
+  color: #9cf8ed;
+  padding: 8px;
+  font-size: 11px;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.approvalQueueCard code + code {
+  margin-top: 6px;
+  color: #ffd893;
+}
+
 .clientAlertGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1936,6 +2004,7 @@ ul {
   .remoteProofMatrix,
   .diagnosticsGrid,
   .providerFallbackGrid,
+  .approvalQueueGrid,
   .clientAlertGrid,
   .toolMatrix,
   .grid {

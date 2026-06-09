@@ -121,6 +121,7 @@ const elements = {
   submitTranscript: document.querySelector("#submitTranscript"),
   coldBrief: document.querySelector("#coldBrief"),
   approvalQueue: document.querySelector("#approvalQueue"),
+  approvalQueueGrid: document.querySelector("#approvalQueueGrid"),
   preparedReplies: document.querySelector("#preparedReplies"),
   preparePositiveReply: document.querySelector("#preparePositiveReply"),
   approvePreparedReply: document.querySelector("#approvePreparedReply"),
@@ -1019,6 +1020,7 @@ function renderPreparedReplies(result) {
 
 function renderApprovalQueue(result) {
   const items = result.items ?? [];
+  renderApprovalQueueGrid(items);
   if (!items.length) return result.summary ?? "Schvalovacia fronta je prazdna.";
   return [
     result.summary ?? `Schvalovacia fronta: ${items.length}`,
@@ -1033,6 +1035,32 @@ function renderApprovalQueue(result) {
       ].join("\n")
     ),
   ].join("\n");
+}
+
+function renderApprovalQueueGrid(items) {
+  if (!elements.approvalQueueGrid) return;
+  elements.approvalQueueGrid.replaceChildren();
+  for (const item of items.slice(0, 6)) {
+    const card = document.createElement("div");
+    const title = document.createElement("strong");
+    const meta = document.createElement("span");
+    const summary = document.createElement("p");
+    const payload = document.createElement("code");
+    const alternatePayloads = Array.isArray(item.alternateApprovalPayloads) ? item.alternateApprovalPayloads : [];
+    card.className = "approvalQueueCard";
+    card.dataset.priority = item.priority ?? "normal";
+    title.textContent = item.title ?? item.type ?? "Approval item";
+    meta.textContent = [item.approvalTool, item.priority].filter(Boolean).join(" / ") || "approval payload";
+    summary.textContent = item.summary ?? "Caka na operatora.";
+    payload.textContent = JSON.stringify(item.approvalPayload ?? {}, null, 2);
+    card.append(title, meta, summary, payload);
+    for (const alternate of alternatePayloads.slice(0, 2)) {
+      const alternateCode = document.createElement("code");
+      alternateCode.textContent = `alternate: ${JSON.stringify(alternate, null, 2)}`;
+      card.appendChild(alternateCode);
+    }
+    elements.approvalQueueGrid.appendChild(card);
+  }
 }
 
 function renderDiagnostics(result) {

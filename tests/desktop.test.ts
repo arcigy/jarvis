@@ -203,6 +203,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.doesNotMatch(html, /<li>generate_contract_documents<\/li>/);
   assert.match(html, /draftReply/);
   assert.match(html, /approvalQueue/);
+  assert.match(html, /id="approvalQueueGrid"/);
+  assert.match(html, /Operator approval queue cards/);
   assert.match(html, /preparedReplies/);
   assert.match(html, /preparePositiveReply/);
   assert.match(html, /Hlasovy listener/);
@@ -697,6 +699,10 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /\/api\/operator-briefing/);
   assert.match(renderer, /\/api\/prepared-outreach-replies/);
   assert.match(renderer, /\/api\/approval-queue/);
+  assert.match(renderer, /approvalQueueGrid/);
+  assert.match(renderer, /function renderApprovalQueueGrid/);
+  assert.match(renderer, /alternateApprovalPayloads/);
+  assert.match(renderer, /JSON\.stringify\(item\.approvalPayload \?\? \{\}, null, 2\)/);
   assert.match(renderer, /\/api\/approve-prepared-outreach-reply/);
   assert.match(renderer, /\/api\/mcp\/arcigy\.send_approved_outreach_reply/);
   assert.match(renderer, /\/api\/system-health/);
@@ -779,7 +785,10 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(styles, /\.diagnosticCard\[data-state="ready"\]/);
   assert.match(styles, /\.providerFallbackGrid/);
   assert.match(styles, /\.providerFallbackCard\[data-state="attention"\]/);
-  assert.match(styles, /\.diagnosticsGrid,\s+\.providerFallbackGrid,\s+\.clientAlertGrid/s);
+  assert.match(styles, /\.approvalQueueGrid/);
+  assert.match(styles, /\.approvalQueueCard\[data-priority="high"\]/);
+  assert.match(styles, /\.approvalQueueCard code \+ code/);
+  assert.match(styles, /\.diagnosticsGrid,\s+\.providerFallbackGrid,\s+\.approvalQueueGrid,\s+\.clientAlertGrid/s);
   assert.match(styles, /\.clientAlertGrid/);
   assert.match(styles, /\.clientAlertCard/);
   assert.match(styles, /\.clientAlertGrid,\s+\.toolMatrix/s);
