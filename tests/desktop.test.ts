@@ -268,10 +268,14 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /SpeechRecognition/);
   assert.match(renderer, /speechOutputAvailable/);
   assert.match(renderer, /updateVoiceRuntimeStatus/);
-  assert.match(renderer, /microphone stream active/);
-  assert.match(renderer, /Speech recognition is unavailable; use transcript fallback/);
-  assert.match(renderer, /microphone error: \$\{errorName\}/);
-  assert.match(renderer, /microphone restart failed: \$\{safeUiErrorText\(error\)\}/);
+  assert.match(renderer, /listenButtonLabels/);
+  assert.match(renderer, /mikrofon stream aktivny/);
+  assert.match(renderer, /Speech recognition nie je dostupny; pouzi text fallback/);
+  assert.match(renderer, /chyba mikrofonu: \$\{errorName\}/);
+  assert.match(renderer, /restart mikrofonu zlyhal: \$\{safeUiErrorText\(error\)\}/);
+  assert.match(renderer, /cakam na wake word Jarvis/);
+  assert.match(renderer, /pocuvanie vypnute/);
+  assert.doesNotMatch(renderer, /elements\.listenButton\.textContent = "Enable"|elements\.listenButton\.textContent = "Disable"|microphone stream active|waiting for Jarvis wake word|listening disabled/);
   assert.match(renderer, /speechSynthesis/);
   assert.match(renderer, /setupNavigation/);
   assert.match(renderer, /IntersectionObserver/);

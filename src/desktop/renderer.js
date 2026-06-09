@@ -224,6 +224,10 @@ const elements = {
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const speechOutputAvailable = "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
 const webToken = resolveWebToken();
+const listenButtonLabels = {
+  start: "Zapnut",
+  stop: "Vypnut",
+};
 const arcigyApi = window.arcigyDesktop ?? {
   openPath: async () => "desktop-only",
   systemHealth: () => getJson("/api/system-health"),
@@ -1949,7 +1953,7 @@ function numberFromInput(value) {
 async function handleTranscript(text) {
   const trimmed = text.trim();
   elements.transcript.value = trimmed;
-  updateVoiceRuntimeStatus(trimmed ? `heard: ${trimmed}` : "empty transcript ignored");
+  updateVoiceRuntimeStatus(trimmed ? `zachytene: ${trimmed}` : "prazdny prepis ignorovany");
 
   const result = await arcigyApi.jarvisVoiceEvent({
     session: state.session,
@@ -1966,8 +1970,8 @@ async function handleTranscript(text) {
 
 function startRecognition() {
   if (!SpeechRecognition) {
-    updateVoiceRuntimeStatus("Speech recognition is unavailable; use transcript fallback.");
-    speak("Hlasové rozpoznávanie nie je v tomto runtime dostupné. Použi textové pole alebo pripoj natívny speech bridge.");
+    updateVoiceRuntimeStatus("Speech recognition nie je dostupny; pouzi text fallback.");
+    speak("Hlasove rozpoznavanie nie je v tomto runtime dostupne. Pouzi textove pole alebo pripoj nativny speech bridge.");
     return;
   }
 
@@ -1980,7 +1984,7 @@ function startRecognition() {
   recognition.continuous = true;
   recognition.interimResults = false;
   recognition.onstart = () => {
-    updateVoiceRuntimeStatus("microphone stream active");
+    updateVoiceRuntimeStatus("mikrofon stream aktivny");
   };
   recognition.onresult = (event) => {
     const latest = event.results[event.results.length - 1];
@@ -1989,26 +1993,26 @@ function startRecognition() {
   };
   recognition.onend = () => {
     if (!state.listening) {
-      updateVoiceRuntimeStatus("microphone stream stopped");
+      updateVoiceRuntimeStatus("mikrofon stream zastaveny");
       return;
     }
     try {
       recognition.start();
     } catch (error) {
       state.listening = false;
-      elements.listenButton.textContent = "Enable";
+      elements.listenButton.textContent = listenButtonLabels.start;
       setMode("idle");
-      updateVoiceRuntimeStatus(`microphone restart failed: ${safeUiErrorText(error)}`);
+      updateVoiceRuntimeStatus(`restart mikrofonu zlyhal: ${safeUiErrorText(error)}`);
     }
   };
   recognition.onerror = (event) => {
     const errorName = event?.error ?? "unknown";
     if (["not-allowed", "service-not-allowed", "audio-capture"].includes(errorName)) {
       state.listening = false;
-      elements.listenButton.textContent = "Enable";
+      elements.listenButton.textContent = listenButtonLabels.start;
     }
     setMode("idle");
-    updateVoiceRuntimeStatus(`microphone error: ${errorName}`);
+    updateVoiceRuntimeStatus(`chyba mikrofonu: ${errorName}`);
   };
 
   state.recognition = recognition;
@@ -2016,13 +2020,13 @@ function startRecognition() {
   try {
     recognition.start();
     setMode("listening");
-    elements.listenButton.textContent = "Disable";
-    updateVoiceRuntimeStatus("waiting for Jarvis wake word");
+    elements.listenButton.textContent = listenButtonLabels.stop;
+    updateVoiceRuntimeStatus("cakam na wake word Jarvis");
   } catch (error) {
     state.listening = false;
-    elements.listenButton.textContent = "Enable";
+    elements.listenButton.textContent = listenButtonLabels.start;
     setMode("idle");
-    updateVoiceRuntimeStatus(`microphone start failed: ${safeUiErrorText(error)}`);
+    updateVoiceRuntimeStatus(`start mikrofonu zlyhal: ${safeUiErrorText(error)}`);
   }
 }
 
@@ -2030,8 +2034,8 @@ function stopRecognition() {
   state.listening = false;
   state.recognition?.stop();
   setMode("idle");
-  elements.listenButton.textContent = "Enable";
-  updateVoiceRuntimeStatus("listening disabled");
+  elements.listenButton.textContent = listenButtonLabels.start;
+  updateVoiceRuntimeStatus("pocuvanie vypnute");
 }
 
 elements.listenButton.addEventListener("click", () => {
