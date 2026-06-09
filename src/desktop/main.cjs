@@ -561,7 +561,7 @@ function buildReadinessLaunchEvidence(status, launchChecklist, nextActions) {
       requiredBeforeExternalAgent: [
         "Run npm run web:tunnel:secure or use the browser Start tunnel button with a strong JARVIS_WEB_TOKEN.",
         "Fetch /.well-known/ai-plugin.json, /api/openapi.json, /.well-known/arcigy-jarvis.json, and /api/remote-mcp-pack?includeReadiness=true&live=true through the external URL.",
-        "Run /api/remote-mcp-smoke and require status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-agent-setup-profiles, pack-voice-quick-start, voice-tool-call, pack-production-evidence-quick-start, production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction ready; production evidence must also be status=ready with release proof, dirty=false, and freshness.fresh=true within 24h before any remote agent uses write-capable tools.",
+        "Run /api/remote-mcp-smoke and require status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-agent-setup-profiles, pack-voice-quick-start, voice-tool-call, pack-production-evidence-quick-start (direct evidence + Jarvis production evidence voice quick-start), production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction ready; production evidence must also be status=ready with release proof, dirty=false, and freshness.fresh=true within 24h before any remote agent uses write-capable tools.",
       ],
       smokeCommand: "npm run remote:mcp:smoke -- --url <external-url>",
       tunnelCommand: "npm run web:tunnel:secure",
@@ -968,7 +968,7 @@ async function getRemoteMcpPack(payload = {}) {
       "Fetch actionManifestUrl when the remote agent supports ai-plugin/action manifests.",
       "Import openApiSchemaUrl when the remote agent supports ChatGPT custom actions, Grok actions, or OpenAPI-based HTTP tool setup.",
       "Fetch productionVerificationEvidenceUrl or call arcigy.get_production_verification_evidence to inspect the latest verified production proof.",
-      "Run the smokeTestUrl before handoff and require ready checks for action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-agent-setup-profiles, pack-voice-quick-start, voice-tool-call, pack-production-evidence-quick-start, production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction. Production evidence must be status=ready with release proof, dirty=false, and freshness.fresh=true within 24h.",
+      "Run the smokeTestUrl before handoff and require ready checks for action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-agent-setup-profiles, pack-voice-quick-start, voice-tool-call, pack-production-evidence-quick-start (direct evidence + Jarvis production evidence voice quick-start), production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction. Production evidence must be status=ready with release proof, dirty=false, and freshness.fresh=true within 24h.",
       "Call MCP tools with POST JSON to mcpToolCallPattern.",
       "Use the bearer auth header placeholder; the real token must be supplied by the operator and is never returned by this pack.",
       "Use tunnel.statusUrl to inspect public tunnel URLs from the redacted secure-tunnel log. Browser-launched tunnel start requires a strong JARVIS_WEB_TOKEN.",
@@ -1058,7 +1058,7 @@ function buildRemoteMcpAgentCompatibility() {
       "Import openApiSchemaUrl if the agent supports OpenAPI or custom actions.",
       "Fetch productionVerificationEvidenceUrl or call arcigy.get_production_verification_evidence and cite its status.",
       "Fetch handoff.connectionPackUrl and confirm tokenValueReturned=false plus repo-only limits.",
-      "Run smokeTestUrl and require status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-agent-setup-profiles, pack-voice-quick-start, voice-tool-call, pack-production-evidence-quick-start, production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction ready. Production evidence must include release proof, dirty=false, and freshness.fresh=true within 24h.",
+      "Run smokeTestUrl and require status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-agent-setup-profiles, pack-voice-quick-start, voice-tool-call, pack-production-evidence-quick-start (direct evidence + Jarvis production evidence voice quick-start), production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction ready. Production evidence must include release proof, dirty=false, and freshness.fresh=true within 24h.",
       "Inspect tunnel.statusUrl after any tunnel start and never ask for the real bearer token.",
     ],
     safetyRules: [
@@ -1087,7 +1087,7 @@ function buildRemoteMcpHandoffRunbook(baseUrl) {
       "Fetch actionManifestUrl if the agent supports ai-plugin/action manifests.",
       "Fetch openApiSchemaUrl if the agent supports OpenAPI/custom actions.",
       "Fetch productionVerificationEvidenceUrl or call arcigy.get_production_verification_evidence and cite its status.",
-      "Run smokeTestUrl and require status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-agent-setup-profiles, pack-voice-quick-start, voice-tool-call, pack-production-evidence-quick-start, production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction ready before using MCP tools. Production evidence must include release proof, dirty=false, and freshness.fresh=true within 24h.",
+      "Run smokeTestUrl and require status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-agent-setup-profiles, pack-voice-quick-start, voice-tool-call, pack-production-evidence-quick-start (direct evidence + Jarvis production evidence voice quick-start), production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction ready before using MCP tools. Production evidence must include release proof, dirty=false, and freshness.fresh=true within 24h.",
       "Fetch tunnel.statusUrl if the operator needs the current public tunnel URLs; token values must remain redacted.",
       "Call arcigy.get_operator_briefing before proposing work.",
       "Use read-only or draft tools first; use dryRun: true before Gmail sync writes.",
@@ -1127,7 +1127,7 @@ function buildRemoteMcpHandoffRunbook(baseUrl) {
       {
         key: "remote-smoke",
         url: `${baseUrl}/api/remote-mcp-smoke`,
-        expected: 'status=ready, including action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-agent-setup-profiles, pack-voice-quick-start, voice-tool-call, pack-production-evidence-quick-start, production-evidence-tool-call, secret-redaction, approval-gate, approval-shape-gate for top-level {"approved":true} payload rejection, and production evidence release proof with dirty=false and freshness.fresh=true within 24h.',
+        expected: 'status=ready, including action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-agent-setup-profiles, pack-voice-quick-start, voice-tool-call, pack-production-evidence-quick-start (direct evidence + Jarvis production evidence voice quick-start), production-evidence-tool-call, secret-redaction, approval-gate, approval-shape-gate for top-level {"approved":true} payload rejection, and production evidence release proof with dirty=false and freshness.fresh=true within 24h.',
       },
     ],
   };
@@ -1547,7 +1547,7 @@ async function runRemoteMcpSmoke(payload = {}) {
     smokeCheck(
       hasProductionEvidenceQuickStart(pack.body, baseUrl),
       "pack-production-evidence-quick-start",
-      "Connection pack includes the production verification evidence URL and read-only MCP quick-start call."
+      "Connection pack includes the production verification evidence URL, read-only evidence MCP quick-start, and Jarvis production evidence voice quick-start."
     )
   );
   const health = await fetchJson(`${baseUrl}/api/mcp/arcigy.get_system_health`, token, { format: "json" });
@@ -1582,7 +1582,7 @@ async function runRemoteMcpSmoke(payload = {}) {
     baseUrl,
     summary:
       status === "ready"
-        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, action manifest, OpenAPI action schema, CORS preflight, external auth gate, auth throttle policy, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, voice quick-start, voice tool call, client memory quick-start, audit quick-start, production evidence quick-start, production evidence tool call, agent compatibility, structured agent setup profiles, handoff proof, read-only call, approval gates, and secret policy passed.`
+        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, action manifest, OpenAPI action schema, CORS preflight, external auth gate, auth throttle policy, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, voice quick-start, voice tool call, client memory quick-start, audit quick-start, production evidence direct + voice quick-start, production evidence tool call, agent compatibility, structured agent setup profiles, handoff proof, read-only call, approval gates, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((check) => check.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,

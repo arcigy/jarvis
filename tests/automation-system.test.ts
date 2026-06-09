@@ -1113,6 +1113,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
   assert.equal(report.status, "blocked");
   assert.ok(report.checks.some((check) => check.key === "production-evidence-tool-call" && check.status === "blocked"));
   assert.ok(report.checks.some((check) => check.key === "pack-production-evidence-quick-start" && check.status === "ready"));
+  assert.ok(report.checks.some((check) => check.key === "pack-production-evidence-quick-start" && check.message.includes("Jarvis production evidence voice quick-start")));
   assert.ok(report.checks.some((check) => check.key === "secret-redaction" && check.status === "ready"));
 });
 

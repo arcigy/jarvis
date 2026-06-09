@@ -409,7 +409,7 @@ function renderTunnelReadySummary(input: {
     `- Connection pack: ${connectionPackUrl}`,
     `- Smoke test: ${smokeUrl}`,
     `- MCP tool call pattern: ${mcpToolPattern}`,
-    "- Required proof before work: action manifest HTTP 200, OpenAPI schema HTTP 200, manifest HTTP 200, connection pack tokenValueReturned=false with repo-only limits and agentSetupProfiles for Claude/ChatGPT/Grok, remote smoke status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-agent-setup-profiles, pack-voice-quick-start, voice-tool-call, pack-production-evidence-quick-start, production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction.",
+    "- Required proof before work: action manifest HTTP 200, OpenAPI schema HTTP 200, manifest HTTP 200, connection pack tokenValueReturned=false with repo-only limits and agentSetupProfiles for Claude/ChatGPT/Grok, remote smoke status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-agent-setup-profiles, pack-voice-quick-start, voice-tool-call, pack-production-evidence-quick-start (direct evidence + Jarvis production evidence voice quick-start), production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction.",
     "- First MCP call: POST arcigy.get_operator_briefing with {\"periodLabel\":\"poslednych 7 dni\",\"live\":true}.",
     "- Approval rule: never call approval-required tools without your explicit confirmation of the exact payload.",
     "- Local write rule: preview Gmail with dryRun=true before syncing messages into local memory.",
