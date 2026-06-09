@@ -12,6 +12,25 @@ test("local web bridge serves UI and API health", async () => {
   assert.match(source, /function cleanPythonErrorMessage/);
   assert.match(source, /return redactSensitiveText\(valueError\.replace/);
   assert.match(source, /return redactSensitiveText\(lines\.at\(-1\) \|\| String\(message\)\)/);
+  const evidencePath = join(process.cwd(), "generated", "production-verification", "latest.json");
+  const previousEvidence = existsSync(evidencePath) ? readFileSync(evidencePath, "utf-8") : null;
+  const syntheticGoogleKey = "AI" + "za" + "S" + "y" + "C".repeat(32);
+  mkdirSync(join(process.cwd(), "generated", "production-verification"), { recursive: true });
+  writeFileSync(
+    evidencePath,
+    JSON.stringify({
+      mode: "arcigy-jarvis-production-verification",
+      status: "ready",
+      generatedAt: "2026-06-09T06:37:47.066Z",
+      webUrl: "http://127.0.0.1:8765",
+      secretPolicy: `Secret-safe ${syntheticGoogleKey}`,
+      checks: [
+        { name: "typecheck", status: "ready", detail: "OK" },
+        { name: "secret-scan", status: "ready", detail: `No leak ${syntheticGoogleKey}` },
+      ],
+    }),
+    "utf-8"
+  );
 
   const server = createLocalApiServer();
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -29,6 +48,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.match(html, /remoteAgentPrompt/);
     assert.match(html, /copyRemotePack/);
     assert.match(html, /runRemoteSmoke/);
+    assert.match(html, /verificationEvidence/);
 
     const css = await fetch(`${baseUrl}/styles.css`);
     assert.equal(css.status, 200);
@@ -56,6 +76,8 @@ test("local web bridge serves UI and API health", async () => {
     assert.match(rendererText, /startWebBridgeWatch/);
     assert.match(rendererText, /renderRemoteMcpPack/);
     assert.match(rendererText, /renderRemoteMcpSmoke/);
+    assert.match(rendererText, /renderProductionVerificationEvidence/);
+    assert.match(rendererText, /\/api\/production-verification-evidence/);
     assert.match(rendererText, /\/api\/remote-mcp-pack/);
     assert.match(rendererText, /\/api\/remote-mcp-smoke/);
 
@@ -68,7 +90,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(manifestResponse.status, 200);
     const manifest = (await manifestResponse.json()) as {
       auth: { type: string; requiredForExternalHosts: boolean };
-      endpoints: { mcpToolCallPattern: string; actionManifest: string; openApiSchema: string };
+      endpoints: { mcpToolCallPattern: string; actionManifest: string; openApiSchema: string; productionVerificationEvidence: string };
       toolPolicy: { approvalRequired: string[]; localStateWrite: string[]; readOnlyOrDraft: string[] };
       tools: Array<{ name: string; method: string; url: string; approval: { required: boolean; field?: string }; localStateWrite: boolean; readOnlyOrDraft: boolean }>;
     };
@@ -77,6 +99,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.match(manifest.endpoints.mcpToolCallPattern, /\/api\/mcp\/\{toolName\}$/);
     assert.match(manifest.endpoints.actionManifest, /\/\.well-known\/ai-plugin\.json$/);
     assert.match(manifest.endpoints.openApiSchema, /\/api\/openapi\.json$/);
+    assert.match(manifest.endpoints.productionVerificationEvidence, /\/api\/production-verification-evidence$/);
     assert.ok(manifest.toolPolicy.approvalRequired.includes("arcigy.generate_contract_documents"));
     assert.ok(manifest.toolPolicy.approvalRequired.includes("arcigy.send_approved_outreach_reply"));
     assert.ok(manifest.toolPolicy.localStateWrite.includes("arcigy.sync_gmail_recent_messages"));
@@ -343,6 +366,16 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(readinessBody.launchEvidence.remoteHandoff.tunnelCommand, "npm run web:tunnel:secure");
     assert.ok(readinessBody.launchEvidence.remoteHandoff.requiredBeforeExternalAgent.some((step) => step.includes("/.well-known/ai-plugin.json") && step.includes("/api/openapi.json")));
     assert.ok(readinessBody.launchEvidence.remoteHandoff.requiredBeforeExternalAgent.some((step) => step.includes("cors-preflight") && step.includes("external-auth-gate") && step.includes("secret-redaction")));
+
+    const verificationEvidence = await fetch(`${baseUrl}/api/production-verification-evidence`);
+    assert.equal(verificationEvidence.status, 200);
+    const verificationEvidenceText = await verificationEvidence.text();
+    assert.equal(verificationEvidenceText.includes(syntheticGoogleKey), false);
+    const verificationEvidenceBody = JSON.parse(verificationEvidenceText) as { status: string; summary: string; checks: Array<{ name: string; status: string; detail: string }> };
+    assert.equal(verificationEvidenceBody.status, "ready");
+    assert.match(verificationEvidenceBody.summary, /2 ready, 0 failed/);
+    assert.ok(verificationEvidenceBody.checks.some((check) => check.name === "secret-scan" && check.status === "ready"));
+    assert.match(verificationEvidenceText, /\[redacted-google-api-key\]/);
 
     const mcpReadiness = await postJson(`${baseUrl}/api/mcp/arcigy.get_production_readiness`, { live: false });
     assert.equal(mcpReadiness.result.mcp.toolCount, listJarvisMcpTools().length);
@@ -659,6 +692,8 @@ test("local web bridge serves UI and API health", async () => {
     const clearedAlertsBody = (await clearedAlerts.json()) as { count: number };
     assert.equal(clearedAlertsBody.count, 0);
   } finally {
+    if (previousEvidence === null) rmSync(evidencePath, { force: true });
+    else writeFileSync(evidencePath, previousEvidence, "utf-8");
     await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   }
 });

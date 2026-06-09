@@ -169,6 +169,7 @@ It serves the same UI at `http://127.0.0.1:8765` and exposes local HTTP endpoint
 - `GET /api/system-health`
 - `POST /api/run-diagnostics`
 - `POST /api/production-readiness`
+- `GET /api/production-verification-evidence`
 - `POST /api/operator-briefing`
 - `POST /api/jarvis/voice-event`
 - `POST /api/cold-outreach-brief`

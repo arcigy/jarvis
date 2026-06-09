@@ -387,6 +387,13 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /Attention queue/);
   assert.match(renderer, /validationCommand/);
   assert.match(renderer, /\/api\/production-readiness/);
+  assert.match(renderer, /\/api\/production-verification-evidence/);
+  assert.match(renderer, /renderProductionVerificationEvidence/);
+  assert.match(html, /verificationEvidence/);
+  assert.match(main, /jarvis:productionVerificationEvidence/);
+  assert.match(main, /function getProductionVerificationEvidence/);
+  assert.match(main, /productionVerificationEvidencePath/);
+  assert.match(preload, /productionVerificationEvidence: \(\) => ipcRenderer\.invoke\("jarvis:productionVerificationEvidence"\)/);
   assert.match(renderer, /\/api\/operator-briefing/);
   assert.match(renderer, /\/api\/prepared-outreach-replies/);
   assert.match(renderer, /\/api\/approval-queue/);

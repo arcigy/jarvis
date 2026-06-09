@@ -10,6 +10,7 @@ let tray;
 let tunnelProcess = null;
 const repoRoot = path.resolve(__dirname, "..", "..");
 const defaultDbPath = path.join(repoRoot, "data", "jarvis-local.db");
+const productionVerificationEvidencePath = path.join(repoRoot, "generated", "production-verification", "latest.json");
 const defaultGmailSyncQuery = "in:inbox newer_than:7d";
 const defaultGmailBriefingQuery = "in:inbox newer_than:2d";
 const googleOAuthTokenUrls = ["https://oauth2.googleapis.com/token", "https://www.googleapis.com/oauth2/v4/token"];
@@ -171,6 +172,7 @@ app.whenReady().then(() => {
   ipcMain.handle("jarvis:systemHealth", () => getSystemHealth());
   ipcMain.handle("jarvis:runDiagnostics", (_event, payload) => runDiagnostics(payload));
   ipcMain.handle("jarvis:productionReadiness", (_event, payload) => getProductionReadiness(payload));
+  ipcMain.handle("jarvis:productionVerificationEvidence", () => getProductionVerificationEvidence());
   ipcMain.handle("jarvis:notifyOperator", (_event, payload) => showOperatorNotification(payload));
   ipcMain.handle("jarvis:operatorBriefing", (_event, payload) => getOperatorBriefing(payload));
   ipcMain.handle("jarvis:webBridgePreflight", () => getWebBridgePreflight());
@@ -744,6 +746,7 @@ function getWebBridgePreflight() {
     manifestUrl: `http://${process.env.JARVIS_WEB_HOST || "127.0.0.1"}:${process.env.JARVIS_WEB_PORT || "8765"}/.well-known/arcigy-jarvis.json`,
     actionManifestUrl: `http://${process.env.JARVIS_WEB_HOST || "127.0.0.1"}:${process.env.JARVIS_WEB_PORT || "8765"}/.well-known/ai-plugin.json`,
     openApiSchemaUrl: `http://${process.env.JARVIS_WEB_HOST || "127.0.0.1"}:${process.env.JARVIS_WEB_PORT || "8765"}/api/openapi.json`,
+    productionVerificationEvidenceUrl: `http://${process.env.JARVIS_WEB_HOST || "127.0.0.1"}:${process.env.JARVIS_WEB_PORT || "8765"}/api/production-verification-evidence`,
     tunnelCommand: "npm run web:tunnel",
     tunnelProvider: "ngrok",
     authRequiredForExternalHosts: true,
@@ -757,6 +760,49 @@ function getWebBridgePreflight() {
     readyForTunnel: tokenConfigured && tokenStrong && riskyToolsRequiringApproval.length > 0,
     warnings,
   };
+}
+
+function getProductionVerificationEvidence() {
+  if (!fs.existsSync(productionVerificationEvidencePath)) {
+    return {
+      mode: "arcigy-jarvis-production-verification",
+      status: "missing",
+      generatedAt: null,
+      evidencePath: productionVerificationEvidencePath,
+      summary: "Run npm run verify:production to create the latest secret-safe verification evidence artifact.",
+      checks: [],
+    };
+  }
+  try {
+    const raw = redactSensitiveText(fs.readFileSync(productionVerificationEvidencePath, "utf-8"));
+    const evidence = JSON.parse(raw);
+    return {
+      mode: evidence.mode === "arcigy-jarvis-production-verification" ? evidence.mode : "arcigy-jarvis-production-verification",
+      status: typeof evidence.status === "string" ? evidence.status : "attention",
+      generatedAt: typeof evidence.generatedAt === "string" ? evidence.generatedAt : null,
+      webUrl: typeof evidence.webUrl === "string" ? evidence.webUrl : undefined,
+      secretPolicy: typeof evidence.secretPolicy === "string" ? evidence.secretPolicy : "Secret-safe verification evidence.",
+      evidencePath: productionVerificationEvidencePath,
+      checks: Array.isArray(evidence.checks) ? evidence.checks : [],
+      summary: summarizeProductionVerificationEvidence(evidence),
+    };
+  } catch (error) {
+    return {
+      mode: "arcigy-jarvis-production-verification",
+      status: "attention",
+      generatedAt: null,
+      evidencePath: productionVerificationEvidencePath,
+      summary: `Production verification evidence exists but could not be parsed: ${redactSensitiveText(error instanceof Error ? error.message : String(error))}`,
+      checks: [],
+    };
+  }
+}
+
+function summarizeProductionVerificationEvidence(evidence) {
+  const checks = Array.isArray(evidence.checks) ? evidence.checks : [];
+  const ready = checks.filter((check) => check && typeof check === "object" && check.status === "ready").length;
+  const failed = checks.filter((check) => check && typeof check === "object" && check.status === "failed").length;
+  return `Production verification ${evidence.status === "ready" ? "ready" : "needs attention"}: ${ready} ready, ${failed} failed.`;
 }
 
 async function getRemoteMcpPack(payload = {}) {

@@ -51,6 +51,7 @@ const elements = {
   launchStatus: document.querySelector("#launchStatus"),
   launchNextAction: document.querySelector("#launchNextAction"),
   launchAttention: document.querySelector("#launchAttention"),
+  verificationEvidence: document.querySelector("#verificationEvidence"),
   launchChecklist: document.querySelector("#launchChecklist"),
   readinessReport: document.querySelector("#readinessReport"),
   operatorBriefing: document.querySelector("#operatorBriefing"),
@@ -163,6 +164,7 @@ const arcigyApi = window.arcigyDesktop ?? {
   jarvisVoiceEvent: (payload) => postJson("/api/jarvis/voice-event", payload),
   runDiagnostics: (payload) => postJson("/api/run-diagnostics", payload),
   productionReadiness: (payload) => postJson("/api/production-readiness", payload),
+  productionVerificationEvidence: () => getJson("/api/production-verification-evidence"),
   notifyOperator: async () => ({ delivered: false }),
   operatorBriefing: (payload) => postJson("/api/operator-briefing", payload),
   startSecureTunnel: () => postJson("/api/start-secure-tunnel", {}),
@@ -396,6 +398,18 @@ function renderLaunchQueue(report) {
   }
 }
 
+function renderProductionVerificationEvidence(evidence) {
+  if (!elements.verificationEvidence) return;
+  const status = evidence?.status ?? "missing";
+  const checks = Array.isArray(evidence?.checks) ? evidence.checks : [];
+  const ready = checks.filter((check) => check?.status === "ready").length;
+  const failed = checks.filter((check) => check?.status === "failed").length;
+  const generatedAt = evidence?.generatedAt ? new Date(evidence.generatedAt).toLocaleString() : "not generated";
+  elements.verificationEvidence.textContent = status === "ready" ? `${ready} gates ready` : `${status}: ${failed} failed`;
+  elements.verificationEvidence.title = `${evidence?.summary ?? "Run npm run verify:production."} ${generatedAt}`;
+  elements.verificationEvidence.closest("div")?.setAttribute("data-state", status === "ready" ? "ready" : "attention");
+}
+
 function buildCommandTimeline(blockers, bridge, advisories = []) {
   const bridgeState = bridge ? (bridge.readyForTunnel ? "MCP bridge ready for tunnel." : "MCP bridge needs attention.") : "MCP bridge preflight not loaded.";
   if (!blockers.length) {
@@ -590,6 +604,14 @@ async function refreshHealth() {
       elements.launchNextAction.textContent = safeUiErrorText(error);
       elements.launchAttention.textContent = "readiness unavailable";
       elements.launchChecklist.replaceChildren();
+    }
+    try {
+      renderProductionVerificationEvidence(await arcigyApi.productionVerificationEvidence());
+    } catch (error) {
+      if (elements.verificationEvidence) {
+        elements.verificationEvidence.textContent = "evidence unavailable";
+        elements.verificationEvidence.title = safeUiErrorText(error);
+      }
     }
   } catch (error) {
     elements.healthGrid.textContent = safeUiErrorText(error);
