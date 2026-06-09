@@ -22,6 +22,7 @@ export type JarvisIntent =
 export type JarvisVoiceCapability =
   | "cold_outreach_brief"
   | "operator_briefing"
+  | "full_launch_proof"
   | "production_readiness"
   | "production_evidence"
   | "remote_mcp"
@@ -62,6 +63,7 @@ export function resolveJarvisIntentFromTranscript(transcript: string): JarvisInt
 
 function resolveVoiceCapability(text: string): JarvisVoiceCapability | null {
   if (hasAny(text, ["cold outreach", "outreach", "smartlead", "pozitivne odpovede"])) return "cold_outreach_brief";
+  if (hasAny(text, ["full proof", "launch proof", "full launch", "kompletny dokaz", "uplny dokaz", "dokaz spustenia"])) return "full_launch_proof";
   if (hasAny(text, ["briefing", "prehlad", "co sa deje", "co sa dialo", "operator"])) return "operator_briefing";
   if (hasAny(text, ["approval", "schvalenie", "schvalit", "potvrdenie", "potvrdit", "na moje znamenie", "cakaju na mna"])) return "approval_queue";
   if (hasAny(text, ["production evidence", "verification evidence", "release proof", "evidence", "verifier", "overenie", "dokaz"])) return "production_evidence";
@@ -82,6 +84,8 @@ function answerVoiceCapability(capability: JarvisVoiceCapability): string {
       "Viem zhrnúť cold outreach v Jarvis štýle: koľkým ľuďom sme napísali, open rate, odpovede, pozitívne odpovede a pripravené odpovede čakajúce na tvoje potvrdenie.",
     operator_briefing:
       "Viem spraviť Jarvis briefing: readiness, cold outreach, Gmail sync, klientske požiadavky, pripravené odpovede a najbližší krok.",
+    full_launch_proof:
+      "Viem hlasom precitat full launch proof: produkcnu readiness, release evidence, remote MCP handoff stav, blokery, advisories a najblizsi bezpecny krok.",
     production_readiness:
       "Viem skontrolovať produkčný stav: integrácie, live diagnostiku, MCP registry, approval locks a launch checklist.",
     production_evidence:

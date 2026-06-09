@@ -78,6 +78,7 @@ The Electron shell opens a local Arcigy Jarvis console with:
 - Slovak TTS via `speechSynthesis`
 - local Electron IPC bridge for Jarvis voice events and cold outreach briefs
 - first-screen operator briefing combining readiness, outreach, client requests, and pending approvals
+- voice `Jarvis full launch proof` command combining live readiness, release evidence, and remote MCP handoff state
 - explicit live operator briefing that syncs recent Gmail messages and prefers Smartlead outreach statistics when `live=true`
 - silent five-minute operator briefing refresh, with speech only after an explicit click
 - voice cold outreach answers backed by live Smartlead statistics with `data\jarvis-local.db` fallback

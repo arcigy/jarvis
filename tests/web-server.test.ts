@@ -690,6 +690,17 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(voiceProductionBody.session.state, "idle");
     assert.match(voiceProductionBody.speakText ?? "", /Production readiness/i);
 
+    const voiceFullProof = await fetch(`${baseUrl}/api/jarvis/voice-event`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text: "Jarvis full launch proof", session: { state: "idle", wakeWord: "jarvis" } }),
+    });
+    assert.equal(voiceFullProof.status, 200);
+    const voiceFullProofBody = (await voiceFullProof.json()) as { session: { state: string }; speakText?: string };
+    assert.equal(voiceFullProofBody.session.state, "idle");
+    assert.match(voiceFullProofBody.speakText ?? "", /Full launch proof/i);
+    assert.match(voiceFullProofBody.speakText ?? "", /Remote MCP pack/i);
+
     const voiceProductionEvidence = await fetch(`${baseUrl}/api/jarvis/voice-event`, {
       method: "POST",
       headers: { "content-type": "application/json" },

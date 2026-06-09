@@ -250,6 +250,13 @@ async function handleVoiceEvent(payload) {
     return voiceDone(session, text, (await getOperatorBriefing({ ...payload, text })).speechText);
   }
 
+  if (isFullLaunchProofVoiceCommand(lowered)) {
+    const report = await getProductionReadiness({ ...payload, live: true });
+    const evidence = getProductionVerificationEvidence();
+    const pack = await getRemoteMcpPack({ ...payload, includeReadiness: true, live: false });
+    return voiceDone(session, text, summarizeFullLaunchProofForVoice(report, evidence, pack));
+  }
+
   if (isProductionEvidenceVoiceCommand(lowered)) {
     return voiceDone(session, text, summarizeProductionEvidenceForVoice(getProductionVerificationEvidence()));
   }
@@ -2394,6 +2401,27 @@ function summarizeProductionEvidenceForVoice(evidence) {
   ].filter(Boolean).join(" ");
 }
 
+function summarizeFullLaunchProofForVoice(report, evidence, pack) {
+  const blockers = Array.isArray(report?.blockers) ? report.blockers : [];
+  const blocking = blockers.filter((item) => item?.severity === "blocking");
+  const advisories = blockers.filter((item) => item?.severity === "warning");
+  const release = evidence?.release && typeof evidence.release === "object" && !Array.isArray(evidence.release) ? evidence.release : {};
+  const freshness = evidence?.freshness && typeof evidence.freshness === "object" && !Array.isArray(evidence.freshness) ? evidence.freshness : {};
+  const checks = Array.isArray(evidence?.checks) ? evidence.checks : [];
+  const readyChecks = checks.filter((check) => check && typeof check === "object" && check.status === "ready").length;
+  const coreReady = evidence?.status === "ready" && release.dirty === false && freshness.fresh === true && !blocking.length;
+  const headline = coreReady ? (advisories.length ? "Full launch proof je ready s advisory." : "Full launch proof je ready.") : "Full launch proof potrebuje pozornost.";
+  const approvalRequired = Array.isArray(pack?.tools?.approvalRequired) ? pack.tools.approvalRequired.length : 0;
+  const next = blocking[0]?.nextAction ?? advisories[0]?.nextAction ?? (Array.isArray(report?.nextActions) ? report.nextActions[0] : null) ?? "Keep proof fresh before remote agent handoff.";
+  return [
+    headline,
+    `Readiness: ${report?.status || "unknown"}, ${blocking.length} blocking, ${advisories.length} advisory.`,
+    `Production evidence: ${evidence?.status || "unknown"}, commit ${release.shortCommit || "unknown"}, tree ${release.dirty === false ? "clean" : "not clean"}, freshness ${freshness.fresh === true ? `fresh ${freshness.ageHours ?? "?"}h` : "stale or missing"}, checks ${readyChecks}/${checks.length}.`,
+    pack ? `Remote MCP pack: ${pack.tools?.count || 0} toolov, ${approvalRequired} approval lockov. Smoke: ${pack.smokeTestUrl || "not loaded"}.` : "Remote MCP pack nie je dostupny.",
+    `Najblizsi krok: ${next}`,
+  ].join(" ");
+}
+
 function summarizeRemoteMcpForVoice(pack) {
   const tools = pack.tools || {};
   const approvalRequired = Array.isArray(tools.approvalRequired) ? tools.approvalRequired : [];
@@ -2436,6 +2464,10 @@ function summarizeGmailPreviewForVoice(result) {
 
 function isProductionReadinessVoiceCommand(text) {
   return ["production", "produkcia", "readiness", "launch", "checklist", "nasadenie"].some((term) => text.includes(term));
+}
+
+function isFullLaunchProofVoiceCommand(text) {
+  return ["full proof", "launch proof", "full launch", "kompletny dokaz", "uplny dokaz", "dokaz spustenia"].some((term) => text.includes(term));
 }
 
 function isProductionEvidenceVoiceCommand(text) {

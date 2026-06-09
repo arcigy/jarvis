@@ -1517,6 +1517,13 @@ async function handleWebVoiceEvent(payload: Record<string, unknown>, request?: I
     return voiceDone(session, text, briefing.speechText);
   }
 
+  if (isFullLaunchProofVoiceCommand(lowered)) {
+    const report = await buildProductionReadinessReport({ live: true, dbPath: resolveRepoPath(payload.dbPath, defaultDbPath, "dbPath") });
+    const evidence = getProductionVerificationEvidence(repoRoot);
+    const pack = request ? await getRemoteMcpPack(request, null, { ...payload, includeReadiness: true, live: false }) : null;
+    return voiceDone(session, text, summarizeFullLaunchProofForVoice(report, evidence, pack));
+  }
+
   if (isProductionEvidenceVoiceCommand(lowered)) {
     const evidence = getProductionVerificationEvidence(repoRoot);
     return voiceDone(session, text, summarizeProductionEvidenceForVoice(evidence));
@@ -1678,6 +1685,31 @@ function summarizeProductionEvidenceForVoice(evidence: {
     .join(" ");
 }
 
+function summarizeFullLaunchProofForVoice(
+  report: { status?: unknown; blockers?: Array<{ severity?: unknown; nextAction?: unknown }>; nextActions?: unknown[] },
+  evidence: { status?: unknown; checks?: unknown[]; release?: unknown; freshness?: unknown },
+  pack: { tools?: { count?: unknown; approvalRequired?: unknown[] }; smokeTestUrl?: unknown } | null
+) {
+  const blockers = Array.isArray(report.blockers) ? report.blockers : [];
+  const blocking = blockers.filter((item) => item.severity === "blocking");
+  const advisories = blockers.filter((item) => item.severity === "warning");
+  const release = evidence.release && typeof evidence.release === "object" && !Array.isArray(evidence.release) ? (evidence.release as Record<string, unknown>) : {};
+  const freshness = evidence.freshness && typeof evidence.freshness === "object" && !Array.isArray(evidence.freshness) ? (evidence.freshness as Record<string, unknown>) : {};
+  const checks = Array.isArray(evidence.checks) ? evidence.checks : [];
+  const readyChecks = checks.filter((check) => check && typeof check === "object" && (check as { status?: unknown }).status === "ready").length;
+  const coreReady = evidence.status === "ready" && release.dirty === false && freshness.fresh === true && !blocking.length;
+  const headline = coreReady ? (advisories.length ? "Full launch proof je ready s advisory." : "Full launch proof je ready.") : "Full launch proof potrebuje pozornost.";
+  const approvalRequired = Array.isArray(pack?.tools?.approvalRequired) ? pack.tools.approvalRequired.length : 0;
+  const next = blocking[0]?.nextAction ?? advisories[0]?.nextAction ?? (Array.isArray(report.nextActions) ? report.nextActions[0] : null) ?? "Keep proof fresh before remote agent handoff.";
+  return [
+    headline,
+    `Readiness: ${String(report.status ?? "unknown")}, ${blocking.length} blocking, ${advisories.length} advisory.`,
+    `Production evidence: ${String(evidence.status ?? "unknown")}, commit ${String(release.shortCommit ?? "unknown")}, tree ${release.dirty === false ? "clean" : "not clean"}, freshness ${freshness.fresh === true ? `fresh ${String(freshness.ageHours ?? "?")}h` : "stale or missing"}, checks ${readyChecks}/${checks.length}.`,
+    pack ? `Remote MCP pack: ${String(pack.tools?.count ?? 0)} toolov, ${approvalRequired} approval lockov. Smoke: ${String(pack.smokeTestUrl ?? "not loaded")}.` : "Remote MCP pack nie je dostupny bez web request kontextu.",
+    `Najblizsi krok: ${String(next)}`,
+  ].join(" ");
+}
+
 function summarizeRemoteMcpForVoice(pack: {
   tools?: { count?: unknown; approvalRequired?: unknown[]; localStateWrite?: unknown[] };
   quickStartCalls?: unknown[];
@@ -1768,6 +1800,10 @@ function isApprovalQueueVoiceCommand(text: string) {
 
 function isProductionReadinessVoiceCommand(text: string) {
   return ["production", "produkcia", "readiness", "launch", "checklist", "nasadenie"].some((term) => text.includes(term));
+}
+
+function isFullLaunchProofVoiceCommand(text: string) {
+  return ["full proof", "launch proof", "full launch", "kompletny dokaz", "uplny dokaz", "dokaz spustenia"].some((term) => text.includes(term));
 }
 
 function isProductionEvidenceVoiceCommand(text: string) {
