@@ -89,6 +89,14 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /id="bridgeAuthState"/);
   assert.match(html, /id="bridgeManifestState"/);
   assert.match(html, /id="bridgeToolState"/);
+  assert.match(html, /id="remoteMissionStatus"/);
+  assert.match(html, /Remote agent mission readiness/);
+  assert.match(html, /id="remoteMissionPack"/);
+  assert.match(html, /id="remoteMissionSmoke"/);
+  assert.match(html, /id="remoteMissionEvidence"/);
+  assert.match(html, /id="remoteMissionAgents"/);
+  assert.match(html, /spusti smoke pred handoffom/);
+  assert.match(html, /Claude \/ ChatGPT \/ Grok cakaju/);
   assert.match(html, /id="handoffStatus"/);
   assert.match(html, /caka/);
   assert.match(html, /id="handoffManifestUrl"/);
@@ -337,6 +345,11 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /node\.setAttribute\("data-state", stateName\)/);
   assert.match(renderer, /renderBridgeCockpit/);
   assert.match(renderer, /renderRemoteMcpPack/);
+  assert.match(renderer, /updateRemoteMissionStatus/);
+  assert.match(renderer, /remoteMissionPack: document\.querySelector\("#remoteMissionPack"\)/);
+  assert.match(renderer, /setRemoteMissionNode/);
+  assert.match(renderer, /"Claude", "ChatGPT", "Grok"/);
+  assert.match(renderer, /packReady && smokeReady && evidenceReady && agentReady/);
   assert.match(renderer, /renderRemoteAgentLaunchBundle/);
   assert.match(renderer, /state\.lastRemoteAgentLaunchBundle = pack\.agentLaunchBundle \?\? null/);
   assert.match(renderer, /Launch proof policy:/);
@@ -758,6 +771,10 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(styles, /\.cortexNode\[data-state="ready"\]/);
   assert.match(styles, /\.remoteProofMatrix/);
   assert.match(styles, /\.proofGateCard\[data-state="ready"\]/);
+  assert.match(styles, /\.remoteMissionStatus/);
+  assert.match(styles, /grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
+  assert.match(styles, /\.remoteMissionStatus strong\[data-state="ready"\]/);
+  assert.match(styles, /\.remoteMissionStatus strong\[data-state="attention"\]/);
   assert.match(styles, /@keyframes cortexSweep/);
   assert.match(styles, /@keyframes cortexPulse/);
   assert.match(styles, /@keyframes signalSweep/);

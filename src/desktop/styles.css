@@ -1014,6 +1014,88 @@ h2 {
   color: #ffd893;
 }
 
+.remoteMissionStatus {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+  border: 1px solid rgb(52 84 80 / 70%);
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, rgb(67 217 196 / 10%), transparent 38%, rgb(240 184 79 / 7%)),
+    rgb(7 12 13 / 78%);
+  padding: 8px;
+}
+
+.remoteMissionStatus div {
+  min-width: 0;
+  min-height: 76px;
+  border: 1px solid #1d302e;
+  border-radius: 7px;
+  background:
+    linear-gradient(150deg, rgb(67 217 196 / 10%), transparent 54%),
+    rgb(10 18 19 / 86%);
+  padding: 9px;
+  position: relative;
+  overflow: hidden;
+}
+
+.remoteMissionStatus div::after {
+  content: "";
+  position: absolute;
+  inset: auto 9px 8px;
+  height: 2px;
+  border-radius: 999px;
+  background: #596866;
+}
+
+.remoteMissionStatus div[data-state="ready"] {
+  border-color: rgb(67 217 196 / 46%);
+}
+
+.remoteMissionStatus div[data-state="ready"]::after {
+  background: #43d9c4;
+  box-shadow: 0 0 14px rgb(67 217 196 / 54%);
+}
+
+.remoteMissionStatus div[data-state="attention"] {
+  border-color: rgb(240 184 79 / 42%);
+}
+
+.remoteMissionStatus div[data-state="attention"]::after {
+  background: #f0b84f;
+}
+
+.remoteMissionStatus span,
+.remoteMissionStatus strong {
+  position: relative;
+  z-index: 1;
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.remoteMissionStatus span {
+  color: #91a19d;
+  font-size: 10px;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.remoteMissionStatus strong {
+  margin-top: 8px;
+  color: #eef4f2;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.remoteMissionStatus strong[data-state="ready"] {
+  color: #9cf8ed;
+}
+
+.remoteMissionStatus strong[data-state="attention"] {
+  color: #ffd893;
+}
+
 .handoffPanel {
   margin-top: 12px;
   border: 1px solid #263634;
@@ -1762,6 +1844,7 @@ ul {
   .operationsRadar,
   .cortexMap,
   .bridgeCockpit,
+  .remoteMissionStatus,
   .handoffGrid,
   .launchBundleStrip,
   .agentSetupGrid,

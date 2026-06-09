@@ -165,6 +165,11 @@ const elements = {
   bridgeAuthState: document.querySelector("#bridgeAuthState"),
   bridgeManifestState: document.querySelector("#bridgeManifestState"),
   bridgeToolState: document.querySelector("#bridgeToolState"),
+  remoteMissionStatus: document.querySelector("#remoteMissionStatus"),
+  remoteMissionPack: document.querySelector("#remoteMissionPack"),
+  remoteMissionSmoke: document.querySelector("#remoteMissionSmoke"),
+  remoteMissionEvidence: document.querySelector("#remoteMissionEvidence"),
+  remoteMissionAgents: document.querySelector("#remoteMissionAgents"),
   webBridgeResult: document.querySelector("#webBridgeResult"),
   handoffStatus: document.querySelector("#handoffStatus"),
   handoffManifestUrl: document.querySelector("#handoffManifestUrl"),
@@ -509,6 +514,7 @@ function renderProductionVerificationEvidence(evidence) {
   elements.verificationEvidence.closest("div")?.setAttribute("data-state", status === "ready" && fresh ? "ready" : "attention");
   renderReleaseProof(evidence, generatedAt);
   updateOperationsRadar();
+  updateRemoteMissionStatus();
 }
 
 function renderReleaseProof(evidence, generatedAt) {
@@ -569,6 +575,49 @@ function updateOperationsRadar() {
   const radarReady = proofReady && checksReady && !clientAlerts;
   elements.operationsRadar.setAttribute("data-state", radarReady ? "ready" : "attention");
   elements.radarSweepLabel.textContent = radarReady ? "Jarvis takticky radar je stabilny" : "Jarvis takticky radar sleduje attention";
+}
+
+function updateRemoteMissionStatus() {
+  if (!elements.remoteMissionStatus) return;
+  const pack = state.lastRemoteMcpPack;
+  const matchingSmoke = pack && state.lastRemoteMcpSmoke?.baseUrl === pack.baseUrl ? state.lastRemoteMcpSmoke : null;
+  const smokeProof = matchingSmoke ? summarizeRemoteProofGates(matchingSmoke) : null;
+  const release = state.lastProductionEvidence?.release && typeof state.lastProductionEvidence.release === "object" ? state.lastProductionEvidence.release : {};
+  const freshness =
+    state.lastProductionEvidence?.freshness && typeof state.lastProductionEvidence.freshness === "object" ? state.lastProductionEvidence.freshness : {};
+  const evidenceGates = Array.isArray(release.requiredRemoteMcpSmokeGates) ? release.requiredRemoteMcpSmokeGates.length : 0;
+  const evidenceReady =
+    state.lastProductionEvidence?.status === "ready" &&
+    release.dirty === false &&
+    freshness.fresh === true &&
+    evidenceGates === requiredRemoteSmokeGates.length;
+  const profiles = Array.isArray(pack?.agentSetupProfiles) ? pack.agentSetupProfiles : [];
+  const requiredAgents = ["Claude", "ChatGPT", "Grok"];
+  const agentReady = requiredAgents.every((agent) =>
+    profiles.some((profile) => String(profile.agent ?? "").toLowerCase() === agent.toLowerCase() && profile.importUrl && profile.firstTool)
+  );
+  const packReady = Boolean(pack?.tools?.count && pack?.agentLaunchBundle && profiles.length >= requiredAgents.length && pack?.auth?.header);
+  const smokeReady = smokeProof?.ready === true;
+  setRemoteMissionNode(elements.remoteMissionPack, packReady ? `${pack.tools.count} toolov, launch bundle ready` : "preflight este nenacitany", packReady);
+  setRemoteMissionNode(
+    elements.remoteMissionSmoke,
+    smokeReady ? `ready ${requiredRemoteSmokeGates.length}/${requiredRemoteSmokeGates.length}` : smokeProof?.text ?? "spusti smoke pred handoffom",
+    smokeReady
+  );
+  setRemoteMissionNode(
+    elements.remoteMissionEvidence,
+    evidenceReady ? `fresh ${freshness.ageHours ?? 0}h, clean tree` : state.lastProductionEvidence ? "evidence potrebuje refresh" : "caka na verify",
+    evidenceReady
+  );
+  setRemoteMissionNode(elements.remoteMissionAgents, agentReady ? "Claude / ChatGPT / Grok ready" : "agent profiles cakaju", agentReady);
+  elements.remoteMissionStatus.setAttribute("data-state", packReady && smokeReady && evidenceReady && agentReady ? "ready" : "attention");
+}
+
+function setRemoteMissionNode(node, text, ready) {
+  if (!node) return;
+  node.textContent = text;
+  node.dataset.state = ready ? "ready" : "attention";
+  node.closest("div")?.setAttribute("data-state", ready ? "ready" : "attention");
 }
 
 function setRadarNode(node, text, stateName) {
@@ -1355,6 +1404,7 @@ function renderRemoteMcpPack(pack) {
   renderAgentSetupProfiles(pack.agentSetupProfiles ?? [], matchingSmoke);
   renderMcpToolList(pack);
   elements.remoteAgentPrompt.textContent = buildRemoteAgentPrompt(pack, matchingSmoke);
+  updateRemoteMissionStatus();
 }
 
 function renderRemoteAgentLaunchBundle(bundle, smokeReport = null) {
@@ -1446,6 +1496,7 @@ function renderSecureTunnelStatus(status) {
     elements.handoffProofGates.textContent = "cakam na tunnel ready log";
     elements.handoffProofGates.dataset.state = "attention";
   }
+  updateRemoteMissionStatus();
   elements.remoteAgentPrompt.textContent = [
     status.summary ?? "Secure tunnel status nacitany.",
     `Bezi: ${status.running ? "ano" : "nie"}`,
@@ -1569,6 +1620,7 @@ function renderRemoteMcpSmoke(report) {
   renderRemoteProofMatrix(report);
   if (state.lastRemoteMcpPack) elements.remoteAgentPrompt.textContent = buildRemoteAgentPrompt(state.lastRemoteMcpPack, report);
   if (state.lastRemoteAgentLaunchBundle) renderRemoteAgentLaunchBundle(state.lastRemoteAgentLaunchBundle, report);
+  updateRemoteMissionStatus();
   elements.remoteSmokeResult.textContent = [
     report.summary ?? `Remote MCP smoke: ${report.status}`,
     "",
@@ -2458,6 +2510,7 @@ elements.runRemoteSmoke.addEventListener("click", async () => {
     elements.handoffProofGates.textContent = "blokovane: smoke chyba";
     elements.handoffProofGates.dataset.state = "attention";
     if (state.lastRemoteMcpPack) elements.remoteAgentPrompt.textContent = buildRemoteAgentPrompt(state.lastRemoteMcpPack, null);
+    updateRemoteMissionStatus();
   }
 });
 elements.readinessReport.addEventListener("click", async () => {
