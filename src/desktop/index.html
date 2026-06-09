@@ -43,8 +43,8 @@
           <strong id="radarLiveChecks">evidence pending</strong>
         </div>
         <div class="radarNode" data-state="checking">
-          <span>Approval locks</span>
-          <strong id="radarApprovals">checking</strong>
+          <span>Schvalovacie zamky</span>
+          <strong id="radarApprovals">kontrola</strong>
         </div>
         <div class="radarNode" data-state="checking">
           <span>Client watch</span>
@@ -66,7 +66,7 @@
       <section class="missionRail" id="missionRail" aria-label="Live mission signals">
         <div class="missionSignal" data-state="checking">
           <span>Readiness</span>
-          <strong id="missionReadiness">checking</strong>
+          <strong id="missionReadiness">kontrola</strong>
         </div>
         <div class="missionSignal" data-state="ready">
           <span>Voice</span>
@@ -74,15 +74,15 @@
         </div>
         <div class="missionSignal" data-state="checking">
           <span>Gmail watch</span>
-          <strong id="missionGmail">checking</strong>
+          <strong id="missionGmail">kontrola</strong>
         </div>
         <div class="missionSignal" data-state="checking">
           <span>Remote MCP</span>
-          <strong id="missionRemote">checking</strong>
+          <strong id="missionRemote">kontrola</strong>
         </div>
         <div class="missionSignal" data-state="checking">
           <span>Contracts</span>
-          <strong id="missionContracts">checking</strong>
+          <strong id="missionContracts">kontrola</strong>
         </div>
       </section>
 
@@ -98,7 +98,7 @@
           </div>
         </div>
         <div class="deckMetric">
-          <span>Ready integrations</span>
+          <span>Pripravene integracie</span>
           <strong id="readyIntegrations">--</strong>
         </div>
         <div class="deckMetric">
@@ -106,35 +106,35 @@
           <strong id="mcpToolCount">--</strong>
         </div>
         <div class="deckMetric">
-          <span>Approval locks</span>
+          <span>Schvalovacie zamky</span>
           <strong id="approvalLockCount">--</strong>
         </div>
         <div class="deckMetric blocker">
-          <span>Live blockers</span>
+          <span>Live blokery</span>
           <strong id="liveBlockerCount">--</strong>
         </div>
         <div class="deckStatus" id="commandTimeline">Nacitavam production gates...</div>
-        <button class="deckAction" id="fullLaunchCheck">Full proof</button>
+        <button class="deckAction" id="fullLaunchCheck">Kompletny proof</button>
         <button class="deckAction" id="operatorBriefing">Operator brief</button>
         <button class="deckAction" id="readinessReport">Readiness report</button>
       </section>
 
       <section class="launchQueue" id="launchQueue" aria-label="Production launch queue">
         <div>
-          <span>Launch state</span>
-          <strong id="launchStatus">checking</strong>
+          <span>Launch stav</span>
+          <strong id="launchStatus">kontrola</strong>
         </div>
         <div>
-          <span>Next action</span>
+          <span>Dalsi krok</span>
           <strong id="launchNextAction">Nacitavam readiness...</strong>
         </div>
         <div>
           <span>Attention</span>
-          <strong id="launchAttention">checking</strong>
+          <strong id="launchAttention">kontrola</strong>
         </div>
         <div class="releaseProof">
-          <span>Verification</span>
-          <strong id="verificationEvidence">latest evidence not loaded</strong>
+          <span>Verifikacia</span>
+          <strong id="verificationEvidence">latest evidence nie je nacitana</strong>
           <dl id="releaseProofGrid"></dl>
         </div>
         <div>
@@ -151,7 +151,7 @@
         </div>
         <div class="cortexNode" data-target="coldPanel" data-state="checking" role="button" tabindex="0">
           <span>Outreach</span>
-          <strong id="cortexOutreach">checking</strong>
+          <strong id="cortexOutreach">kontrola</strong>
           <i></i>
         </div>
         <div class="cortexNode" data-target="clientPanel" data-state="checking" role="button" tabindex="0">
@@ -161,12 +161,12 @@
         </div>
         <div class="cortexNode" data-target="contractPanel" data-state="checking" role="button" tabindex="0">
           <span>Contracts</span>
-          <strong id="cortexContracts">checking</strong>
+          <strong id="cortexContracts">kontrola</strong>
           <i></i>
         </div>
         <div class="cortexNode" data-target="mcpPanel" data-state="checking" role="button" tabindex="0">
           <span>Remote MCP</span>
-          <strong id="cortexRemote">checking</strong>
+          <strong id="cortexRemote">kontrola</strong>
           <i></i>
         </div>
       </section>
@@ -182,8 +182,8 @@
           </div>
           <dl class="voiceRuntime" id="voiceRuntime">
             <div><dt>Mode</dt><dd id="voiceMode">idle</dd></div>
-            <div><dt>Input</dt><dd id="voiceInput">checking</dd></div>
-            <div><dt>Output</dt><dd id="voiceOutput">checking</dd></div>
+            <div><dt>Input</dt><dd id="voiceInput">kontrola</dd></div>
+            <div><dt>Output</dt><dd id="voiceOutput">kontrola</dd></div>
             <div><dt>Event</dt><dd id="voiceLastEvent">standby</dd></div>
           </dl>
           <div class="orb" id="orb"></div>
@@ -355,19 +355,19 @@
           <div class="bridgeCockpit" id="bridgeCockpit" aria-label="Remote MCP bridge status">
             <div>
               <span>Remote tunnel</span>
-              <strong id="bridgeTunnelState">checking</strong>
+              <strong id="bridgeTunnelState">kontrola</strong>
             </div>
             <div>
               <span>Auth</span>
-              <strong id="bridgeAuthState">checking</strong>
+              <strong id="bridgeAuthState">kontrola</strong>
             </div>
             <div>
               <span>Manifest</span>
-              <strong id="bridgeManifestState">checking</strong>
+              <strong id="bridgeManifestState">kontrola</strong>
             </div>
             <div>
               <span>Tool URL</span>
-              <strong id="bridgeToolState">checking</strong>
+              <strong id="bridgeToolState">kontrola</strong>
             </div>
           </div>
           <div class="response compact" id="webBridgeResult">Pripravene overit tunel pre remote MCP.</div>
@@ -407,7 +407,7 @@
                 <code id="handoffSmokeUrl">--</code>
               </div>
               <div>
-                <span>Approval locks</span>
+                <span>Schvalovacie zamky</span>
                 <code id="handoffApprovalTools">--</code>
               </div>
               <div>

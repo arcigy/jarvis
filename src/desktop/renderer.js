@@ -617,9 +617,9 @@ function renderReadinessReport(report) {
   return [
     report.summary ?? `Status: ${report.status}`,
     `Status: ${report.status}`,
-    `Integrations: ${report.integrations?.ready ?? "--"}/${report.integrations?.total ?? "--"}`,
+    `Integracie: ${report.integrations?.ready ?? "--"}/${report.integrations?.total ?? "--"}`,
     `MCP tools: ${report.mcp?.toolCount ?? "--"}`,
-    `Approval locks: ${(report.mcp?.approvalRequired ?? []).length}`,
+    `Schvalovacie zamky: ${(report.mcp?.approvalRequired ?? []).length}`,
     "",
     launchChecklist.length ? "Launch checklist:" : "Launch checklist: not loaded",
     ...launchChecklist.map((item) => [`- [${item.status}] ${item.title}`, `  Proof: ${item.proof}`, `  Next: ${item.nextAction}`].join("\n")),
@@ -642,7 +642,7 @@ function renderReadinessReport(report) {
       [`- [${item.severity}] ${item.title}`, `  Source: ${item.source}`, `  Next: ${item.nextAction}`, `  Validate: ${item.validationCommand}`].join("\n")
     ),
     "",
-    "Next actions:",
+    "Dalsie kroky:",
     ...(report.nextActions ?? []).map((action) => `- ${action}`),
     "",
     "Fix guide:",
@@ -677,11 +677,11 @@ function renderOperatorBriefingCards(briefing) {
   const cards = [
     { key: "readiness", label: "Readiness", value: readiness, state: readinessCardState(readiness) },
     { key: "productionEvidence", label: "Evidence", value: sections.productionEvidence, state: evidenceCardState(sections.productionEvidence) },
-    { key: "providerFallback", label: "Fallbacks", value: sections.providerFallback, state: textHasAttention(sections.providerFallback) ? "attention" : "ready" },
+    { key: "providerFallback", label: "Fallbacky", value: sections.providerFallback, state: textHasAttention(sections.providerFallback) ? "attention" : "ready" },
     { key: "coldOutreach", label: "Outreach", value: sections.coldOutreach, state: textHasAttention(sections.coldOutreach) ? "attention" : "ready" },
-    { key: "clientNeeds", label: "Client needs", value: sections.clientNeeds, state: textHasAttention(sections.clientNeeds) ? "attention" : "ready" },
-    { key: "preparedReplies", label: "Approvals", value: sections.preparedReplies, state: textHasAttention(sections.preparedReplies) ? "attention" : "ready" },
-    { key: "nextAction", label: "Next action", value: sections.nextAction, state: "attention" },
+    { key: "clientNeeds", label: "Klientske poziadavky", value: sections.clientNeeds, state: textHasAttention(sections.clientNeeds) ? "attention" : "ready" },
+    { key: "preparedReplies", label: "Schvalenia", value: sections.preparedReplies, state: textHasAttention(sections.preparedReplies) ? "attention" : "ready" },
+    { key: "nextAction", label: "Dalsi krok", value: sections.nextAction, state: "attention" },
   ];
   elements.briefingGrid.replaceChildren();
   for (const card of cards) {
@@ -691,7 +691,7 @@ function renderOperatorBriefingCards(briefing) {
     node.className = "briefingCard";
     node.setAttribute("data-state", card.state);
     label.textContent = card.label;
-    value.textContent = card.value || "No signal yet.";
+    value.textContent = card.value || "Signal este nie je nacitany.";
     node.append(label, value);
     elements.briefingGrid.appendChild(node);
   }
@@ -2169,20 +2169,20 @@ elements.clientNeedAlerts.addEventListener("click", async () => {
 });
 elements.resolveClientNeed.addEventListener("click", async () => {
   try {
-    elements.clientAlertsResult.textContent = "Resolving newest client alert...";
+    elements.clientAlertsResult.textContent = "Riesim najnovsi client alert...";
     const result = await updateLatestClientNeedStatus("resolved");
     if (result?.summary) speak(result.summary);
-    else elements.clientAlertsResult.textContent = "Client alert update cancelled.";
+    else elements.clientAlertsResult.textContent = "Aktualizacia client alertu bola zrusena.";
   } catch (error) {
     elements.clientAlertsResult.textContent = safeUiErrorText(error);
   }
 });
 elements.ignoreClientNeed.addEventListener("click", async () => {
   try {
-    elements.clientAlertsResult.textContent = "Ignoring newest client alert...";
+    elements.clientAlertsResult.textContent = "Ignorujem najnovsi client alert...";
     const result = await updateLatestClientNeedStatus("ignored");
     if (result?.summary) speak(result.summary);
-    else elements.clientAlertsResult.textContent = "Client alert update cancelled.";
+    else elements.clientAlertsResult.textContent = "Aktualizacia client alertu bola zrusena.";
   } catch (error) {
     elements.clientAlertsResult.textContent = safeUiErrorText(error);
   }
@@ -2194,7 +2194,7 @@ elements.toggleClientNeedWatch.addEventListener("click", () => {
 elements.draftReply.addEventListener("click", async () => {
   try {
     const message = requiredInputValue(elements.clientMessage, "Klientska sprava je povinna pred draftovanim odpovede.");
-    elements.draftResult.textContent = "Drafting...";
+    elements.draftResult.textContent = "Draftujem odpoved...";
     const result = await arcigyApi.generateAiReply({
       message,
       context: "Client communication inside Arcigy Jarvis.",

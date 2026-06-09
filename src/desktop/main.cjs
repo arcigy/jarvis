@@ -618,7 +618,7 @@ function buildReadinessLaunchChecklist(integrations, bridge, blockers, diagnosti
     },
     {
       id: "approval-locks",
-      title: "Approval locks",
+      title: "Schvalovacie zamky",
       status: approvalReady ? "ready" : "blocked",
       proof: approvalReady ? `${approvalTools.length} approval-gated tool(s), including contract, prepared reply send, and Sheet writes.` : "One or more required approval gates are missing.",
       nextAction: approvalReady ? "Review exact payloads before approving write tools." : "Restore approval gates for write tools before live use.",
