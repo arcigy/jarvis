@@ -594,6 +594,15 @@ test("local web bridge serves UI and API health", async () => {
         (call) =>
           call.tool === "arcigy.jarvis_voice_event" &&
           call.approvalRequired === false &&
+          call.body.text === "Jarvis full launch proof" &&
+          (call.body.session as { state?: string; wakeWord?: string } | undefined)?.wakeWord === "jarvis"
+      )
+    );
+    assert.ok(
+      remotePackBody.quickStartCalls.some(
+        (call) =>
+          call.tool === "arcigy.jarvis_voice_event" &&
+          call.approvalRequired === false &&
           call.body.text === "Jarvis integracie" &&
           (call.body.session as { state?: string; wakeWord?: string } | undefined)?.wakeWord === "jarvis"
       )

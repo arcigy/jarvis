@@ -681,6 +681,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /pack-contract-draft-quick-start/);
   assert.match(main, /Ask Jarvis for production evidence/);
   assert.match(main, /Jarvis production evidence/);
+  assert.match(main, /Ask Jarvis for full launch proof/);
+  assert.match(main, /Jarvis full launch proof/);
   assert.match(main, /Test Jarvis voice wake command/);
   assert.match(main, /pack-voice-quick-start/);
   assert.match(main, /voice-tool-call/);

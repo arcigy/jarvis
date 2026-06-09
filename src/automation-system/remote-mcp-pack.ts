@@ -429,6 +429,14 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Ask Jarvis for full launch proof",
+      tool: "arcigy.jarvis_voice_event",
+      method: "POST",
+      url: toolUrl("arcigy.jarvis_voice_event"),
+      body: { text: "Jarvis full launch proof", session: { state: "idle", wakeWord: "jarvis" } },
+      approvalRequired: false,
+    },
+    {
       label: "Get Jarvis operator briefing",
       tool: "arcigy.get_operator_briefing",
       method: "POST",
