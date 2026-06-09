@@ -809,6 +809,7 @@ function getProductionVerificationEvidence() {
       status: typeof evidence.status === "string" ? evidence.status : "attention",
       generatedAt: typeof evidence.generatedAt === "string" ? evidence.generatedAt : null,
       webUrl: typeof evidence.webUrl === "string" ? evidence.webUrl : undefined,
+      release: isPlainObject(evidence.release) ? evidence.release : undefined,
       secretPolicy: typeof evidence.secretPolicy === "string" ? evidence.secretPolicy : "Secret-safe verification evidence.",
       evidencePath: productionVerificationEvidencePath,
       checks: Array.isArray(evidence.checks) ? evidence.checks : [],
@@ -830,7 +831,12 @@ function summarizeProductionVerificationEvidence(evidence) {
   const checks = Array.isArray(evidence.checks) ? evidence.checks : [];
   const ready = checks.filter((check) => check && typeof check === "object" && check.status === "ready").length;
   const failed = checks.filter((check) => check && typeof check === "object" && check.status === "failed").length;
-  return `Production verification ${evidence.status === "ready" ? "ready" : "needs attention"}: ${ready} ready, ${failed} failed.`;
+  const release = isPlainObject(evidence.release) && typeof evidence.release.shortCommit === "string" ? ` Commit ${evidence.release.shortCommit}.` : "";
+  return `Production verification ${evidence.status === "ready" ? "ready" : "needs attention"}: ${ready} ready, ${failed} failed.${release}`;
+}
+
+function isPlainObject(value) {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
 
 async function getRemoteMcpPack(payload = {}) {

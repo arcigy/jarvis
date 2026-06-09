@@ -410,6 +410,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /verificationEvidence/);
   assert.match(main, /jarvis:productionVerificationEvidence/);
   assert.match(main, /function getProductionVerificationEvidence/);
+  assert.match(main, /release: isPlainObject\(evidence\.release\) \? evidence\.release : undefined/);
+  assert.match(main, /Commit \$\{evidence\.release\.shortCommit\}/);
   assert.match(main, /productionVerificationEvidencePath/);
   assert.match(preload, /productionVerificationEvidence: \(\) => ipcRenderer\.invoke\("jarvis:productionVerificationEvidence"\)/);
   assert.match(renderer, /\/api\/operator-briefing/);

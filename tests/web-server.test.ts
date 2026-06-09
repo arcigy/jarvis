@@ -27,6 +27,13 @@ test("local web bridge serves UI and API health", async () => {
       status: "ready",
       generatedAt: "2026-06-09T06:37:47.066Z",
       webUrl: "http://127.0.0.1:8765",
+      release: {
+        repository: "arcigy/jarvis",
+        branch: "main",
+        shortCommit: "0123456789ab",
+        dirty: false,
+        requiredRemoteMcpSmokeGates: ["secret-redaction"],
+      },
       secretPolicy: `Secret-safe ${syntheticGoogleKey}`,
       checks: [
         { name: "typecheck", status: "ready", detail: "OK" },
@@ -381,9 +388,18 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(verificationEvidence.status, 200);
     const verificationEvidenceText = await verificationEvidence.text();
     assert.equal(verificationEvidenceText.includes(syntheticGoogleKey), false);
-    const verificationEvidenceBody = JSON.parse(verificationEvidenceText) as { status: string; summary: string; checks: Array<{ name: string; status: string; detail: string }> };
+    const verificationEvidenceBody = JSON.parse(verificationEvidenceText) as {
+      status: string;
+      summary: string;
+      release?: { repository?: string; shortCommit?: string; dirty?: boolean; requiredRemoteMcpSmokeGates?: string[] };
+      checks: Array<{ name: string; status: string; detail: string }>;
+    };
     assert.equal(verificationEvidenceBody.status, "ready");
     assert.match(verificationEvidenceBody.summary, /2 ready, 0 failed/);
+    assert.equal(verificationEvidenceBody.release?.repository, "arcigy/jarvis");
+    assert.equal(verificationEvidenceBody.release?.shortCommit, "0123456789ab");
+    assert.equal(verificationEvidenceBody.release?.dirty, false);
+    assert.ok(verificationEvidenceBody.release?.requiredRemoteMcpSmokeGates?.includes("secret-redaction"));
     assert.ok(verificationEvidenceBody.checks.some((check) => check.name === "secret-scan" && check.status === "ready"));
     assert.match(verificationEvidenceText, /\[redacted-google-api-key\]/);
 
@@ -398,6 +414,8 @@ test("local web bridge serves UI and API health", async () => {
     const mcpEvidence = await postJson(`${baseUrl}/api/mcp/arcigy.get_production_verification_evidence`, {});
     assert.equal(mcpEvidence.result.status, "ready");
     assert.match(mcpEvidence.result.summary, /2 ready, 0 failed/);
+    assert.equal(mcpEvidence.result.release.repository, "arcigy/jarvis");
+    assert.equal(mcpEvidence.result.release.shortCommit, "0123456789ab");
     assert.equal(JSON.stringify(mcpEvidence).includes(syntheticGoogleKey), false);
 
     const actionManifest = await fetch(`${baseUrl}/.well-known/ai-plugin.json`);

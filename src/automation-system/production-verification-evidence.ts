@@ -8,6 +8,7 @@ export type ProductionVerificationEvidence = {
   status: string;
   generatedAt: string | null;
   webUrl?: string;
+  release?: unknown;
   secretPolicy?: string;
   evidencePath: string;
   summary: string;
@@ -34,6 +35,7 @@ export function getProductionVerificationEvidence(repoRoot: string): ProductionV
       status: typeof evidence.status === "string" ? evidence.status : "attention",
       generatedAt: typeof evidence.generatedAt === "string" ? evidence.generatedAt : null,
       webUrl: typeof evidence.webUrl === "string" ? evidence.webUrl : undefined,
+      release: isRecord(evidence.release) ? evidence.release : undefined,
       secretPolicy: typeof evidence.secretPolicy === "string" ? evidence.secretPolicy : "Secret-safe verification evidence.",
       evidencePath,
       checks: Array.isArray(evidence.checks) ? evidence.checks : [],
@@ -55,5 +57,10 @@ function summarizeProductionVerificationEvidence(evidence: Record<string, unknow
   const checks = Array.isArray(evidence.checks) ? evidence.checks : [];
   const ready = checks.filter((check) => check && typeof check === "object" && (check as { status?: unknown }).status === "ready").length;
   const failed = checks.filter((check) => check && typeof check === "object" && (check as { status?: unknown }).status === "failed").length;
-  return `Production verification ${evidence.status === "ready" ? "ready" : "needs attention"}: ${ready} ready, ${failed} failed.`;
+  const release = isRecord(evidence.release) && typeof evidence.release.shortCommit === "string" ? ` Commit ${evidence.release.shortCommit}.` : "";
+  return `Production verification ${evidence.status === "ready" ? "ready" : "needs attention"}: ${ready} ready, ${failed} failed.${release}`;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }

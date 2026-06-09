@@ -206,11 +206,13 @@ function runSecretScan() {
 
 function writeEvidence() {
   const failed = checks.filter((check) => check.status === "failed").length;
+  const release = getReleaseIdentity();
   const payload = {
     mode: "arcigy-jarvis-production-verification",
     status: failed ? "failed" : "ready",
     generatedAt: new Date().toISOString(),
     webUrl,
+    release,
     secretPolicy: "Secret-safe: command output is streamed through redactSensitiveText and this artifact stores only redacted check details.",
     evidencePath,
     checks: checks.map((check) => ({
@@ -237,8 +239,10 @@ function validateEvidenceArtifact() {
       mode?: unknown;
       status?: unknown;
       generatedAt?: unknown;
+      release?: { repository?: unknown; branch?: unknown; shortCommit?: unknown; dirty?: unknown; requiredRemoteMcpSmokeGates?: unknown };
       checks?: Array<{ name?: unknown; status?: unknown; detail?: unknown }>;
     };
+    const release = evidence.release;
     const expectedChecks = checks.map((check) => check.name);
     const evidenceChecks = Array.isArray(evidence.checks) ? evidence.checks : [];
     const evidenceNames = new Set(evidenceChecks.map((check) => String(check.name ?? "")));
@@ -247,6 +251,14 @@ function validateEvidenceArtifact() {
       evidence.mode !== "arcigy-jarvis-production-verification" ||
       evidence.status !== "ready" ||
       typeof evidence.generatedAt !== "string" ||
+      !release ||
+      release.repository !== "arcigy/jarvis" ||
+      typeof release.branch !== "string" ||
+      typeof release.shortCommit !== "string" ||
+      !/^[0-9a-f]{7,12}$/i.test(release.shortCommit) ||
+      typeof release.dirty !== "boolean" ||
+      !Array.isArray(release.requiredRemoteMcpSmokeGates) ||
+      release.requiredRemoteMcpSmokeGates.length !== requiredRemoteMcpSmokeGates.length ||
       missingChecks.length > 0 ||
       evidenceChecks.some((check) => check.status !== "ready" || typeof check.detail !== "string");
     if (invalid) {
@@ -266,6 +278,22 @@ function validateEvidenceArtifact() {
     process.stdout.write(renderSummary());
     process.exit(1);
   }
+}
+
+function getReleaseIdentity() {
+  return {
+    repository: "arcigy/jarvis",
+    branch: readGit(["rev-parse", "--abbrev-ref", "HEAD"], "unknown"),
+    shortCommit: readGit(["rev-parse", "--short=12", "HEAD"], "unknown"),
+    dirty: readGit(["status", "--porcelain", "--untracked-files=no"], "").length > 0,
+    requiredRemoteMcpSmokeGates,
+  };
+}
+
+function readGit(args: string[], fallback: string): string {
+  const result = spawnSync("git", args, { cwd: repoRoot, encoding: "utf-8" });
+  if (result.status !== 0) return fallback;
+  return result.stdout.trim() || fallback;
 }
 
 function hasSecretPattern(value: string): boolean {

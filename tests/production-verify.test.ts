@@ -31,6 +31,11 @@ test("production verifier wires every live release gate", () => {
   assert.match(script, /validateEvidenceArtifact/);
   assert.match(script, /\[verify\] evidence-artifact/);
   assert.match(script, /Latest production verification evidence is valid and secret-safe/);
+  assert.match(script, /getReleaseIdentity/);
+  assert.match(script, /repository: "arcigy\/jarvis"/);
+  assert.match(script, /rev-parse", "--short=12", "HEAD"/);
+  assert.match(script, /status", "--porcelain", "--untracked-files=no"/);
+  assert.match(script, /release\.requiredRemoteMcpSmokeGates\.length !== requiredRemoteMcpSmokeGates\.length/);
   assert.match(script, /hasSecretPattern/);
   assert.match(script, /generated", "production-verification", "latest\.json"/);
   assert.match(script, /arcigy-jarvis-production-verification/);
