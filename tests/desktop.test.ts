@@ -232,6 +232,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /renderAgentSetupProfiles/);
   assert.match(renderer, /findAgentSetupProfile/);
   assert.match(renderer, /pack-agent-setup-profiles/);
+  assert.match(renderer, /pack-agent-launch-bundle/);
   assert.match(renderer, /state\.lastRemoteMcpSmoke\?\.baseUrl === pack\.baseUrl/);
   assert.match(renderer, /if \(state\.lastRemoteMcpSmoke && !matchingSmoke\) state\.lastRemoteMcpSmoke = null/);
   assert.match(renderer, /buildRemoteAgentPrompt\(pack, matchingSmoke\)/);
@@ -408,7 +409,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /buildReadinessLaunchEvidence/);
   assert.match(main, /production-launch-evidence/);
   assert.match(main, /\.well-known\/ai-plugin\.json, \/api\/openapi\.json/);
-  assert.match(main, /all 35 required remote MCP smoke gates/);
+  assert.match(main, /all 36 required remote MCP smoke gates/);
   assert.match(main, /manifest-tool-metadata/);
   assert.match(main, /pack-contract-draft-quick-start/);
   assert.match(main, /pack-client-memory-quick-start/);
@@ -655,7 +656,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /buildRemoteMcpHandoffRunbook/);
   assert.match(main, /connectionPackUrl/);
   assert.match(main, /repo-only limits/);
-  assert.match(main, /all 35 required remote MCP smoke gates/);
+  assert.match(main, /all 36 required remote MCP smoke gates/);
   assert.match(main, /manifest-tool-metadata/);
   assert.match(main, /pack-contract-draft-quick-start/);
   assert.match(main, /pack-client-memory-quick-start/);
@@ -706,6 +707,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /production-evidence-tool-call/);
   assert.match(main, /buildRemoteMcpAgentLaunchBundle/);
   assert.match(main, /agentLaunchBundle: buildRemoteMcpAgentLaunchBundle/);
+  assert.match(main, /hasAgentLaunchBundle/);
+  assert.match(main, /pack-agent-launch-bundle/);
   assert.match(main, /mode: "remote-agent-launch-bundle"/);
   assert.match(main, /OAuth refresh tokens/);
   assert.match(main, /Show the exact approvalRequired payload/);

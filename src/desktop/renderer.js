@@ -55,6 +55,7 @@ const requiredRemoteSmokeGates = [
   "pack-contract-quick-start",
   "pack-contract-draft-quick-start",
   "pack-agent-setup-profiles",
+  "pack-agent-launch-bundle",
   "pack-voice-quick-start",
   "pack-handoff-proof",
   "pack-agent-compatibility",

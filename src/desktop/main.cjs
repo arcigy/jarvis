@@ -568,7 +568,7 @@ function buildReadinessLaunchEvidence(status, launchChecklist, nextActions) {
       requiredBeforeExternalAgent: [
         "Run npm run web:tunnel:secure or use the browser Start tunnel button with a strong JARVIS_WEB_TOKEN.",
         "Fetch /.well-known/ai-plugin.json, /api/openapi.json, /.well-known/arcigy-jarvis.json, and /api/remote-mcp-pack?includeReadiness=true&live=true through the external URL.",
-        "Run /api/remote-mcp-smoke and require status=ready with all 35 required remote MCP smoke gates ready, including manifest, tool-count, manifest-tool-registry, manifest-tool-metadata, auth-placeholder, manifest-local-write-policy, action-manifest, openapi-schema, cors-preflight, external-auth-gate, connection-pack, pack-secret-policy, pack-auth-throttle-policy, pack-limits, pack-tunnel-controls, secure-tunnel-status, pack-local-write-policy, pack-tool-registry, pack-quick-start-urls, pack-quick-start-approval-policy, pack-contract-quick-start, pack-contract-draft-quick-start, pack-agent-setup-profiles, pack-voice-quick-start, pack-handoff-proof, pack-agent-compatibility, pack-client-memory-quick-start, pack-audit-quick-start, voice-tool-call, pack-production-evidence-quick-start, read-only-tool-call, production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction; production evidence must also be status=ready with release proof, dirty=false, and freshness.fresh=true within 24h before any remote agent uses write-capable tools.",
+        "Run /api/remote-mcp-smoke and require status=ready with all 36 required remote MCP smoke gates ready, including manifest, tool-count, manifest-tool-registry, manifest-tool-metadata, auth-placeholder, manifest-local-write-policy, action-manifest, openapi-schema, cors-preflight, external-auth-gate, connection-pack, pack-secret-policy, pack-auth-throttle-policy, pack-limits, pack-tunnel-controls, secure-tunnel-status, pack-local-write-policy, pack-tool-registry, pack-quick-start-urls, pack-quick-start-approval-policy, pack-contract-quick-start, pack-contract-draft-quick-start, pack-agent-setup-profiles, pack-agent-launch-bundle, pack-voice-quick-start, pack-handoff-proof, pack-agent-compatibility, pack-client-memory-quick-start, pack-audit-quick-start, voice-tool-call, pack-production-evidence-quick-start, read-only-tool-call, production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction; production evidence must also be status=ready with release proof, dirty=false, and freshness.fresh=true within 24h before any remote agent uses write-capable tools.",
       ],
       smokeCommand: "npm run remote:mcp:smoke -- --url <external-url>",
       tunnelCommand: "npm run web:tunnel:secure",
@@ -976,7 +976,7 @@ async function getRemoteMcpPack(payload = {}) {
       "Fetch actionManifestUrl when the remote agent supports ai-plugin/action manifests.",
       "Import openApiSchemaUrl when the remote agent supports ChatGPT custom actions, Grok actions, or OpenAPI-based HTTP tool setup.",
       "Fetch productionVerificationEvidenceUrl or call arcigy.get_production_verification_evidence to inspect the latest verified production proof.",
-      "Run the smokeTestUrl before handoff and require status=ready with all 35 required remote MCP smoke gates ready, including manifest, tool-count, manifest-tool-registry, manifest-tool-metadata, auth-placeholder, manifest-local-write-policy, action-manifest, openapi-schema, cors-preflight, external-auth-gate, connection-pack, pack-secret-policy, pack-auth-throttle-policy, pack-limits, pack-tunnel-controls, secure-tunnel-status, pack-local-write-policy, pack-tool-registry, pack-quick-start-urls, pack-quick-start-approval-policy, pack-contract-quick-start, pack-contract-draft-quick-start, pack-agent-setup-profiles, pack-voice-quick-start, pack-handoff-proof, pack-agent-compatibility, pack-client-memory-quick-start, pack-audit-quick-start, voice-tool-call, pack-production-evidence-quick-start, read-only-tool-call, production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction. Production evidence must be status=ready with release proof, dirty=false, and freshness.fresh=true within 24h.",
+      "Run the smokeTestUrl before handoff and require status=ready with all 36 required remote MCP smoke gates ready, including manifest, tool-count, manifest-tool-registry, manifest-tool-metadata, auth-placeholder, manifest-local-write-policy, action-manifest, openapi-schema, cors-preflight, external-auth-gate, connection-pack, pack-secret-policy, pack-auth-throttle-policy, pack-limits, pack-tunnel-controls, secure-tunnel-status, pack-local-write-policy, pack-tool-registry, pack-quick-start-urls, pack-quick-start-approval-policy, pack-contract-quick-start, pack-contract-draft-quick-start, pack-agent-setup-profiles, pack-agent-launch-bundle, pack-voice-quick-start, pack-handoff-proof, pack-agent-compatibility, pack-client-memory-quick-start, pack-audit-quick-start, voice-tool-call, pack-production-evidence-quick-start, read-only-tool-call, production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction. Production evidence must be status=ready with release proof, dirty=false, and freshness.fresh=true within 24h.",
       "Call MCP tools with POST JSON to mcpToolCallPattern.",
       "Use the bearer auth header placeholder; the real token must be supplied by the operator and is never returned by this pack.",
       "Use tunnel.statusUrl to inspect public tunnel URLs from the redacted secure-tunnel log. Browser-launched tunnel start requires a strong JARVIS_WEB_TOKEN.",
@@ -1067,6 +1067,7 @@ function buildRemoteMcpAgentSetupProfiles(baseUrl) {
     "pack-contract-quick-start",
     "pack-contract-draft-quick-start",
     "pack-agent-setup-profiles",
+    "pack-agent-launch-bundle",
     "pack-voice-quick-start",
     "pack-handoff-proof",
     "pack-agent-compatibility",
@@ -1144,7 +1145,7 @@ function buildRemoteMcpAgentCompatibility() {
       "Import openApiSchemaUrl if the agent supports OpenAPI or custom actions.",
       "Fetch productionVerificationEvidenceUrl or call arcigy.get_production_verification_evidence and cite its status.",
       "Fetch handoff.connectionPackUrl and confirm tokenValueReturned=false plus repo-only limits.",
-      "Run smokeTestUrl and require status=ready with all 35 required remote MCP smoke gates ready, including manifest, tool-count, manifest-tool-registry, manifest-tool-metadata, auth-placeholder, manifest-local-write-policy, action-manifest, openapi-schema, cors-preflight, external-auth-gate, connection-pack, pack-secret-policy, pack-auth-throttle-policy, pack-limits, pack-tunnel-controls, secure-tunnel-status, pack-local-write-policy, pack-tool-registry, pack-quick-start-urls, pack-quick-start-approval-policy, pack-contract-quick-start, pack-contract-draft-quick-start, pack-agent-setup-profiles, pack-voice-quick-start, pack-handoff-proof, pack-agent-compatibility, pack-client-memory-quick-start, pack-audit-quick-start, voice-tool-call, pack-production-evidence-quick-start, read-only-tool-call, production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction. Production evidence must include release proof, dirty=false, and freshness.fresh=true within 24h.",
+      "Run smokeTestUrl and require status=ready with all 36 required remote MCP smoke gates ready, including manifest, tool-count, manifest-tool-registry, manifest-tool-metadata, auth-placeholder, manifest-local-write-policy, action-manifest, openapi-schema, cors-preflight, external-auth-gate, connection-pack, pack-secret-policy, pack-auth-throttle-policy, pack-limits, pack-tunnel-controls, secure-tunnel-status, pack-local-write-policy, pack-tool-registry, pack-quick-start-urls, pack-quick-start-approval-policy, pack-contract-quick-start, pack-contract-draft-quick-start, pack-agent-setup-profiles, pack-agent-launch-bundle, pack-voice-quick-start, pack-handoff-proof, pack-agent-compatibility, pack-client-memory-quick-start, pack-audit-quick-start, voice-tool-call, pack-production-evidence-quick-start, read-only-tool-call, production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction. Production evidence must include release proof, dirty=false, and freshness.fresh=true within 24h.",
       "Inspect tunnel.statusUrl after any tunnel start and never ask for the real bearer token.",
     ],
     safetyRules: [
@@ -1173,7 +1174,7 @@ function buildRemoteMcpHandoffRunbook(baseUrl) {
       "Fetch actionManifestUrl if the agent supports ai-plugin/action manifests.",
       "Fetch openApiSchemaUrl if the agent supports OpenAPI/custom actions.",
       "Fetch productionVerificationEvidenceUrl or call arcigy.get_production_verification_evidence and cite its status.",
-      "Run smokeTestUrl and require status=ready with all 35 required remote MCP smoke gates ready, including manifest, tool-count, manifest-tool-registry, manifest-tool-metadata, auth-placeholder, manifest-local-write-policy, action-manifest, openapi-schema, cors-preflight, external-auth-gate, connection-pack, pack-secret-policy, pack-auth-throttle-policy, pack-limits, pack-tunnel-controls, secure-tunnel-status, pack-local-write-policy, pack-tool-registry, pack-quick-start-urls, pack-quick-start-approval-policy, pack-contract-quick-start, pack-contract-draft-quick-start, pack-agent-setup-profiles, pack-voice-quick-start, pack-handoff-proof, pack-agent-compatibility, pack-client-memory-quick-start, pack-audit-quick-start, voice-tool-call, pack-production-evidence-quick-start, read-only-tool-call, production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction before using MCP tools. Production evidence must include release proof, dirty=false, and freshness.fresh=true within 24h.",
+      "Run smokeTestUrl and require status=ready with all 36 required remote MCP smoke gates ready, including manifest, tool-count, manifest-tool-registry, manifest-tool-metadata, auth-placeholder, manifest-local-write-policy, action-manifest, openapi-schema, cors-preflight, external-auth-gate, connection-pack, pack-secret-policy, pack-auth-throttle-policy, pack-limits, pack-tunnel-controls, secure-tunnel-status, pack-local-write-policy, pack-tool-registry, pack-quick-start-urls, pack-quick-start-approval-policy, pack-contract-quick-start, pack-contract-draft-quick-start, pack-agent-setup-profiles, pack-agent-launch-bundle, pack-voice-quick-start, pack-handoff-proof, pack-agent-compatibility, pack-client-memory-quick-start, pack-audit-quick-start, voice-tool-call, pack-production-evidence-quick-start, read-only-tool-call, production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction before using MCP tools. Production evidence must include release proof, dirty=false, and freshness.fresh=true within 24h.",
       "Fetch tunnel.statusUrl if the operator needs the current public tunnel URLs; token values must remain redacted.",
       "Call arcigy.get_operator_briefing before proposing work.",
       "Use read-only or draft tools first; use dryRun: true before Gmail sync writes.",
@@ -1213,7 +1214,7 @@ function buildRemoteMcpHandoffRunbook(baseUrl) {
       {
         key: "remote-smoke",
         url: `${baseUrl}/api/remote-mcp-smoke`,
-        expected: 'status=ready with all 35 required remote MCP smoke gates, including manifest, tool-count, manifest-tool-registry, manifest-tool-metadata, auth-placeholder, manifest-local-write-policy, action-manifest, openapi-schema, cors-preflight, external-auth-gate, connection-pack, pack-secret-policy, pack-auth-throttle-policy, pack-limits, pack-tunnel-controls, secure-tunnel-status, pack-local-write-policy, pack-tool-registry, pack-quick-start-urls, pack-quick-start-approval-policy, pack-contract-quick-start, pack-contract-draft-quick-start, pack-agent-setup-profiles, pack-voice-quick-start, pack-handoff-proof, pack-agent-compatibility, pack-client-memory-quick-start, pack-audit-quick-start, voice-tool-call, pack-production-evidence-quick-start, read-only-tool-call, production-evidence-tool-call, secret-redaction, approval-gate, approval-shape-gate for top-level {"approved":true} payload rejection, and production evidence release proof with dirty=false and freshness.fresh=true within 24h.',
+        expected: 'status=ready with all 36 required remote MCP smoke gates, including manifest, tool-count, manifest-tool-registry, manifest-tool-metadata, auth-placeholder, manifest-local-write-policy, action-manifest, openapi-schema, cors-preflight, external-auth-gate, connection-pack, pack-secret-policy, pack-auth-throttle-policy, pack-limits, pack-tunnel-controls, secure-tunnel-status, pack-local-write-policy, pack-tool-registry, pack-quick-start-urls, pack-quick-start-approval-policy, pack-contract-quick-start, pack-contract-draft-quick-start, pack-agent-setup-profiles, pack-agent-launch-bundle, pack-voice-quick-start, pack-handoff-proof, pack-agent-compatibility, pack-client-memory-quick-start, pack-audit-quick-start, voice-tool-call, pack-production-evidence-quick-start, read-only-tool-call, production-evidence-tool-call, secret-redaction, approval-gate, approval-shape-gate for top-level {"approved":true} payload rejection, and production evidence release proof with dirty=false and freshness.fresh=true within 24h.',
       },
     ],
   };
@@ -1625,6 +1626,13 @@ async function runRemoteMcpSmoke(payload = {}) {
   );
   checks.push(
     smokeCheck(
+      hasAgentLaunchBundle(pack.body?.agentLaunchBundle, baseUrl),
+      "pack-agent-launch-bundle",
+      "Connection pack exposes a secret-safe remote agent launch bundle with prompts, URLs, proof policy, and tunnel controls."
+    )
+  );
+  checks.push(
+    smokeCheck(
       hasClientMemoryQuickStarts(pack.body?.quickStartCalls),
       "pack-client-memory-quick-start",
       "Connection pack includes read-only client identity and open-need quick-start calls."
@@ -1676,7 +1684,7 @@ async function runRemoteMcpSmoke(payload = {}) {
     baseUrl,
     summary:
       status === "ready"
-        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, action manifest, OpenAPI action schema, CORS preflight, external auth gate, auth throttle policy, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, voice quick-start, voice tool call, client memory quick-start, audit quick-start, production evidence direct + voice quick-start, production evidence tool call, agent compatibility, structured agent setup profiles, handoff proof, read-only call, approval gates, and secret policy passed.`
+        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, action manifest, OpenAPI action schema, CORS preflight, external auth gate, auth throttle policy, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, voice quick-start, voice tool call, client memory quick-start, audit quick-start, production evidence direct + voice quick-start, production evidence tool call, agent compatibility, structured agent setup profiles, remote agent launch bundle, handoff proof, read-only call, approval gates, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((check) => check.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -1967,6 +1975,7 @@ function hasHandoffProof(value, baseUrl) {
       "pack-auth-throttle-policy",
       "pack-limits",
       "pack-agent-setup-profiles",
+      "pack-agent-launch-bundle",
       "pack-voice-quick-start",
       "voice-tool-call",
       "pack-production-evidence-quick-start",
@@ -2021,6 +2030,7 @@ function hasAgentSetupProfiles(value, baseUrl) {
         "pack-auth-throttle-policy",
         "pack-limits",
         "pack-agent-setup-profiles",
+        "pack-agent-launch-bundle",
         "pack-voice-quick-start",
         "voice-tool-call",
         "pack-production-evidence-quick-start",
@@ -2031,6 +2041,40 @@ function hasAgentSetupProfiles(value, baseUrl) {
       ].every((gate) => gates.includes(gate))
     );
   });
+}
+
+function hasAgentLaunchBundle(value, baseUrl) {
+  if (!value || typeof value !== "object") return false;
+  const share = value.shareWithAgent ?? {};
+  const controls = value.operatorControls ?? {};
+  const prompts = value.firstPrompts ?? {};
+  const beforeAnyWork = Array.isArray(value.proofPolicy?.beforeAnyWork) ? value.proofPolicy.beforeAnyWork : [];
+  const beforeWrites = Array.isArray(value.proofPolicy?.beforeWrites) ? value.proofPolicy.beforeWrites : [];
+  const safetyRails = Array.isArray(value.safetyRails) ? value.safetyRails : [];
+  return (
+    value.mode === "remote-agent-launch-bundle" &&
+    value.publicBaseUrl === baseUrl &&
+    value.authHeaderPlaceholder === "Authorization: Bearer <JARVIS_WEB_TOKEN>" &&
+    share.connectionPackUrl === `${baseUrl}/api/remote-mcp-pack?includeReadiness=true&live=true` &&
+    share.actionManifestUrl === `${baseUrl}/.well-known/ai-plugin.json` &&
+    share.manifestUrl === `${baseUrl}/.well-known/arcigy-jarvis.json` &&
+    share.openApiSchemaUrl === `${baseUrl}/api/openapi.json` &&
+    share.smokeTestUrl === `${baseUrl}/api/remote-mcp-smoke` &&
+    share.productionVerificationEvidenceUrl === `${baseUrl}/api/production-verification-evidence` &&
+    share.mcpToolCallPattern === `${baseUrl}/api/mcp/{toolName}` &&
+    controls.secureTunnelCommand === "npm run web:tunnel:secure" &&
+    controls.tunnelStatusUrl === `${baseUrl}/api/secure-tunnel-status` &&
+    controls.startTunnelUrl === `${baseUrl}/api/start-secure-tunnel` &&
+    controls.stopTunnelUrl === `${baseUrl}/api/stop-secure-tunnel` &&
+    ["Claude", "ChatGPT", "Grok", "Generic HTTP agent"].every((agent) => typeof prompts[agent] === "string" && prompts[agent].includes("arcigy.get_operator_briefing")) &&
+    value.proofPolicy?.freshnessMaxAgeHours === 24 &&
+    beforeAnyWork.some((step) => typeof step === "string" && step.includes("tokenValueReturned=false")) &&
+    beforeAnyWork.some((step) => typeof step === "string" && step.includes("status=ready")) &&
+    beforeWrites.some((step) => typeof step === "string" && step.includes("freshness.fresh=true")) &&
+    beforeWrites.some((step) => typeof step === "string" && step.includes("approval.approved=true")) &&
+    safetyRails.some((rail) => typeof rail === "string" && rail.includes("OAuth refresh tokens")) &&
+    safetyRails.some((rail) => typeof rail === "string" && rail.includes("family-friendly"))
+  );
 }
 
 function hasClientMemoryQuickStarts(value) {
@@ -2106,6 +2150,7 @@ const requiredReleaseProofGates = [
   "pack-contract-quick-start",
   "pack-contract-draft-quick-start",
   "pack-agent-setup-profiles",
+  "pack-agent-launch-bundle",
   "pack-voice-quick-start",
   "pack-handoff-proof",
   "pack-agent-compatibility",

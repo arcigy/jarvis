@@ -29,6 +29,7 @@ test("production verifier wires every live release gate", () => {
   assert.match(script, /pack-client-memory-quick-start/);
   assert.match(script, /pack-audit-quick-start/);
   assert.match(script, /pack-agent-setup-profiles/);
+  assert.match(script, /pack-agent-launch-bundle/);
   assert.match(script, /pack-voice-quick-start/);
   assert.match(script, /voice-tool-call/);
   assert.match(script, /ui:smoke/);

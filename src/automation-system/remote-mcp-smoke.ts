@@ -50,6 +50,7 @@ const requiredReleaseProofGates = [
   "pack-contract-quick-start",
   "pack-contract-draft-quick-start",
   "pack-agent-setup-profiles",
+  "pack-agent-launch-bundle",
   "pack-voice-quick-start",
   "pack-handoff-proof",
   "pack-agent-compatibility",
@@ -232,6 +233,13 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
   );
   checks.push(
     check(
+      hasAgentLaunchBundle(pack.body?.agentLaunchBundle, baseUrl),
+      "pack-agent-launch-bundle",
+      "Connection pack exposes a secret-safe remote agent launch bundle with prompts, URLs, proof policy, and tunnel controls."
+    )
+  );
+  checks.push(
+    check(
       hasClientMemoryQuickStarts(pack.body?.quickStartCalls),
       "pack-client-memory-quick-start",
       "Connection pack includes read-only client identity and open-need quick-start calls."
@@ -295,7 +303,7 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
     baseUrl,
     summary:
       status === "ready"
-        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, action manifest, OpenAPI action schema, CORS preflight, external auth gate, auth throttle policy, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, voice quick-start, voice tool call, client memory quick-start, audit quick-start, production evidence direct + voice quick-start, production evidence tool call, agent compatibility, structured agent setup profiles, handoff proof, read-only call, approval gates, and secret policy passed.`
+        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, action manifest, OpenAPI action schema, CORS preflight, external auth gate, auth throttle policy, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, voice quick-start, voice tool call, client memory quick-start, audit quick-start, production evidence direct + voice quick-start, production evidence tool call, agent compatibility, structured agent setup profiles, remote agent launch bundle, handoff proof, read-only call, approval gates, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((item) => item.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -646,6 +654,7 @@ function hasHandoffProof(value: unknown, baseUrl: string): boolean {
       "pack-auth-throttle-policy",
       "pack-limits",
       "pack-agent-setup-profiles",
+      "pack-agent-launch-bundle",
       "pack-voice-quick-start",
       "voice-tool-call",
       "pack-production-evidence-quick-start",
@@ -705,6 +714,7 @@ function hasAgentSetupProfiles(value: unknown, baseUrl: string): boolean {
         "pack-auth-throttle-policy",
         "pack-limits",
         "pack-agent-setup-profiles",
+        "pack-agent-launch-bundle",
         "pack-voice-quick-start",
         "voice-tool-call",
         "pack-production-evidence-quick-start",
@@ -715,6 +725,50 @@ function hasAgentSetupProfiles(value: unknown, baseUrl: string): boolean {
       ].every((gate) => gates.includes(gate))
     );
   });
+}
+
+function hasAgentLaunchBundle(value: unknown, baseUrl: string): boolean {
+  if (!value || typeof value !== "object") return false;
+  const bundle = value as {
+    mode?: unknown;
+    publicBaseUrl?: unknown;
+    authHeaderPlaceholder?: unknown;
+    shareWithAgent?: Record<string, unknown>;
+    operatorControls?: Record<string, unknown>;
+    firstPrompts?: Record<string, unknown>;
+    proofPolicy?: { freshnessMaxAgeHours?: unknown; beforeAnyWork?: unknown; beforeWrites?: unknown };
+    safetyRails?: unknown;
+  };
+  const share = bundle.shareWithAgent ?? {};
+  const controls = bundle.operatorControls ?? {};
+  const prompts = bundle.firstPrompts ?? {};
+  const beforeAnyWork = Array.isArray(bundle.proofPolicy?.beforeAnyWork) ? bundle.proofPolicy.beforeAnyWork : [];
+  const beforeWrites = Array.isArray(bundle.proofPolicy?.beforeWrites) ? bundle.proofPolicy.beforeWrites : [];
+  const safetyRails = Array.isArray(bundle.safetyRails) ? bundle.safetyRails : [];
+  return (
+    bundle.mode === "remote-agent-launch-bundle" &&
+    bundle.publicBaseUrl === baseUrl &&
+    bundle.authHeaderPlaceholder === "Authorization: Bearer <JARVIS_WEB_TOKEN>" &&
+    share.connectionPackUrl === `${baseUrl}/api/remote-mcp-pack?includeReadiness=true&live=true` &&
+    share.actionManifestUrl === `${baseUrl}/.well-known/ai-plugin.json` &&
+    share.manifestUrl === `${baseUrl}/.well-known/arcigy-jarvis.json` &&
+    share.openApiSchemaUrl === `${baseUrl}/api/openapi.json` &&
+    share.smokeTestUrl === `${baseUrl}/api/remote-mcp-smoke` &&
+    share.productionVerificationEvidenceUrl === `${baseUrl}/api/production-verification-evidence` &&
+    share.mcpToolCallPattern === `${baseUrl}/api/mcp/{toolName}` &&
+    controls.secureTunnelCommand === "npm run web:tunnel:secure" &&
+    controls.tunnelStatusUrl === `${baseUrl}/api/secure-tunnel-status` &&
+    controls.startTunnelUrl === `${baseUrl}/api/start-secure-tunnel` &&
+    controls.stopTunnelUrl === `${baseUrl}/api/stop-secure-tunnel` &&
+    ["Claude", "ChatGPT", "Grok", "Generic HTTP agent"].every((agent) => typeof prompts[agent] === "string" && String(prompts[agent]).includes("arcigy.get_operator_briefing")) &&
+    bundle.proofPolicy?.freshnessMaxAgeHours === 24 &&
+    beforeAnyWork.some((step) => typeof step === "string" && step.includes("tokenValueReturned=false")) &&
+    beforeAnyWork.some((step) => typeof step === "string" && step.includes("status=ready")) &&
+    beforeWrites.some((step) => typeof step === "string" && step.includes("freshness.fresh=true")) &&
+    beforeWrites.some((step) => typeof step === "string" && step.includes("approval.approved=true")) &&
+    safetyRails.some((rail) => typeof rail === "string" && rail.includes("OAuth refresh tokens")) &&
+    safetyRails.some((rail) => typeof rail === "string" && rail.includes("family-friendly"))
+  );
 }
 
 function hasClientMemoryQuickStarts(value: unknown): boolean {

@@ -53,6 +53,20 @@ type RemoteConnectionPack = {
     localWritePolicy?: string;
     requiredProofGates?: string[];
   }>;
+  agentLaunchBundle?: {
+    mode?: string;
+    publicBaseUrl?: string;
+    authHeaderPlaceholder?: string;
+    shareWithAgent?: Record<string, string>;
+    operatorControls?: Record<string, string>;
+    firstPrompts?: Record<string, string>;
+    proofPolicy?: {
+      freshnessMaxAgeHours?: number;
+      beforeAnyWork?: string[];
+      beforeWrites?: string[];
+    };
+    safetyRails?: string[];
+  };
   handoff?: {
     connectionPackUrl?: string;
     requiredProof?: Array<{ key?: string }>;
@@ -294,6 +308,9 @@ async function verifyExternalConnectionPack(publicUrl: string, token: string | n
   if (!hasAgentSetupProfiles(body.agentSetupProfiles, publicUrl)) {
     exitWithMessage("Tunnel opened, but the external Jarvis connection pack is missing structured Claude, ChatGPT, Grok, and generic HTTP agent setup profiles.");
   }
+  if (!hasAgentLaunchBundle(body.agentLaunchBundle, publicUrl)) {
+    exitWithMessage("Tunnel opened, but the external Jarvis connection pack is missing the remote agent launch bundle with prompts, proof policy, and tunnel controls.");
+  }
   return body;
 }
 
@@ -318,6 +335,7 @@ function hasAgentSetupProfiles(value: RemoteConnectionPack["agentSetupProfiles"]
     "pack-auth-throttle-policy",
     "pack-limits",
     "pack-agent-setup-profiles",
+    "pack-agent-launch-bundle",
     "pack-voice-quick-start",
     "voice-tool-call",
     "pack-production-evidence-quick-start",
@@ -344,6 +362,39 @@ function hasAgentSetupProfiles(value: RemoteConnectionPack["agentSetupProfiles"]
       requiredAgentSetupProofGates.every((gate) => gates.includes(gate))
     );
   });
+}
+
+function hasAgentLaunchBundle(value: RemoteConnectionPack["agentLaunchBundle"], publicUrl: string): boolean {
+  const share = value?.shareWithAgent ?? {};
+  const controls = value?.operatorControls ?? {};
+  const prompts = value?.firstPrompts ?? {};
+  const beforeAnyWork = value?.proofPolicy?.beforeAnyWork ?? [];
+  const beforeWrites = value?.proofPolicy?.beforeWrites ?? [];
+  const safetyRails = value?.safetyRails ?? [];
+  return (
+    value?.mode === "remote-agent-launch-bundle" &&
+    value.publicBaseUrl === publicUrl &&
+    value.authHeaderPlaceholder === "Authorization: Bearer <JARVIS_WEB_TOKEN>" &&
+    share.connectionPackUrl === `${publicUrl}/api/remote-mcp-pack?includeReadiness=true&live=true` &&
+    share.actionManifestUrl === `${publicUrl}/.well-known/ai-plugin.json` &&
+    share.manifestUrl === `${publicUrl}/.well-known/arcigy-jarvis.json` &&
+    share.openApiSchemaUrl === `${publicUrl}/api/openapi.json` &&
+    share.smokeTestUrl === `${publicUrl}/api/remote-mcp-smoke` &&
+    share.productionVerificationEvidenceUrl === `${publicUrl}/api/production-verification-evidence` &&
+    share.mcpToolCallPattern === `${publicUrl}/api/mcp/{toolName}` &&
+    controls.secureTunnelCommand === "npm run web:tunnel:secure" &&
+    controls.tunnelStatusUrl === `${publicUrl}/api/secure-tunnel-status` &&
+    controls.startTunnelUrl === `${publicUrl}/api/start-secure-tunnel` &&
+    controls.stopTunnelUrl === `${publicUrl}/api/stop-secure-tunnel` &&
+    ["Claude", "ChatGPT", "Grok", "Generic HTTP agent"].every((agent) => typeof prompts[agent] === "string" && prompts[agent].includes("arcigy.get_operator_briefing")) &&
+    value.proofPolicy?.freshnessMaxAgeHours === 24 &&
+    beforeAnyWork.some((step) => step.includes("tokenValueReturned=false")) &&
+    beforeAnyWork.some((step) => step.includes("status=ready")) &&
+    beforeWrites.some((step) => step.includes("freshness.fresh=true")) &&
+    beforeWrites.some((step) => step.includes("approval.approved=true")) &&
+    safetyRails.some((rail) => rail.includes("OAuth refresh tokens")) &&
+    safetyRails.some((rail) => rail.includes("family-friendly"))
+  );
 }
 
 async function verifyRemoteMcpSmoke(publicUrl: string, token: string | null): Promise<RemoteMcpSmoke | null> {
@@ -385,6 +436,7 @@ async function verifyRemoteMcpSmoke(publicUrl: string, token: string | null): Pr
     "pack-contract-quick-start",
     "pack-contract-draft-quick-start",
     "pack-agent-setup-profiles",
+    "pack-agent-launch-bundle",
     "pack-voice-quick-start",
     "pack-handoff-proof",
     "pack-agent-compatibility",
@@ -445,7 +497,7 @@ function renderTunnelReadySummary(input: {
     `- Connection pack: ${connectionPackUrl}`,
     `- Smoke test: ${smokeUrl}`,
     `- MCP tool call pattern: ${mcpToolPattern}`,
-    "- Required proof before work: action manifest HTTP 200, OpenAPI schema HTTP 200, manifest HTTP 200, connection pack tokenValueReturned=false with repo-only limits and agentSetupProfiles for Claude/ChatGPT/Grok, remote smoke status=ready with all 35 required remote MCP smoke gates, including manifest, tool-count, manifest-tool-registry, manifest-tool-metadata, auth-placeholder, manifest-local-write-policy, action-manifest, openapi-schema, cors-preflight, external-auth-gate, connection-pack, pack-secret-policy, pack-auth-throttle-policy, pack-limits, pack-tunnel-controls, secure-tunnel-status, pack-local-write-policy, pack-tool-registry, pack-quick-start-urls, pack-quick-start-approval-policy, pack-contract-quick-start, pack-contract-draft-quick-start, pack-agent-setup-profiles, pack-voice-quick-start, pack-handoff-proof, pack-agent-compatibility, pack-client-memory-quick-start, pack-audit-quick-start, voice-tool-call, pack-production-evidence-quick-start, read-only-tool-call, production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction.",
+    "- Required proof before work: action manifest HTTP 200, OpenAPI schema HTTP 200, manifest HTTP 200, connection pack tokenValueReturned=false with repo-only limits, agentSetupProfiles, and agentLaunchBundle for Claude/ChatGPT/Grok, remote smoke status=ready with all 36 required remote MCP smoke gates, including manifest, tool-count, manifest-tool-registry, manifest-tool-metadata, auth-placeholder, manifest-local-write-policy, action-manifest, openapi-schema, cors-preflight, external-auth-gate, connection-pack, pack-secret-policy, pack-auth-throttle-policy, pack-limits, pack-tunnel-controls, secure-tunnel-status, pack-local-write-policy, pack-tool-registry, pack-quick-start-urls, pack-quick-start-approval-policy, pack-contract-quick-start, pack-contract-draft-quick-start, pack-agent-setup-profiles, pack-agent-launch-bundle, pack-voice-quick-start, pack-handoff-proof, pack-agent-compatibility, pack-client-memory-quick-start, pack-audit-quick-start, voice-tool-call, pack-production-evidence-quick-start, read-only-tool-call, production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction.",
     "- First MCP call: POST arcigy.get_operator_briefing with {\"periodLabel\":\"poslednych 7 dni\",\"live\":true}.",
     "- Approval rule: never call approval-required tools without your explicit confirmation of the exact payload.",
     "- Local write rule: preview Gmail with dryRun=true before syncing messages into local memory.",

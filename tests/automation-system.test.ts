@@ -113,7 +113,7 @@ test("production readiness report returns blockers and next actions without secr
   assert.ok(
     report.launchEvidence.remoteHandoff.requiredBeforeExternalAgent.some(
       (step) =>
-        step.includes("all 35 required remote MCP smoke gates") &&
+        step.includes("all 36 required remote MCP smoke gates") &&
         step.includes("pack-contract-draft-quick-start") &&
         step.includes("pack-client-memory-quick-start") &&
         step.includes("pack-production-evidence-quick-start") &&
@@ -887,7 +887,7 @@ test("remote MCP smoke requires the production evidence quick-start", async () =
             { key: "connection-pack" },
             { key: "secure-tunnel-status" },
             { key: "production-verification-evidence" },
-            { key: "remote-smoke", expected: "action-manifest openapi-schema cors-preflight external-auth-gate pack-auth-throttle-policy pack-limits pack-agent-setup-profiles pack-voice-quick-start voice-tool-call pack-production-evidence-quick-start production-evidence-tool-call approval-shape-gate secret-redaction dirty=false freshness.fresh=true" },
+            { key: "remote-smoke", expected: "action-manifest openapi-schema cors-preflight external-auth-gate pack-auth-throttle-policy pack-limits pack-agent-setup-profiles pack-agent-launch-bundle pack-voice-quick-start voice-tool-call pack-production-evidence-quick-start production-evidence-tool-call approval-shape-gate secret-redaction dirty=false freshness.fresh=true" },
           ],
           agentFirstSteps: ["Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
         },
@@ -952,7 +952,7 @@ test("remote MCP smoke requires the production evidence voice quick-start", asyn
             { key: "connection-pack" },
             { key: "secure-tunnel-status" },
             { key: "production-verification-evidence" },
-            { key: "remote-smoke", expected: "action-manifest openapi-schema cors-preflight external-auth-gate pack-auth-throttle-policy pack-limits pack-agent-setup-profiles pack-voice-quick-start voice-tool-call pack-production-evidence-quick-start production-evidence-tool-call approval-shape-gate secret-redaction dirty=false freshness.fresh=true" },
+            { key: "remote-smoke", expected: "action-manifest openapi-schema cors-preflight external-auth-gate pack-auth-throttle-policy pack-limits pack-agent-setup-profiles pack-agent-launch-bundle pack-voice-quick-start voice-tool-call pack-production-evidence-quick-start production-evidence-tool-call approval-shape-gate secret-redaction dirty=false freshness.fresh=true" },
           ],
           agentFirstSteps: ["Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
         },
@@ -1053,7 +1053,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
             { key: "connection-pack" },
             { key: "secure-tunnel-status" },
             { key: "production-verification-evidence" },
-            { key: "remote-smoke", expected: "action-manifest openapi-schema cors-preflight external-auth-gate pack-auth-throttle-policy pack-limits pack-agent-setup-profiles pack-voice-quick-start voice-tool-call pack-production-evidence-quick-start production-evidence-tool-call approval-shape-gate secret-redaction dirty=false freshness.fresh=true" },
+            { key: "remote-smoke", expected: "action-manifest openapi-schema cors-preflight external-auth-gate pack-auth-throttle-policy pack-limits pack-agent-setup-profiles pack-agent-launch-bundle pack-voice-quick-start voice-tool-call pack-production-evidence-quick-start production-evidence-tool-call approval-shape-gate secret-redaction dirty=false freshness.fresh=true" },
           ],
           agentFirstSteps: ["Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
         },
@@ -1199,7 +1199,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(
     pack.agentCompatibility.requiredBeforeWork.some(
       (step) =>
-        step.includes("all 35 required remote MCP smoke gates") &&
+        step.includes("all 36 required remote MCP smoke gates") &&
         step.includes("manifest-tool-metadata") &&
         step.includes("pack-contract-draft-quick-start") &&
         step.includes("pack-client-memory-quick-start") &&
@@ -1221,7 +1221,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
     pack.handoff.requiredProof.some(
       (item) =>
         item.key === "remote-smoke" &&
-        item.expected.includes("all 35 required remote MCP smoke gates") &&
+        item.expected.includes("all 36 required remote MCP smoke gates") &&
         item.expected.includes("manifest-tool-metadata") &&
         item.expected.includes("pack-contract-draft-quick-start") &&
         item.expected.includes("pack-client-memory-quick-start") &&
@@ -1236,7 +1236,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.agentSetupProfiles.some((profile) => profile.agent === "ChatGPT" && profile.setupMode === "openapi-custom-action" && profile.importUrl === "https://jarvis.example/api/openapi.json"));
   assert.ok(pack.agentSetupProfiles.some((profile) => profile.agent === "Grok" && profile.fallbackUrl === "https://jarvis.example/api/mcp/{toolName}"));
   assert.ok(pack.agentSetupProfiles.every((profile) => profile.firstTool === "arcigy.get_operator_briefing" && profile.writePolicy === "approval.approved-required"));
-  assert.ok(pack.agentSetupProfiles.every((profile) => profile.requiredProofGates.includes("pack-production-evidence-quick-start") && profile.requiredProofGates.includes("production-evidence-tool-call")));
+  assert.ok(pack.agentSetupProfiles.every((profile) => profile.requiredProofGates.includes("pack-production-evidence-quick-start") && profile.requiredProofGates.includes("production-evidence-tool-call") && profile.requiredProofGates.includes("pack-agent-launch-bundle")));
   assert.equal(pack.agentLaunchBundle.mode, "remote-agent-launch-bundle");
   assert.equal(pack.agentLaunchBundle.authHeaderPlaceholder, "Authorization: Bearer <JARVIS_WEB_TOKEN>");
   assert.equal(pack.agentLaunchBundle.shareWithAgent.openApiSchemaUrl, "https://jarvis.example/api/openapi.json");
@@ -1278,7 +1278,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(
     pack.agentInstructions.some(
       (step) =>
-        step.includes("all 35 required remote MCP smoke gates") &&
+        step.includes("all 36 required remote MCP smoke gates") &&
         step.includes("pack-client-memory-quick-start") &&
         step.includes("pack-production-evidence-quick-start") &&
         step.includes("production-evidence-tool-call") &&
@@ -1291,7 +1291,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
     pack.handoff.requiredProof.some(
       (item) =>
         item.key === "remote-smoke" &&
-        item.expected.includes("all 35 required remote MCP smoke gates") &&
+        item.expected.includes("all 36 required remote MCP smoke gates") &&
         item.expected.includes("pack-client-memory-quick-start") &&
         item.expected.includes("production-evidence-tool-call") &&
         item.expected.includes("dirty=false") &&
@@ -3185,6 +3185,7 @@ function remoteSmokeRequiredGateFixture() {
     "pack-contract-quick-start",
     "pack-contract-draft-quick-start",
     "pack-agent-setup-profiles",
+    "pack-agent-launch-bundle",
     "pack-voice-quick-start",
     "pack-handoff-proof",
     "pack-agent-compatibility",

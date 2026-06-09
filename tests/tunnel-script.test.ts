@@ -47,6 +47,8 @@ test("web tunnel script orchestrates protected Jarvis MCP exposure", () => {
   assert.match(script, /read-only-tool-call/);
   assert.match(script, /pack-voice-quick-start/);
   assert.match(script, /pack-agent-setup-profiles/);
+  assert.match(script, /pack-agent-launch-bundle/);
+  assert.match(script, /hasAgentLaunchBundle/);
   assert.match(script, /voice-tool-call/);
   assert.match(script, /pack-production-evidence-quick-start/);
   assert.match(script, /renderTunnelReadySummary/);
@@ -55,8 +57,8 @@ test("web tunnel script orchestrates protected Jarvis MCP exposure", () => {
   assert.match(script, /arcigy\.get_operator_briefing/);
   assert.match(script, /dryRun=true/);
   assert.match(script, /tokenValueReturned=false with repo-only limits/);
-  assert.match(script, /connection pack tokenValueReturned=false with repo-only limits and agentSetupProfiles for Claude\/ChatGPT\/Grok/);
-  assert.match(script, /remote smoke status=ready with all 35 required remote MCP smoke gates/);
+  assert.match(script, /connection pack tokenValueReturned=false with repo-only limits, agentSetupProfiles, and agentLaunchBundle for Claude\/ChatGPT\/Grok/);
+  assert.match(script, /remote smoke status=ready with all 36 required remote MCP smoke gates/);
   assert.match(script, /pack-contract-draft-quick-start/);
   assert.match(script, /pack-client-memory-quick-start/);
   assert.match(script, /pack-production-evidence-quick-start/);

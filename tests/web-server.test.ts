@@ -393,7 +393,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(
       readinessBody.launchEvidence.remoteHandoff.requiredBeforeExternalAgent.some(
         (step) =>
-          step.includes("all 35 required remote MCP smoke gates") &&
+          step.includes("all 36 required remote MCP smoke gates") &&
           step.includes("pack-contract-draft-quick-start") &&
           step.includes("pack-client-memory-quick-start") &&
           step.includes("pack-production-evidence-quick-start") &&
@@ -426,6 +426,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(typeof verificationEvidenceBody.freshness.ageHours, "number");
     assert.ok(verificationEvidenceBody.release?.requiredRemoteMcpSmokeGates?.includes("secret-redaction"));
     assert.ok(verificationEvidenceBody.release?.requiredRemoteMcpSmokeGates?.includes("pack-agent-setup-profiles"));
+    assert.ok(verificationEvidenceBody.release?.requiredRemoteMcpSmokeGates?.includes("pack-agent-launch-bundle"));
     assert.ok(verificationEvidenceBody.release?.requiredRemoteMcpSmokeGates?.includes("pack-agent-compatibility"));
     assert.ok(verificationEvidenceBody.release?.requiredRemoteMcpSmokeGates?.includes("pack-handoff-proof"));
     assert.ok(verificationEvidenceBody.checks.some((check) => check.name === "secret-scan" && check.status === "ready"));
@@ -575,7 +576,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(remotePackBody.agentSetupProfiles.some((profile) => profile.agent === "ChatGPT" && profile.setupMode === "openapi-custom-action" && profile.importUrl.endsWith("/api/openapi.json")));
     assert.ok(remotePackBody.agentSetupProfiles.some((profile) => profile.agent === "Grok" && profile.fallbackUrl.endsWith("/api/mcp/{toolName}")));
     assert.ok(remotePackBody.agentSetupProfiles.every((profile) => profile.firstTool === "arcigy.get_operator_briefing" && profile.writePolicy === "approval.approved-required" && profile.localWritePolicy === "dry-run-first"));
-    assert.ok(remotePackBody.agentSetupProfiles.every((profile) => profile.requiredProofGates.includes("pack-agent-setup-profiles")));
+    assert.ok(remotePackBody.agentSetupProfiles.every((profile) => profile.requiredProofGates.includes("pack-agent-setup-profiles") && profile.requiredProofGates.includes("pack-agent-launch-bundle")));
     assert.ok(remotePackBody.agentSetupProfiles.every((profile) => profile.requiredProofGates.includes("pack-production-evidence-quick-start") && profile.requiredProofGates.includes("production-evidence-tool-call")));
     assert.equal(remotePackBody.agentLaunchBundle.mode, "remote-agent-launch-bundle");
     assert.equal(remotePackBody.agentLaunchBundle.authHeaderPlaceholder, "Authorization: Bearer <JARVIS_WEB_TOKEN>");
@@ -965,6 +966,7 @@ function remoteSmokeRequiredGateFixture() {
     "pack-contract-quick-start",
     "pack-contract-draft-quick-start",
     "pack-agent-setup-profiles",
+    "pack-agent-launch-bundle",
     "pack-voice-quick-start",
     "pack-handoff-proof",
     "pack-agent-compatibility",
