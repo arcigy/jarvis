@@ -126,7 +126,7 @@ npm run secrets:audit
 npm run secrets:audit -- --json
 ```
 
-`npm run secrets:bootstrap` creates or rotates only `JARVIS_WEB_TOKEN` in ignored `.env.local`; it never prints the token value.
+`npm run secrets:bootstrap` creates or rotates local `JARVIS_WEB_TOKEN` and dummy/missing `API_SECRET_KEY` values in ignored `.env.local`; it never prints secret values.
 
 Tauri is the preferred target for a production desktop build, but this machine currently has no Rust/Cargo toolchain available. Electron is used here as the working desktop fallback.
 

@@ -87,10 +87,10 @@ test("Jarvis env bootstrap writes a strong web token without printing it", () =>
   assert.match(source, /arcigy-jarvis-env-bootstrap/);
   assert.match(source, /randomBytes\(32\)\.toString\("base64url"\)/);
   assert.match(source, /redactSensitiveText\(output\)/);
-  assert.match(source, /Secret-safe: generated token is written to \.env\.local and never printed/);
+  assert.match(source, /Secret-safe: generated local secrets are written to \.env\.local and never printed/);
 
   const root = mkdtempSync(join(tmpdir(), "jarvis-env-bootstrap-"));
-  writeFileSync(join(root, ".env.local"), "GEMINI_API_KEY=existing\n", "utf-8");
+  writeFileSync(join(root, ".env.local"), "GEMINI_API_KEY=existing\nAPI_SECRET_KEY=dummy\n", "utf-8");
 
   const result = spawnSync("node", ["scripts/jarvis_env_bootstrap.ts", "--json", "--repo-root", root], {
     cwd: process.cwd(),
@@ -98,23 +98,40 @@ test("Jarvis env bootstrap writes a strong web token without printing it", () =>
   });
 
   assert.equal(result.status, 0, result.stderr);
-  const body = JSON.parse(result.stdout) as { mode: string; changed: boolean; tokenLength: number; tokenFingerprint: string; secretPolicy: string };
+  const body = JSON.parse(result.stdout) as {
+    mode: string;
+    changed: boolean;
+    tokenLength: number;
+    tokenFingerprint: string;
+    apiSecretChanged: boolean;
+    apiSecretLength: number;
+    apiSecretFingerprint: string;
+    secretPolicy: string;
+  };
   const envFile = readFileSync(join(root, ".env.local"), "utf-8");
   const token = envFile.match(/^JARVIS_WEB_TOKEN=(.+)$/m)?.[1] ?? "";
+  const apiSecret = envFile.match(/^API_SECRET_KEY=(.+)$/m)?.[1] ?? "";
 
   assert.equal(body.mode, "arcigy-jarvis-env-bootstrap");
   assert.equal(body.changed, true);
   assert.equal(body.tokenLength, token.length);
   assert.ok(token.length >= 32);
+  assert.equal(body.apiSecretChanged, true);
+  assert.equal(body.apiSecretLength, apiSecret.length);
+  assert.ok(apiSecret.length >= 32);
+  assert.notEqual(apiSecret, "dummy");
   assert.match(body.tokenFingerprint, /^sha256:[0-9a-f]{12}$/);
+  assert.match(body.apiSecretFingerprint, /^sha256:[0-9a-f]{12}$/);
   assert.equal(result.stdout.includes(token), false);
+  assert.equal(result.stdout.includes(apiSecret), false);
   assert.match(body.secretPolicy, /never printed/);
 });
 
 test("Jarvis env bootstrap preserves strong token unless forced", () => {
   const root = mkdtempSync(join(tmpdir(), "jarvis-env-bootstrap-existing-"));
   const existingToken = "existing-strong-jarvis-web-token-value";
-  writeFileSync(join(root, ".env.local"), `JARVIS_WEB_TOKEN=${existingToken}\n`, "utf-8");
+  const existingApiSecret = "existing-strong-api-secret-value";
+  writeFileSync(join(root, ".env.local"), `JARVIS_WEB_TOKEN=${existingToken}\nAPI_SECRET_KEY=${existingApiSecret}\n`, "utf-8");
 
   const noForce = spawnSync("node", ["scripts/jarvis_env_bootstrap.ts", "--json", "--repo-root", root], {
     cwd: process.cwd(),
@@ -122,7 +139,9 @@ test("Jarvis env bootstrap preserves strong token unless forced", () => {
   });
   assert.equal(noForce.status, 0, noForce.stderr);
   assert.equal(JSON.parse(noForce.stdout).changed, false);
-  assert.equal(readFileSync(join(root, ".env.local"), "utf-8").includes(existingToken), true);
+  const noForceEnv = readFileSync(join(root, ".env.local"), "utf-8");
+  assert.equal(noForceEnv.includes(existingToken), true);
+  assert.equal(noForceEnv.includes(existingApiSecret), true);
 
   const forced = spawnSync("node", ["scripts/jarvis_env_bootstrap.ts", "--json", "--force", "--repo-root", root], {
     cwd: process.cwd(),
@@ -132,6 +151,9 @@ test("Jarvis env bootstrap preserves strong token unless forced", () => {
   assert.equal(JSON.parse(forced.stdout).changed, true);
   const envFile = readFileSync(join(root, ".env.local"), "utf-8");
   assert.equal(envFile.includes(existingToken), false);
+  assert.equal(envFile.includes(existingApiSecret), false);
   const nextToken = envFile.match(/^JARVIS_WEB_TOKEN=(.+)$/m)?.[1] ?? "";
+  const nextApiSecret = envFile.match(/^API_SECRET_KEY=(.+)$/m)?.[1] ?? "";
   assert.equal(forced.stdout.includes(nextToken), false);
+  assert.equal(forced.stdout.includes(nextApiSecret), false);
 });

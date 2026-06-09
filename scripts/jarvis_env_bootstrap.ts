@@ -23,7 +23,7 @@ if (args.has("--help")) {
       "",
       "Options:",
       "  --json             Print machine-readable JSON.",
-      "  --force            Rotate JARVIS_WEB_TOKEN even when a strong token already exists.",
+      "  --force            Rotate generated local tokens even when strong values already exist.",
       "  --repo-root <path>  Test/support override for the repository root.",
       "",
       "Creates or updates only .env.local. Secret values are never printed.",
@@ -33,18 +33,19 @@ if (args.has("--help")) {
   process.exit(0);
 }
 
-const result = bootstrapJarvisWebToken(repoRoot, args.has("--force"));
+const result = bootstrapJarvisLocalSecrets(repoRoot, args.has("--force"));
 const output = args.has("--json") ? `${JSON.stringify(result, null, 2)}\n` : renderText(result);
 process.stdout.write(redactSensitiveText(output));
 
-function bootstrapJarvisWebToken(root: string, force: boolean) {
+function bootstrapJarvisLocalSecrets(root: string, force: boolean) {
   const envPath = join(root, ".env.local");
   const existing = existsSync(envPath) ? readFileSync(envPath, "utf-8") : "";
-  const current = readEnvValue(existing, "JARVIS_WEB_TOKEN");
-  const currentStrong = isStrongToken(current);
-  const changed = force || !currentStrong;
-  const nextToken = changed ? generateToken() : current;
-  const nextContent = changed ? upsertEnvValue(existing, "JARVIS_WEB_TOKEN", nextToken) : existing;
+  const webToken = nextSecretValue(existing, "JARVIS_WEB_TOKEN", force);
+  const apiSecret = nextSecretValue(existing, "API_SECRET_KEY", force);
+  const changed = webToken.changed || apiSecret.changed;
+  let nextContent = existing;
+  if (webToken.changed) nextContent = upsertEnvValue(nextContent, "JARVIS_WEB_TOKEN", webToken.value);
+  if (apiSecret.changed) nextContent = upsertEnvValue(nextContent, "API_SECRET_KEY", apiSecret.value);
   if (changed) {
     mkdirSync(dirname(envPath), { recursive: true });
     writeFileSync(envPath, nextContent, "utf-8");
@@ -54,13 +55,25 @@ function bootstrapJarvisWebToken(root: string, force: boolean) {
     status: "ready",
     envFile: ".env.local",
     changed,
-    rotated: force && changed && Boolean(current),
+    rotated: force && changed,
     tokenState: "configured",
-    tokenLength: nextToken.length,
-    tokenFingerprint: secretFingerprint(nextToken),
+    tokenChanged: webToken.changed,
+    tokenLength: webToken.value.length,
+    tokenFingerprint: secretFingerprint(webToken.value),
+    apiSecretState: "configured",
+    apiSecretChanged: apiSecret.changed,
+    apiSecretLength: apiSecret.value.length,
+    apiSecretFingerprint: secretFingerprint(apiSecret.value),
     nextActions: ["Run npm run secrets:audit, then npm run doctor before starting a remote MCP tunnel."],
-    secretPolicy: "Secret-safe: generated token is written to .env.local and never printed; output includes only length and SHA-256 fingerprint.",
+    secretPolicy: "Secret-safe: generated local secrets are written to .env.local and never printed; output includes only lengths and SHA-256 fingerprints.",
   };
+}
+
+function nextSecretValue(content: string, key: string, force: boolean): { value: string; changed: boolean } {
+  const current = readEnvValue(content, key);
+  const currentStrong = isStrongToken(current);
+  const changed = force || !currentStrong;
+  return { value: changed ? generateToken() : current, changed };
 }
 
 function getArg(name: string): string | null {
@@ -101,13 +114,15 @@ function secretFingerprint(value: string): string {
   return `sha256:${createHash("sha256").update(value).digest("hex").slice(0, 12)}`;
 }
 
-function renderText(result: ReturnType<typeof bootstrapJarvisWebToken>): string {
+function renderText(result: ReturnType<typeof bootstrapJarvisLocalSecrets>): string {
   return [
     "Arcigy Jarvis env bootstrap",
     `Status: ${result.status}`,
     `Env file: ${result.envFile}`,
-    `JARVIS_WEB_TOKEN: ${result.changed ? "generated" : "already configured"}`,
+    `JARVIS_WEB_TOKEN: ${result.tokenChanged ? "generated" : "already configured"}`,
     `Token fingerprint: ${result.tokenFingerprint}`,
+    `API_SECRET_KEY: ${result.apiSecretChanged ? "generated" : "already configured"}`,
+    `API secret fingerprint: ${result.apiSecretFingerprint}`,
     "",
     "Next actions:",
     ...result.nextActions.map((action) => `- ${action}`),
