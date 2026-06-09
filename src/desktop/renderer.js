@@ -975,9 +975,9 @@ function renderProviderFallbackGrid(result) {
   const fallbackCards = [
     {
       key: "required-stack",
-      label: "Required stack",
+      label: "Povinny stack",
       state: requiredReady === requiredKeys.length ? "ready" : "blocked",
-      detail: `${requiredReady}/${requiredKeys.length} core providers ready`,
+      detail: `${requiredReady}/${requiredKeys.length} core providerov ready`,
     },
     {
       key: "lead-discovery",
@@ -985,14 +985,14 @@ function renderProviderFallbackGrid(result) {
       state: byKey.get("googleMaps")?.status === "ready" || byKey.get("serper")?.status === "ready" ? "ready" : "blocked",
       detail:
         byKey.get("serper")?.status === "ready"
-          ? "Serper + Google Places available"
+          ? "Serper + Google Places dostupne"
           : byKey.get("googleMaps")?.status === "ready"
-            ? "Google Places fallback active; Serper is optional"
-            : "Lead providers need attention",
+            ? "Google Places fallback aktivny; Serper je volitelny"
+            : "Lead provideri potrebuju attention",
     },
     {
       key: "local-memory",
-      label: "Client memory",
+      label: "Klientska pamat",
       state: byKey.get("sqlite")?.status === "ready" ? "ready" : "blocked",
       detail: byKey.get("gmail")?.status === "ready" ? "Gmail sync + SQLite memory ready" : "SQLite stays available without Gmail sync",
     },
@@ -1457,7 +1457,7 @@ function renderMcpToolList(pack) {
   const approvalTools = new Set(pack.tools?.approvalRequired ?? []);
   const localWriteTools = new Set(pack.tools?.localStateWrite ?? []);
   const readOnlyTools = new Set(pack.tools?.readOnlyOrDraft ?? []);
-  elements.mcpToolListStatus.textContent = tools.length ? `Live registry: ${tools.length} tools loaded.` : "No MCP tools loaded.";
+  elements.mcpToolListStatus.textContent = tools.length ? `Live registry: ${tools.length} toolov nacitanych.` : "Ziadne MCP tooly nie su nacitane.";
   elements.mcpToolList.replaceChildren();
   for (const name of tools) {
     const badges = [];
@@ -1522,10 +1522,10 @@ function buildRemoteAgentPrompt(pack, smokeReport = null) {
     limits,
     supportedAgents ? `Supported agents: ${supportedAgents}` : "",
     compatibility?.protocol ? `Protocol: ${compatibility.protocol}` : "",
-    `Secure tunnel: ${pack.tunnel?.secureCommand ?? "npm run web:tunnel:secure"}`,
-    pack.tunnel?.statusUrl ? `Tunnel status: ${pack.tunnel.statusUrl}` : "",
-    pack.tunnel?.startUrl ? `Browser tunnel start: ${pack.tunnel.startUrl}` : "",
-    pack.tunnel?.stopUrl ? `Browser tunnel stop: ${pack.tunnel.stopUrl}` : "",
+    `Secure tunel: ${pack.tunnel?.secureCommand ?? "npm run web:tunnel:secure"}`,
+    pack.tunnel?.statusUrl ? `Status tunela: ${pack.tunnel.statusUrl}` : "",
+    pack.tunnel?.startUrl ? `Browser start tunela: ${pack.tunnel.startUrl}` : "",
+    pack.tunnel?.stopUrl ? `Browser stop tunela: ${pack.tunnel.stopUrl}` : "",
     `Smoke test: ${pack.smokeTestUrl ?? "--"}`,
     proof ? `Required proof:\n${proof}` : "",
     agentProfiles ? `Agent setup profiles:\n${agentProfiles}` : "",
@@ -1668,7 +1668,7 @@ async function copyAgentPrompt(agentKey, agentLabel, button) {
     pack.agentLaunchBundle?.shareWithAgent?.connectionPackUrl ? `Launch bundle connection pack: ${pack.agentLaunchBundle.shareWithAgent.connectionPackUrl}` : "",
     pack.agentLaunchBundle?.proofPolicy ? `Launch proof policy: ${(pack.agentLaunchBundle.proofPolicy.beforeAnyWork ?? []).join(" | ")} / ${(pack.agentLaunchBundle.proofPolicy.beforeWrites ?? []).join(" | ")}` : "",
     `Smoke test: ${pack.smokeTestUrl}`,
-    pack.tunnel?.statusUrl ? `Tunnel status: ${pack.tunnel.statusUrl}` : "",
+    pack.tunnel?.statusUrl ? `Status tunela: ${pack.tunnel.statusUrl}` : "",
     `Tool call pattern: ${pack.mcpToolCallPattern}`,
     `Auth header: ${pack.auth?.header ?? "Authorization: Bearer <JARVIS_WEB_TOKEN>"}`,
   ].join("\n");

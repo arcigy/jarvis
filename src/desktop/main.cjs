@@ -126,7 +126,7 @@ function getSecureTunnelStatus() {
       logExists: false,
       ready: false,
       logPath,
-      summary: running ? "Secure tunnel process is starting; log is not written yet." : "No secure tunnel log exists yet.",
+      summary: running ? "Secure tunel startuje; log este nie je zapisany." : "Secure tunnel log este neexistuje.",
     };
   }
 
@@ -152,7 +152,7 @@ function getSecureTunnelStatus() {
     mcpToolCallPattern: publicUrl ? `${publicUrl}/api/mcp/{toolName}` : null,
     tokenPresent: /One-time token:\s*\S+|Token source:\s*JARVIS_WEB_TOKEN/i.test(raw),
     smokeSummary,
-    summary: ready ? "Secure tunnel is ready. Public MCP URLs were extracted without returning the bearer token." : "Secure tunnel is not ready yet.",
+    summary: ready ? "Secure tunel je ready. Public MCP URL boli extrahovane bez vratenia auth tokenu." : "Secure tunel este nie je ready.",
     redactedTail: safe.split(/\r?\n/).filter(Boolean).slice(-18).join("\n"),
   };
 }
@@ -566,7 +566,7 @@ function buildReadinessLaunchEvidence(status, launchChecklist, nextActions) {
     })),
     remoteHandoff: {
       requiredBeforeExternalAgent: [
-        "Run npm run web:tunnel:secure or use the browser Start tunnel button with a strong JARVIS_WEB_TOKEN.",
+        "Spusti npm run web:tunnel:secure alebo pouzi browser tlacidlo Spustit tunel so silnym JARVIS_WEB_TOKEN.",
         "Fetch /.well-known/ai-plugin.json, /api/openapi.json, /.well-known/arcigy-jarvis.json, and /api/remote-mcp-pack?includeReadiness=true&live=true through the external URL.",
         "Run /api/remote-mcp-smoke and require status=ready with all 36 required remote MCP smoke gates ready, including manifest, tool-count, manifest-tool-registry, manifest-tool-metadata, auth-placeholder, manifest-local-write-policy, action-manifest, openapi-schema, cors-preflight, external-auth-gate, connection-pack, pack-secret-policy, pack-auth-throttle-policy, pack-limits, pack-tunnel-controls, secure-tunnel-status, pack-local-write-policy, pack-tool-registry, pack-quick-start-urls, pack-quick-start-approval-policy, pack-contract-quick-start, pack-contract-draft-quick-start, pack-agent-setup-profiles, pack-agent-launch-bundle, pack-voice-quick-start, pack-handoff-proof, pack-agent-compatibility, pack-client-memory-quick-start, pack-audit-quick-start, voice-tool-call, pack-production-evidence-quick-start, read-only-tool-call, production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction; production evidence must also be status=ready with release proof, dirty=false, and freshness.fresh=true within 24h before any remote agent uses write-capable tools.",
       ],
@@ -1163,7 +1163,7 @@ function buildRemoteMcpHandoffRunbook(baseUrl) {
     connectionPackUrl: `${baseUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`,
     operatorChecklist: [
       "Run npm run web:tunnel:secure and keep the process open while the remote agent works.",
-      "If using browser mode, configure a strong JARVIS_WEB_TOKEN first, then use Start tunnel or POST /api/start-secure-tunnel.",
+      "Ak pouzivas browser mode, najprv nastav silny JARVIS_WEB_TOKEN, potom pouzi Spustit tunel alebo POST /api/start-secure-tunnel.",
       "Give the remote agent the external action manifest, Jarvis manifest, connection pack, smoke test URL, MCP base URL, and bearer auth header placeholder.",
       "For ChatGPT custom actions or Grok-compatible OpenAPI setup, give the remote agent the external openApiSchemaUrl too.",
       "Approve approvalRequired tools only after reviewing the exact payload the agent will send.",

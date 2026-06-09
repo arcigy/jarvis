@@ -58,7 +58,7 @@
       <header>
         <div>
           <h1>Arcigy Jarvis</h1>
-          <p>Voice command center for contracts, outreach, client memory, Gemini drafts, and MCP operations.</p>
+          <p>Voice command center pre zmluvy, outreach, klientsku pamat, Gemini drafty a MCP operacie.</p>
         </div>
         <div class="status" id="statusBadge">Idle</div>
       </header>
@@ -81,7 +81,7 @@
           <strong id="missionRemote">kontrola</strong>
         </div>
         <div class="missionSignal" data-state="checking">
-          <span>Contracts</span>
+          <span>Zmluvy</span>
           <strong id="missionContracts">kontrola</strong>
         </div>
       </section>
@@ -239,7 +239,7 @@
           <div class="panelHead">
             <div>
               <h2>Operations sync</h2>
-              <p>Pull recent Gmail signals into local memory and inspect Smartlead campaigns.</p>
+              <p>Taha najnovsie Gmail signaly do lokalnej pamate a kontroluje Smartlead kampane.</p>
             </div>
             <div class="buttonGroup">
               <button id="runDiagnostics">Diagnostika</button>
@@ -279,8 +279,8 @@
         <article class="panel clientMemoryPanel" id="clientPanel">
           <div class="panelHead">
             <div>
-              <h2>Client memory</h2>
-              <p>Identify a sender and store client requests in local SQLite memory.</p>
+              <h2>Klientska pamat</h2>
+              <p>Identifikuje odosielatela a uklada klientsku poziadavku do lokalnej SQLite pamate.</p>
             </div>
             <div class="buttonGroup">
               <button id="identifyEmail">Identifikovat</button>
@@ -315,7 +315,7 @@
           <div class="panelHead">
             <div>
               <h2>Lead discovery</h2>
-              <p>Search live company candidates through configured discovery APIs.</p>
+              <p>Hlada live firemnych kandidatov cez nakonfigurovane discovery API.</p>
             </div>
             <div class="buttonGroup">
               <button id="discoverLeads">Hladat</button>
@@ -332,13 +332,13 @@
         <article class="panel">
           <div class="panelHead">
             <div>
-              <h2>Gemini reply draft</h2>
-              <p>Prepare a client answer without sending it.</p>
+              <h2>Gemini draft odpovede</h2>
+              <p>Pripravi klientsku odpoved bez odoslania.</p>
             </div>
             <button id="draftReply">Draftovat</button>
           </div>
           <label>
-            Client message
+            Klientska sprava
             <textarea id="clientMessage" spellcheck="false" placeholder="Potrebujem upravit onboarding automatizaciu do piatku."></textarea>
           </label>
           <div class="response compact" id="draftResult">Pripravene na Gemini.</div>
@@ -348,13 +348,13 @@
           <div class="panelHead">
             <div>
               <h2>MCP tools</h2>
-              <p>Check the local web bridge before exposing MCP tools through a tunnel.</p>
+              <p>Skontroluje lokalny web bridge pred vystavenim MCP toolov cez tunel.</p>
             </div>
             <button id="checkWebBridge">Preflight</button>
           </div>
           <div class="bridgeCockpit" id="bridgeCockpit" aria-label="Remote MCP bridge status">
             <div>
-              <span>Remote tunnel</span>
+              <span>Remote tunel</span>
               <strong id="bridgeTunnelState">kontrola</strong>
             </div>
             <div>
@@ -375,13 +375,13 @@
             <div class="handoffHead">
               <div>
                 <span>Remote agent pack</span>
-                <strong id="handoffStatus">waiting</strong>
+                <strong id="handoffStatus">caka</strong>
               </div>
               <div class="buttonGroup">
-                <button id="startSecureTunnel">Start tunnel</button>
-                <button id="stopSecureTunnel">Stop tunnel</button>
-                <button id="checkTunnelStatus">Tunnel status</button>
-                <button id="openTunnelLog">Open log</button>
+                <button id="startSecureTunnel">Spustit tunel</button>
+                <button id="stopSecureTunnel">Zastavit tunel</button>
+                <button id="checkTunnelStatus">Status tunela</button>
+                <button id="openTunnelLog">Otvorit log</button>
                 <button id="copyTunnelCommand">Kopirovat tunel</button>
                 <button id="copyClaudePrompt">Kopirovat Claude</button>
                 <button id="copyChatGptPrompt">Kopirovat ChatGPT</button>
@@ -399,7 +399,7 @@
                 <code id="handoffToolPattern">--</code>
               </div>
               <div>
-                <span>Secure tunnel</span>
+                <span>Secure tunel</span>
                 <code id="handoffTunnelCommand">--</code>
               </div>
               <div>
@@ -411,7 +411,7 @@
                 <code id="handoffApprovalTools">--</code>
               </div>
               <div>
-                <span>Local writes</span>
+                <span>Lokalne zapisy</span>
                 <code id="handoffLocalWriteTools">--</code>
               </div>
               <div>
@@ -429,11 +429,11 @@
             </div>
             <div class="launchBundleStrip" id="launchBundleStrip" aria-label="Remote launch bundle proof policy">
               <div>
-                <span>Before any work</span>
+                <span>Pred pracou</span>
                 <strong id="launchBeforeWork">Nacitaj launch bundle.</strong>
               </div>
               <div>
-                <span>Before writes</span>
+                <span>Pred zapisom</span>
                 <strong id="launchBeforeWrites">Vyziadaj fresh proof a schvalenie.</strong>
               </div>
               <div>
@@ -467,8 +467,8 @@
         <article class="panel contractPanel" id="contractPanel">
           <div class="panelHead">
             <div>
-              <h2>Contract generator</h2>
-              <p>Fill the form or edit the same JSON intake used by MCP.</p>
+              <h2>Generator zmluv</h2>
+              <p>Vypln formular alebo uprav rovnaky JSON intake, ktory pouziva MCP.</p>
             </div>
             <div class="buttonGroup">
               <button id="draftContractIntake">AI draft</button>
@@ -482,27 +482,27 @@
           </label>
           <div class="contractForm">
             <label>
-              Client business name
+              Obchodne meno klienta
               <input id="contractBusinessName" spellcheck="false" />
             </label>
             <label>
-              Registered address
+              Registrovana adresa
               <input id="contractAddress" spellcheck="false" />
             </label>
             <label>
-              Company ID
+              ICO / company ID
               <input id="contractCompanyId" spellcheck="false" />
             </label>
             <label>
-              VAT / tax ID
+              DIC / VAT ID
               <input id="contractTaxId" spellcheck="false" />
             </label>
             <label>
-              Representative
+              Zastupca
               <input id="contractRepresentativeName" spellcheck="false" />
             </label>
             <label>
-              Role
+              Rola
               <input id="contractRepresentativeRole" spellcheck="false" />
             </label>
             <label>
@@ -510,28 +510,28 @@
               <input id="contractEmail" spellcheck="false" />
             </label>
             <label>
-              Phone
+              Telefon
               <input id="contractPhone" spellcheck="false" />
             </label>
             <label>
-              Project name
+              Nazov projektu
               <input id="contractProjectName" spellcheck="false" />
             </label>
             <label>
-              Implementation fee EUR
+              Implementacny poplatok EUR
               <input id="contractImplementationFee" inputmode="numeric" />
             </label>
             <label>
-              Monthly fee EUR
+              Mesacny poplatok EUR
               <input id="contractMonthlyFee" inputmode="numeric" />
             </label>
             <label>
-              Initial term months
+              Uvodne obdobie v mesiacoch
               <input id="contractTermMonths" inputmode="numeric" />
             </label>
           </div>
           <label>
-            Project goal
+            Ciel projektu
             <textarea id="contractProjectGoal" spellcheck="false"></textarea>
           </label>
           <label>
