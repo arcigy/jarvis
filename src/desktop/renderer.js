@@ -143,6 +143,7 @@ const elements = {
   draftResult: document.querySelector("#draftResult"),
   runDiagnostics: document.querySelector("#runDiagnostics"),
   diagnosticsGrid: document.querySelector("#diagnosticsGrid"),
+  providerFallbackGrid: document.querySelector("#providerFallbackGrid"),
   diagnosticsResult: document.querySelector("#diagnosticsResult"),
   auditEvents: document.querySelector("#auditEvents"),
   localMemorySnapshot: document.querySelector("#localMemorySnapshot"),
@@ -892,6 +893,58 @@ function renderDiagnosticsGrid(result) {
     message.textContent = check.message ?? "-";
     node.append(key, status, message);
     elements.diagnosticsGrid.appendChild(node);
+  }
+}
+
+function renderProviderFallbackGrid(result) {
+  const checks = result.checks ?? [];
+  const byKey = new Map(checks.map((check) => [check.key, check]));
+  const requiredKeys = ["gemini", "gmail", "smartlead", "postgres", "googleSheets", "googleMaps", "remoteMcp", "sqlite"];
+  const requiredReady = requiredKeys.filter((key) => byKey.get(key)?.status === "ready").length;
+  const fallbackCards = [
+    {
+      key: "required-stack",
+      label: "Required stack",
+      state: requiredReady === requiredKeys.length ? "ready" : "blocked",
+      detail: `${requiredReady}/${requiredKeys.length} core providers ready`,
+    },
+    {
+      key: "lead-discovery",
+      label: "Lead discovery",
+      state: byKey.get("googleMaps")?.status === "ready" || byKey.get("serper")?.status === "ready" ? "ready" : "blocked",
+      detail:
+        byKey.get("serper")?.status === "ready"
+          ? "Serper + Google Places available"
+          : byKey.get("googleMaps")?.status === "ready"
+            ? "Google Places fallback active; Serper is optional"
+            : "Lead providers need attention",
+    },
+    {
+      key: "local-memory",
+      label: "Client memory",
+      state: byKey.get("sqlite")?.status === "ready" ? "ready" : "blocked",
+      detail: byKey.get("gmail")?.status === "ready" ? "Gmail sync + SQLite memory ready" : "SQLite stays available without Gmail sync",
+    },
+    {
+      key: "cache-queue",
+      label: "Cache queue",
+      state: byKey.get("redis")?.status === "ready" ? "ready" : "attention",
+      detail: byKey.get("redis")?.status === "ready" ? "Redis live" : "Optional Redis advisory; shipped state uses SQLite",
+    },
+  ];
+  elements.providerFallbackGrid.replaceChildren();
+  for (const card of fallbackCards) {
+    const node = document.createElement("div");
+    const label = document.createElement("strong");
+    const status = document.createElement("span");
+    const detail = document.createElement("p");
+    node.className = "providerFallbackCard";
+    node.setAttribute("data-state", card.state);
+    label.textContent = card.label;
+    status.textContent = card.state;
+    detail.textContent = card.detail;
+    node.append(label, status, detail);
+    elements.providerFallbackGrid.appendChild(node);
   }
 }
 
@@ -2019,6 +2072,7 @@ elements.runDiagnostics.addEventListener("click", async () => {
     elements.diagnosticsGrid.replaceChildren();
     const result = await arcigyApi.runDiagnostics({ live: true });
     renderDiagnosticsGrid(result);
+    renderProviderFallbackGrid(result);
     elements.diagnosticsResult.textContent = renderDiagnostics(result);
   } catch (error) {
     elements.diagnosticsResult.textContent = safeUiErrorText(error);

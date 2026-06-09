@@ -118,6 +118,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /preparedReplyResult/);
   assert.match(html, /runDiagnostics/);
   assert.match(html, /diagnosticsGrid/);
+  assert.match(html, /providerFallbackGrid/);
   assert.match(html, /diagnosticsResult/);
   assert.match(html, /auditEvents/);
   assert.match(html, /localMemorySnapshot/);
@@ -201,6 +202,10 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /arcigyApi\.productionReadiness\(\{ live: false \}\)/);
   assert.match(renderer, /function renderDiagnosticsGrid/);
   assert.match(renderer, /elements\.diagnosticsGrid\.replaceChildren\(\)/);
+  assert.match(renderer, /function renderProviderFallbackGrid/);
+  assert.match(renderer, /elements\.providerFallbackGrid\.replaceChildren\(\)/);
+  assert.match(renderer, /Google Places fallback active; Serper is optional/);
+  assert.match(renderer, /Optional Redis advisory; shipped state uses SQLite/);
   assert.match(renderer, /node\.setAttribute\("data-state", stateName\)/);
   assert.match(renderer, /renderBridgeCockpit/);
   assert.match(renderer, /renderRemoteMcpPack/);
@@ -521,7 +526,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(styles, /\.launchQueue,\s+\.operationsRadar,\s+\.cortexMap/s);
   assert.match(styles, /\.diagnosticsGrid/);
   assert.match(styles, /\.diagnosticCard\[data-state="ready"\]/);
-  assert.match(styles, /\.diagnosticsGrid,\s+\.clientAlertGrid/s);
+  assert.match(styles, /\.providerFallbackGrid/);
+  assert.match(styles, /\.providerFallbackCard\[data-state="attention"\]/);
+  assert.match(styles, /\.diagnosticsGrid,\s+\.providerFallbackGrid,\s+\.clientAlertGrid/s);
   assert.match(styles, /\.clientAlertGrid/);
   assert.match(styles, /\.clientAlertCard/);
   assert.match(styles, /\.clientAlertGrid,\s+\.toolMatrix/s);

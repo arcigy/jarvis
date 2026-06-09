@@ -1215,6 +1215,82 @@ h2 {
   border-color: rgb(240 184 79 / 55%);
 }
 
+.providerFallbackGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.providerFallbackCard {
+  position: relative;
+  min-width: 0;
+  border: 1px solid #263634;
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgb(67 217 196 / 9%), transparent 48%),
+    rgb(8 14 15 / 86%);
+  padding: 10px;
+  overflow: hidden;
+}
+
+.providerFallbackCard::after {
+  content: "";
+  position: absolute;
+  inset: auto 10px 8px;
+  height: 2px;
+  border-radius: 999px;
+  background: #56615f;
+}
+
+.providerFallbackCard strong,
+.providerFallbackCard span {
+  display: block;
+}
+
+.providerFallbackCard strong {
+  color: #eef4f2;
+  font-size: 13px;
+}
+
+.providerFallbackCard span {
+  margin-top: 5px;
+  color: #91a19d;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.providerFallbackCard p {
+  margin: 8px 0 8px;
+  color: #c8d6d2;
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.providerFallbackCard[data-state="ready"] {
+  border-color: rgb(67 217 196 / 44%);
+}
+
+.providerFallbackCard[data-state="ready"]::after {
+  background: #43d9c4;
+  box-shadow: 0 0 16px rgb(67 217 196 / 50%);
+}
+
+.providerFallbackCard[data-state="attention"] {
+  border-color: rgb(240 184 79 / 50%);
+}
+
+.providerFallbackCard[data-state="attention"]::after,
+.providerFallbackCard[data-state="blocked"]::after {
+  background: #f0b84f;
+  box-shadow: 0 0 16px rgb(240 184 79 / 44%);
+}
+
+.providerFallbackCard[data-state="blocked"] {
+  border-color: rgb(240 184 79 / 68%);
+}
+
 .clientAlertGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1556,6 +1632,7 @@ ul {
   .handoffGrid,
   .agentSetupGrid,
   .diagnosticsGrid,
+  .providerFallbackGrid,
   .clientAlertGrid,
   .toolMatrix,
   .grid {
