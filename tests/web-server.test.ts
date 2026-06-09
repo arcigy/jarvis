@@ -515,6 +515,15 @@ test("local web bridge serves UI and API health", async () => {
       agentCompatibility: { supportedAgents: string[]; safetyRules: string[]; requiredBeforeWork: string[] };
       agentPromptTemplates: { claude: string; chatgpt: string; grok: string; generic: string };
       agentSetupProfiles: Array<{ agent: string; setupMode: string; importUrl: string; fallbackUrl: string; firstTool: string; writePolicy: string; localWritePolicy: string; requiredProofGates: string[] }>;
+      agentLaunchBundle: {
+        mode: string;
+        authHeaderPlaceholder: string;
+        shareWithAgent: { connectionPackUrl: string; openApiSchemaUrl: string; smokeTestUrl: string; mcpToolCallPattern: string };
+        operatorControls: { secureTunnelCommand: string; tunnelStatusUrl: string; startTunnelUrl: string; stopTunnelUrl: string };
+        firstPrompts: { Claude: string; ChatGPT: string; Grok: string; "Generic HTTP agent": string };
+        proofPolicy: { freshnessMaxAgeHours: number; beforeAnyWork: string[]; beforeWrites: string[] };
+        safetyRails: string[];
+      };
       tunnel: { secureCommand: string; statusUrl: string; startUrl: string; stopUrl: string; browserStartRequiresStrongToken: boolean };
     };
     assert.match(remotePackBody.manifestUrl, /\/\.well-known\/arcigy-jarvis\.json$/);
@@ -568,6 +577,16 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(remotePackBody.agentSetupProfiles.every((profile) => profile.firstTool === "arcigy.get_operator_briefing" && profile.writePolicy === "approval.approved-required" && profile.localWritePolicy === "dry-run-first"));
     assert.ok(remotePackBody.agentSetupProfiles.every((profile) => profile.requiredProofGates.includes("pack-agent-setup-profiles")));
     assert.ok(remotePackBody.agentSetupProfiles.every((profile) => profile.requiredProofGates.includes("pack-production-evidence-quick-start") && profile.requiredProofGates.includes("production-evidence-tool-call")));
+    assert.equal(remotePackBody.agentLaunchBundle.mode, "remote-agent-launch-bundle");
+    assert.equal(remotePackBody.agentLaunchBundle.authHeaderPlaceholder, "Authorization: Bearer <JARVIS_WEB_TOKEN>");
+    assert.match(remotePackBody.agentLaunchBundle.shareWithAgent.connectionPackUrl, /\/api\/remote-mcp-pack\?includeReadiness=true&live=true$/);
+    assert.match(remotePackBody.agentLaunchBundle.shareWithAgent.openApiSchemaUrl, /\/api\/openapi\.json$/);
+    assert.match(remotePackBody.agentLaunchBundle.shareWithAgent.smokeTestUrl, /\/api\/remote-mcp-smoke$/);
+    assert.match(remotePackBody.agentLaunchBundle.firstPrompts.Grok, /api\/mcp\/\{toolName\}/);
+    assert.match(remotePackBody.agentLaunchBundle.firstPrompts.ChatGPT, /custom action schema/);
+    assert.equal(remotePackBody.agentLaunchBundle.proofPolicy.freshnessMaxAgeHours, 24);
+    assert.ok(remotePackBody.agentLaunchBundle.proofPolicy.beforeWrites.some((step) => step.includes("approval.approved=true")));
+    assert.ok(remotePackBody.agentLaunchBundle.safetyRails.some((rail) => rail.includes("OAuth refresh tokens")));
     assert.ok(remotePackBody.quickStartCalls.every((call) => call.method === "POST" && call.url.endsWith(`/api/mcp/${call.tool}`)));
     assert.ok(remotePackBody.quickStartCalls.every((call) => call.approvalRequired === remotePackBody.tools.approvalRequired.includes(call.tool)));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_production_verification_evidence" && call.approvalRequired === false));
@@ -629,6 +648,30 @@ test("local web bridge serves UI and API health", async () => {
     assert.match(remotePackBody.tunnel.startUrl, /\/api\/start-secure-tunnel$/);
     assert.match(remotePackBody.tunnel.stopUrl, /\/api\/stop-secure-tunnel$/);
     assert.equal(remotePackBody.tunnel.browserStartRequiresStrongToken, true);
+
+    const launchBundle = await fetch(`${baseUrl}/api/remote-agent-launch-bundle`);
+    assert.equal(launchBundle.status, 200);
+    const launchBundleText = await launchBundle.text();
+    assert.equal(launchBundleText.includes("preflight-secret-token"), false);
+    const launchBundleBody = JSON.parse(launchBundleText) as {
+      mode: string;
+      authHeaderPlaceholder: string;
+      tools: { count: number };
+      connectionPackUrl: string;
+      secureTunnelStatus: { ready: boolean; redactedTail?: string };
+      productionVerificationEvidence: { tokenValueReturned?: boolean };
+      firstPrompts: { Grok: string };
+      proofPolicy: { beforeAnyWork: string[]; beforeWrites: string[] };
+    };
+    assert.equal(launchBundleBody.mode, "remote-agent-launch-bundle");
+    assert.equal(launchBundleBody.authHeaderPlaceholder, "Authorization: Bearer <JARVIS_WEB_TOKEN>");
+    assert.equal(launchBundleBody.tools.count, listJarvisMcpTools().length);
+    assert.match(launchBundleBody.connectionPackUrl, /\/api\/remote-mcp-pack\?includeReadiness=true&live=true$/);
+    assert.match(launchBundleBody.firstPrompts.Grok, /arcigy\.get_operator_briefing/);
+    assert.ok(launchBundleBody.proofPolicy.beforeAnyWork.some((step) => step.includes("tokenValueReturned=false")));
+    assert.ok(launchBundleBody.proofPolicy.beforeWrites.some((step) => step.includes("freshness.fresh=true")));
+    assert.equal(JSON.stringify(launchBundleBody.secureTunnelStatus).includes("preflight-secret-token"), false);
+    assert.notEqual(launchBundleBody.productionVerificationEvidence.tokenValueReturned, true);
 
     const mcpRemotePack = await postJson(`${baseUrl}/api/mcp/arcigy.get_remote_mcp_pack`, { includeReadiness: false });
     assert.equal(mcpRemotePack.result.tools.count, listJarvisMcpTools().length);

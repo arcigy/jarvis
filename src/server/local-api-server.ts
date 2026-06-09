@@ -117,6 +117,11 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
     return;
   }
 
+  if (request.method === "GET" && url.pathname === "/api/remote-agent-launch-bundle") {
+    writeJson(response, 200, await getRemoteAgentLaunchBundle(request, url));
+    return;
+  }
+
   if (request.method === "GET" && url.pathname === "/api/remote-mcp-smoke") {
     writeJson(response, 200, await getRemoteMcpSmoke(request));
     return;
@@ -489,6 +494,7 @@ function buildWebBridgeManifest(request: IncomingMessage) {
       diagnostics: `${origin}/api/run-diagnostics`,
       productionReadiness: `${origin}/api/production-readiness`,
       productionVerificationEvidence: `${origin}/api/production-verification-evidence`,
+      remoteAgentLaunchBundle: `${origin}/api/remote-agent-launch-bundle`,
       secureTunnelStatus: `${origin}/api/secure-tunnel-status`,
       actionManifest: `${origin}/.well-known/ai-plugin.json`,
       openApiSchema: `${origin}/api/openapi.json`,
@@ -985,6 +991,18 @@ async function getRemoteMcpPack(request: IncomingMessage, url: URL | null, paylo
     authFailureWindowMs: getAuthFailureWindowMs(),
     source: "web",
   });
+}
+
+async function getRemoteAgentLaunchBundle(request: IncomingMessage, url: URL | null) {
+  const pack = await getRemoteMcpPack(request, url);
+  return {
+    ...pack.agentLaunchBundle,
+    generatedAt: new Date().toISOString(),
+    tools: pack.tools,
+    connectionPackUrl: pack.handoff.connectionPackUrl,
+    secureTunnelStatus: getSecureTunnelStatus(),
+    productionVerificationEvidence: getProductionVerificationEvidence(repoRoot),
+  };
 }
 
 async function getRemoteMcpSmoke(request: IncomingMessage) {

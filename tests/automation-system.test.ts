@@ -1237,6 +1237,15 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.agentSetupProfiles.some((profile) => profile.agent === "Grok" && profile.fallbackUrl === "https://jarvis.example/api/mcp/{toolName}"));
   assert.ok(pack.agentSetupProfiles.every((profile) => profile.firstTool === "arcigy.get_operator_briefing" && profile.writePolicy === "approval.approved-required"));
   assert.ok(pack.agentSetupProfiles.every((profile) => profile.requiredProofGates.includes("pack-production-evidence-quick-start") && profile.requiredProofGates.includes("production-evidence-tool-call")));
+  assert.equal(pack.agentLaunchBundle.mode, "remote-agent-launch-bundle");
+  assert.equal(pack.agentLaunchBundle.authHeaderPlaceholder, "Authorization: Bearer <JARVIS_WEB_TOKEN>");
+  assert.equal(pack.agentLaunchBundle.shareWithAgent.openApiSchemaUrl, "https://jarvis.example/api/openapi.json");
+  assert.equal(pack.agentLaunchBundle.shareWithAgent.connectionPackUrl, "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true");
+  assert.equal(pack.agentLaunchBundle.operatorControls.secureTunnelCommand, "npm run web:tunnel:secure");
+  assert.match(pack.agentLaunchBundle.firstPrompts.Grok, /POST https:\/\/jarvis\.example\/api\/mcp\/\{toolName\}/);
+  assert.match(pack.agentLaunchBundle.firstPrompts.ChatGPT, /custom action schema/);
+  assert.ok(pack.agentLaunchBundle.proofPolicy.beforeWrites.some((step) => step.includes("approval.approved=true")));
+  assert.ok(pack.agentLaunchBundle.safetyRails.some((rail) => rail.includes("OAuth refresh tokens")));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_production_verification_evidence" && call.approvalRequired === false));
   assert.ok(
     pack.quickStartCalls.some(

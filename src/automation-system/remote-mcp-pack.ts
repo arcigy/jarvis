@@ -100,6 +100,34 @@ export type RemoteMcpConnectionPack = {
     writePolicy: "approval.approved-required";
     localWritePolicy: "dry-run-first";
   }>;
+  agentLaunchBundle: {
+    mode: "remote-agent-launch-bundle";
+    status: ProductionReadinessReport["status"] | "unknown";
+    publicBaseUrl: string;
+    authHeaderPlaceholder: "Authorization: Bearer <JARVIS_WEB_TOKEN>";
+    shareWithAgent: {
+      connectionPackUrl: string;
+      actionManifestUrl: string;
+      manifestUrl: string;
+      openApiSchemaUrl: string;
+      smokeTestUrl: string;
+      productionVerificationEvidenceUrl: string;
+      mcpToolCallPattern: string;
+    };
+    operatorControls: {
+      secureTunnelCommand: "npm run web:tunnel:secure";
+      tunnelStatusUrl: string;
+      startTunnelUrl: string;
+      stopTunnelUrl: string;
+    };
+    firstPrompts: Record<"Claude" | "ChatGPT" | "Grok" | "Generic HTTP agent", string>;
+    proofPolicy: {
+      freshnessMaxAgeHours: 24;
+      beforeAnyWork: string[];
+      beforeWrites: string[];
+    };
+    safetyRails: string[];
+  };
   limits: {
     maxJsonBytes: number;
     pathPolicy: "repo-only";
@@ -183,6 +211,7 @@ export async function buildRemoteMcpConnectionPack(
     agentCompatibility: buildAgentCompatibility(),
     agentPromptTemplates: buildAgentPromptTemplates(baseUrl),
     agentSetupProfiles: buildAgentSetupProfiles(baseUrl),
+    agentLaunchBundle: buildAgentLaunchBundle(baseUrl, readiness?.status),
     limits: {
       maxJsonBytes: input.maxJsonBytes ?? 1_000_000,
       pathPolicy: "repo-only",
@@ -219,6 +248,62 @@ export async function buildRemoteMcpConnectionPack(
       "Treat generate_contract_documents, approve_prepared_outreach_reply, send_approved_outreach_reply, update_client_need_status, and append_leads_to_google_sheet as approval-gated actions.",
       "Treat localStateWrite tools as local memory writes. Prefer dryRun: true for sync_gmail_recent_messages before ingesting messages.",
       "Use get_operator_briefing for a Jarvis-style daily status before making recommendations.",
+    ],
+  };
+}
+
+function buildAgentLaunchBundle(baseUrl: string, status: ProductionReadinessReport["status"] | undefined): RemoteMcpConnectionPack["agentLaunchBundle"] {
+  const shareWithAgent = {
+    connectionPackUrl: `${baseUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`,
+    actionManifestUrl: `${baseUrl}/.well-known/ai-plugin.json`,
+    manifestUrl: `${baseUrl}/.well-known/arcigy-jarvis.json`,
+    openApiSchemaUrl: `${baseUrl}/api/openapi.json`,
+    smokeTestUrl: `${baseUrl}/api/remote-mcp-smoke`,
+    productionVerificationEvidenceUrl: `${baseUrl}/api/production-verification-evidence`,
+    mcpToolCallPattern: `${baseUrl}/api/mcp/{toolName}`,
+  };
+  const sharedPrompt =
+    `Use Arcigy Jarvis at ${baseUrl}. ` +
+    "Fetch the connection pack, production verification evidence, and remote smoke with Authorization: Bearer <JARVIS_WEB_TOKEN>. " +
+    "Before any local write or approvalRequired action, cite the ready smoke status, fresh production evidence, and the exact payload you want the operator to approve. " +
+    "Never ask for or reveal the real token.";
+
+  return {
+    mode: "remote-agent-launch-bundle",
+    status: status ?? "unknown",
+    publicBaseUrl: baseUrl,
+    authHeaderPlaceholder: "Authorization: Bearer <JARVIS_WEB_TOKEN>",
+    shareWithAgent,
+    operatorControls: {
+      secureTunnelCommand: "npm run web:tunnel:secure",
+      tunnelStatusUrl: `${baseUrl}/api/secure-tunnel-status`,
+      startTunnelUrl: `${baseUrl}/api/start-secure-tunnel`,
+      stopTunnelUrl: `${baseUrl}/api/stop-secure-tunnel`,
+    },
+    firstPrompts: {
+      Claude: `${sharedPrompt} In Claude, use the external HTTP MCP bridge and start with arcigy.get_operator_briefing.`,
+      ChatGPT: `${sharedPrompt} In ChatGPT, import ${shareWithAgent.openApiSchemaUrl} as a custom action schema and start with arcigy.get_operator_briefing.`,
+      Grok: `${sharedPrompt} In Grok, import ${shareWithAgent.openApiSchemaUrl} when actions are available, otherwise call POST ${shareWithAgent.mcpToolCallPattern}. Start with arcigy.get_operator_briefing.`,
+      "Generic HTTP agent": `${sharedPrompt} Use POST JSON calls against ${shareWithAgent.mcpToolCallPattern} and start with arcigy.get_operator_briefing.`,
+    },
+    proofPolicy: {
+      freshnessMaxAgeHours: 24,
+      beforeAnyWork: [
+        "Fetch the connection pack and confirm tokenValueReturned=false.",
+        "Fetch productionVerificationEvidenceUrl or call arcigy.get_production_verification_evidence.",
+        "Run smokeTestUrl and require status=ready.",
+      ],
+      beforeWrites: [
+        "Confirm production evidence status=ready, dirty=false, and freshness.fresh=true.",
+        "Confirm all remote MCP smoke gates are ready.",
+        "Show the exact approvalRequired payload and wait for operator approval.approved=true.",
+      ],
+    },
+    safetyRails: [
+      "Never return bearer tokens, API keys, OAuth refresh tokens, database URLs, or provider credentials.",
+      "Use read-only and draft tools before local writes.",
+      "Use dryRun: true before Gmail sync writes.",
+      "Keep all outputs family-friendly and client-safe.",
     ],
   };
 }
