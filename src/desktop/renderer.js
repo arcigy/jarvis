@@ -1021,15 +1021,15 @@ function renderProviderFallbackGrid(result) {
 
 function renderAuditEvents(result) {
   const events = result.events ?? [];
-  if (!events.length) return result.summary ?? "No audit events yet.";
+  if (!events.length) return result.summary ?? "Audit zatial nema ziadne udalosti.";
   return [
-    result.summary ?? `Audit events: ${events.length}`,
+    result.summary ?? `Audit udalosti: ${events.length}`,
     "",
     ...events.slice(0, 12).map((event, index) =>
       [
         `${index + 1}. ${event.automationKey} / ${event.status}`,
-        `   Created: ${event.createdAt ?? "-"}`,
-        `   Approval: ${event.requiresApproval ? event.approvedAt ?? "required" : "not required"}`,
+        `   Vytvorene: ${event.createdAt ?? "-"}`,
+        `   Schvalenie: ${event.requiresApproval ? event.approvedAt ?? "vyzadovane" : "nevyzadovane"}`,
       ].join("\n")
     ),
   ].join("\n");
@@ -1041,60 +1041,60 @@ function renderLocalMemorySnapshot(result) {
   const needs = result.recentClientNeedSignals ?? [];
   const audit = result.recentAuditEvents ?? [];
   return [
-    result.summary ?? "Local memory snapshot loaded.",
+    result.summary ?? "Lokalny snapshot pamate je nacitany.",
     "",
-    `People: ${counts.people ?? 0}`,
-    `Email activities: ${counts.emailActivities ?? 0}`,
-    `Open client needs: ${counts.openClientNeeds ?? 0}`,
-    `Cold outreach events: ${counts.coldOutreachEvents ?? 0}`,
-    `Audit events: ${counts.auditEvents ?? 0}`,
+    `Kontakty: ${counts.people ?? 0}`,
+    `Email aktivity: ${counts.emailActivities ?? 0}`,
+    `Otvorene klientske poziadavky: ${counts.openClientNeeds ?? 0}`,
+    `Cold outreach udalosti: ${counts.coldOutreachEvents ?? 0}`,
+    `Audit udalosti: ${counts.auditEvents ?? 0}`,
     "",
-    "Recent people:",
-    ...(people.length ? people.slice(0, 5).map((person) => `- ${person.primaryEmail} (${person.kind})`) : ["- none"]),
+    "Nedavne kontakty:",
+    ...(people.length ? people.slice(0, 5).map((person) => `- ${person.primaryEmail} (${person.kind})`) : ["- ziadne"]),
     "",
-    "Recent client needs:",
-    ...(needs.length ? needs.slice(0, 5).map((need) => `- ${need.status}: ${need.summary}`) : ["- none"]),
+    "Nedavne klientske poziadavky:",
+    ...(needs.length ? needs.slice(0, 5).map((need) => `- ${need.status}: ${need.summary}`) : ["- ziadne"]),
     "",
-    "Recent audit:",
-    ...(audit.length ? audit.slice(0, 5).map((event) => `- ${event.automationKey} / ${event.status}`) : ["- none"]),
+    "Nedavny audit:",
+    ...(audit.length ? audit.slice(0, 5).map((event) => `- ${event.automationKey} / ${event.status}`) : ["- ziadne"]),
   ].join("\n");
 }
 
 function renderIdentity(result) {
   if (!result.person) {
-    return `No local identity match for ${result.email}.`;
+    return `Lokalna identita pre ${result.email} sa nenasla.`;
   }
   const needs = result.openNeedSignals ?? [];
   return [
     `${result.person.displayName ?? result.person.companyName ?? result.person.primaryEmail}`,
     `Email: ${result.person.primaryEmail}`,
-    `Kind: ${result.person.kind}`,
-    `Match: ${result.reason} (${Math.round((result.confidence ?? 0) * 100)}%)`,
-    needs.length ? `Open needs: ${needs.length}` : "Open needs: 0",
+    `Typ: ${result.person.kind}`,
+    `Zhoda: ${result.reason} (${Math.round((result.confidence ?? 0) * 100)}%)`,
+    needs.length ? `Otvorene poziadavky: ${needs.length}` : "Otvorene poziadavky: 0",
     ...needs.slice(0, 5).map((need) => `- ${need.summary}`),
   ].join("\n");
 }
 
 function renderIngestedMessage(result) {
   return [
-    result.jarvisAlert ?? "Message saved. No new client request detected.",
+    result.jarvisAlert ?? "Sprava je ulozena. Nova klientska poziadavka nebola detegovana.",
     "",
-    "Identity:",
+    "Identita:",
     renderIdentity(result.identity),
   ].join("\n");
 }
 
 function renderClientNeedAlerts(result) {
   const alerts = result.alerts ?? [];
-  if (!alerts.length) return result.summary ?? "No open client requests.";
+  if (!alerts.length) return result.summary ?? "Ziadne otvorene klientske poziadavky.";
   return [
-    result.summary ?? `Open client requests: ${alerts.length}`,
+    result.summary ?? `Otvorene klientske poziadavky: ${alerts.length}`,
     "",
     ...alerts.slice(0, 10).map((alert, index) => {
       const person = alert.person ?? {};
       const need = alert.needSignal ?? {};
-      const name = person.displayName ?? person.companyName ?? person.primaryEmail ?? "Unknown";
-      return [`${index + 1}. ${name}`, `   Email: ${person.primaryEmail ?? "-"}`, `   Need: ${need.summary ?? "-"}`, `   Since: ${need.occurredAt ?? "-"}`].join("\n");
+      const name = person.displayName ?? person.companyName ?? person.primaryEmail ?? "Neznamy klient";
+      return [`${index + 1}. ${name}`, `   Email: ${person.primaryEmail ?? "-"}`, `   Poziadavka: ${need.summary ?? "-"}`, `   Od: ${need.occurredAt ?? "-"}`].join("\n");
     }),
   ].join("\n");
 }
@@ -1110,9 +1110,9 @@ function renderClientAlertGrid(result) {
     const meta = document.createElement("span");
     const summary = document.createElement("p");
     node.className = "clientAlertCard";
-    name.textContent = person.displayName ?? person.companyName ?? person.primaryEmail ?? "Unknown client";
-    meta.textContent = [person.primaryEmail, need.occurredAt].filter(Boolean).join(" / ") || "local memory";
-    summary.textContent = need.summary ?? "Open client request.";
+    name.textContent = person.displayName ?? person.companyName ?? person.primaryEmail ?? "Neznamy klient";
+    meta.textContent = [person.primaryEmail, need.occurredAt].filter(Boolean).join(" / ") || "lokalna pamat";
+    summary.textContent = need.summary ?? "Otvorena klientska poziadavka.";
     node.append(name, meta, summary);
     elements.clientAlertGrid.appendChild(node);
   }
@@ -1127,10 +1127,10 @@ function clientAlertKey(alert) {
 function notifyClientNeedAlert(alert, result) {
   const person = alert.person ?? {};
   const need = alert.needSignal ?? {};
-  const name = person.displayName ?? person.companyName ?? person.primaryEmail ?? "Client";
-  const summary = need.summary ?? result.summary ?? "New client request detected.";
-  const more = Number(result.count ?? 0) > 1 ? ` Open requests: ${result.count}.` : "";
-  notifyOperator("Arcigy Jarvis: client request", `${name}: ${summary}${more}`.slice(0, 240), "arcigy-client-need");
+  const name = person.displayName ?? person.companyName ?? person.primaryEmail ?? "Klient";
+  const summary = need.summary ?? result.summary ?? "Nova klientska poziadavka.";
+  const more = Number(result.count ?? 0) > 1 ? ` Otvorene poziadavky: ${result.count}.` : "";
+  notifyOperator("Arcigy Jarvis: klientska poziadavka", `${name}: ${summary}${more}`.slice(0, 240), "arcigy-client-need");
 }
 
 function latestClientNeedAlert() {
@@ -1139,7 +1139,7 @@ function latestClientNeedAlert() {
 
 async function updateLatestClientNeedStatus(status) {
   const alert = latestClientNeedAlert();
-  if (!alert) throw new Error("Load client alerts first. No open client request is selected.");
+  if (!alert) throw new Error("Najprv nacitaj klientske alerty. Nie je vybrana ziadna otvorena poziadavka.");
   const person = alert.person ?? {};
   const need = alert.needSignal ?? {};
   const name = person.displayName ?? person.companyName ?? person.primaryEmail ?? "client";

@@ -348,6 +348,13 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /Pripravene odpovede: \$\{replies\.length\}/);
   assert.match(renderer, /Schvalovacia fronta je prazdna/);
   assert.doesNotMatch(renderer, /No Gmail accounts were synced|Preview only: wrote 0 local records|Local memory sync wrote new records|No prepared replies are waiting for approval|Approval queue is empty/);
+  assert.match(renderer, /Audit zatial nema ziadne udalosti/);
+  assert.match(renderer, /Lokalny snapshot pamate je nacitany/);
+  assert.match(renderer, /Lokalna identita pre \$\{result\.email\} sa nenasla/);
+  assert.match(renderer, /Sprava je ulozena\. Nova klientska poziadavka nebola detegovana/);
+  assert.match(renderer, /Ziadne otvorene klientske poziadavky/);
+  assert.match(renderer, /Najprv nacitaj klientske alerty/);
+  assert.doesNotMatch(renderer, /No audit events yet|Local memory snapshot loaded|No local identity match|Message saved\\. No new client request detected|No open client requests|Unknown client|New client request detected|Load client alerts first/);
   assert.match(renderer, /in:inbox newer_than:7d/);
   assert.match(renderer, /arcigyApi\.getSmartleadCampaignStatus/);
   assert.match(renderer, /arcigyApi\.getSmartleadOutreachBrief/);
