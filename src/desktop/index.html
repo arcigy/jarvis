@@ -36,11 +36,11 @@
         </div>
         <div class="radarNode" data-state="checking">
           <span>Remote proof</span>
-          <strong id="radarRemoteProof">smoke pending</strong>
+          <strong id="radarRemoteProof">smoke caka</strong>
         </div>
         <div class="radarNode" data-state="checking">
           <span>Live checks</span>
-          <strong id="radarLiveChecks">evidence pending</strong>
+          <strong id="radarLiveChecks">evidence caka</strong>
         </div>
         <div class="radarNode" data-state="checking">
           <span>Schvalovacie zamky</span>
@@ -48,9 +48,9 @@
         </div>
         <div class="radarNode" data-state="checking">
           <span>Client watch</span>
-          <strong id="radarClientAlerts">starting</strong>
+          <strong id="radarClientAlerts">startujem</strong>
         </div>
-        <div class="radarSweepLabel" id="radarSweepLabel">Jarvis tactical radar warming up</div>
+        <div class="radarSweepLabel" id="radarSweepLabel">Jarvis takticky radar sa zahrieva</div>
       </section>
     </aside>
 
@@ -288,7 +288,7 @@
               <button id="clientNeedAlerts">Alerts</button>
               <button id="resolveClientNeed">Resolve</button>
               <button id="ignoreClientNeed">Ignore</button>
-              <button id="toggleClientNeedWatch">Pause watch</button>
+              <button id="toggleClientNeedWatch">Pauznut watch</button>
             </div>
           </div>
           <div class="watchStatus" id="clientAlertWatchStatus">Client alert watch is starting with Gmail auto-sync.</div>
@@ -416,50 +416,50 @@
               </div>
               <div>
                 <span>Proof gates</span>
-                <code id="handoffProofGates" data-state="attention">smoke not run</code>
+                <code id="handoffProofGates" data-state="attention">smoke este nebezi</code>
               </div>
               <div>
                 <span>Launch bundle</span>
-                <code id="handoffLaunchBundle" data-state="attention">not loaded</code>
+                <code id="handoffLaunchBundle" data-state="attention">nenacitane</code>
               </div>
               <div>
                 <span>Write policy</span>
-                <code id="handoffWritePolicy">approval required</code>
+                <code id="handoffWritePolicy">vyzaduje schvalenie</code>
               </div>
             </div>
             <div class="launchBundleStrip" id="launchBundleStrip" aria-label="Remote launch bundle proof policy">
               <div>
                 <span>Before any work</span>
-                <strong id="launchBeforeWork">Load launch bundle.</strong>
+                <strong id="launchBeforeWork">Nacitaj launch bundle.</strong>
               </div>
               <div>
                 <span>Before writes</span>
-                <strong id="launchBeforeWrites">Require fresh proof and approval.</strong>
+                <strong id="launchBeforeWrites">Vyziadaj fresh proof a schvalenie.</strong>
               </div>
               <div>
                 <span>Agent prompt</span>
-                <strong id="launchAgentPrompt">Claude / ChatGPT / Grok ready after pack load.</strong>
+                <strong id="launchAgentPrompt">Claude / ChatGPT / Grok pripraveny po nacitani packu.</strong>
               </div>
             </div>
             <div class="agentSetupGrid" id="agentSetupProfiles" aria-label="Remote agent setup profiles">
               <div class="agentSetupCard" data-state="attention">
                 <span>Agent setup</span>
-                <strong>waiting for pack</strong>
-                <code>Load bridge preflight.</code>
+                <strong>caka na pack</strong>
+                <code>Nacitaj bridge preflight.</code>
               </div>
             </div>
-            <button id="runRemoteSmoke">Run smoke</button>
-            <div class="response compact" id="remoteSmokeResult">Smoke test not run.</div>
+            <button id="runRemoteSmoke">Spustit smoke</button>
+            <div class="response compact" id="remoteSmokeResult">Smoke test este nebezi.</div>
             <div class="remoteProofMatrix" id="remoteProofMatrix" aria-label="Remote MCP proof gate matrix">
               <div class="proofGateCard" data-state="attention">
                 <span>Proof matrix</span>
-                <strong>Smoke not run</strong>
+                <strong>Smoke este nebezi</strong>
               </div>
             </div>
-            <pre class="response compact handoffPrompt" id="remoteAgentPrompt">Remote pack not loaded.</pre>
+            <pre class="response compact handoffPrompt" id="remoteAgentPrompt">Remote pack nie je nacitany.</pre>
           </div>
           <ul>
-            <li id="mcpToolListStatus">Load bridge preflight to list live MCP tools.</li>
+            <li id="mcpToolListStatus">Nacitaj bridge preflight pre zoznam live MCP toolov.</li>
           </ul>
           <div class="toolMatrix" id="mcpToolList" aria-label="Live MCP tool registry"></div>
         </article>

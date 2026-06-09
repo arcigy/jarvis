@@ -21,7 +21,7 @@ const state = {
   clientAlertPollMs: 60000,
   clientAlertGmailSyncPollMs: 300000,
   lastClientAlertGmailSyncAt: 0,
-  lastClientAlertGmailSyncSummary: "Gmail auto-sync pending.",
+  lastClientAlertGmailSyncSummary: "Gmail auto-sync caka.",
   contractFormDirty: false,
   secureTunnelLogPath: null,
   lastSecureTunnelStatus: null,
@@ -544,19 +544,19 @@ function updateOperationsRadar() {
   const checksReady = state.lastProductionEvidence?.status === "ready" && freshness.fresh === true && checks.length > 0 && readyChecks === checks.length;
   setRadarNode(
     elements.radarRemoteProof,
-    smokeProof ? smokeProof.text : gates ? `evidence ${gates}/${requiredRemoteSmokeGates.length} gates` : "smoke pending",
+    smokeProof ? smokeProof.text : gates ? `evidence ${gates}/${requiredRemoteSmokeGates.length} gates` : "smoke caka",
     proofReady ? "ready" : "attention"
   );
-  setRadarNode(elements.radarLiveChecks, checks.length ? `${readyChecks}/${checks.length} checks` : "evidence pending", checksReady ? "ready" : "attention");
-  setRadarNode(elements.radarApprovals, `${approvals.length} locked`, approvals.length ? "ready" : "attention");
+  setRadarNode(elements.radarLiveChecks, checks.length ? `${readyChecks}/${checks.length} checks` : "evidence caka", checksReady ? "ready" : "attention");
+  setRadarNode(elements.radarApprovals, `${approvals.length} zamknute`, approvals.length ? "ready" : "attention");
   setRadarNode(
     elements.radarClientAlerts,
-    clientAlerts ? `${clientAlerts} open need(s)` : state.clientAlertWatchEnabled ? "watch clear" : "watch paused",
+    clientAlerts ? `${clientAlerts} otvorene poziadavky` : state.clientAlertWatchEnabled ? "watch cisty" : "watch pauznuty",
     clientAlerts ? "attention" : state.clientAlertWatchEnabled ? "ready" : "attention"
   );
   const radarReady = proofReady && checksReady && !clientAlerts;
   elements.operationsRadar.setAttribute("data-state", radarReady ? "ready" : "attention");
-  elements.radarSweepLabel.textContent = radarReady ? "Jarvis tactical radar stable" : "Jarvis tactical radar tracking attention";
+  elements.radarSweepLabel.textContent = radarReady ? "Jarvis takticky radar je stabilny" : "Jarvis takticky radar sleduje attention";
 }
 
 function setRadarNode(node, text, stateName) {
@@ -566,7 +566,7 @@ function setRadarNode(node, text, stateName) {
 }
 
 function buildCommandTimeline(blockers, bridge, advisories = []) {
-  const bridgeState = bridge ? (bridge.readyForTunnel ? "MCP bridge ready for tunnel." : "MCP bridge needs attention.") : "MCP bridge preflight not loaded.";
+  const bridgeState = bridge ? (bridge.readyForTunnel ? "MCP bridge je pripraveny na tunel." : "MCP bridge potrebuje attention.") : "MCP bridge preflight nie je nacitany.";
   if (!blockers.length) {
     const advisoryText = advisories.length ? ` Non-blocking advisory: ${advisories.map((item) => item.key).join(", ")}.` : "";
     return `All required integration gates are ready.${advisoryText} ${bridgeState}`;
@@ -603,7 +603,7 @@ function renderMissionSignals(health, bridge = null) {
   setMissionSignal(elements.missionRemote, bridge ? (bridge.readyForTunnel ? "ready" : "locked") : "checking", bridge ? (bridge.readyForTunnel ? "ready" : "attention") : "checking");
   setMissionSignal(elements.missionContracts, gemini?.configured ? "Gemini ready" : "needs Gemini", gemini?.configured ? "ready" : "attention");
   setCortexSignal(elements.cortexOutreach, smartlead?.configured ? "Smartlead ready" : "needs key", smartlead?.configured ? "ready" : "attention");
-  setCortexSignal(elements.cortexMemory, gmail?.configured ? (state.clientAlertWatchEnabled ? "Gmail watch" : "watch paused") : "needs Gmail", gmail?.configured && state.clientAlertWatchEnabled ? "ready" : "attention");
+  setCortexSignal(elements.cortexMemory, gmail?.configured ? (state.clientAlertWatchEnabled ? "Gmail watch" : "watch pauznuty") : "needs Gmail", gmail?.configured && state.clientAlertWatchEnabled ? "ready" : "attention");
   setCortexSignal(elements.cortexContracts, gemini?.configured ? "Gemini intake" : "needs Gemini", gemini?.configured ? "ready" : "attention");
   setCortexSignal(elements.cortexRemote, bridge ? (bridge.readyForTunnel ? "tunnel ready" : "auth locked") : "checking", bridge ? (bridge.readyForTunnel ? "ready" : "attention") : "checking");
 }
@@ -621,10 +621,10 @@ function renderReadinessReport(report) {
     `MCP tools: ${report.mcp?.toolCount ?? "--"}`,
     `Schvalovacie zamky: ${(report.mcp?.approvalRequired ?? []).length}`,
     "",
-    launchChecklist.length ? "Launch checklist:" : "Launch checklist: not loaded",
+    launchChecklist.length ? "Launch checklist:" : "Launch checklist: nie je nacitany",
     ...launchChecklist.map((item) => [`- [${item.status}] ${item.title}`, `  Proof: ${item.proof}`, `  Next: ${item.nextAction}`].join("\n")),
     "",
-    launchEvidence ? `Launch evidence: ${launchEvidence.decision}` : "Launch evidence: not loaded",
+    launchEvidence ? `Launch evidence: ${launchEvidence.decision}` : "Launch evidence: nie je nacitana",
     ...proofGates.map((gate) => [`- [${gate.status}] ${gate.title}`, `  Proof: ${gate.proof}`, `  Validate: ${gate.validationCommand}`].join("\n")),
     launchEvidence?.remoteHandoff
       ? [
@@ -1178,8 +1178,8 @@ async function refreshClientNeedAlerts({ announceNew = false, loadingText = null
   }
 
   elements.clientAlertWatchStatus.textContent = state.clientAlertWatchEnabled
-    ? `Client alert watch active. Open requests: ${result.count ?? alerts.length}. ${state.lastClientAlertGmailSyncSummary}`
-    : `Client alert watch paused. Open requests: ${result.count ?? alerts.length}. ${state.lastClientAlertGmailSyncSummary}`;
+    ? `Client alert watch aktivny. Otvorene poziadavky: ${result.count ?? alerts.length}. ${state.lastClientAlertGmailSyncSummary}`
+    : `Client alert watch pauznuty. Otvorene poziadavky: ${result.count ?? alerts.length}. ${state.lastClientAlertGmailSyncSummary}`;
   setCortexSignal(
     elements.cortexMemory,
     Number(result.count ?? alerts.length) > 0 ? `${result.count ?? alerts.length} open need(s)` : "watch clear",
@@ -1209,16 +1209,16 @@ async function maybeSyncGmailForClientAlerts({ force = false } = {}) {
     const created = synced.reduce((sum, item) => sum + Number(item.created ?? item.ingested ?? 0), 0);
     const duplicates = synced.reduce((sum, item) => sum + Number(item.duplicates ?? 0), 0);
     const alerts = synced.reduce((sum, item) => sum + (item.alerts ?? []).length, 0);
-    state.lastClientAlertGmailSyncSummary = `Gmail auto-sync checked ${synced.length} account(s), fetched ${fetched}, created ${created}, skipped ${duplicates} duplicate(s), raised ${alerts} alert(s).`;
+    state.lastClientAlertGmailSyncSummary = `Gmail auto-sync skontroloval ${synced.length} accountov, nacital ${fetched}, vytvoril ${created}, preskocil ${duplicates} duplikatov, zdvihol ${alerts} alertov.`;
   } catch (error) {
     const message = safeUiErrorText(error);
-    state.lastClientAlertGmailSyncSummary = `Gmail auto-sync unavailable: ${message}`;
+    state.lastClientAlertGmailSyncSummary = `Gmail auto-sync nedostupny: ${message}`;
   }
 }
 
 function startClientNeedWatch() {
   state.clientAlertWatchEnabled = true;
-  elements.toggleClientNeedWatch.textContent = "Pause watch";
+  elements.toggleClientNeedWatch.textContent = "Pauznut watch";
   setMissionSignal(elements.missionGmail, "watching", "ready");
   setCortexSignal(elements.cortexMemory, "Gmail watch", "ready");
   if (state.clientAlertPollTimer) window.clearInterval(state.clientAlertPollTimer);
@@ -1237,10 +1237,10 @@ function stopClientNeedWatch() {
   state.clientAlertWatchEnabled = false;
   if (state.clientAlertPollTimer) window.clearInterval(state.clientAlertPollTimer);
   state.clientAlertPollTimer = null;
-  elements.toggleClientNeedWatch.textContent = "Resume watch";
-  elements.clientAlertWatchStatus.textContent = "Client alert watch paused.";
+  elements.toggleClientNeedWatch.textContent = "Obnovit watch";
+  elements.clientAlertWatchStatus.textContent = "Client alert watch pauznuty.";
   setMissionSignal(elements.missionGmail, "paused", "attention");
-  setCortexSignal(elements.cortexMemory, "watch paused", "attention");
+  setCortexSignal(elements.cortexMemory, "watch pauznuty", "attention");
 }
 
 function renderSmartleadStatus(result) {
@@ -1335,7 +1335,7 @@ function renderRemoteMcpPack(pack) {
   elements.handoffSmokeUrl.textContent = pack.smokeTestUrl ?? "--";
   elements.handoffApprovalTools.textContent = approvalTools.length ? `${approvalTools.length}: ${approvalTools.join(", ")}` : "none";
   elements.handoffLocalWriteTools.textContent = localWriteTools.length ? `${localWriteTools.length}: ${localWriteTools.join(", ")}` : "none";
-  const proof = matchingSmoke ? summarizeRemoteProofGates(matchingSmoke) : { ready: false, text: "smoke not run" };
+  const proof = matchingSmoke ? summarizeRemoteProofGates(matchingSmoke) : { ready: false, text: "smoke este nebezi" };
   elements.handoffProofGates.textContent = proof.text;
   elements.handoffProofGates.dataset.state = proof.ready ? "ready" : "attention";
   renderRemoteProofMatrix(matchingSmoke);
@@ -1348,16 +1348,16 @@ function renderRemoteMcpPack(pack) {
 function renderRemoteAgentLaunchBundle(bundle, smokeReport = null) {
   if (!bundle) {
     state.lastRemoteAgentLaunchBundle = null;
-    elements.handoffLaunchBundle.textContent = "not loaded";
+    elements.handoffLaunchBundle.textContent = "nenacitane";
     elements.handoffLaunchBundle.dataset.state = "attention";
     elements.handoffWritePolicy.textContent = "approval.approved-required";
-    elements.launchBeforeWork.textContent = "Load launch bundle.";
-    elements.launchBeforeWrites.textContent = "Require fresh proof and approval.";
-    elements.launchAgentPrompt.textContent = "Claude / ChatGPT / Grok ready after pack load.";
+    elements.launchBeforeWork.textContent = "Nacitaj launch bundle.";
+    elements.launchBeforeWrites.textContent = "Vyziadaj fresh proof a schvalenie.";
+    elements.launchAgentPrompt.textContent = "Claude / ChatGPT / Grok pripraveny po nacitani packu.";
     return;
   }
   state.lastRemoteAgentLaunchBundle = bundle;
-  const proof = smokeReport ? summarizeRemoteProofGates(smokeReport) : { ready: false, text: "smoke not run" };
+  const proof = smokeReport ? summarizeRemoteProofGates(smokeReport) : { ready: false, text: "smoke este nebezi" };
   const beforeAnyWork = bundle.proofPolicy?.beforeAnyWork ?? [];
   const beforeWrites = bundle.proofPolicy?.beforeWrites ?? [];
   const prompts = bundle.firstPrompts ?? {};
@@ -1373,7 +1373,7 @@ function renderRemoteAgentLaunchBundle(bundle, smokeReport = null) {
   ].join("\n");
   elements.launchBeforeWork.textContent = beforeAnyWork.slice(0, 3).join(" | ") || "Fetch pack, evidence, and smoke.";
   elements.launchBeforeWrites.textContent = beforeWrites.slice(0, 3).join(" | ") || "Require fresh proof and approval.";
-  elements.launchAgentPrompt.textContent = prompts.Grok ? "Claude, ChatGPT, Grok prompts loaded." : "Agent prompts not loaded.";
+  elements.launchAgentPrompt.textContent = prompts.Grok ? "Claude, ChatGPT, Grok prompty nacitane." : "Agent prompty nie su nacitane.";
 }
 
 function renderAgentSetupProfiles(profiles, smokeReport = null) {
@@ -1386,13 +1386,13 @@ function renderAgentSetupProfiles(profiles, smokeReport = null) {
     node.className = "agentSetupCard";
     node.dataset.state = "attention";
     label.textContent = "Agent setup";
-    title.textContent = "missing";
-    meta.textContent = "Connection pack has no profiles.";
+    title.textContent = "chyba";
+    meta.textContent = "Connection pack nema profily.";
     node.append(label, title, meta);
     elements.agentSetupProfiles.appendChild(node);
     return;
   }
-  const gateSummary = smokeReport ? summarizeRemoteProofGates(smokeReport) : { ready: false, text: "smoke not run" };
+  const gateSummary = smokeReport ? summarizeRemoteProofGates(smokeReport) : { ready: false, text: "smoke este nebezi" };
   for (const profile of profiles) {
     const gates = Array.isArray(profile.requiredProofGates) ? profile.requiredProofGates : [];
     const node = document.createElement("div");
@@ -1408,7 +1408,7 @@ function renderAgentSetupProfiles(profiles, smokeReport = null) {
       `Fallback: ${profile.fallbackUrl ?? "--"}`,
       `First: ${profile.firstTool ?? "arcigy.get_operator_briefing"}`,
       `Policy: ${profile.writePolicy ?? "approval.approved-required"} / ${profile.localWritePolicy ?? "dry-run-first"}`,
-      `Proof: ${gates.length ? gates.join(", ") : "not declared"}`,
+      `Proof: ${gates.length ? gates.join(", ") : "nedeklarovane"}`,
     ].join("\n");
     node.append(label, title, meta);
     elements.agentSetupProfiles.appendChild(node);
@@ -1429,24 +1429,24 @@ function renderSecureTunnelStatus(status) {
     setMissionSignal(elements.missionRemote, "tunnel live", "ready");
     setCortexSignal(elements.cortexRemote, "tunnel live", "ready");
   } else if (status.running) {
-    elements.handoffStatus.textContent = "starting";
+    elements.handoffStatus.textContent = "startuje";
     elements.handoffStatus.dataset.state = "attention";
-    elements.handoffProofGates.textContent = "waiting for tunnel ready log";
+    elements.handoffProofGates.textContent = "cakam na tunnel ready log";
     elements.handoffProofGates.dataset.state = "attention";
   }
   elements.remoteAgentPrompt.textContent = [
-    status.summary ?? "Secure tunnel status loaded.",
-    `Running: ${status.running ? "yes" : "no"}`,
-    `Ready: ${status.ready ? "yes" : "no"}`,
+    status.summary ?? "Secure tunnel status nacitany.",
+    `Bezi: ${status.running ? "ano" : "nie"}`,
+    `Ready: ${status.ready ? "ano" : "nie"}`,
     status.publicUrl ? `Public MCP base URL: ${status.publicUrl}` : null,
     status.actionManifestUrl ? `Action manifest: ${status.actionManifestUrl}` : status.publicUrl ? `Action manifest: ${status.publicUrl}/.well-known/ai-plugin.json` : null,
     status.openApiSchemaUrl ? `OpenAPI schema: ${status.openApiSchemaUrl}` : status.publicUrl ? `OpenAPI schema: ${status.publicUrl}/api/openapi.json` : null,
     status.connectionPackUrl ? `Connection pack: ${status.connectionPackUrl}` : null,
     status.smokeUrl ? `Smoke test: ${status.smokeUrl}` : null,
     status.mcpToolCallPattern ? `Tool call pattern: ${status.mcpToolCallPattern}` : null,
-    `Bearer token: ${status.tokenPresent ? "present in private log, not shown here" : "not detected"}`,
+    `Auth token: ${status.tokenPresent ? "je v privatnom logu, tu sa nezobrazuje" : "nezisteny"}`,
     status.logPath ? `Private log: ${status.logPath}` : null,
-    status.redactedTail ? `\nRedacted log tail:\n${status.redactedTail}` : null,
+    status.redactedTail ? `\nRedigovany koniec logu:\n${status.redactedTail}` : null,
   ]
     .filter(Boolean)
     .join("\n");

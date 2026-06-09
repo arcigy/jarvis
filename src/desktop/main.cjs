@@ -2531,7 +2531,7 @@ function summarizeFullLaunchProofForVoice(report, evidence, pack) {
     headline,
     `Readiness: ${report?.status || "unknown"}, ${blocking.length} blocking, ${advisories.length} advisory.`,
     `Production evidence: ${evidence?.status || "unknown"}, commit ${release.shortCommit || "unknown"}, tree ${release.dirty === false ? "clean" : "not clean"}, freshness ${freshness.fresh === true ? `fresh ${freshness.ageHours ?? "?"}h` : "stale or missing"}, checks ${readyChecks}/${checks.length}.`,
-    pack ? `Remote MCP pack: ${pack.tools?.count || 0} toolov, ${approvalRequired} approval lockov. Smoke: ${pack.smokeTestUrl || "not loaded"}.` : "Remote MCP pack nie je dostupny.",
+    pack ? `Remote MCP pack: ${pack.tools?.count || 0} toolov, ${approvalRequired} schvalovacich zamkov. Smoke: ${pack.smokeTestUrl || "nenacitane"}.` : "Remote MCP pack nie je dostupny.",
     `Najblizsi krok: ${next}`,
   ].join(" ");
 }
