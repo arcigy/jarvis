@@ -250,6 +250,10 @@ async function handleVoiceEvent(payload) {
     return voiceDone(session, text, (await getOperatorBriefing({ ...payload, text })).speechText);
   }
 
+  if (isProductionEvidenceVoiceCommand(lowered)) {
+    return voiceDone(session, text, summarizeProductionEvidenceForVoice(getProductionVerificationEvidence()));
+  }
+
   if (isProductionReadinessVoiceCommand(lowered)) {
     const report = await getProductionReadiness({ ...payload, live: payload?.live === true || lowered.includes("live") });
     return voiceDone(session, text, summarizeReadinessForVoice(report));
@@ -2279,6 +2283,22 @@ function summarizeReadinessForVoice(report) {
   ].filter(Boolean).join(" ");
 }
 
+function summarizeProductionEvidenceForVoice(evidence) {
+  const release = evidence?.release && typeof evidence.release === "object" && !Array.isArray(evidence.release) ? evidence.release : {};
+  const freshness = evidence?.freshness && typeof evidence.freshness === "object" && !Array.isArray(evidence.freshness) ? evidence.freshness : {};
+  const checks = Array.isArray(evidence?.checks) ? evidence.checks : [];
+  const ready = checks.filter((check) => check && typeof check === "object" && check.status === "ready").length;
+  const failed = checks.filter((check) => check && typeof check === "object" && check.status === "failed").length;
+  const tree = release.dirty === false ? "clean" : release.dirty === true ? "dirty" : "unknown";
+  const fresh = freshness.fresh === true ? `fresh ${freshness.ageHours ?? "?"}h` : "not fresh";
+  return [
+    `Production evidence je ${evidence?.status || "unknown"}.`,
+    typeof evidence?.summary === "string" ? evidence.summary : null,
+    `Release commit ${release.shortCommit || "unknown"}, tree ${tree}, ${fresh}.`,
+    checks.length ? `Checks: ${ready}/${checks.length} ready, ${failed} failed.` : null,
+  ].filter(Boolean).join(" ");
+}
+
 function summarizeRemoteMcpForVoice(pack) {
   const tools = pack.tools || {};
   const approvalRequired = Array.isArray(tools.approvalRequired) ? tools.approvalRequired : [];
@@ -2321,6 +2341,10 @@ function summarizeGmailPreviewForVoice(result) {
 
 function isProductionReadinessVoiceCommand(text) {
   return ["production", "produkcia", "readiness", "launch", "checklist", "nasadenie"].some((term) => text.includes(term));
+}
+
+function isProductionEvidenceVoiceCommand(text) {
+  return ["production evidence", "verification evidence", "release proof", "evidence", "verifier", "overenie", "dokaz"].some((term) => text.includes(term));
 }
 
 function isRemoteMcpVoiceCommand(text) {

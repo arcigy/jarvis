@@ -23,6 +23,7 @@ export type JarvisVoiceCapability =
   | "cold_outreach_brief"
   | "operator_briefing"
   | "production_readiness"
+  | "production_evidence"
   | "remote_mcp"
   | "approval_queue"
   | "contract_generation"
@@ -63,6 +64,7 @@ function resolveVoiceCapability(text: string): JarvisVoiceCapability | null {
   if (hasAny(text, ["cold outreach", "outreach", "smartlead", "pozitivne odpovede"])) return "cold_outreach_brief";
   if (hasAny(text, ["briefing", "prehlad", "co sa deje", "co sa dialo", "operator"])) return "operator_briefing";
   if (hasAny(text, ["approval", "schvalenie", "schvalit", "potvrdenie", "potvrdit", "na moje znamenie", "cakaju na mna"])) return "approval_queue";
+  if (hasAny(text, ["production evidence", "verification evidence", "release proof", "evidence", "verifier", "overenie", "dokaz"])) return "production_evidence";
   if (hasAny(text, ["production", "produkcia", "readiness", "launch", "checklist", "nasadenie"])) return "production_readiness";
   if (hasAny(text, ["remote mcp", "mcp", "tunel", "tunnel", "handoff", "claude", "chatgpt", "grok", "xai", "x.ai"])) return "remote_mcp";
   if (hasAny(text, ["zmluva", "zmluvy", "contract", "priloha", "docx", "intake"])) return "contract_generation";
@@ -82,6 +84,8 @@ function answerVoiceCapability(capability: JarvisVoiceCapability): string {
       "Viem spraviť Jarvis briefing: readiness, cold outreach, Gmail sync, klientske požiadavky, pripravené odpovede a najbližší krok.",
     production_readiness:
       "Viem skontrolovať produkčný stav: integrácie, live diagnostiku, MCP registry, approval locks a launch checklist.",
+    production_evidence:
+      "Viem precitat najnovsi produkcny dokaz z npm run verify:production: status, release commit, clean alebo dirty tree, cerstvost evidence a pocet ready checks.",
     remote_mcp:
       "Viem pripraviť remote MCP handoff pre Claude, ChatGPT alebo Grok: manifest, connection pack, smoke test, bearer auth placeholder, agent prompt a quick-start volania.",
     approval_queue:

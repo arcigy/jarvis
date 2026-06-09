@@ -2357,6 +2357,9 @@ test("Jarvis voice handles wake word and command in one transcript", () => {
 
 test("Jarvis voice resolves production, remote MCP, contracts, Gmail, and client memory prompts", () => {
   assert.equal(resolveJarvisIntentFromTranscript("Jarvis skontroluj production readiness")?.kind, "voice_capability");
+  const evidenceIntent = resolveJarvisIntentFromTranscript("Jarvis precitaj production evidence");
+  assert.equal(evidenceIntent?.kind, "voice_capability");
+  assert.equal(evidenceIntent?.kind === "voice_capability" ? evidenceIntent.capability : null, "production_evidence");
   assert.equal(resolveJarvisIntentFromTranscript("Jarvis priprav remote MCP handoff pre Claude")?.kind, "voice_capability");
   assert.equal(resolveJarvisIntentFromTranscript("Jarvis priprav MCP handoff pre Grok")?.kind, "voice_capability");
   assert.equal(resolveJarvisIntentFromTranscript("Jarvis priprav zmluvny intake")?.kind, "voice_capability");

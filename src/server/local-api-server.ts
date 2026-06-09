@@ -1500,6 +1500,11 @@ async function handleWebVoiceEvent(payload: Record<string, unknown>, request?: I
     return voiceDone(session, text, briefing.speechText);
   }
 
+  if (isProductionEvidenceVoiceCommand(lowered)) {
+    const evidence = getProductionVerificationEvidence(repoRoot);
+    return voiceDone(session, text, summarizeProductionEvidenceForVoice(evidence));
+  }
+
   if (isProductionReadinessVoiceCommand(lowered)) {
     const report = await buildProductionReadinessReport({ live: payload.live === true || lowered.includes("live"), dbPath: resolveRepoPath(payload.dbPath, defaultDbPath, "dbPath") });
     return voiceDone(session, text, summarizeReadinessForVoice(report));
@@ -1632,6 +1637,30 @@ function summarizeReadinessForVoice(report: {
     .join(" ");
 }
 
+function summarizeProductionEvidenceForVoice(evidence: {
+  status?: unknown;
+  summary?: unknown;
+  checks?: unknown[];
+  release?: unknown;
+  freshness?: unknown;
+}) {
+  const release = evidence.release && typeof evidence.release === "object" && !Array.isArray(evidence.release) ? (evidence.release as Record<string, unknown>) : {};
+  const freshness = evidence.freshness && typeof evidence.freshness === "object" && !Array.isArray(evidence.freshness) ? (evidence.freshness as Record<string, unknown>) : {};
+  const checks = Array.isArray(evidence.checks) ? evidence.checks : [];
+  const ready = checks.filter((check) => check && typeof check === "object" && (check as { status?: unknown }).status === "ready").length;
+  const failed = checks.filter((check) => check && typeof check === "object" && (check as { status?: unknown }).status === "failed").length;
+  const tree = release.dirty === false ? "clean" : release.dirty === true ? "dirty" : "unknown";
+  const fresh = freshness.fresh === true ? `fresh ${String(freshness.ageHours ?? "?")}h` : "not fresh";
+  return [
+    `Production evidence je ${String(evidence.status ?? "unknown")}.`,
+    typeof evidence.summary === "string" ? evidence.summary : null,
+    `Release commit ${String(release.shortCommit ?? "unknown")}, tree ${tree}, ${fresh}.`,
+    checks.length ? `Checks: ${ready}/${checks.length} ready, ${failed} failed.` : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
 function summarizeRemoteMcpForVoice(pack: {
   tools?: { count?: unknown; approvalRequired?: unknown[]; localStateWrite?: unknown[] };
   quickStartCalls?: unknown[];
@@ -1722,6 +1751,10 @@ function isApprovalQueueVoiceCommand(text: string) {
 
 function isProductionReadinessVoiceCommand(text: string) {
   return ["production", "produkcia", "readiness", "launch", "checklist", "nasadenie"].some((term) => text.includes(term));
+}
+
+function isProductionEvidenceVoiceCommand(text: string) {
+  return ["production evidence", "verification evidence", "release proof", "evidence", "verifier", "overenie", "dokaz"].some((term) => text.includes(term));
 }
 
 function isRemoteMcpVoiceCommand(text: string) {
