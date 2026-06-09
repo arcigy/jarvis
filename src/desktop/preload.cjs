@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld("arcigyDesktop", {
   runDiagnostics: (payload) => ipcRenderer.invoke("jarvis:runDiagnostics", payload),
   productionReadiness: (payload) => ipcRenderer.invoke("jarvis:productionReadiness", payload),
   productionVerificationEvidence: () => ipcRenderer.invoke("jarvis:productionVerificationEvidence"),
+  jarvisCapabilityAudit: (payload) => ipcRenderer.invoke("jarvis:capabilityAudit", payload),
   notifyOperator: (payload) => ipcRenderer.invoke("jarvis:notifyOperator", payload),
   operatorBriefing: (payload) => ipcRenderer.invoke("jarvis:operatorBriefing", payload),
   webBridgePreflight: () => ipcRenderer.invoke("jarvis:webBridgePreflight"),

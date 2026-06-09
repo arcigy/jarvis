@@ -117,6 +117,7 @@
         <button class="deckAction" id="fullLaunchCheck">Kompletny proof</button>
         <button class="deckAction" id="operatorBriefing">Operator brief</button>
         <button class="deckAction" id="readinessReport">Readiness report</button>
+        <button class="deckAction" id="capabilityAudit">Capability audit</button>
       </section>
 
       <section class="launchQueue" id="launchQueue" aria-label="Production launch queue">
@@ -567,6 +568,23 @@
           <strong>Nacitavam readiness gates</strong>
           <p>Kontrakty, outreach, klienti, hlas a remote agent sa overia z production checklistu.</p>
         </div>
+      </section>
+
+      <section class="capabilityAuditPanel" id="capabilityAuditPanel" aria-label="Jarvis capability audit" data-state="checking">
+        <div class="capabilityAuditHead">
+          <div>
+            <span>Jarvis coverage</span>
+            <strong id="capabilityAuditStatus">audit caka</strong>
+          </div>
+          <p id="capabilityAuditSummary">Overuje kontrakty, outreach, klientsku pamat, hlas, Gemini, lead discovery, remote MCP a approval safety.</p>
+        </div>
+        <div class="capabilityAuditStats">
+          <div><span>MCP tooly</span><strong id="capabilityAuditToolCount">--</strong></div>
+          <div><span>Schvalenia</span><strong id="capabilityAuditApprovalCount">--</strong></div>
+          <div><span>Lokalne zapisy</span><strong id="capabilityAuditLocalWriteCount">--</strong></div>
+          <div><span>Evidence</span><strong id="capabilityAuditEvidence">--</strong></div>
+        </div>
+        <div class="capabilityAuditGrid" id="capabilityAuditGrid" aria-label="Jarvis capability coverage cards"></div>
       </section>
 
       <section class="briefingGrid" id="briefingGrid" aria-label="Operator briefing signals"></section>

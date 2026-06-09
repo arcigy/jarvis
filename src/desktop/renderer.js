@@ -29,6 +29,7 @@ const state = {
   lastBridgePreflight: null,
   lastReadinessReport: null,
   lastProductionEvidence: null,
+  lastCapabilityAudit: null,
 };
 
 const requiredRemoteSmokeGates = [
@@ -109,6 +110,15 @@ const elements = {
   fullLaunchCheck: document.querySelector("#fullLaunchCheck"),
   readinessReport: document.querySelector("#readinessReport"),
   operatorBriefing: document.querySelector("#operatorBriefing"),
+  capabilityAudit: document.querySelector("#capabilityAudit"),
+  capabilityAuditPanel: document.querySelector("#capabilityAuditPanel"),
+  capabilityAuditStatus: document.querySelector("#capabilityAuditStatus"),
+  capabilityAuditSummary: document.querySelector("#capabilityAuditSummary"),
+  capabilityAuditToolCount: document.querySelector("#capabilityAuditToolCount"),
+  capabilityAuditApprovalCount: document.querySelector("#capabilityAuditApprovalCount"),
+  capabilityAuditLocalWriteCount: document.querySelector("#capabilityAuditLocalWriteCount"),
+  capabilityAuditEvidence: document.querySelector("#capabilityAuditEvidence"),
+  capabilityAuditGrid: document.querySelector("#capabilityAuditGrid"),
   listenButton: document.querySelector("#listenButton"),
   voiceRuntime: document.querySelector("#voiceRuntime"),
   voiceMode: document.querySelector("#voiceMode"),
@@ -244,6 +254,7 @@ const arcigyApi = window.arcigyDesktop ?? {
   runDiagnostics: (payload) => postJson("/api/run-diagnostics", payload),
   productionReadiness: (payload) => postJson("/api/production-readiness", payload),
   productionVerificationEvidence: () => getJson("/api/production-verification-evidence"),
+  jarvisCapabilityAudit: (payload) => postJson("/api/mcp/arcigy.get_jarvis_capability_audit", payload).then((value) => value.result),
   notifyOperator: async () => ({ delivered: false }),
   operatorBriefing: (payload) => postJson("/api/operator-briefing", payload),
   startSecureTunnel: () => postJson("/api/start-secure-tunnel", {}),
@@ -552,6 +563,71 @@ function renderProductionVerificationEvidence(evidence) {
   renderReleaseProof(evidence, generatedAt);
   updateOperationsRadar();
   updateRemoteMissionStatus();
+}
+
+function renderCapabilityAudit(audit) {
+  state.lastCapabilityAudit = audit;
+  if (!elements.capabilityAuditGrid) return;
+  const status = audit?.status ?? "attention";
+  const evidence = audit?.productionEvidence ?? {};
+  const evidenceText = [
+    evidence.status ?? "missing",
+    evidence.fresh ? "fresh" : "stale",
+    evidence.dirty === false ? "clean" : "dirty",
+    `${evidence.requiredRemoteMcpSmokeGates ?? 0} gates`,
+  ].join(" / ");
+  elements.capabilityAuditPanel?.setAttribute("data-state", status === "ready" ? "ready" : status === "blocked" ? "blocked" : "attention");
+  elements.capabilityAuditStatus.textContent = status;
+  elements.capabilityAuditSummary.textContent = audit?.summary ?? "Jarvis capability audit nie je nacitany.";
+  elements.capabilityAuditToolCount.textContent = String(audit?.toolCount ?? "--");
+  elements.capabilityAuditApprovalCount.textContent = String(audit?.approvalRequiredCount ?? "--");
+  elements.capabilityAuditLocalWriteCount.textContent = String(audit?.localStateWriteCount ?? "--");
+  elements.capabilityAuditEvidence.textContent = evidenceText;
+  elements.capabilityAuditGrid.replaceChildren();
+  for (const item of audit?.capabilities ?? []) {
+    const card = document.createElement("div");
+    const label = document.createElement("span");
+    const title = document.createElement("strong");
+    const proof = document.createElement("p");
+    const meta = document.createElement("code");
+    card.className = "capabilityCard";
+    card.dataset.state = item.status === "ready" ? "ready" : item.status === "blocked" ? "blocked" : "attention";
+    label.textContent = item.status;
+    title.textContent = item.title ?? item.id;
+    proof.textContent = (item.proof ?? []).join(" ");
+    meta.textContent = [
+      `Tooly: ${(item.tools ?? []).join(", ") || "ziadne"}`,
+      `Schvalenia: ${(item.approvalRequired ?? []).join(", ") || "ziadne"}`,
+      `Evidence: ${(item.evidence ?? []).join(", ") || "ziadne"}`,
+      `Dalsi krok: ${item.nextAction ?? "Drz proof cerstvy."}`,
+    ].join("\n");
+    card.append(label, title, proof, meta);
+    elements.capabilityAuditGrid.appendChild(card);
+  }
+}
+
+function renderCapabilityAuditText(audit) {
+  return [
+    audit.summary ?? `Jarvis capability audit: ${audit.status}`,
+    "",
+    `Status: ${audit.status}`,
+    `MCP tooly: ${audit.toolCount}`,
+    `Schvalovacie zamky: ${audit.approvalRequiredCount}`,
+    `Lokalne zapisy: ${audit.localStateWriteCount}`,
+    `Production evidence: ${audit.productionEvidence?.status ?? "missing"}; fresh=${audit.productionEvidence?.fresh === true}; clean=${audit.productionEvidence?.dirty === false}; gates=${audit.productionEvidence?.requiredRemoteMcpSmokeGates ?? 0}`,
+    "",
+    ...(audit.capabilities ?? []).map((item) =>
+      [
+        `- [${item.status}] ${item.title}`,
+        `  Proof: ${(item.proof ?? []).join(" ")}`,
+        `  Tooly: ${(item.tools ?? []).join(", ")}`,
+        `  Dalsi krok: ${item.nextAction}`,
+      ].join("\n")
+    ),
+    "",
+    "Dalsie kroky:",
+    ...(audit.nextActions ?? []).map((action) => `- ${action}`),
+  ].join("\n");
 }
 
 function renderReleaseProof(evidence, generatedAt) {
@@ -876,6 +952,14 @@ async function refreshHealth() {
         elements.verificationEvidence.title = safeUiErrorText(error);
       }
     }
+    try {
+      renderCapabilityAudit(await arcigyApi.jarvisCapabilityAudit({ live: false }));
+    } catch (error) {
+      if (elements.capabilityAuditStatus) {
+        elements.capabilityAuditStatus.textContent = "attention";
+        elements.capabilityAuditSummary.textContent = safeUiErrorText(error);
+      }
+    }
   } catch (error) {
     elements.healthGrid.textContent = safeUiErrorText(error);
     elements.commandTimeline.textContent = safeUiErrorText(error);
@@ -892,9 +976,11 @@ async function runFullLaunchCheck() {
   renderLaunchQueue(readiness);
   const evidence = await arcigyApi.productionVerificationEvidence();
   renderProductionVerificationEvidence(evidence);
+  const audit = await arcigyApi.jarvisCapabilityAudit({ live: true });
+  renderCapabilityAudit(audit);
   const smoke = await arcigyApi.remoteMcpSmoke({ baseUrl: state.lastRemoteMcpPack?.baseUrl });
   renderRemoteMcpSmoke(smoke);
-  const summary = renderFullLaunchProof({ health, bridge, readiness, evidence, smoke });
+  const summary = renderFullLaunchProof({ health, bridge, readiness, evidence, audit, smoke });
   const firstLine = summary.split("\n")[0] ?? "Full launch proof finished.";
   elements.response.textContent = summary;
   elements.commandTimeline.textContent = firstLine;
@@ -902,7 +988,7 @@ async function runFullLaunchCheck() {
   elements.response.textContent = summary;
 }
 
-function renderFullLaunchProof({ health, bridge, readiness, evidence, smoke }) {
+function renderFullLaunchProof({ health, bridge, readiness, evidence, audit, smoke }) {
   const integrations = health?.integrations ?? [];
   const productionSafeIntegrations = integrations.filter((item) => item.configured || item.requiredForProduction === false).length;
   const release = evidence?.release && typeof evidence.release === "object" ? evidence.release : {};
@@ -928,6 +1014,7 @@ function renderFullLaunchProof({ health, bridge, readiness, evidence, smoke }) {
     `Integracie: ${productionSafeIntegrations}/${integrations.length || "--"} production-safe.`,
     `Bridge: ${bridge?.readyForTunnel ? "ready na tunel" : "potrebuje token alebo preflight attention"}.`,
     `Readiness: ${readiness?.status ?? "unknown"}; ${blocking.length} blocking, ${advisories.length} advisory.`,
+    `Capability audit: ${audit?.status ?? "unknown"}; ${(audit?.capabilities ?? []).filter((item) => item.status === "ready").length}/${(audit?.capabilities ?? []).length || "--"} groups ready.`,
     `Production evidence: ${evidence?.status ?? "missing"}, tree ${release.dirty === false ? "clean" : "not clean"}, freshness ${
       freshness.fresh === true ? `fresh ${freshness.ageHours}h` : "stale or missing"
     }.`,
@@ -2644,6 +2731,20 @@ elements.readinessReport.addEventListener("click", async () => {
     elements.response.textContent = renderReadinessReport(report);
   } catch (error) {
     elements.commandTimeline.textContent = safeUiErrorText(error);
+  }
+});
+elements.capabilityAudit.addEventListener("click", async () => {
+  try {
+    elements.capabilityAuditSummary.textContent = "Spustam live Jarvis capability audit...";
+    const audit = await arcigyApi.jarvisCapabilityAudit({ live: true });
+    renderCapabilityAudit(audit);
+    elements.commandTimeline.textContent = audit.summary;
+    elements.response.textContent = renderCapabilityAuditText(audit);
+    speak(audit.summary);
+  } catch (error) {
+    const message = safeUiErrorText(error);
+    elements.capabilityAuditSummary.textContent = message;
+    elements.commandTimeline.textContent = message;
   }
 });
 elements.operatorBriefing.addEventListener("click", async () => {

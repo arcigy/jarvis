@@ -86,6 +86,11 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /id="readinessReport"/);
   assert.match(html, /id="operatorBriefing"/);
   assert.match(html, /id="fullLaunchCheck"/);
+  assert.match(html, /id="capabilityAudit"/);
+  assert.match(html, /id="capabilityAuditPanel"/);
+  assert.match(html, /Jarvis coverage/);
+  assert.match(html, /capabilityAuditGrid/);
+  assert.match(html, /Overuje kontrakty, outreach, klientsku pamat, hlas, Gemini, lead discovery, remote MCP a approval safety/);
   assert.match(html, /id="bridgeCockpit"/);
   assert.match(html, /id="bridgeTunnelState"/);
   assert.match(html, /Remote tunel/);
@@ -298,6 +303,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /openPath: async \(\) => "desktop-only"/);
   assert.match(renderer, /arcigyApi\.runDiagnostics/);
   assert.match(renderer, /arcigyApi\.productionReadiness/);
+  assert.match(renderer, /arcigyApi\.jarvisCapabilityAudit/);
+  assert.match(renderer, /\/api\/mcp\/arcigy\.get_jarvis_capability_audit/);
   assert.match(renderer, /arcigyApi\.notifyOperator/);
   assert.match(renderer, /arcigyApi\.operatorBriefing/);
   assert.match(renderer, /arcigyApi\.webBridgePreflight/);
@@ -334,6 +341,12 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.doesNotMatch(renderer, /node\.innerHTML/);
   assert.match(renderer, /function renderLaunchQueue/);
   assert.match(renderer, /elements\.launchChecklist\.replaceChildren\(\)/);
+  assert.match(renderer, /function renderCapabilityAudit/);
+  assert.match(renderer, /function renderCapabilityAuditText/);
+  assert.match(renderer, /capabilityCard/);
+  assert.match(renderer, /Capability audit: \$\{audit\?\.status/);
+  assert.match(renderer, /elements\.capabilityAudit\.addEventListener\("click"/);
+  assert.match(renderer, /Spustam live Jarvis capability audit/);
   assert.match(renderer, /function renderWorkflowProofMatrix/);
   assert.match(renderer, /endsWith\("-workflow"\)/);
   assert.match(renderer, /arcigyApi\.productionReadiness\(\{ live: false \}\)/);
@@ -788,7 +801,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(styles, /\.radarNode\[data-state="attention"\]/);
   assert.match(styles, /@keyframes radarSweep/);
   assert.match(styles, /@keyframes radarPanelSweep/);
-  assert.match(styles, /\.launchQueue,\s+\.workflowProofGrid,\s+\.operationsRadar,\s+\.cortexMap/s);
+  assert.match(styles, /\.launchQueue,\s+\.capabilityAuditHead,\s+\.capabilityAuditStats,\s+\.capabilityAuditGrid,\s+\.workflowProofGrid,\s+\.operationsRadar,\s+\.cortexMap/s);
   assert.match(styles, /\.diagnosticsGrid/);
   assert.match(styles, /\.diagnosticCard\[data-state="ready"\]/);
   assert.match(styles, /\.providerFallbackGrid/);
@@ -878,6 +891,10 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /summarizeFullLaunchProofForVoice/);
   assert.match(main, /ipcMain\.handle\("jarvis:runDiagnostics"/);
   assert.match(main, /ipcMain\.handle\("jarvis:productionReadiness"/);
+  assert.match(main, /ipcMain\.handle\("jarvis:capabilityAudit"/);
+  assert.match(main, /function buildJarvisCapabilityAudit/);
+  assert.match(main, /jarvisCapabilityDefinitions/);
+  assert.match(main, /mode: "arcigy-jarvis-capability-audit"/);
   assert.match(main, /ipcMain\.handle\("jarvis:operatorBriefing"/);
   assert.match(main, /productionEvidenceSummary: productionEvidence\.summary/);
   assert.match(main, /sections\.productionEvidence/);
@@ -1150,6 +1167,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(preload, /jarvisVoiceEvent/);
   assert.match(preload, /runDiagnostics/);
   assert.match(preload, /productionReadiness/);
+  assert.match(preload, /jarvisCapabilityAudit/);
   assert.match(preload, /operatorBriefing/);
   assert.match(preload, /webBridgePreflight/);
   assert.match(preload, /startSecureTunnel: \(\) => ipcRenderer\.invoke\("jarvis:startSecureTunnel"\)/);

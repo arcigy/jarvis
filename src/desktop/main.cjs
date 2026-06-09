@@ -174,6 +174,7 @@ app.whenReady().then(() => {
   ipcMain.handle("jarvis:runDiagnostics", (_event, payload) => runDiagnostics(payload));
   ipcMain.handle("jarvis:productionReadiness", (_event, payload) => getProductionReadiness(payload));
   ipcMain.handle("jarvis:productionVerificationEvidence", () => getProductionVerificationEvidence());
+  ipcMain.handle("jarvis:capabilityAudit", (_event, payload) => getJarvisCapabilityAudit(payload));
   ipcMain.handle("jarvis:notifyOperator", (_event, payload) => showOperatorNotification(payload));
   ipcMain.handle("jarvis:operatorBriefing", (_event, payload) => getOperatorBriefing(payload));
   ipcMain.handle("jarvis:webBridgePreflight", () => getWebBridgePreflight());
@@ -978,6 +979,186 @@ function summarizeProductionVerificationEvidence(evidence, status, freshness) {
   const release = isPlainObject(evidence.release) && typeof evidence.release.shortCommit === "string" ? ` Commit ${evidence.release.shortCommit}.` : "";
   const freshnessText = freshness.fresh ? ` Fresh evidence (${freshness.ageHours}h old).` : ` ${freshness.detail}`;
   return `Production verification ${status === "ready" ? "ready" : "needs attention"}: ${ready} ready, ${failed} failed.${release}${freshnessText}`;
+}
+
+async function getJarvisCapabilityAudit(payload = {}) {
+  const readiness = await getProductionReadiness({ live: payload?.live === true });
+  const productionEvidence = getProductionVerificationEvidence();
+  return buildJarvisCapabilityAudit({ readiness, productionEvidence });
+}
+
+function buildJarvisCapabilityAudit({ readiness, productionEvidence }) {
+  const tools = listWebMcpTools();
+  const toolNames = new Set(tools.map((tool) => tool.name));
+  const approvalNames = new Set(tools.filter((tool) => tool.requiresApproval).map((tool) => tool.name));
+  const release = isPlainObject(productionEvidence.release) ? productionEvidence.release : {};
+  const requiredRemoteMcpSmokeGates = Array.isArray(release.requiredRemoteMcpSmokeGates)
+    ? release.requiredRemoteMcpSmokeGates.filter((item) => typeof item === "string")
+    : [];
+  const evidenceKeys = new Set([
+    ...(productionEvidence.checks ?? []).map((check) => (isPlainObject(check) ? check.name : null)).filter(Boolean),
+    ...requiredRemoteMcpSmokeGates,
+  ]);
+  const healthByKey = new Map(getSystemHealth().integrations.map((item) => [item.key, item.configured]));
+  const capabilities = jarvisCapabilityDefinitions().map((definition) => {
+    const missingTools = definition.tools.filter((tool) => !toolNames.has(tool));
+    const missingApprovals = definition.approvalRequired.filter((tool) => !approvalNames.has(tool));
+    const missingEvidence = definition.evidence.filter((item) => !evidenceKeys.has(item));
+    const missingEnv = (definition.envKeys ?? []).filter((key) => healthByKey.get(key) !== true);
+    const status =
+      missingTools.length || missingApprovals.length
+        ? "blocked"
+        : missingEvidence.length || missingEnv.length
+          ? "attention"
+          : "ready";
+    return {
+      id: definition.id,
+      title: definition.title,
+      status,
+      tools: definition.tools,
+      approvalRequired: definition.approvalRequired,
+      evidence: definition.evidence,
+      proof: [
+        `${definition.tools.length - missingTools.length}/${definition.tools.length} required MCP tool(s) registered.`,
+        `${definition.approvalRequired.length - missingApprovals.length}/${definition.approvalRequired.length} required approval lock(s) registered.`,
+        `${definition.evidence.length - missingEvidence.length}/${definition.evidence.length} production evidence item(s) present.`,
+        ...(definition.envKeys?.length ? [`${definition.envKeys.length - missingEnv.length}/${definition.envKeys.length} related integration group(s) configured.`] : []),
+      ],
+      nextAction:
+        status === "ready"
+          ? "Covered by production verification; keep exact MCP payloads and approval gates in parity."
+          : `Restore ${[...missingTools, ...missingApprovals, ...missingEvidence, ...missingEnv].join(", ")} and rerun npm run verify:production.`,
+    };
+  });
+  const blocked = capabilities.filter((item) => item.status === "blocked");
+  const attention = capabilities.filter((item) => item.status === "attention");
+  const evidenceReady =
+    productionEvidence.status === "ready" &&
+    productionEvidence.freshness?.fresh === true &&
+    release.dirty === false &&
+    requiredRemoteMcpSmokeGates.length >= 37;
+  const readinessReady = readiness.status === "ready" || readiness.status === "attention";
+  const status = blocked.length ? "blocked" : attention.length || !evidenceReady || !readinessReady ? "attention" : "ready";
+  return {
+    mode: "arcigy-jarvis-capability-audit",
+    status,
+    generatedAt: new Date().toISOString(),
+    summary:
+      status === "ready"
+        ? `Jarvis capability audit ready: ${capabilities.length}/${capabilities.length} capability groups covered by MCP tools, approval locks, integrations, and production evidence.`
+        : `Jarvis capability audit needs attention: ${capabilities.length - blocked.length - attention.length}/${capabilities.length} capability groups ready.`,
+    toolCount: tools.length,
+    approvalRequiredCount: approvalNames.size,
+    localStateWriteCount: localStateWriteToolNamesList().length,
+    productionEvidence: {
+      status: productionEvidence.status,
+      fresh: productionEvidence.freshness?.fresh === true,
+      dirty: typeof release.dirty === "boolean" ? release.dirty : null,
+      requiredRemoteMcpSmokeGates: requiredRemoteMcpSmokeGates.length,
+      checks: productionEvidence.checks?.length ?? 0,
+    },
+    capabilities,
+    nextActions:
+      status === "ready"
+        ? ["Run arcigy.get_operator_briefing before work and require explicit approval before write-capable tools."]
+        : [...blocked, ...attention].map((item) => item.nextAction),
+  };
+}
+
+function jarvisCapabilityDefinitions() {
+  return [
+    {
+      id: "contracts",
+      title: "Universal Arcigy contract automation",
+      tools: ["arcigy.draft_contract_intake", "arcigy.generate_contract_documents"],
+      approvalRequired: ["arcigy.generate_contract_documents"],
+      evidence: ["contractGeneration", "tests", "ui-smoke"],
+      envKeys: ["gemini"],
+    },
+    {
+      id: "cold-outreach",
+      title: "Cold outreach status, replies, and approvals",
+      tools: [
+        "arcigy.get_smartlead_outreach_brief",
+        "arcigy.get_cold_outreach_brief_from_db",
+        "arcigy.prepare_positive_outreach_reply",
+        "arcigy.get_prepared_outreach_replies",
+        "arcigy.get_approval_queue",
+        "arcigy.send_approved_outreach_reply",
+      ],
+      approvalRequired: ["arcigy.send_approved_outreach_reply"],
+      evidence: ["local-memory-smoke", "tests", "doctor-live"],
+      envKeys: ["smartlead", "gmail", "gemini"],
+    },
+    {
+      id: "client-memory",
+      title: "Local client and lead memory by email",
+      tools: [
+        "arcigy.upsert_local_person",
+        "arcigy.identify_email",
+        "arcigy.ingest_client_message",
+        "arcigy.get_client_need_alerts",
+        "arcigy.update_client_need_status",
+        "arcigy.get_local_memory_snapshot",
+        "arcigy.export_local_memory_snapshot",
+      ],
+      approvalRequired: ["arcigy.update_client_need_status", "arcigy.export_local_memory_snapshot"],
+      evidence: ["local-memory-smoke", "tests", "ui-smoke"],
+      envKeys: ["postgres"],
+    },
+    {
+      id: "voice-jarvis",
+      title: "Jarvis wake-word desktop voice loop",
+      tools: ["arcigy.jarvis_voice_event", "arcigy.get_operator_briefing", "arcigy.get_production_verification_evidence"],
+      approvalRequired: [],
+      evidence: ["ui-smoke", "ui-smoke-narrow", "voice-tool-call", "pack-voice-quick-start"],
+    },
+    {
+      id: "remote-mcp",
+      title: "Remote MCP handoff for Claude, ChatGPT, Grok, and HTTP agents",
+      tools: [
+        "arcigy.get_remote_mcp_pack",
+        "arcigy.run_remote_mcp_smoke",
+        "arcigy.get_production_readiness",
+        "arcigy.get_production_verification_evidence",
+        "arcigy.get_jarvis_capability_audit",
+        "arcigy.get_operator_briefing",
+      ],
+      approvalRequired: [],
+      evidence: ["remote-mcp-smoke", "remote-mcp-smoke-required-gates", "pack-agent-setup-profiles", "pack-agent-launch-bundle"],
+      envKeys: ["remoteMcp"],
+    },
+    {
+      id: "gemini-ai",
+      title: "Gemini AI drafting for replies and contract intake",
+      tools: ["arcigy.generate_ai_reply", "arcigy.draft_contract_intake", "arcigy.prepare_positive_outreach_reply"],
+      approvalRequired: [],
+      evidence: ["tests", "doctor-live"],
+      envKeys: ["gemini"],
+    },
+    {
+      id: "lead-discovery",
+      title: "Lead discovery and Google Sheets export",
+      tools: ["arcigy.search_serper", "arcigy.search_google_places", "arcigy.discover_leads", "arcigy.append_leads_to_google_sheet"],
+      approvalRequired: ["arcigy.append_leads_to_google_sheet"],
+      evidence: ["tests", "doctor-live"],
+      envKeys: ["serper", "googleMaps", "googleSheets"],
+    },
+    {
+      id: "approval-safety",
+      title: "Family-friendly approval and secret safety",
+      tools: ["arcigy.get_approval_queue", "arcigy.get_audit_events", "arcigy.run_remote_mcp_smoke"],
+      approvalRequired: [
+        "arcigy.generate_contract_documents",
+        "arcigy.approve_prepared_outreach_reply",
+        "arcigy.send_approved_outreach_reply",
+        "arcigy.update_client_need_status",
+        "arcigy.export_local_memory_snapshot",
+        "arcigy.append_leads_to_google_sheet",
+      ],
+      evidence: ["approval-gate", "approval-shape-gate", "secret-redaction", "secret-scan"],
+    },
+  ];
 }
 
 function buildEvidenceFreshness(generatedAt) {

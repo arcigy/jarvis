@@ -117,6 +117,7 @@ async function run() {
   try {
     await window.loadURL(targetUrl);
     await waitForCommandDeck(window);
+    await waitForCapabilityAudit(window);
 
     const dom = await window.webContents.executeJavaScript(`
       (() => {
@@ -141,6 +142,7 @@ async function run() {
           "fullLaunchCheck",
           "operatorBriefing",
           "readinessReport",
+          "capabilityAudit",
           "listenButton",
           "simulateWake",
           "submitTranscript",
@@ -211,6 +213,7 @@ async function run() {
           rail: box("#missionRail"),
           cortex: box("#cortexMap"),
           deck: box("#commandDeck"),
+          capabilityAuditPanel: box("#capabilityAuditPanel"),
           visual: box(".deckVisual"),
           jarvisPanel: box("#jarvisPanel"),
           voiceRuntime: box("#voiceRuntime"),
@@ -220,6 +223,9 @@ async function run() {
           readyIntegrationsText: document.querySelector("#readyIntegrations")?.textContent.trim() || "",
           mcpToolCountText: document.querySelector("#mcpToolCount")?.textContent.trim() || "",
           approvalLockCountText: document.querySelector("#approvalLockCount")?.textContent.trim() || "",
+          capabilityAuditStatusText: document.querySelector("#capabilityAuditStatus")?.textContent.trim() || "",
+          capabilityAuditToolCountText: document.querySelector("#capabilityAuditToolCount")?.textContent.trim() || "",
+          capabilityAuditCardCount: document.querySelectorAll("#capabilityAuditGrid .capabilityCard").length,
           workflowProofCards: [...document.querySelectorAll("#workflowProofGrid .workflowProofCard")].map((node) => ({
             state: node.getAttribute("data-state") || "",
             text: node.textContent.trim(),
@@ -269,6 +275,11 @@ async function run() {
     if (!/^[0-9]+\/[0-9]+$/.test(dom.readyIntegrationsText)) fail(`Ready integration count is not loaded: ${dom.readyIntegrationsText}.`);
     if (!/^[0-9]+$/.test(dom.mcpToolCountText) || displayedToolCount < 35) fail(`MCP tool count is stale or not loaded: ${dom.mcpToolCountText}.`);
     if (!/^[0-9]+$/.test(dom.approvalLockCountText) || displayedApprovalLockCount < 6) fail(`Approval lock count is stale or not loaded: ${dom.approvalLockCountText}.`);
+    if (!/ready|attention|blocked/i.test(dom.capabilityAuditStatusText)) fail(`Capability audit status is not rendered: ${dom.capabilityAuditStatusText}.`);
+    if (!/^[0-9]+$/.test(dom.capabilityAuditToolCountText) || Number(dom.capabilityAuditToolCountText) < 35) {
+      fail(`Capability audit tool count is stale or not loaded: ${dom.capabilityAuditToolCountText}.`);
+    }
+    if (dom.capabilityAuditCardCount !== 8) fail(`Capability audit card grid is incomplete: ${dom.capabilityAuditCardCount}/8 cards.`);
     if (displayedToolCount !== preflight.mcpToolCount) fail(`MCP tool count mismatch: UI ${displayedToolCount}, preflight ${preflight.mcpToolCount}.`);
     if (displayedApprovalLockCount !== preflight.riskyToolsRequiringApproval.length) {
       fail(`Approval lock count mismatch: UI ${displayedApprovalLockCount}, preflight ${preflight.riskyToolsRequiringApproval.length}.`);
@@ -314,6 +325,7 @@ async function run() {
       assertVisibleStart("mission rail", dom.rail, { width: 300, height: 50 });
       assertSize("cortex map", dom.cortex, { width: 300, height: 80 });
       assertSize("command deck", dom.deck, { width: 300, height: 90 });
+      assertSize("capability audit", dom.capabilityAuditPanel, { width: 300, height: 90 });
       assertSize("deck visual", dom.visual, { width: 120, height: 80 });
       assertSize("Jarvis panel", dom.jarvisPanel, { width: 280, height: 180 });
       assertSize("voice runtime", dom.voiceRuntime, { width: 260, height: 44 });
@@ -322,6 +334,7 @@ async function run() {
       assertBox("mission rail", dom.rail, { width: 600, height: 50 });
       assertBox("cortex map", dom.cortex, { width: 600, height: 80 });
       assertBox("command deck", dom.deck, { width: 600, height: 90 });
+      assertSize("capability audit", dom.capabilityAuditPanel, { width: 600, height: 90 });
       assertBox("deck visual", dom.visual, { width: 120, height: 80 });
       assertVisibleStart("Jarvis panel", dom.jarvisPanel, { width: 280, height: 180 });
       assertVisibleStart("voice runtime", dom.voiceRuntime, { width: 260, height: 44 });
@@ -491,6 +504,29 @@ async function waitForCommandDeck(window) {
     await new Promise((resolveDone) => setTimeout(resolveDone, 200));
   }
   fail(`Command deck did not finish loading: ${JSON.stringify(lastState)}.`);
+}
+
+async function waitForCapabilityAudit(window) {
+  const deadline = Date.now() + 8000;
+  let lastState = {};
+  let stableReads = 0;
+  while (Date.now() < deadline) {
+    lastState = await window.webContents.executeJavaScript(`
+      (() => ({
+        status: document.querySelector("#capabilityAuditStatus")?.textContent.trim() || "",
+        tools: document.querySelector("#capabilityAuditToolCount")?.textContent.trim() || "",
+        cards: document.querySelectorAll("#capabilityAuditGrid .capabilityCard").length
+      }))()
+    `);
+    if (/ready|attention|blocked/i.test(lastState.status) && /^[0-9]+$/.test(lastState.tools) && Number(lastState.cards) === 8) {
+      stableReads += 1;
+      if (stableReads >= 2) return;
+    } else {
+      stableReads = 0;
+    }
+    await new Promise((resolveDone) => setTimeout(resolveDone, 200));
+  }
+  fail(`Capability audit did not finish loading: ${JSON.stringify(lastState)}.`);
 }
 
 run()
