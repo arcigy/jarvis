@@ -50,14 +50,18 @@ test("Jarvis secrets audit reports local setup without leaking secret values", (
     localEnvIgnoredByGit: boolean;
     keys: Array<{ key: string; state: string; length: number; fingerprint: string | null; issue: string | null }>;
     integrations: Array<{ key: string; configured: boolean; requiredForProduction: boolean }>;
+    advisories: string[];
+    nextActions: string[];
   };
   assert.equal(body.mode, "arcigy-jarvis-secrets-audit");
-  assert.equal(body.status, "attention");
+  assert.equal(body.status, "ready");
   assert.equal(body.localEnvIgnoredByGit, true);
   assert.equal(body.integrations.find((item) => item.key === "redis")?.requiredForProduction, false);
   assert.equal(body.integrations.find((item) => item.key === "remoteMcp")?.configured, true);
   assert.equal(body.integrations.find((item) => item.key === "remoteMcp")?.requiredForProduction, false);
   assert.equal(body.keys.find((item) => item.key === "REDIS_URL")?.state, "placeholder");
+  assert.ok(body.advisories.some((item) => item.includes("Optional redis") && item.includes("non-blocking")));
+  assert.deepEqual(body.nextActions, []);
   assert.match(body.keys.find((item) => item.key === "GEMINI_API_KEY")?.fingerprint ?? "", /^sha256:[0-9a-f]{12}$/);
 });
 

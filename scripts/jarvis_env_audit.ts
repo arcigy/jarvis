@@ -45,11 +45,9 @@ function buildSecretsAudit(root: string, runtimeEnv: RuntimeEnv, loadedFiles: st
   const health = getIntegrationHealth(runtimeEnv);
   const requiredMissing = health.filter((item) => !item.configured && item.requiredForProduction);
   const advisoryMissing = health.filter((item) => !item.configured && !item.requiredForProduction);
-  const status: AuditStatus = requiredMissing.length ? "blocked" : advisoryMissing.length ? "attention" : "ready";
-  const nextActions = [
-    ...requiredMissing.map((item) => `Set ${item.key} runtime secret(s): ${item.missing.join(", ")}.`),
-    ...advisoryMissing.map((item) => `Review optional ${item.key} secret(s): ${item.missing.join(", ")}.`),
-  ];
+  const status: AuditStatus = requiredMissing.length ? "blocked" : "ready";
+  const advisories = advisoryMissing.map((item) => `Optional ${item.key} secret(s) are non-blocking for shipped workflows: ${item.missing.join(", ")}.`);
+  const nextActions = requiredMissing.map((item) => `Set ${item.key} runtime secret(s): ${item.missing.join(", ")}.`);
 
   return {
     mode: "arcigy-jarvis-secrets-audit",
@@ -60,10 +58,10 @@ function buildSecretsAudit(root: string, runtimeEnv: RuntimeEnv, loadedFiles: st
     secretPolicy: "Secret-safe: reports only key names, configured/missing/placeholder state, value length, and SHA-256 fingerprints.",
     summary:
       status === "ready"
-        ? "All production integration secret groups are configured."
-        : status === "attention"
-          ? "Required production secrets are configured; optional provider or remote handoff secrets need attention."
-          : "Required production secrets need attention before live production handoff.",
+        ? advisories.length
+          ? "Required production secrets are configured; optional unused provider advisories are visible and non-blocking."
+          : "All production integration secret groups are configured."
+        : "Required production secrets need attention before live production handoff.",
     integrations: health.map((item) => ({
       key: item.key,
       configured: item.configured,
@@ -71,6 +69,7 @@ function buildSecretsAudit(root: string, runtimeEnv: RuntimeEnv, loadedFiles: st
       missing: item.missing,
     })),
     keys,
+    advisories,
     nextActions,
   };
 }
@@ -145,6 +144,9 @@ function renderText(report: ReturnType<typeof buildSecretsAudit>): string {
     "",
     "Integrations:",
     ...report.integrations.map((item) => `- ${item.key}: ${item.configured ? "configured" : item.missing.join(", ")}`),
+    "",
+    report.advisories.length ? "Non-blocking advisories:" : "Non-blocking advisories: clear",
+    ...report.advisories.map((action) => `- ${action}`),
     "",
     report.nextActions.length ? "Next actions:" : "Next actions: clear",
     ...report.nextActions.map((action) => `- ${action}`),
