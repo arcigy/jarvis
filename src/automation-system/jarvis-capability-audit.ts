@@ -227,6 +227,35 @@ export function buildJarvisCapabilityAudit(
   };
 }
 
+export function summarizeJarvisCapabilityAuditForVoice(audit: {
+  status?: unknown;
+  summary?: unknown;
+  toolCount?: unknown;
+  approvalRequiredCount?: unknown;
+  localStateWriteCount?: unknown;
+  productionEvidence?: { status?: unknown; fresh?: unknown; dirty?: unknown; requiredRemoteMcpSmokeGates?: unknown };
+  capabilities?: Array<{ title?: unknown; status?: unknown; nextAction?: unknown }>;
+  nextActions?: unknown[];
+}): string {
+  const capabilities = Array.isArray(audit.capabilities) ? audit.capabilities : [];
+  const ready = capabilities.filter((item) => item.status === "ready").length;
+  const attention = capabilities.filter((item) => item.status === "attention").length;
+  const blocked = capabilities.filter((item) => item.status === "blocked").length;
+  const evidence = audit.productionEvidence ?? {};
+  const firstIssue = capabilities.find((item) => item.status !== "ready");
+  const next = firstIssue?.nextAction ?? (Array.isArray(audit.nextActions) ? audit.nextActions[0] : null) ?? "Drz production proof cerstvy pred remote agent handoffom.";
+  return [
+    `Jarvis capability audit je ${String(audit.status ?? "unknown")}.`,
+    typeof audit.summary === "string" ? audit.summary : null,
+    `Coverage: ${ready}/${capabilities.length} skupin ready, ${attention} attention, ${blocked} blocked.`,
+    `MCP: ${String(audit.toolCount ?? 0)} toolov, ${String(audit.approvalRequiredCount ?? 0)} schvalovacich zamkov, ${String(audit.localStateWriteCount ?? 0)} lokalnych zapisov.`,
+    `Evidence: ${String(evidence.status ?? "unknown")}, fresh=${evidence.fresh === true}, clean=${evidence.dirty === false}, gates=${String(evidence.requiredRemoteMcpSmokeGates ?? 0)}.`,
+    `Najblizsi krok: ${String(next)}`,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
 }

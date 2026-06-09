@@ -174,6 +174,25 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.append_leads_to_google_sheet")));
   assert.doesNotMatch(JSON.stringify(audit), /AIza|GOCSPX|1\/\/|postgresql:\/\/|redis:\/\//);
 
+  const voiceAuditResult = await client.callTool({
+    name: "arcigy.jarvis_voice_event",
+    arguments: { text: "Jarvis capability audit co vsetko je pokryte", session: { state: "idle", wakeWord: "jarvis" }, live: false },
+  });
+  const voiceAudit = getStructuredResult(voiceAuditResult) as { session: { state: string; lastResponse?: string }; speakText?: string };
+  assert.equal(voiceAudit.session.state, "idle");
+  assert.match(voiceAudit.speakText ?? "", /Jarvis capability audit je/i);
+  assert.match(voiceAudit.speakText ?? "", /Coverage: \d+\/\d+ skupin ready/);
+  assert.match(voiceAudit.speakText ?? "", /MCP: \d+ toolov/);
+  assert.equal(voiceAudit.session.lastResponse, voiceAudit.speakText);
+  assert.doesNotMatch(JSON.stringify(voiceAudit), /AIza|GOCSPX|1\/\/|postgresql:\/\/|redis:\/\//);
+  assertToolError(
+    await client.callTool({
+      name: "arcigy.jarvis_voice_event",
+      arguments: { text: "Jarvis capability audit", session: { state: "idle", wakeWord: "jarvis" }, dbPath: join(tmpdir(), "outside-jarvis-voice.sqlite") },
+    }),
+    /dbPath must stay inside the Jarvis repository/
+  );
+
   const packResult = await client.callTool({
     name: "arcigy.get_remote_mcp_pack",
     arguments: { baseUrl: "https://jarvis.example.ngrok-free.app", includeReadiness: false },

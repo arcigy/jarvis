@@ -11,7 +11,7 @@ import { getIntegrationHealth, loadLocalEnv } from "../automation-system/env.ts"
 import { buildClientReplyPrompt, buildPositiveOutreachReplyPrompt, generateGeminiText } from "../automation-system/gemini.ts";
 import { defaultGmailBriefingQuery, defaultGmailSyncQuery, listConfiguredGmailAccounts, listRecentGmailMessageEvents, sendGmailTextMessage } from "../automation-system/gmail.ts";
 import { containsWakeWord, extractCommandAfterWakeWord, type JarvisVoiceSession } from "../automation-system/jarvis-voice.ts";
-import { buildJarvisCapabilityAudit } from "../automation-system/jarvis-capability-audit.ts";
+import { buildJarvisCapabilityAudit, summarizeJarvisCapabilityAuditForVoice } from "../automation-system/jarvis-capability-audit.ts";
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "../automation-system/lead-discovery.ts";
 import { buildContractGenerationCommand, getColdOutreachMcpAnswer, listJarvisMcpTools, localStateWriteToolNames } from "../automation-system/mcp-tools.ts";
 import { buildOperatorBriefing } from "../automation-system/operator-briefing.ts";
@@ -1569,7 +1569,7 @@ async function handleWebVoiceEvent(payload: Record<string, unknown>, request?: I
 
   if (isCapabilityAuditVoiceCommand(lowered)) {
     const audit = await getJarvisCapabilityAudit({ ...payload, live: payload.live === true || lowered.includes("live") });
-    return voiceDone(session, text, summarizeCapabilityAuditForVoice(audit));
+    return voiceDone(session, text, summarizeJarvisCapabilityAuditForVoice(audit));
   }
 
   if (isProductionReadinessVoiceCommand(lowered)) {
@@ -1723,35 +1723,6 @@ function summarizeProductionEvidenceForVoice(evidence: {
     typeof evidence.summary === "string" ? evidence.summary : null,
     `Release commit ${String(release.shortCommit ?? "unknown")}, tree ${tree}, ${fresh}.`,
     checks.length ? `Checks: ${ready}/${checks.length} ready, ${failed} failed.` : null,
-  ]
-    .filter(Boolean)
-    .join(" ");
-}
-
-function summarizeCapabilityAuditForVoice(audit: {
-  status?: unknown;
-  summary?: unknown;
-  toolCount?: unknown;
-  approvalRequiredCount?: unknown;
-  localStateWriteCount?: unknown;
-  productionEvidence?: { status?: unknown; fresh?: unknown; dirty?: unknown; requiredRemoteMcpSmokeGates?: unknown };
-  capabilities?: Array<{ title?: unknown; status?: unknown; nextAction?: unknown }>;
-  nextActions?: unknown[];
-}) {
-  const capabilities = Array.isArray(audit.capabilities) ? audit.capabilities : [];
-  const ready = capabilities.filter((item) => item.status === "ready").length;
-  const attention = capabilities.filter((item) => item.status === "attention").length;
-  const blocked = capabilities.filter((item) => item.status === "blocked").length;
-  const evidence = audit.productionEvidence ?? {};
-  const firstIssue = capabilities.find((item) => item.status !== "ready");
-  const next = firstIssue?.nextAction ?? (Array.isArray(audit.nextActions) ? audit.nextActions[0] : null) ?? "Drz production proof cerstvy pred remote agent handoffom.";
-  return [
-    `Jarvis capability audit je ${String(audit.status ?? "unknown")}.`,
-    typeof audit.summary === "string" ? audit.summary : null,
-    `Coverage: ${ready}/${capabilities.length} skupin ready, ${attention} attention, ${blocked} blocked.`,
-    `MCP: ${String(audit.toolCount ?? 0)} toolov, ${String(audit.approvalRequiredCount ?? 0)} schvalovacich zamkov, ${String(audit.localStateWriteCount ?? 0)} lokalnych zapisov.`,
-    `Evidence: ${String(evidence.status ?? "unknown")}, fresh=${evidence.fresh === true}, clean=${evidence.dirty === false}, gates=${String(evidence.requiredRemoteMcpSmokeGates ?? 0)}.`,
-    `Najblizsi krok: ${String(next)}`,
   ]
     .filter(Boolean)
     .join(" ");

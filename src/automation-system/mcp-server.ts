@@ -12,7 +12,7 @@ import { getIntegrationHealth, loadLocalEnv, summarizeIntegrationHealth } from "
 import { buildClientReplyPrompt, buildPositiveOutreachReplyPrompt, generateGeminiText } from "./gemini.ts";
 import { defaultGmailBriefingQuery, defaultGmailSyncQuery, listConfiguredGmailAccounts, listRecentGmailMessageEvents, sendGmailTextMessage } from "./gmail.ts";
 import { handleJarvisVoiceEvent, type JarvisVoiceSession } from "./jarvis-voice.ts";
-import { buildJarvisCapabilityAudit } from "./jarvis-capability-audit.ts";
+import { buildJarvisCapabilityAudit, summarizeJarvisCapabilityAuditForVoice } from "./jarvis-capability-audit.ts";
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "./lead-discovery.ts";
 import {
   buildContractGenerationCommand,
@@ -573,6 +573,8 @@ export function createJarvisMcpServer(): McpServer {
           .optional(),
         text: z.string().min(1),
         kind: z.enum(["transcript"]).default("transcript"),
+        live: z.boolean().default(false),
+        dbPath: z.string().optional(),
       },
       annotations: {
         readOnlyHint: true,
@@ -581,11 +583,24 @@ export function createJarvisMcpServer(): McpServer {
         openWorldHint: false,
       },
     },
-    async ({ session, text }) => {
+    async ({ session, text, live, dbPath }) => {
       const result = handleJarvisVoiceEvent((session ?? { state: "idle", wakeWord: "jarvis" }) as JarvisVoiceSession, {
         type: "transcript",
         text,
       });
+      if (result.speakText?.includes("Jarvis capability audit")) {
+        const safeDbPath = resolveOptionalRepoPath(dbPath, "dbPath");
+        const audit = buildJarvisCapabilityAudit({
+          readiness: await buildProductionReadinessReport({ live, dbPath: safeDbPath }),
+          productionEvidence: getProductionVerificationEvidence(repoRoot),
+        });
+        const speakText = summarizeJarvisCapabilityAuditForVoice(audit);
+        return jsonResult({
+          ...result,
+          session: { ...result.session, lastResponse: speakText },
+          speakText,
+        });
+      }
       return jsonResult(result);
     }
   );
