@@ -5,6 +5,7 @@ import test from "node:test";
 type GateSource = {
   file: string;
   variableName: string;
+  label?: string;
 };
 
 const gateSources: GateSource[] = [
@@ -13,6 +14,8 @@ const gateSources: GateSource[] = [
   { file: "src/desktop/main.cjs", variableName: "requiredReleaseProofGates" },
   { file: "src/desktop/renderer.js", variableName: "requiredRemoteSmokeGates" },
   { file: "scripts/start_web_tunnel.ts", variableName: "requiredChecks" },
+  { file: "src/automation-system/remote-mcp-pack.ts", variableName: "requiredProofGates", label: "remote pack agent setup profiles" },
+  { file: "src/desktop/main.cjs", variableName: "requiredProofGates", label: "desktop agent setup profiles" },
 ];
 
 test("remote MCP release proof gates stay in parity across production surfaces", () => {
@@ -38,7 +41,11 @@ test("remote MCP release proof gates stay in parity across production surfaces",
   ]);
 
   for (const source of gateSources.slice(1)) {
-    assert.deepEqual(extractStringArray(source), canonical, `${source.file}:${source.variableName} drifted from verify_production.ts`);
+    assert.deepEqual(
+      extractStringArray(source),
+      canonical,
+      `${source.file}:${source.label ?? source.variableName} drifted from verify_production.ts`,
+    );
   }
 });
 
