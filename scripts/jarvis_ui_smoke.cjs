@@ -198,7 +198,7 @@ async function run() {
       // Initial and blocked states are valid render states for the first smoke pass.
     } else if (!proofReadyMatch) {
       fail(`Remote proof gates are not rendered: ${proofGateText}.`);
-    } else if (proofReadyMatch[1] !== proofReadyMatch[2] || Number(proofReadyMatch[1]) < 14) {
+    } else if (proofReadyMatch[1] !== proofReadyMatch[2] || Number(proofReadyMatch[1]) < 35) {
       fail(`Remote proof gates are stale or incomplete: ${proofGateText}.`);
     }
     const agentSetupText = String(dom.agentSetupProfilesText ?? "");

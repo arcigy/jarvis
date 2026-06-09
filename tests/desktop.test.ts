@@ -527,7 +527,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(uiSmoke, /Command core image did not load/);
   assert.match(uiSmoke, /handoffProofGatesText/);
   assert.match(uiSmoke, /proofReadyMatch/);
-  assert.match(uiSmoke, /Number\(proofReadyMatch\[1\]\) < 14/);
+  assert.match(uiSmoke, /Number\(proofReadyMatch\[1\]\) < 35/);
   assert.match(uiSmoke, /agentSetupProfilesText/);
   assert.match(uiSmoke, /Agent setup profiles are not rendered/);
   assert.match(uiSmoke, /Remote proof gates are not rendered/);
