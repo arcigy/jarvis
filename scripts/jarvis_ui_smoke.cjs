@@ -265,14 +265,16 @@ async function run() {
     if (displayedApprovalLockCount !== preflight.riskyToolsRequiringApproval.length) {
       fail(`Approval lock count mismatch: UI ${displayedApprovalLockCount}, preflight ${preflight.riskyToolsRequiringApproval.length}.`);
     }
-    const proofGateText = String(dom.handoffProofGatesText ?? "");
+    const remoteSmokeUi = await runRemoteSmokeFromUi(window);
+    const proofGateText = String(remoteSmokeUi.handoffProofGatesText ?? "");
     const proofReadyMatch = proofGateText.match(/^ready:\s*(\d+)\/(\d+)\s+safety gates$/i);
-    if (/smoke not run|blocked:/i.test(proofGateText)) {
-      // Initial and blocked states are valid render states for the first smoke pass.
-    } else if (!proofReadyMatch) {
+    if (!proofReadyMatch) {
       fail(`Remote proof gates are not rendered: ${proofGateText}.`);
     } else if (proofReadyMatch[1] !== proofReadyMatch[2] || Number(proofReadyMatch[1]) < 35) {
       fail(`Remote proof gates are stale or incomplete: ${proofGateText}.`);
+    }
+    if (!/Remote MCP smoke ready/i.test(remoteSmokeUi.remoteSmokeResultText) || !/READY manifest/i.test(remoteSmokeUi.remoteSmokeResultText)) {
+      fail("Remote MCP smoke result was not rendered from the UI button flow.");
     }
     const agentSetupText = String(dom.agentSetupProfilesText ?? "");
     for (const expected of ["Claude", "ChatGPT", "Grok", "openapi-custom-action", "openapi-or-http-json", "external-http-mcp"]) {
@@ -349,6 +351,46 @@ async function fetchUiPreflight() {
   if (!Number.isInteger(mcpToolCount) || mcpToolCount < 35) fail(`Preflight MCP tool count is stale: ${body.mcpToolCount}.`);
   if (riskyToolsRequiringApproval.length < 6) fail(`Preflight approval lock count is stale: ${riskyToolsRequiringApproval.length}.`);
   return { mcpToolCount, riskyToolsRequiringApproval };
+}
+
+async function runRemoteSmokeFromUi(window) {
+  const clicked = await executeRendererJson(window, `
+    (() => {
+      const button = document.getElementById("runRemoteSmoke");
+      if (!button) return false;
+      window.setTimeout(() => button.click(), 0);
+      return true;
+    })()
+  `, 5000);
+  if (!clicked) {
+    fail("Remote MCP smoke button is missing.");
+    return { handoffProofGatesText: "", remoteSmokeResultText: "" };
+  }
+  const deadline = Date.now() + 20000;
+  let state = { handoffProofGatesText: "", remoteSmokeResultText: "" };
+  while (Date.now() < deadline) {
+    state = await executeRendererJson(window, `
+      (() => ({
+        handoffProofGatesText: document.querySelector("#handoffProofGates")?.textContent.trim() || "",
+        remoteSmokeResultText: document.querySelector("#remoteSmokeResult")?.textContent.trim() || ""
+      }))()
+    `, 5000);
+    if (new RegExp("^ready:\\s*\\d+/\\d+\\s+safety gates$", "i").test(state.handoffProofGatesText) || /^blocked:/i.test(state.handoffProofGatesText)) {
+      return state;
+    }
+    await new Promise((resolveDone) => setTimeout(resolveDone, 250));
+  }
+  fail(`Remote MCP smoke UI flow did not settle: ${state.handoffProofGatesText || state.remoteSmokeResultText || "empty"}.`);
+  return state;
+}
+
+async function executeRendererJson(window, source, timeoutMs) {
+  return await Promise.race([
+    window.webContents.executeJavaScript(source),
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error(`Renderer JavaScript timed out after ${timeoutMs}ms.`)), timeoutMs);
+    }),
+  ]);
 }
 
 function assertScreenshotPixels(image, png) {
