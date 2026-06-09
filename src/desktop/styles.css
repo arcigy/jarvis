@@ -263,7 +263,7 @@ h2 {
 
 .commandDeck {
   display: grid;
-  grid-template-columns: 190px repeat(4, minmax(112px, 1fr)) 150px;
+  grid-template-columns: 190px repeat(4, minmax(112px, 1fr)) repeat(3, minmax(118px, 0.45fr));
   gap: 12px;
   align-items: stretch;
   margin-bottom: 16px;
@@ -367,7 +367,7 @@ h2 {
 }
 
 .deckStatus {
-  grid-column: 2 / -3;
+  grid-column: 2 / -4;
   min-height: auto;
   line-height: 1.45;
   color: #c8d6d2;
@@ -708,9 +708,9 @@ h2 {
   position: relative;
   display: grid;
   grid-template-columns: repeat(5, minmax(120px, 1fr));
-  gap: 10px;
+  gap: 8px;
   margin: 0 0 16px;
-  padding: 12px;
+  padding: 10px;
   border: 1px solid #26302f;
   border-radius: 8px;
   background:
@@ -736,7 +736,7 @@ h2 {
 .cortexNode {
   position: relative;
   isolation: isolate;
-  min-height: 104px;
+  min-height: 86px;
   border: 1px solid #203331;
   border-radius: 8px;
   background:
@@ -778,7 +778,7 @@ h2 {
 }
 
 .cortexNode strong {
-  margin-top: 42px;
+  margin-top: 28px;
   color: #eef4f2;
   font-size: 14px;
   line-height: 1.2;

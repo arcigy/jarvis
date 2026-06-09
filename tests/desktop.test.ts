@@ -62,6 +62,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /id="missionContracts"/);
   assert.match(html, /id="readinessReport"/);
   assert.match(html, /id="operatorBriefing"/);
+  assert.match(html, /id="fullLaunchCheck"/);
   assert.match(html, /id="bridgeCockpit"/);
   assert.match(html, /id="bridgeTunnelState"/);
   assert.match(html, /id="bridgeAuthState"/);
@@ -432,6 +433,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /productionReadiness\(\{ live: true \}\)/);
   assert.match(renderer, /Building live operator briefing/);
   assert.match(renderer, /Building live production readiness report/);
+  assert.match(renderer, /Running full Jarvis launch proof/);
+  assert.match(renderer, /function runFullLaunchCheck/);
+  assert.match(renderer, /function renderFullLaunchProof/);
   assert.match(renderer, /startOperatorBriefingWatch/);
   assert.match(renderer, /operatorBriefingPollMs: 300000/);
   assert.match(renderer, /Fix guide/);

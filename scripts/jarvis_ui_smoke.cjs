@@ -137,6 +137,7 @@ async function run() {
           };
         };
         const requiredWorkflowControls = [
+          "fullLaunchCheck",
           "operatorBriefing",
           "readinessReport",
           "listenButton",

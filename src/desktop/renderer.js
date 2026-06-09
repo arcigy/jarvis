@@ -102,6 +102,7 @@ const elements = {
   radarApprovals: document.querySelector("#radarApprovals"),
   radarClientAlerts: document.querySelector("#radarClientAlerts"),
   radarSweepLabel: document.querySelector("#radarSweepLabel"),
+  fullLaunchCheck: document.querySelector("#fullLaunchCheck"),
   readinessReport: document.querySelector("#readinessReport"),
   operatorBriefing: document.querySelector("#operatorBriefing"),
   listenButton: document.querySelector("#listenButton"),
@@ -771,6 +772,53 @@ async function refreshHealth() {
     elements.healthGrid.textContent = safeUiErrorText(error);
     elements.commandTimeline.textContent = safeUiErrorText(error);
   }
+}
+
+async function runFullLaunchCheck() {
+  elements.commandTimeline.textContent = "Running full Jarvis launch proof...";
+  const health = await arcigyApi.systemHealth();
+  renderHealth(health);
+  const bridge = await arcigyApi.webBridgePreflight();
+  renderCommandDeck(health, bridge);
+  const readiness = await arcigyApi.productionReadiness({ live: true });
+  renderLaunchQueue(readiness);
+  const evidence = await arcigyApi.productionVerificationEvidence();
+  renderProductionVerificationEvidence(evidence);
+  const smoke = await arcigyApi.remoteMcpSmoke({ baseUrl: state.lastRemoteMcpPack?.baseUrl });
+  renderRemoteMcpSmoke(smoke);
+  const summary = renderFullLaunchProof({ health, bridge, readiness, evidence, smoke });
+  const firstLine = summary.split("\n")[0] ?? "Full launch proof finished.";
+  elements.response.textContent = summary;
+  elements.commandTimeline.textContent = firstLine;
+  speak(firstLine);
+  elements.response.textContent = summary;
+}
+
+function renderFullLaunchProof({ health, bridge, readiness, evidence, smoke }) {
+  const integrations = health?.integrations ?? [];
+  const productionSafeIntegrations = integrations.filter((item) => item.configured || item.requiredForProduction === false).length;
+  const release = evidence?.release && typeof evidence.release === "object" ? evidence.release : {};
+  const freshness = evidence?.freshness && typeof evidence.freshness === "object" ? evidence.freshness : {};
+  const gates = Array.isArray(release.requiredRemoteMcpSmokeGates) ? release.requiredRemoteMcpSmokeGates.length : 0;
+  const smokeGates = summarizeRemoteProofGates(smoke);
+  const ready =
+    readiness?.status === "ready" &&
+    bridge?.readyForTunnel === true &&
+    evidence?.status === "ready" &&
+    release.dirty === false &&
+    freshness.fresh === true &&
+    smoke?.status === "ready";
+  return [
+    ready ? "Jarvis full launch proof is ready." : "Jarvis full launch proof needs attention.",
+    `Integrations: ${productionSafeIntegrations}/${integrations.length || "--"} production-safe.`,
+    `Bridge: ${bridge?.readyForTunnel ? "ready for tunnel" : "needs token or preflight attention"}.`,
+    `Readiness: ${readiness?.status ?? "unknown"}.`,
+    `Production evidence: ${evidence?.status ?? "missing"}, tree ${release.dirty === false ? "clean" : "not clean"}, freshness ${
+      freshness.fresh === true ? `fresh ${freshness.ageHours}h` : "stale or missing"
+    }.`,
+    `Remote MCP smoke: ${smokeGates ? smokeGates.text : smoke?.status ?? "not verified"}; required gates ${gates}/${requiredRemoteSmokeGates.length}.`,
+    readiness?.nextActions?.[0] ? `Next: ${readiness.nextActions[0]}` : "Next: keep proof fresh before remote agent handoff.",
+  ].join("\n");
 }
 
 function renderLeadDiscovery(result) {
@@ -2327,6 +2375,15 @@ elements.operatorBriefing.addEventListener("click", async () => {
     await refreshOperatorBriefing({ speakResult: true, loadingText: "Building live operator briefing...", live: true });
   } catch (error) {
     elements.commandTimeline.textContent = safeUiErrorText(error);
+  }
+});
+elements.fullLaunchCheck.addEventListener("click", async () => {
+  try {
+    await runFullLaunchCheck();
+  } catch (error) {
+    const message = safeUiErrorText(error);
+    elements.commandTimeline.textContent = message;
+    elements.response.textContent = message;
   }
 });
 elements.discoverLeads.addEventListener("click", async () => {
