@@ -1610,9 +1610,9 @@ async function copyRemotePack() {
     ),
   ].join("\n");
   await writeClipboardText(payload);
-  elements.copyRemotePack.textContent = "Copied";
+  elements.copyRemotePack.textContent = "Skopirovane";
   window.setTimeout(() => {
-    elements.copyRemotePack.textContent = "Copy pack";
+    elements.copyRemotePack.textContent = "Kopirovat pack";
   }, 1400);
 }
 
@@ -1673,9 +1673,9 @@ async function copyAgentPrompt(agentKey, agentLabel, button) {
     `Auth header: ${pack.auth?.header ?? "Authorization: Bearer <JARVIS_WEB_TOKEN>"}`,
   ].join("\n");
   await writeClipboardText(payload);
-  button.textContent = "Copied";
+  button.textContent = "Skopirovane";
   window.setTimeout(() => {
-    button.textContent = `Copy ${agentLabel}`;
+    button.textContent = `Kopirovat ${agentLabel}`;
   }, 1400);
 }
 
@@ -1689,18 +1689,18 @@ async function copyTunnelCommand() {
   const payload = [
     command,
     "",
-    "Keep this terminal process open while Grok, Claude, or ChatGPT uses the remote MCP bridge.",
-    "After the tunnel URL appears, run remote smoke and copy the right agent prompt from Jarvis.",
+    "Nechaj tento terminal otvoreny, kym Grok, Claude alebo ChatGPT pouziva remote MCP bridge.",
+    "Ked sa zobrazi tunnel URL, spusti remote smoke a skopiruj spravny agent prompt z Jarvisu.",
   ].join("\n");
   await writeClipboardText(payload);
-  elements.copyTunnelCommand.textContent = "Copied";
+  elements.copyTunnelCommand.textContent = "Skopirovane";
   window.setTimeout(() => {
-    elements.copyTunnelCommand.textContent = "Copy tunnel";
+    elements.copyTunnelCommand.textContent = "Kopirovat tunel";
   }, 1400);
 }
 
 async function refreshSecureTunnelStatus() {
-  elements.remoteAgentPrompt.textContent = "Checking secure tunnel status from the private log...";
+  elements.remoteAgentPrompt.textContent = "Kontrolujem secure tunnel status z privatneho logu...";
   const status = await arcigyApi.getSecureTunnelStatus();
   renderSecureTunnelStatus(status);
   return status;
@@ -1710,15 +1710,15 @@ function buildCopiedHandoffStatus(smokeReport) {
   if (!smokeReport) {
     return {
       ready: false,
-      text: "HANDOFF STATUS: BLOCKED. Run remote MCP smoke and require ready proof gates before the remote agent starts work.",
+      text: "HANDOFF STAV: BLOKOVANE. Spusti remote MCP smoke a vyziadaj ready proof gates pred pracou remote agenta.",
     };
   }
   const proof = summarizeRemoteProofGates(smokeReport);
   return {
     ready: proof.ready,
     text: proof.ready
-      ? "HANDOFF STATUS: READY. Remote smoke and required proof gates passed."
-      : `HANDOFF STATUS: BLOCKED. ${proof.text}`,
+      ? "HANDOFF STAV: READY. Remote smoke a povinne proof gates presli."
+      : `HANDOFF STAV: BLOKOVANE. ${proof.text}`,
   };
 }
 
@@ -1736,7 +1736,7 @@ async function writeClipboardText(text) {
   textarea.select();
   const copied = document.execCommand("copy");
   textarea.remove();
-  if (!copied) throw new Error("Clipboard copy failed. Select and copy the remote pack manually.");
+  if (!copied) throw new Error("Kopirovanie do clipboardu zlyhalo. Oznac a skopiruj remote pack manualne.");
 }
 
 function startWebBridgeWatch() {
@@ -1862,7 +1862,7 @@ function setupContractFormDirtyTracking() {
   for (const element of contractFormElements()) {
     element.addEventListener("input", () => {
       state.contractFormDirty = true;
-      elements.contractResult.textContent = "Contract form changed. Apply form before generating DOCX files.";
+      elements.contractResult.textContent = "Zmluvny formular sa zmenil. Pred generovanim DOCX suborov aplikuj formular.";
     });
   }
 }
@@ -2239,7 +2239,7 @@ elements.exportLocalMemorySnapshot.addEventListener("click", async () => {
   try {
     const approved = window.confirm("Export a redacted local memory snapshot to generated/local-memory/local-memory-snapshot.json?");
     if (!approved) {
-      elements.auditResult.textContent = "Local memory snapshot export cancelled before any file write.";
+      elements.auditResult.textContent = "Export snapshotu lokalnej pamate bol zruseny pred zapisom suboru.";
       return;
     }
     elements.auditResult.textContent = "Exporting redacted local memory snapshot...";

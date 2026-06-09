@@ -242,23 +242,23 @@
               <p>Pull recent Gmail signals into local memory and inspect Smartlead campaigns.</p>
             </div>
             <div class="buttonGroup">
-              <button id="runDiagnostics">Diagnostics</button>
+              <button id="runDiagnostics">Diagnostika</button>
               <button id="auditEvents">Audit</button>
-              <button id="localMemorySnapshot">Memory snapshot</button>
-              <button id="exportLocalMemorySnapshot">Export snapshot</button>
+              <button id="localMemorySnapshot">Snapshot pamate</button>
+              <button id="exportLocalMemorySnapshot">Export snapshotu</button>
             </div>
           </div>
           <div class="diagnosticsGrid" id="diagnosticsGrid" aria-label="Live integration diagnostics"></div>
           <div class="providerFallbackGrid" id="providerFallbackGrid" aria-label="Provider fallback status"></div>
-          <div class="response compact" id="diagnosticsResult">Ready for live integration diagnostics.</div>
-          <div class="response compact" id="auditResult">Audit trail is ready.</div>
+          <div class="response compact" id="diagnosticsResult">Pripravene na live diagnostiku integracii.</div>
+          <div class="response compact" id="auditResult">Audit trail je pripraveny.</div>
           <div class="splitControls">
             <label>
               Gmail query
               <input id="gmailQuery" spellcheck="false" placeholder="in:inbox newer_than:7d" />
             </label>
             <div class="buttonGroup">
-              <button id="previewGmail">Preview</button>
+              <button id="previewGmail">Preview Gmailu</button>
               <button id="syncGmail">Sync Gmail</button>
             </div>
           </div>
@@ -273,7 +273,7 @@
               <button id="smartleadBrief">Jarvis brief</button>
             </div>
           </div>
-          <div class="response compact" id="smartleadResult">Ready for read-only Smartlead status.</div>
+          <div class="response compact" id="smartleadResult">Pripravene na read-only Smartlead status.</div>
         </article>
 
         <article class="panel clientMemoryPanel" id="clientPanel">
@@ -283,15 +283,15 @@
               <p>Identify a sender and store client requests in local SQLite memory.</p>
             </div>
             <div class="buttonGroup">
-              <button id="identifyEmail">Identify</button>
-              <button id="ingestClientMessage">Ingest</button>
+              <button id="identifyEmail">Identifikovat</button>
+              <button id="ingestClientMessage">Ulozit signal</button>
               <button id="clientNeedAlerts">Alerts</button>
-              <button id="resolveClientNeed">Resolve</button>
-              <button id="ignoreClientNeed">Ignore</button>
+              <button id="resolveClientNeed">Vyriesit</button>
+              <button id="ignoreClientNeed">Ignorovat</button>
               <button id="toggleClientNeedWatch">Pauznut watch</button>
             </div>
           </div>
-          <div class="watchStatus" id="clientAlertWatchStatus">Client alert watch is starting with Gmail auto-sync.</div>
+          <div class="watchStatus" id="clientAlertWatchStatus">Client alert watch startuje s Gmail auto-sync.</div>
           <div class="splitControls">
             <label>
               Email
@@ -303,7 +303,7 @@
             </label>
           </div>
           <label>
-            Message
+            Sprava
             <textarea id="memoryMessage" spellcheck="false" placeholder="Poziadavka klienta alebo telo emailu"></textarea>
           </label>
           <div class="response compact" id="memoryResult">Pripravene identifikovat email alebo ulozit klientsku poziadavku.</div>
@@ -318,7 +318,7 @@
               <p>Search live company candidates through configured discovery APIs.</p>
             </div>
             <div class="buttonGroup">
-              <button id="discoverLeads">Search</button>
+              <button id="discoverLeads">Hladat</button>
               <button id="exportLeads">Export</button>
             </div>
           </div>
@@ -326,7 +326,7 @@
             Search query
             <textarea id="leadQuery" spellcheck="false" placeholder="automation agency Bratislava"></textarea>
           </label>
-          <div class="response compact leadResult" id="leadResult">Ready for read-only lead discovery.</div>
+          <div class="response compact leadResult" id="leadResult">Pripravene na read-only lead discovery.</div>
         </article>
 
         <article class="panel">
@@ -335,13 +335,13 @@
               <h2>Gemini reply draft</h2>
               <p>Prepare a client answer without sending it.</p>
             </div>
-            <button id="draftReply">Draft</button>
+            <button id="draftReply">Draftovat</button>
           </div>
           <label>
             Client message
             <textarea id="clientMessage" spellcheck="false" placeholder="Potrebujem upravit onboarding automatizaciu do piatku."></textarea>
           </label>
-          <div class="response compact" id="draftResult">Ready for Gemini.</div>
+          <div class="response compact" id="draftResult">Pripravene na Gemini.</div>
         </article>
 
         <article class="panel" id="mcpPanel">
@@ -382,11 +382,11 @@
                 <button id="stopSecureTunnel">Stop tunnel</button>
                 <button id="checkTunnelStatus">Tunnel status</button>
                 <button id="openTunnelLog">Open log</button>
-                <button id="copyTunnelCommand">Copy tunnel</button>
-                <button id="copyClaudePrompt">Copy Claude</button>
-                <button id="copyChatGptPrompt">Copy ChatGPT</button>
-                <button id="copyGrokPrompt">Copy Grok</button>
-                <button id="copyRemotePack">Copy pack</button>
+                <button id="copyTunnelCommand">Kopirovat tunel</button>
+                <button id="copyClaudePrompt">Kopirovat Claude</button>
+                <button id="copyChatGptPrompt">Kopirovat ChatGPT</button>
+                <button id="copyGrokPrompt">Kopirovat Grok</button>
+                <button id="copyRemotePack">Kopirovat pack</button>
               </div>
             </div>
             <div class="handoffGrid">
@@ -472,8 +472,8 @@
             </div>
             <div class="buttonGroup">
               <button id="draftContractIntake">AI draft</button>
-              <button id="applyContractForm">Apply form</button>
-              <button id="generateContracts">Generate</button>
+              <button id="applyContractForm">Aplikovat formular</button>
+              <button id="generateContracts">Generovat</button>
             </div>
           </div>
           <label>
