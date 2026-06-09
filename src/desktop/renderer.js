@@ -14,6 +14,7 @@ const state = {
   lastRemoteAgentLaunchBundle: null,
   lastRemoteMcpSmoke: null,
   lastReadinessNoticeSignature: null,
+  lastAttentionDigestNoticeSignature: null,
   clientAlertWatchEnabled: true,
   clientAlertPollTimer: null,
   lastClientNeedAlerts: [],
@@ -903,6 +904,30 @@ function trackReadinessNoticeFromBriefing(briefing) {
   notifyOperator(title, `${readiness} ${nextAction}`.trim(), `arcigy-jarvis-readiness-${status}`);
 }
 
+function trackAttentionDigestNoticeFromBriefing(briefing) {
+  const sections = briefing.sections ?? {};
+  const clientNeeds = String(sections.clientNeeds ?? "");
+  const preparedReplies = String(sections.preparedReplies ?? "");
+  const clientNeedCount = extractLeadingSectionCount(clientNeeds);
+  const preparedReplyCount = extractLeadingSectionCount(preparedReplies);
+  const signals = [];
+  if (clientNeedCount > 0) signals.push(clientNeeds);
+  if (preparedReplyCount > 0) signals.push(`${preparedReplies} Poslem ich az po tvojom schvaleni.`);
+  if (!signals.length) {
+    state.lastAttentionDigestNoticeSignature = null;
+    return;
+  }
+  const signature = signals.join(" | ");
+  if (state.lastAttentionDigestNoticeSignature === signature) return;
+  state.lastAttentionDigestNoticeSignature = signature;
+  notifyOperator("Jarvis attention digest", signature, "arcigy-jarvis-attention-digest");
+}
+
+function extractLeadingSectionCount(value) {
+  const match = String(value ?? "").match(/:\s*([1-9]\d*)\b/);
+  return match ? Number(match[1]) : 0;
+}
+
 async function refreshOperatorBriefing({ speakResult = false, loadingText = null, live = true } = {}) {
   if (loadingText) elements.commandTimeline.textContent = loadingText;
   const briefing = await arcigyApi.operatorBriefing({ periodLabel: "poslednych 7 dni", live });
@@ -910,6 +935,7 @@ async function refreshOperatorBriefing({ speakResult = false, loadingText = null
   elements.response.textContent = renderOperatorBriefing(briefing);
   renderOperatorBriefingCards(briefing);
   trackReadinessNoticeFromBriefing(briefing);
+  trackAttentionDigestNoticeFromBriefing(briefing);
   if (speakResult) speak(briefing.speechText ?? briefing.summary);
   return briefing;
 }
