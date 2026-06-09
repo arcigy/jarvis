@@ -1247,9 +1247,9 @@ function renderSmartleadStatus(result) {
   if (Array.isArray(result.campaigns)) {
     const campaigns = result.campaigns.slice(0, 8);
     return [
-      `Campaigns: ${result.campaigns.length}`,
+      `Kampane: ${result.campaigns.length}`,
       "",
-      ...campaigns.map((campaign) => `${campaign.id ?? "-"} - ${campaign.name ?? "unnamed"}${campaign.status ? ` (${campaign.status})` : ""}`),
+      ...campaigns.map((campaign) => `${campaign.id ?? "-"} - ${campaign.name ?? "bez nazvu"}${campaign.status ? ` (${campaign.status})` : ""}`),
     ].join("\n");
   }
   return JSON.stringify(result, null, 2);
@@ -1257,36 +1257,36 @@ function renderSmartleadStatus(result) {
 
 function renderSmartleadBrief(result) {
   const metrics = result.metrics ?? {};
-  setCortexSignal(elements.cortexOutreach, `${metrics.replied ?? 0} replies`, metrics.positiveReplies > 0 || metrics.replied > 0 ? "attention" : "ready");
+  setCortexSignal(elements.cortexOutreach, `${metrics.replied ?? 0} odpovedi`, metrics.positiveReplies > 0 || metrics.replied > 0 ? "attention" : "ready");
   const campaignLine = result.campaignCount > 1
-    ? `${result.campaignCount} campaigns: ${(result.campaignIds ?? []).join(", ")}`
+    ? `${result.campaignCount} kampani: ${(result.campaignIds ?? []).join(", ")}`
     : result.campaignId ?? "-";
   return [
-    result.summary ?? "Smartlead brief is empty.",
+    result.summary ?? "Smartlead brief je prazdny.",
     "",
-    `Campaign: ${campaignLine}`,
-    `Contacted: ${metrics.contacted ?? 0}`,
-    `Opened: ${metrics.opened ?? 0} (${metrics.openRate ?? 0}%)`,
-    `Replied: ${metrics.replied ?? 0} (${metrics.replyRate ?? 0}%)`,
-    `Positive: ${metrics.positiveReplies ?? "not classified"}`,
-    ...(result.notes?.length ? ["", ...result.notes.map((note) => `Note: ${note}`)] : []),
+    `Kampan: ${campaignLine}`,
+    `Osloveni: ${metrics.contacted ?? 0}`,
+    `Otvorili: ${metrics.opened ?? 0} (${metrics.openRate ?? 0}%)`,
+    `Odpisali: ${metrics.replied ?? 0} (${metrics.replyRate ?? 0}%)`,
+    `Pozitivni: ${metrics.positiveReplies ?? "neklasifikovane"}`,
+    ...(result.notes?.length ? ["", ...result.notes.map((note) => `Poznamka: ${note}`)] : []),
   ].join("\n");
 }
 
 function renderWebBridgePreflight(result) {
   return [
-    `Tunnel ready: ${result.readyForTunnel ? "yes" : "no"}`,
-    `Token configured: ${result.tokenConfigured ? "yes" : "no"}`,
-    `Remote auth: ${result.authRequiredForExternalHosts ? "required" : "not required"}`,
-    `Tunnel command: ${result.tunnelCommand ?? "npm run web:tunnel"}`,
+    `Tunel pripraveny: ${result.readyForTunnel ? "ano" : "nie"}`,
+    `Token nastaveny: ${result.tokenConfigured ? "ano" : "nie"}`,
+    `Remote auth: ${result.authRequiredForExternalHosts ? "vyzadovana" : "nevyzadovana"}`,
+    `Prikaz tunela: ${result.tunnelCommand ?? "npm run web:tunnel"}`,
     `Manifest URL: ${result.manifestUrl}`,
     `Action manifest: ${result.actionManifestUrl ?? `${result.origin ?? "http://127.0.0.1:8765"}/.well-known/ai-plugin.json`}`,
     `OpenAPI schema: ${result.openApiSchemaUrl ?? `${result.origin ?? "http://127.0.0.1:8765"}/api/openapi.json`}`,
     `Tool call pattern: ${result.mcpToolCallPattern ?? `${result.origin ?? "http://127.0.0.1:8765"}/api/mcp/{toolName}`}`,
-    `MCP tools: ${result.mcpToolCount}`,
-    `Approval tools: ${(result.riskyToolsRequiringApproval ?? []).join(", ") || "none"}`,
+    `MCP tooly: ${result.mcpToolCount}`,
+    `Schvalovacie tooly: ${(result.riskyToolsRequiringApproval ?? []).join(", ") || "ziadne"}`,
     `Path policy: ${result.pathPolicy}`,
-    ...(result.warnings?.length ? ["", ...result.warnings.map((warning) => `Warning: ${warning}`)] : []),
+    ...(result.warnings?.length ? ["", ...result.warnings.map((warning) => `Varovanie: ${warning}`)] : []),
   ].join("\n");
 }
 

@@ -358,6 +358,14 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /in:inbox newer_than:7d/);
   assert.match(renderer, /arcigyApi\.getSmartleadCampaignStatus/);
   assert.match(renderer, /arcigyApi\.getSmartleadOutreachBrief/);
+  assert.match(renderer, /Kampane: \$\{result\.campaigns\.length\}/);
+  assert.match(renderer, /Smartlead brief je prazdny/);
+  assert.match(renderer, /Osloveni: \$\{metrics\.contacted/);
+  assert.match(renderer, /Tunel pripraveny: \$\{result\.readyForTunnel \? "ano" : "nie"\}/);
+  assert.match(renderer, /Token nastaveny: \$\{result\.tokenConfigured \? "ano" : "nie"\}/);
+  assert.match(renderer, /MCP tooly: \$\{result\.mcpToolCount\}/);
+  assert.match(renderer, /Schvalovacie tooly:/);
+  assert.doesNotMatch(renderer, /Smartlead brief is empty|Campaigns: \$\{result\.campaigns\.length\}|Contacted: \$\{metrics\.contacted|Tunnel ready:|Token configured:|MCP tools: \$\{result\.mcpToolCount\}|Approval tools:/);
   assert.match(renderer, /arcigyApi\.discoverLeads/);
   assert.match(renderer, /arcigyApi\.appendLeadsToGoogleSheet/);
   assert.match(renderer, /window\.confirm\(`Export \$\{state\.lastLeads\.length\} lead\(s\) to Google Sheets\?`\)/);
@@ -392,7 +400,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /readyIntegrations/);
   assert.match(renderer, /approvalLockCount/);
   assert.match(renderer, /liveBlockerCount/);
-  assert.match(renderer, /Tunnel command/);
+  assert.match(renderer, /Prikaz tunela/);
   assert.match(renderer, /Tunnel status:/);
   assert.match(renderer, /Browser tunnel start:/);
   assert.match(renderer, /Browser tunnel stop:/);
