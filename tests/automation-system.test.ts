@@ -1082,7 +1082,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
             branch: "main",
             shortCommit: "0123456789ab",
             dirty: false,
-            requiredRemoteMcpSmokeGates: ["secret-redaction", "pack-agent-setup-profiles"],
+            requiredRemoteMcpSmokeGates: remoteSmokeRequiredGateFixture(),
           },
           freshness: {
             fresh: false,
@@ -1160,7 +1160,7 @@ test("production verification evidence marks stale ready artifacts as attention"
         branch: "main",
         shortCommit: "0123456789ab",
         dirty: false,
-        requiredRemoteMcpSmokeGates: ["secret-redaction", "pack-agent-setup-profiles"],
+        requiredRemoteMcpSmokeGates: remoteSmokeRequiredGateFixture(),
       },
       checks: [{ name: "secret-scan", status: "ready", detail: "OK" }],
     }),
@@ -3112,6 +3112,46 @@ function responseJson(value: unknown, status = 200): Response {
   } as Response;
 }
 
+function remoteSmokeRequiredGateFixture() {
+  return [
+    "manifest",
+    "tool-count",
+    "manifest-tool-registry",
+    "manifest-tool-metadata",
+    "auth-placeholder",
+    "manifest-local-write-policy",
+    "action-manifest",
+    "openapi-schema",
+    "cors-preflight",
+    "external-auth-gate",
+    "connection-pack",
+    "pack-secret-policy",
+    "pack-auth-throttle-policy",
+    "pack-limits",
+    "pack-tunnel-controls",
+    "secure-tunnel-status",
+    "pack-local-write-policy",
+    "pack-tool-registry",
+    "pack-quick-start-urls",
+    "pack-quick-start-approval-policy",
+    "pack-contract-quick-start",
+    "pack-contract-draft-quick-start",
+    "pack-agent-setup-profiles",
+    "pack-voice-quick-start",
+    "pack-handoff-proof",
+    "pack-agent-compatibility",
+    "pack-client-memory-quick-start",
+    "pack-audit-quick-start",
+    "voice-tool-call",
+    "pack-production-evidence-quick-start",
+    "read-only-tool-call",
+    "production-evidence-tool-call",
+    "approval-gate",
+    "approval-shape-gate",
+    "secret-redaction",
+  ];
+}
+
 function remoteAgentCompatibilityFixture() {
   return {
     supportedAgents: ["Claude", "ChatGPT", "Grok"],
@@ -3125,22 +3165,7 @@ function remoteAgentSetupProfilesFixture() {
   const base = {
     firstTool: "arcigy.get_operator_briefing",
     firstToolUrl: `${baseUrl}/api/mcp/arcigy.get_operator_briefing`,
-    requiredProofGates: [
-      "action-manifest",
-      "openapi-schema",
-      "cors-preflight",
-      "external-auth-gate",
-      "pack-auth-throttle-policy",
-      "pack-limits",
-      "pack-agent-setup-profiles",
-      "pack-voice-quick-start",
-      "voice-tool-call",
-      "pack-production-evidence-quick-start",
-      "production-evidence-tool-call",
-      "approval-gate",
-      "approval-shape-gate",
-      "secret-redaction",
-    ],
+    requiredProofGates: remoteSmokeRequiredGateFixture(),
     writePolicy: "approval.approved-required",
     localWritePolicy: "dry-run-first",
   };

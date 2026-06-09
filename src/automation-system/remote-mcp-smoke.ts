@@ -26,6 +26,44 @@ export type RemoteMcpSmokeReport = {
   checks: RemoteMcpSmokeCheck[];
 };
 
+const requiredReleaseProofGates = [
+  "manifest",
+  "tool-count",
+  "manifest-tool-registry",
+  "manifest-tool-metadata",
+  "auth-placeholder",
+  "manifest-local-write-policy",
+  "action-manifest",
+  "openapi-schema",
+  "cors-preflight",
+  "external-auth-gate",
+  "connection-pack",
+  "pack-secret-policy",
+  "pack-auth-throttle-policy",
+  "pack-limits",
+  "pack-tunnel-controls",
+  "secure-tunnel-status",
+  "pack-local-write-policy",
+  "pack-tool-registry",
+  "pack-quick-start-urls",
+  "pack-quick-start-approval-policy",
+  "pack-contract-quick-start",
+  "pack-contract-draft-quick-start",
+  "pack-agent-setup-profiles",
+  "pack-voice-quick-start",
+  "pack-handoff-proof",
+  "pack-agent-compatibility",
+  "pack-client-memory-quick-start",
+  "pack-audit-quick-start",
+  "voice-tool-call",
+  "pack-production-evidence-quick-start",
+  "read-only-tool-call",
+  "production-evidence-tool-call",
+  "approval-gate",
+  "approval-shape-gate",
+  "secret-redaction",
+];
+
 export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promise<RemoteMcpSmokeReport> {
   const baseUrl = (input.baseUrl || "http://127.0.0.1:8765").replace(/\/+$/g, "");
   const fetchImpl = input.fetchImpl ?? fetch;
@@ -765,14 +803,13 @@ function hasFreshProductionEvidence(value: unknown): boolean {
 function hasSafeReleaseProof(value: unknown): boolean {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const release = value as { repository?: unknown; branch?: unknown; shortCommit?: unknown; dirty?: unknown; requiredRemoteMcpSmokeGates?: unknown };
+  const gates = Array.isArray(release.requiredRemoteMcpSmokeGates) ? release.requiredRemoteMcpSmokeGates : [];
   return (
     release.repository === "arcigy/jarvis" &&
     typeof release.branch === "string" &&
     /^[0-9a-f]{7,12}$/i.test(String(release.shortCommit ?? "")) &&
     release.dirty === false &&
-    Array.isArray(release.requiredRemoteMcpSmokeGates) &&
-    release.requiredRemoteMcpSmokeGates.includes("secret-redaction") &&
-    release.requiredRemoteMcpSmokeGates.includes("pack-agent-setup-profiles")
+    requiredReleaseProofGates.every((gate) => gates.includes(gate))
   );
 }
 

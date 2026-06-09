@@ -32,7 +32,7 @@ test("local web bridge serves UI and API health", async () => {
         branch: "main",
         shortCommit: "0123456789ab",
         dirty: false,
-        requiredRemoteMcpSmokeGates: ["secret-redaction", "pack-agent-setup-profiles"],
+        requiredRemoteMcpSmokeGates: remoteSmokeRequiredGateFixture(),
       },
       freshnessPolicy: { maxAgeHours: 24, command: "npm run verify:production" },
       secretPolicy: `Secret-safe ${syntheticGoogleKey}`,
@@ -425,6 +425,8 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(typeof verificationEvidenceBody.freshness.ageHours, "number");
     assert.ok(verificationEvidenceBody.release?.requiredRemoteMcpSmokeGates?.includes("secret-redaction"));
     assert.ok(verificationEvidenceBody.release?.requiredRemoteMcpSmokeGates?.includes("pack-agent-setup-profiles"));
+    assert.ok(verificationEvidenceBody.release?.requiredRemoteMcpSmokeGates?.includes("pack-agent-compatibility"));
+    assert.ok(verificationEvidenceBody.release?.requiredRemoteMcpSmokeGates?.includes("pack-handoff-proof"));
     assert.ok(verificationEvidenceBody.checks.some((check) => check.name === "secret-scan" && check.status === "ready"));
     assert.match(verificationEvidenceText, /\[redacted-google-api-key\]/);
 
@@ -873,6 +875,46 @@ test("local web bridge serves UI and API health", async () => {
     await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   }
 });
+
+function remoteSmokeRequiredGateFixture() {
+  return [
+    "manifest",
+    "tool-count",
+    "manifest-tool-registry",
+    "manifest-tool-metadata",
+    "auth-placeholder",
+    "manifest-local-write-policy",
+    "action-manifest",
+    "openapi-schema",
+    "cors-preflight",
+    "external-auth-gate",
+    "connection-pack",
+    "pack-secret-policy",
+    "pack-auth-throttle-policy",
+    "pack-limits",
+    "pack-tunnel-controls",
+    "secure-tunnel-status",
+    "pack-local-write-policy",
+    "pack-tool-registry",
+    "pack-quick-start-urls",
+    "pack-quick-start-approval-policy",
+    "pack-contract-quick-start",
+    "pack-contract-draft-quick-start",
+    "pack-agent-setup-profiles",
+    "pack-voice-quick-start",
+    "pack-handoff-proof",
+    "pack-agent-compatibility",
+    "pack-client-memory-quick-start",
+    "pack-audit-quick-start",
+    "voice-tool-call",
+    "pack-production-evidence-quick-start",
+    "read-only-tool-call",
+    "production-evidence-tool-call",
+    "approval-gate",
+    "approval-shape-gate",
+    "secret-redaction",
+  ];
+}
 
 async function postJson(url: string, payload: unknown) {
   const response = await fetch(url, {

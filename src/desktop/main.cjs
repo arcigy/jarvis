@@ -1990,6 +1990,44 @@ function hasSafeProductionEvidenceResult(value) {
   return value.status === "ready" && hasSafeReleaseProof(value.release) && hasFreshProductionEvidence(value.freshness);
 }
 
+const requiredReleaseProofGates = [
+  "manifest",
+  "tool-count",
+  "manifest-tool-registry",
+  "manifest-tool-metadata",
+  "auth-placeholder",
+  "manifest-local-write-policy",
+  "action-manifest",
+  "openapi-schema",
+  "cors-preflight",
+  "external-auth-gate",
+  "connection-pack",
+  "pack-secret-policy",
+  "pack-auth-throttle-policy",
+  "pack-limits",
+  "pack-tunnel-controls",
+  "secure-tunnel-status",
+  "pack-local-write-policy",
+  "pack-tool-registry",
+  "pack-quick-start-urls",
+  "pack-quick-start-approval-policy",
+  "pack-contract-quick-start",
+  "pack-contract-draft-quick-start",
+  "pack-agent-setup-profiles",
+  "pack-voice-quick-start",
+  "pack-handoff-proof",
+  "pack-agent-compatibility",
+  "pack-client-memory-quick-start",
+  "pack-audit-quick-start",
+  "voice-tool-call",
+  "pack-production-evidence-quick-start",
+  "read-only-tool-call",
+  "production-evidence-tool-call",
+  "approval-gate",
+  "approval-shape-gate",
+  "secret-redaction",
+];
+
 function hasFreshProductionEvidence(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   return (
@@ -2011,8 +2049,7 @@ function hasSafeReleaseProof(value) {
     /^[0-9a-f]{7,12}$/i.test(String(value.shortCommit ?? "")) &&
     value.dirty === false &&
     Array.isArray(value.requiredRemoteMcpSmokeGates) &&
-    value.requiredRemoteMcpSmokeGates.includes("secret-redaction") &&
-    value.requiredRemoteMcpSmokeGates.includes("pack-agent-setup-profiles")
+    requiredReleaseProofGates.every((gate) => value.requiredRemoteMcpSmokeGates.includes(gate))
   );
 }
 
