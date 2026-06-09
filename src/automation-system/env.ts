@@ -11,7 +11,8 @@ export type IntegrationKey =
   | "redis"
   | "googleSheets"
   | "googleMaps"
-  | "serper";
+  | "serper"
+  | "remoteMcp";
 
 export type IntegrationHealth = {
   key: IntegrationKey;
@@ -27,7 +28,13 @@ export const gmailRefreshTokenEnv = [
   "GMAIL_REFRESH_TOKEN_ANDREJ_R_ARCIGY_GROUP",
 ] as const;
 
-const integrations: Array<{ key: IntegrationKey; required: string[]; requiredAnyOf?: readonly string[]; requiredForProduction?: boolean }> = [
+const integrations: Array<{
+  key: IntegrationKey;
+  required: string[];
+  requiredAnyOf?: readonly string[];
+  requiredForProduction?: boolean;
+  check?: (env: RuntimeEnv) => string[];
+}> = [
   { key: "gemini", required: ["GEMINI_API_KEY"] },
   { key: "gmail", required: ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", ...gmailRefreshTokenEnv] },
   { key: "smartlead", required: ["SMARTLEAD_API_KEY"] },
@@ -36,6 +43,7 @@ const integrations: Array<{ key: IntegrationKey; required: string[]; requiredAny
   { key: "googleSheets", required: ["GOOGLE_SHEET_ID", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"], requiredAnyOf: gmailRefreshTokenEnv },
   { key: "googleMaps", required: [], requiredAnyOf: ["GOOGLE_MAPS_API_KEY", "GOOGLE_MAPS_API_KEYS"] },
   { key: "serper", required: ["SERPER_API_KEY"], requiredForProduction: false },
+  { key: "remoteMcp", required: [], requiredForProduction: false, check: getRemoteMcpRuntimeEnvIssue },
 ];
 
 export function getEnv(env: RuntimeEnv, key: string): string | null {
@@ -57,6 +65,7 @@ export function getIntegrationHealth(env: RuntimeEnv = process.env): Integration
     const missing = [
       ...integration.required.flatMap((key) => getRuntimeEnvIssue(env, key)),
       ...getAnyOfRuntimeEnvIssue(env, integration.requiredAnyOf),
+      ...(integration.check?.(env) ?? []),
     ];
     return {
       key: integration.key,
@@ -79,6 +88,14 @@ function getRuntimeEnvIssue(env: RuntimeEnv, key: string): string[] {
     return [`${key} contains a placeholder credential`];
   }
   return [];
+}
+
+function getRemoteMcpRuntimeEnvIssue(env: RuntimeEnv): string[] {
+  const jarvisWebToken = getEnv(env, "JARVIS_WEB_TOKEN");
+  if (jarvisWebToken) return jarvisWebToken.length >= 32 ? [] : ["JARVIS_WEB_TOKEN must be at least 32 characters"];
+  const apiSecret = getEnv(env, "API_SECRET_KEY");
+  if (apiSecret) return apiSecret.length >= 32 ? [] : ["API_SECRET_KEY fallback must be at least 32 characters"];
+  return ["JARVIS_WEB_TOKEN or API_SECRET_KEY"];
 }
 
 function hasPlaceholderUrlCredential(value: string): boolean {

@@ -101,6 +101,7 @@ Live integrations are runtime-only:
 - Gmail: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and the `GMAIL_REFRESH_TOKEN_*` values
 - Smartlead: `SMARTLEAD_API_KEY`
 - local app storage: `DATABASE_URL`, `REDIS_URL`, `data\jarvis-local.db`
+- remote MCP tunnel auth: `JARVIS_WEB_TOKEN` with at least 32 characters, or `npm run web:tunnel:secure` for an ephemeral one-time token
 - lead discovery: `SERPER_API_KEY`, `GOOGLE_MAPS_API_KEY` or comma-separated fallback keys in `GOOGLE_MAPS_API_KEYS`
 - lead export: `GOOGLE_SHEET_ID` plus a Google OAuth refresh token with Sheets access
 - when multiple `GMAIL_REFRESH_TOKEN_*` values are configured, Sheets diagnostics and lead export try them in order unless a specific `accountEnvKey` is supplied

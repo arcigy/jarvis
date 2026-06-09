@@ -863,6 +863,7 @@ test("production readiness treats unused Redis as non-blocking advisory", async 
       SMARTLEAD_API_KEY: "smartlead",
       DATABASE_URL: "postgres://postgres:secret@example.com:5432/db",
       REDIS_URL: "redis://default:PASSWORD@example.com:6379",
+      JARVIS_WEB_TOKEN: "strong-jarvis-web-token-for-remote-mcp",
       GOOGLE_SHEET_ID: "sheet",
       GOOGLE_MAPS_API_KEY: "maps",
       SERPER_API_KEY: "serper",
@@ -1122,6 +1123,19 @@ test("runtime integration health rejects placeholder URL credentials", () => {
   assert.deepEqual(health.find((item) => item.key === "postgres")?.missing, ["DATABASE_URL contains a placeholder credential"]);
   assert.deepEqual(health.find((item) => item.key === "redis")?.missing, ["REDIS_URL contains a placeholder credential"]);
   assert.equal(health.find((item) => item.key === "redis")?.requiredForProduction, false);
+});
+
+test("runtime integration health reports remote MCP token readiness as advisory", () => {
+  const missing = getIntegrationHealth({});
+  const weak = getIntegrationHealth({ JARVIS_WEB_TOKEN: "short-token" });
+  const strong = getIntegrationHealth({ JARVIS_WEB_TOKEN: "strong-jarvis-web-token-for-remote-mcp" });
+  const apiFallback = getIntegrationHealth({ API_SECRET_KEY: "strong-api-secret-token-for-remote-mcp" });
+
+  assert.equal(missing.find((item) => item.key === "remoteMcp")?.requiredForProduction, false);
+  assert.deepEqual(missing.find((item) => item.key === "remoteMcp")?.missing, ["JARVIS_WEB_TOKEN or API_SECRET_KEY"]);
+  assert.deepEqual(weak.find((item) => item.key === "remoteMcp")?.missing, ["JARVIS_WEB_TOKEN must be at least 32 characters"]);
+  assert.equal(strong.find((item) => item.key === "remoteMcp")?.configured, true);
+  assert.equal(apiFallback.find((item) => item.key === "remoteMcp")?.configured, true);
 });
 
 test("runtime integration health requires Google OAuth account for Sheets", () => {
@@ -1763,6 +1777,7 @@ test("integration diagnostics run live read-only checks with mocked providers", 
         SMARTLEAD_API_KEY: "smartlead",
         DATABASE_URL: `postgres://user:pass@127.0.0.1:${postgres.port}/db`,
         REDIS_URL: `redis://default:secret@127.0.0.1:${redis.port}`,
+        JARVIS_WEB_TOKEN: "strong-jarvis-web-token-for-remote-mcp",
         GOOGLE_SHEET_ID: "sheet-id",
         GOOGLE_MAPS_API_KEY: "maps",
         SERPER_API_KEY: "serper",
@@ -1902,6 +1917,7 @@ test("production readiness treats Serper exhaustion as advisory when other lead 
         SMARTLEAD_API_KEY: "smartlead",
         DATABASE_URL: `postgres://user:pass@127.0.0.1:${postgres.port}/db`,
         REDIS_URL: `redis://default:secret@127.0.0.1:${redis.port}`,
+        JARVIS_WEB_TOKEN: "strong-jarvis-web-token-for-remote-mcp",
         GOOGLE_SHEET_ID: "sheet-id",
         GOOGLE_MAPS_API_KEY: "maps",
         SERPER_API_KEY: "spent-serper",

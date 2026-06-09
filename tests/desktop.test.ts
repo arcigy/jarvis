@@ -651,6 +651,10 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /getOperatorBriefing/);
   assert.match(main, /getOperatorColdOutreachSummary/);
   assert.match(main, /readinessAttentionQueue: readiness\.attentionQueue/);
+  assert.match(main, /"remoteMcp"/);
+  assert.match(main, /getRemoteMcpRuntimeEnvIssue/);
+  assert.match(main, /JARVIS_WEB_TOKEN must be at least 32 characters/);
+  assert.match(main, /remote-mcp-token/);
   assert.match(main, /summarizeReadinessAttention/);
   assert.match(main, /clientNeedHighlights: Array\.isArray\(clientNeeds\.alerts\)/);
   assert.match(main, /summarizeClientNeeds/);

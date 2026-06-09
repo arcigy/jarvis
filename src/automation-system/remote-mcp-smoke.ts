@@ -617,7 +617,7 @@ function hasSafeProductionEvidenceResult(value: unknown): boolean {
   if (!value || typeof value !== "object") return false;
   const evidence = value as { mode?: unknown; status?: unknown; generatedAt?: unknown; summary?: unknown; checks?: unknown };
   if (evidence.mode !== "arcigy-jarvis-production-verification") return false;
-  if (typeof evidence.status !== "string" || !["ready", "attention", "missing"].includes(evidence.status)) return false;
+  if (typeof evidence.status !== "string" || !["ready", "attention", "missing", "failed"].includes(evidence.status)) return false;
   if (!(typeof evidence.generatedAt === "string" || evidence.generatedAt === null)) return false;
   if (typeof evidence.summary !== "string" || !evidence.summary.trim()) return false;
   return Array.isArray(evidence.checks);

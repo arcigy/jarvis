@@ -159,8 +159,9 @@ async function checkLiveIntegrationDiagnostics(): Promise<DoctorCheck> {
   const dbPath = safeGeneratedPath(`doctor-live-diagnostics-${Date.now()}-${process.pid}.db`);
   const diagnostics = await runIntegrationDiagnostics({ live: true, dbPath });
   const notReady = diagnostics.checks.filter((check) => check.status !== "ready");
-  const blockingNotReady = notReady.filter((check) => !["redis", "serper"].includes(check.key));
-  const advisoryNotReady = notReady.filter((check) => ["redis", "serper"].includes(check.key));
+  const advisoryKeys = ["redis", "serper", "remoteMcp"];
+  const blockingNotReady = notReady.filter((check) => !advisoryKeys.includes(check.key));
+  const advisoryNotReady = notReady.filter((check) => advisoryKeys.includes(check.key));
   return {
     key: "liveIntegrationDiagnostics",
     status: blockingNotReady.length ? "failed" : "ready",
@@ -652,6 +653,9 @@ function runtimeEnvNextAction(key: string, message: string): string {
   if (text.includes("redis") && text.includes("placeholder")) return "Replace REDIS_URL with the real Redis password, then rerun npm run doctor -- --live-integrations.";
   if (text.includes("redis") && text.includes("rediss")) return "Change REDIS_URL to rediss:// if the provider requires TLS.";
   if (text.includes("serper") && text.includes("not enough credits")) return "Top up or replace at least one Serper API key.";
+  if (text.includes("remotemcp") || text.includes("jarvis_web_token") || text.includes("api_secret_key fallback")) {
+    return "Set a strong JARVIS_WEB_TOKEN in .env.local or use npm run web:tunnel:secure for a one-time token.";
+  }
   return `Fix ${key} and rerun npm run doctor -- --live-integrations.`;
 }
 

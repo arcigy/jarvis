@@ -62,7 +62,7 @@ function buildSecretsAudit(root: string, runtimeEnv: RuntimeEnv, loadedFiles: st
       status === "ready"
         ? "All production integration secret groups are configured."
         : status === "attention"
-          ? "Required production secrets are configured; optional provider secrets need attention."
+          ? "Required production secrets are configured; optional provider or remote handoff secrets need attention."
           : "Required production secrets need attention before live production handoff.",
     integrations: health.map((item) => ({
       key: item.key,

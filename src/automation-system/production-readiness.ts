@@ -184,8 +184,9 @@ function buildLaunchChecklist(
   ];
   const approvalReady = requiredApprovalTools.every((tool) => approvalTools.includes(tool));
   const liveChecks = diagnostics?.checks ?? [];
-  const liveBlocking = liveChecks.filter((check) => check.status === "failed" && !["redis", "serper"].includes(check.key));
-  const liveWarnings = liveChecks.filter((check) => check.status !== "ready" && ["redis", "serper"].includes(check.key));
+  const liveAdvisoryKeys = ["redis", "serper", "remoteMcp"];
+  const liveBlocking = liveChecks.filter((check) => check.status === "failed" && !liveAdvisoryKeys.includes(check.key));
+  const liveWarnings = liveChecks.filter((check) => check.status !== "ready" && liveAdvisoryKeys.includes(check.key));
   return [
     {
       id: "required-integrations",
@@ -239,7 +240,7 @@ function integrationHealthBlockers(item: IntegrationHealth): ReadinessBlocker[] 
 
 function diagnosticBlockers(check: DiagnosticCheck): ReadinessBlocker[] {
   if (check.status === "ready") return [];
-  const requiredForProduction = !["redis", "serper"].includes(check.key);
+  const requiredForProduction = !["redis", "serper", "remoteMcp"].includes(check.key);
   return [
     {
       key: check.key,
@@ -255,6 +256,9 @@ function nextActionFor(key: string, message: string): string {
   if (text.includes("redis") && text.includes("placeholder")) return "Replace REDIS_URL with the real Railway Redis password, then rerun npm run doctor -- --live-integrations.";
   if (text.includes("redis") && text.includes("rediss")) return "Change REDIS_URL to rediss:// if the provider requires TLS, then rerun live diagnostics.";
   if (text.includes("serper") && text.includes("not enough credits")) return "Top up or replace at least one Serper API key; both configured keys were exhausted.";
+  if (text.includes("remotemcp") || text.includes("jarvis_web_token") || text.includes("api_secret_key fallback")) {
+    return "Set a strong JARVIS_WEB_TOKEN in .env.local or use npm run web:tunnel:secure for a one-time remote MCP token.";
+  }
   if (text.includes("gmail")) return "Refresh Google OAuth credentials for the configured Gmail accounts.";
   if (text.includes("google")) return "Verify Google API key, OAuth scopes, and the configured Sheet ID.";
   if (text.includes("smartlead")) return "Verify Smartlead API key and campaign access.";
@@ -344,6 +348,15 @@ function fixStepFor(blocker: ReadinessBlocker): ReadinessFixStep | null {
       detail: "Top up or replace at least one Serper key. The live check already tries SERPER_API_KEY and SERPER_API_KEY_2 before reporting exhaustion.",
       envKeys: ["SERPER_API_KEY", "SERPER_API_KEY_2"],
       validationCommand: "npm run doctor -- --live-integrations",
+    };
+  }
+  if (text.includes("remotemcp") || text.includes("jarvis_web_token") || text.includes("api_secret_key fallback")) {
+    return {
+      id: "remote-mcp-token",
+      title: "Configure remote MCP bearer token",
+      detail: "Set JARVIS_WEB_TOKEN to a non-dummy value with at least 32 characters before persistent tunnel handoff, or use npm run web:tunnel:secure for an ephemeral one-time token.",
+      envKeys: ["JARVIS_WEB_TOKEN", "API_SECRET_KEY"],
+      validationCommand: "npm run secrets:audit && npm run doctor",
     };
   }
   if (text.includes("gmail") || text.includes("google")) {

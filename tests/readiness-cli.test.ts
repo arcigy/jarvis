@@ -51,6 +51,7 @@ test("Jarvis readiness CLI exits zero with attention when only unused Redis is i
       SMARTLEAD_API_KEY: "smartlead",
       DATABASE_URL: "postgres://postgres:secret@example.com:5432/db",
       REDIS_URL: "redis://default:PASSWORD@example.com:6379",
+      JARVIS_WEB_TOKEN: "strong-jarvis-web-token-for-remote-mcp",
       GOOGLE_SHEET_ID: "sheet",
       GOOGLE_MAPS_API_KEY: "maps",
       SERPER_API_KEY: "serper",
