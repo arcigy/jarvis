@@ -136,6 +136,68 @@ async function run() {
             height: rect.height
           };
         };
+        const requiredWorkflowControls = [
+          "operatorBriefing",
+          "readinessReport",
+          "listenButton",
+          "simulateWake",
+          "submitTranscript",
+          "coldBrief",
+          "approvalQueue",
+          "preparedReplies",
+          "preparePositiveReply",
+          "approvePreparedReply",
+          "sendApprovedReply",
+          "previewGmail",
+          "syncGmail",
+          "checkSmartlead",
+          "smartleadBrief",
+          "identifyEmail",
+          "ingestClientMessage",
+          "clientNeedAlerts",
+          "discoverLeads",
+          "exportLeads",
+          "draftReply",
+          "checkWebBridge",
+          "startSecureTunnel",
+          "stopSecureTunnel",
+          "runRemoteSmoke",
+          "draftContractIntake",
+          "applyContractForm",
+          "generateContracts"
+        ];
+        const requiredFormControls = [
+          "transcript",
+          "positiveLeadEmail",
+          "positiveSignal",
+          "gmailQuery",
+          "smartleadCampaignId",
+          "memoryEmail",
+          "memoryMessage",
+          "leadQuery",
+          "clientMessage",
+          "contractBrief",
+          "contractBusinessName",
+          "contractProjectName",
+          "contractIntake"
+        ];
+        const controlStatus = (id) => {
+          const node = document.getElementById(id);
+          if (!node) return { id, missing: true };
+          const rect = node.getBoundingClientRect();
+          const style = getComputedStyle(node);
+          return {
+            id,
+            missing: false,
+            display: style.display,
+            visibility: style.visibility,
+            width: rect.width,
+            height: rect.height
+          };
+        };
+        const buttonTextOverflow = [...document.querySelectorAll("button")].filter((node) => {
+          return node.scrollWidth > node.clientWidth + 2;
+        }).map((node) => node.id || node.textContent.trim()).filter(Boolean);
         return {
           title: document.title,
           bodyText: document.body.innerText,
@@ -162,6 +224,9 @@ async function run() {
           voiceInputText: document.querySelector("#voiceInput")?.textContent.trim() || "",
           voiceOutputText: document.querySelector("#voiceOutput")?.textContent.trim() || "",
           voiceLastEventText: document.querySelector("#voiceLastEvent")?.textContent.trim() || "",
+          criticalWorkflowControls: requiredWorkflowControls.map(controlStatus),
+          criticalFormControls: requiredFormControls.map(controlStatus),
+          buttonTextOverflow,
           coreImageComplete: document.querySelector(".coreVisual")?.complete === true,
           coreImageNaturalWidth: document.querySelector(".coreVisual")?.naturalWidth || 0,
           visibleMissionSignals: [...document.querySelectorAll(".missionSignal")].filter((node) => {
@@ -185,6 +250,14 @@ async function run() {
     if (dom.visibleCortexNodes !== 5) fail(`Expected 5 cortex nodes, found ${dom.visibleCortexNodes}.`);
     if (/undefined|null|\[object Object\]/i.test(dom.bodyText)) fail("UI contains raw undefined/null/object text.");
     if (dom.scrollWidth > dom.clientWidth + 2) fail(`UI has horizontal overflow: ${dom.scrollWidth}px > ${dom.clientWidth}px.`);
+    for (const control of [...dom.criticalWorkflowControls, ...dom.criticalFormControls]) {
+      if (control.missing) {
+        fail(`Critical workflow control is missing: ${control.id}.`);
+      } else if (control.display === "none" || control.visibility === "hidden" || control.width < 20 || control.height < 20) {
+        fail(`Critical workflow control is not usable: ${control.id} (${Math.round(control.width)}x${Math.round(control.height)}).`);
+      }
+    }
+    if (dom.buttonTextOverflow.length) fail(`Button text overflows: ${dom.buttonTextOverflow.slice(0, 8).join(", ")}.`);
     if (!/^[0-9]+\/[0-9]+$/.test(dom.readyIntegrationsText)) fail(`Ready integration count is not loaded: ${dom.readyIntegrationsText}.`);
     if (!/^[0-9]+$/.test(dom.mcpToolCountText) || displayedToolCount < 35) fail(`MCP tool count is stale or not loaded: ${dom.mcpToolCountText}.`);
     if (!/^[0-9]+$/.test(dom.approvalLockCountText) || displayedApprovalLockCount < 6) fail(`Approval lock count is stale or not loaded: ${dom.approvalLockCountText}.`);

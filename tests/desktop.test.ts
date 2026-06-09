@@ -524,6 +524,10 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(uiSmoke, /#missionRail/);
   assert.match(uiSmoke, /#cortexMap/);
   assert.match(uiSmoke, /visibleCortexNodes/);
+  assert.match(uiSmoke, /criticalWorkflowControls/);
+  assert.match(uiSmoke, /criticalFormControls/);
+  assert.match(uiSmoke, /Critical workflow control is missing/);
+  assert.match(uiSmoke, /Button text overflows/);
   assert.match(uiSmoke, /Command core image did not load/);
   assert.match(uiSmoke, /handoffProofGatesText/);
   assert.match(uiSmoke, /proofReadyMatch/);
