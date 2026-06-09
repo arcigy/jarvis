@@ -912,7 +912,7 @@ function trackAttentionDigestNoticeFromBriefing(briefing) {
   const preparedReplyCount = extractLeadingSectionCount(preparedReplies);
   const signals = [];
   if (clientNeedCount > 0) signals.push(clientNeeds);
-  if (preparedReplyCount > 0) signals.push(`${preparedReplies} Poslem ich az po tvojom schvaleni.`);
+  if (preparedReplyCount > 0) signals.push(preparedReplies);
   if (!signals.length) {
     state.lastAttentionDigestNoticeSignature = null;
     return;

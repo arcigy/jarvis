@@ -764,7 +764,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /trackAttentionDigestNoticeFromBriefing/);
   assert.match(renderer, /extractLeadingSectionCount/);
   assert.match(renderer, /Jarvis attention digest/);
-  assert.match(renderer, /Poslem ich az po tvojom schvaleni/);
+  assert.doesNotMatch(renderer, /preparedReplies\}\s+Poslem ich az po tvojom schvaleni/);
   assert.match(renderer, /arcigy-jarvis-attention-digest/);
   assert.match(renderer, /clientAlertPollMs: 60000/);
   assert.match(renderer, /clientAlertGmailSyncPollMs: 300000/);
