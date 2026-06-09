@@ -1164,6 +1164,14 @@ function buildRemoteMcpQuickStartCalls(baseUrl) {
       approvalRequired: false,
     },
     {
+      label: "Ask Jarvis for production evidence",
+      tool: "arcigy.jarvis_voice_event",
+      method: "POST",
+      url: toolUrl("arcigy.jarvis_voice_event"),
+      body: { text: "Jarvis production evidence", session: { state: "idle", wakeWord: "jarvis" } },
+      approvalRequired: false,
+    },
+    {
       label: "Test Jarvis voice wake command",
       tool: "arcigy.jarvis_voice_event",
       method: "POST",

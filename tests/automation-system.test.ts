@@ -1157,6 +1157,15 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
       (call) =>
         call.tool === "arcigy.jarvis_voice_event" &&
         call.approvalRequired === false &&
+        call.body.text === "Jarvis production evidence" &&
+        (call.body.session as { state?: string; wakeWord?: string } | undefined)?.wakeWord === "jarvis"
+    )
+  );
+  assert.ok(
+    pack.quickStartCalls.some(
+      (call) =>
+        call.tool === "arcigy.jarvis_voice_event" &&
+        call.approvalRequired === false &&
         call.body.text === "Jarvis integracie" &&
         (call.body.session as { state?: string; wakeWord?: string } | undefined)?.state === "idle"
     )
