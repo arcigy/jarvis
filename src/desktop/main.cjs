@@ -217,9 +217,8 @@ app.on("window-all-closed", (event) => {
 });
 
 async function handleVoiceEvent(payload) {
-  const session = payload?.session ?? { state: "idle", wakeWord: "jarvis" };
-  const text = String(payload?.text ?? "").trim();
-  const lowered = normalizeTranscript(text);
+  let session = payload?.session ?? { state: "idle", wakeWord: "jarvis" };
+  let text = String(payload?.text ?? "").trim();
 
   if (session.state === "idle") {
     if (!containsWakeWord(text, session.wakeWord)) {
@@ -231,13 +230,20 @@ async function handleVoiceEvent(payload) {
       };
     }
 
-    return {
-      session: { ...session, state: "awake", lastTranscript: text },
-      shouldStartRecording: true,
-      shouldStopRecording: false,
-      speakText: "Ano, pocuvam.",
-    };
+    const wakeCommand = extractCommandAfterWakeWord(text, session.wakeWord);
+    if (!wakeCommand) {
+      return {
+        session: { ...session, state: "awake", lastTranscript: text },
+        shouldStartRecording: true,
+        shouldStopRecording: false,
+        speakText: "Ano, pocuvam.",
+      };
+    }
+    session = { ...session, state: "awake", lastTranscript: text };
+    text = wakeCommand;
   }
+
+  const lowered = normalizeTranscript(text);
 
   if (lowered.includes("briefing") || lowered.includes("prehlad") || lowered.includes("prehľad") || lowered.includes("co sa deje") || lowered.includes("čo sa deje")) {
     return voiceDone(session, text, (await getOperatorBriefing({ ...payload, text })).speechText);
@@ -2705,6 +2711,15 @@ function skPreparedReplies(count) {
 function containsWakeWord(text, wakeWord = "jarvis") {
   const target = normalizeTranscript(wakeWord);
   return normalizeTranscript(text).split(/\s+/).includes(target);
+}
+
+function extractCommandAfterWakeWord(text, wakeWord = "jarvis") {
+  const target = normalizeTranscript(wakeWord);
+  const words = String(text).trim().split(/\s+/);
+  const index = words.findIndex((word) => normalizeTranscript(word) === target);
+  if (index < 0) return null;
+  const command = words.slice(index + 1).join(" ").trim();
+  return command || null;
 }
 
 function normalizeTranscript(text) {

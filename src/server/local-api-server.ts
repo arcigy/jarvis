@@ -10,7 +10,7 @@ import { runIntegrationDiagnostics } from "../automation-system/diagnostics.ts";
 import { getIntegrationHealth, loadLocalEnv } from "../automation-system/env.ts";
 import { buildClientReplyPrompt, buildPositiveOutreachReplyPrompt, generateGeminiText } from "../automation-system/gemini.ts";
 import { defaultGmailBriefingQuery, defaultGmailSyncQuery, listConfiguredGmailAccounts, listRecentGmailMessageEvents, sendGmailTextMessage } from "../automation-system/gmail.ts";
-import { containsWakeWord, type JarvisVoiceSession } from "../automation-system/jarvis-voice.ts";
+import { containsWakeWord, extractCommandAfterWakeWord, type JarvisVoiceSession } from "../automation-system/jarvis-voice.ts";
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "../automation-system/lead-discovery.ts";
 import { buildContractGenerationCommand, getColdOutreachMcpAnswer, listJarvisMcpTools, localStateWriteToolNames } from "../automation-system/mcp-tools.ts";
 import { buildOperatorBriefing } from "../automation-system/operator-briefing.ts";
@@ -1466,9 +1466,8 @@ function isCommandAvailable(command: string): boolean {
 }
 
 async function handleWebVoiceEvent(payload: Record<string, unknown>) {
-  const session = (payload.session ?? { state: "idle", wakeWord: "jarvis" }) as JarvisVoiceSession;
-  const text = String(payload.text ?? "").trim();
-  const lowered = normalizeTranscript(text);
+  let session = (payload.session ?? { state: "idle", wakeWord: "jarvis" }) as JarvisVoiceSession;
+  let text = String(payload.text ?? "").trim();
 
   if (session.state === "idle") {
     if (!containsWakeWord(text, session.wakeWord)) {
@@ -1479,13 +1478,20 @@ async function handleWebVoiceEvent(payload: Record<string, unknown>) {
         speakText: null,
       };
     }
-    return {
-      session: { ...session, state: "awake", lastTranscript: text },
-      shouldStartRecording: true,
-      shouldStopRecording: false,
-      speakText: "Ano, pocuvam.",
-    };
+    const wakeCommand = extractCommandAfterWakeWord(text, session.wakeWord);
+    if (!wakeCommand) {
+      return {
+        session: { ...session, state: "awake", lastTranscript: text },
+        shouldStartRecording: true,
+        shouldStopRecording: false,
+        speakText: "Ano, pocuvam.",
+      };
+    }
+    session = { ...session, state: "awake", lastTranscript: text };
+    text = wakeCommand;
   }
+
+  const lowered = normalizeTranscript(text);
 
   if (lowered.includes("briefing") || lowered.includes("prehlad") || lowered.includes("co sa deje")) {
     const briefing = await getOperatorBriefing({ ...payload, text });

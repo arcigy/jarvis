@@ -25,6 +25,7 @@ import { buildSmartleadOutreachBrief, getSmartleadCampaignStatus, getSmartleadOu
 import {
   containsWakeWord,
   createJarvisVoiceSession,
+  extractCommandAfterWakeWord,
   handleJarvisVoiceEvent,
 } from "../src/automation-system/jarvis-voice.ts";
 import { resolveJarvisIntentFromTranscript } from "../src/automation-system/jarvis-intents.ts";
@@ -2043,6 +2044,8 @@ test("identity matching can fall back to client domain", () => {
 test("Jarvis voice flow wakes, answers, then returns idle", () => {
   assert.equal(containsWakeWord("Jarvis, počúvaš?"), true);
 
+  assert.equal(extractCommandAfterWakeWord("Jarvis, skontroluj integracie"), "skontroluj integracie");
+
   let session = createJarvisVoiceSession();
   const wake = handleJarvisVoiceEvent(session, {
     type: "transcript",
@@ -2073,6 +2076,18 @@ test("Jarvis voice flow wakes, answers, then returns idle", () => {
   assert.equal(response.session.state, "idle");
   assert.equal(response.shouldStopRecording, true);
   assert.match(response.speakText ?? "", /Za dnes sme napísali 10 ľuďom/);
+});
+
+test("Jarvis voice handles wake word and command in one transcript", () => {
+  const directCommand = handleJarvisVoiceEvent(createJarvisVoiceSession(), {
+    type: "transcript",
+    text: "Jarvis skontroluj integracie",
+  });
+
+  assert.equal(directCommand.session.state, "idle");
+  assert.equal(directCommand.shouldStartRecording, false);
+  assert.equal(directCommand.shouldStopRecording, true);
+  assert.match(directCommand.speakText ?? "", /integr/i);
 });
 
 test("Jarvis voice resolves production, remote MCP, contracts, Gmail, and client memory prompts", () => {

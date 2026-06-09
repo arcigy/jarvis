@@ -42,6 +42,15 @@ export function containsWakeWord(text: string, wakeWord = "jarvis"): boolean {
   return normalized.split(/\s+/).includes(target);
 }
 
+export function extractCommandAfterWakeWord(text: string, wakeWord = "jarvis"): string | null {
+  const target = normalizeWakeWord(wakeWord);
+  const words = text.trim().split(/\s+/);
+  const index = words.findIndex((word) => normalizeTranscript(word) === target);
+  if (index < 0) return null;
+  const command = words.slice(index + 1).join(" ").trim();
+  return command || null;
+}
+
 export function handleJarvisVoiceEvent(
   session: JarvisVoiceSession,
   event: JarvisVoiceEvent
@@ -64,6 +73,25 @@ export function handleJarvisVoiceEvent(
         shouldStopRecording: false,
         speakText: null,
       };
+    }
+
+    const wakeCommand = extractCommandAfterWakeWord(transcript, session.wakeWord);
+    if (wakeCommand) {
+      const intent = event.intent ?? resolveJarvisIntentFromTranscript(wakeCommand);
+      if (intent) {
+        const response = answerJarvisIntent(intent);
+        return {
+          session: {
+            ...session,
+            state: "idle",
+            lastTranscript: transcript,
+            lastResponse: response,
+          },
+          shouldStartRecording: false,
+          shouldStopRecording: true,
+          speakText: response,
+        };
+      }
     }
 
     return {
