@@ -383,7 +383,12 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /buildReadinessLaunchEvidence/);
   assert.match(main, /production-launch-evidence/);
   assert.match(main, /\.well-known\/ai-plugin\.json, \/api\/openapi\.json/);
-  assert.match(main, /cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-agent-setup-profiles, pack-voice-quick-start, voice-tool-call, pack-production-evidence-quick-start \(direct evidence \+ Jarvis production evidence voice quick-start\), production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction/);
+  assert.match(main, /all 35 required remote MCP smoke gates/);
+  assert.match(main, /manifest-tool-metadata/);
+  assert.match(main, /pack-contract-draft-quick-start/);
+  assert.match(main, /pack-client-memory-quick-start/);
+  assert.match(main, /pack-production-evidence-quick-start/);
+  assert.match(main, /production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction/);
   assert.match(main, /release proof, dirty=false, and freshness\.fresh=true/);
   assert.match(main, /isProductionEvidenceVoiceCommand/);
   assert.match(main, /summarizeProductionEvidenceForVoice/);
@@ -597,7 +602,10 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /buildRemoteMcpHandoffRunbook/);
   assert.match(main, /connectionPackUrl/);
   assert.match(main, /repo-only limits/);
-  assert.match(main, /action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits/);
+  assert.match(main, /all 35 required remote MCP smoke gates/);
+  assert.match(main, /manifest-tool-metadata/);
+  assert.match(main, /pack-contract-draft-quick-start/);
+  assert.match(main, /pack-client-memory-quick-start/);
   assert.match(main, /hasAuthThrottlePolicy/);
   assert.match(main, /checkExternalAuthGate/);
   assert.match(main, /approval-shape-gate/);

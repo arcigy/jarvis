@@ -56,8 +56,11 @@ test("web tunnel script orchestrates protected Jarvis MCP exposure", () => {
   assert.match(script, /dryRun=true/);
   assert.match(script, /tokenValueReturned=false with repo-only limits/);
   assert.match(script, /connection pack tokenValueReturned=false with repo-only limits and agentSetupProfiles for Claude\/ChatGPT\/Grok/);
-  assert.match(script, /pack-production-evidence-quick-start \(direct evidence \+ Jarvis production evidence voice quick-start\)/);
-  assert.match(script, /remote smoke status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-agent-setup-profiles, pack-voice-quick-start, voice-tool-call, pack-production-evidence-quick-start \(direct evidence \+ Jarvis production evidence voice quick-start\), production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction/);
+  assert.match(script, /remote smoke status=ready with all 35 required remote MCP smoke gates/);
+  assert.match(script, /pack-contract-draft-quick-start/);
+  assert.match(script, /pack-client-memory-quick-start/);
+  assert.match(script, /pack-production-evidence-quick-start/);
+  assert.match(script, /production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction/);
   assert.match(script, /Authorization: Bearer <JARVIS_WEB_TOKEN>/);
   assert.match(script, /--no-start-web/);
   assert.match(script, /--generate-token/);

@@ -122,7 +122,15 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(readiness.launchEvidence.proofGates.some((gate) => gate.id === "approval-locks" && gate.validationCommand === "npm test"));
   assert.equal(readiness.launchEvidence.remoteHandoff.tunnelCommand, "npm run web:tunnel:secure");
   assert.ok(readiness.launchEvidence.remoteHandoff.requiredBeforeExternalAgent.some((step) => step.includes("/.well-known/ai-plugin.json") && step.includes("/api/openapi.json")));
-  assert.ok(readiness.launchEvidence.remoteHandoff.requiredBeforeExternalAgent.some((step) => step.includes("cors-preflight") && step.includes("secret-redaction")));
+  assert.ok(
+    readiness.launchEvidence.remoteHandoff.requiredBeforeExternalAgent.some(
+      (step) =>
+        step.includes("all 35 required remote MCP smoke gates") &&
+        step.includes("pack-client-memory-quick-start") &&
+        step.includes("pack-production-evidence-quick-start") &&
+        step.includes("secret-redaction")
+    )
+  );
   assert.ok(
     readiness.launchEvidence.remoteHandoff.requiredBeforeExternalAgent.some(
       (step) =>

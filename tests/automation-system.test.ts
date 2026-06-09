@@ -113,11 +113,9 @@ test("production readiness report returns blockers and next actions without secr
   assert.ok(
     report.launchEvidence.remoteHandoff.requiredBeforeExternalAgent.some(
       (step) =>
-        step.includes("cors-preflight") &&
-        step.includes("external-auth-gate") &&
-        step.includes("pack-auth-throttle-policy") &&
-        step.includes("pack-limits") &&
-        step.includes("pack-agent-setup-profiles") &&
+        step.includes("all 35 required remote MCP smoke gates") &&
+        step.includes("pack-contract-draft-quick-start") &&
+        step.includes("pack-client-memory-quick-start") &&
         step.includes("pack-production-evidence-quick-start") &&
         step.includes("production-evidence-tool-call") &&
         step.includes("release proof") &&
@@ -1198,7 +1196,17 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("productionVerificationEvidenceUrl")));
   assert.equal(pack.agentCompatibility.protocol, "HTTP JSON MCP bridge");
   assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("status=ready")));
-  assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("cors-preflight") && step.includes("external-auth-gate") && step.includes("pack-auth-throttle-policy") && step.includes("action-manifest")));
+  assert.ok(
+    pack.agentCompatibility.requiredBeforeWork.some(
+      (step) =>
+        step.includes("all 35 required remote MCP smoke gates") &&
+        step.includes("manifest-tool-metadata") &&
+        step.includes("pack-contract-draft-quick-start") &&
+        step.includes("pack-client-memory-quick-start") &&
+        step.includes("pack-production-evidence-quick-start") &&
+        step.includes("production-evidence-tool-call")
+    )
+  );
   assert.ok(pack.agentCompatibility.safetyRules.some((rule) => rule.includes("family-friendly")));
   assert.ok(pack.agentCompatibility.safetyRules.some((rule) => rule.includes("approvalRequired")));
   assert.equal(pack.tunnel.statusUrl, "https://jarvis.example/api/secure-tunnel-status");
@@ -1209,7 +1217,18 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "secure-tunnel-status"));
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "production-verification-evidence" && item.url.endsWith("/api/production-verification-evidence")));
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "openapi-schema" && item.url.endsWith("/api/openapi.json")));
-  assert.ok(pack.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("cors-preflight") && item.expected.includes("external-auth-gate") && item.expected.includes("pack-auth-throttle-policy") && item.expected.includes("action-manifest")));
+  assert.ok(
+    pack.handoff.requiredProof.some(
+      (item) =>
+        item.key === "remote-smoke" &&
+        item.expected.includes("all 35 required remote MCP smoke gates") &&
+        item.expected.includes("manifest-tool-metadata") &&
+        item.expected.includes("pack-contract-draft-quick-start") &&
+        item.expected.includes("pack-client-memory-quick-start") &&
+        item.expected.includes("pack-production-evidence-quick-start") &&
+        item.expected.includes("production-evidence-tool-call")
+    )
+  );
   assert.match(pack.agentPromptTemplates.grok, /xAI-compatible agents/);
   assert.match(pack.agentPromptTemplates.grok, /remote smoke/);
   assert.match(pack.agentPromptTemplates.chatgpt, /POST https:\/\/jarvis\.example\/api\/mcp\/\{toolName\}/);
@@ -1241,6 +1260,8 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(
     pack.agentInstructions.some(
       (step) =>
+        step.includes("all 35 required remote MCP smoke gates") &&
+        step.includes("pack-client-memory-quick-start") &&
         step.includes("pack-production-evidence-quick-start") &&
         step.includes("production-evidence-tool-call") &&
         step.includes("dirty=false") &&
@@ -1252,6 +1273,8 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
     pack.handoff.requiredProof.some(
       (item) =>
         item.key === "remote-smoke" &&
+        item.expected.includes("all 35 required remote MCP smoke gates") &&
+        item.expected.includes("pack-client-memory-quick-start") &&
         item.expected.includes("production-evidence-tool-call") &&
         item.expected.includes("dirty=false") &&
         item.expected.includes("freshness.fresh=true")

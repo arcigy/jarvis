@@ -393,8 +393,9 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(
       readinessBody.launchEvidence.remoteHandoff.requiredBeforeExternalAgent.some(
         (step) =>
-          step.includes("cors-preflight") &&
-          step.includes("external-auth-gate") &&
+          step.includes("all 35 required remote MCP smoke gates") &&
+          step.includes("pack-contract-draft-quick-start") &&
+          step.includes("pack-client-memory-quick-start") &&
           step.includes("pack-production-evidence-quick-start") &&
           step.includes("production-evidence-tool-call") &&
           step.includes("release proof") &&
