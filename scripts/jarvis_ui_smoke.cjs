@@ -223,6 +223,7 @@ async function run() {
     await waitForPaint(window);
     const image = await window.webContents.capturePage();
     const png = image.toPNG();
+    assertScreenshotPixels(image, png);
     mkdirSync(dirname(outputPath), { recursive: true });
     writeFileSync(outputPath, png);
     if (!existsSync(outputPath) || png.length < 100000) fail(`Screenshot was not written correctly: ${outputPath}.`);
@@ -248,6 +249,54 @@ async function waitForPaint(window) {
       requestAnimationFrame(() => requestAnimationFrame(resolve));
     })
   `);
+}
+
+function assertScreenshotPixels(image, png) {
+  const size = image.getSize();
+  if (size.width < viewport.width * 0.8 || size.height < viewport.height * 0.8) {
+    fail(`Screenshot size is too small: ${size.width}x${size.height}.`);
+  }
+  if (png.length < viewport.width * viewport.height * 0.08) {
+    fail(`Screenshot PNG is suspiciously small for viewport: ${png.length} bytes.`);
+  }
+  const bitmap = image.toBitmap();
+  let sampled = 0;
+  let dark = 0;
+  let bright = 0;
+  let accent = 0;
+  let minBrightness = 255;
+  let maxBrightness = 0;
+  const buckets = new Set();
+  const stride = Math.max(4, Math.floor(bitmap.length / 12000 / 4) * 4);
+  for (let index = 0; index + 3 < bitmap.length; index += stride) {
+    const b = bitmap[index];
+    const g = bitmap[index + 1];
+    const r = bitmap[index + 2];
+    const alpha = bitmap[index + 3];
+    if (alpha < 10) continue;
+    sampled += 1;
+    const brightness = (r + g + b) / 3;
+    minBrightness = Math.min(minBrightness, brightness);
+    maxBrightness = Math.max(maxBrightness, brightness);
+    if (brightness < 34) dark += 1;
+    if (brightness > 150) bright += 1;
+    if (Math.max(r, g, b) - Math.min(r, g, b) > 42 && brightness > 45) accent += 1;
+    buckets.add(`${r >> 4}:${g >> 4}:${b >> 4}`);
+    if (buckets.size > 512) break;
+  }
+  if (sampled < 1000) {
+    fail(`Screenshot pixel sample is too small: ${sampled}.`);
+    return;
+  }
+  const brightnessSpread = maxBrightness - minBrightness;
+  const darkRatio = dark / sampled;
+  const brightRatio = bright / sampled;
+  const accentRatio = accent / sampled;
+  if (buckets.size < 36) fail(`Screenshot has too little color detail: ${buckets.size} color buckets.`);
+  if (brightnessSpread < 70) fail(`Screenshot has too little brightness range: ${Math.round(brightnessSpread)}.`);
+  if (darkRatio < 0.15) fail(`Screenshot is missing the dark Jarvis shell: ${darkRatio.toFixed(3)} dark pixels.`);
+  if (brightRatio < 0.01) fail(`Screenshot is missing bright readable UI details: ${brightRatio.toFixed(3)} bright pixels.`);
+  if (accentRatio < 0.02) fail(`Screenshot is missing colored Jarvis accents: ${accentRatio.toFixed(3)} accent pixels.`);
 }
 
 async function waitForCommandDeck(window) {
