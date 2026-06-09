@@ -2038,7 +2038,7 @@ elements.coldBrief.addEventListener("click", async () => {
 });
 elements.approvalQueue.addEventListener("click", async () => {
   try {
-    elements.preparedReplyResult.textContent = "Loading approval queue...";
+    elements.preparedReplyResult.textContent = "Nacitavam schvalovaciu frontu...";
     const result = await arcigyApi.getApprovalQueue({ limit: 20 });
     elements.preparedReplyResult.textContent = renderApprovalQueue(result);
     if (result.count > 0 && result.summary) speak(result.summary);
@@ -2048,7 +2048,7 @@ elements.approvalQueue.addEventListener("click", async () => {
 });
 elements.preparedReplies.addEventListener("click", async () => {
   try {
-    elements.preparedReplyResult.textContent = "Loading prepared replies...";
+    elements.preparedReplyResult.textContent = "Nacitavam pripravene odpovede...";
     const result = await arcigyApi.getPreparedOutreachReplies({ status: "pending", limit: 10 });
     state.lastPreparedReplies = result.replies ?? [];
     if (state.lastPreparedReplies.length) state.lastApprovedPreparedReply = null;
@@ -2061,9 +2061,9 @@ elements.preparedReplies.addEventListener("click", async () => {
 });
 elements.preparePositiveReply.addEventListener("click", async () => {
   try {
-    const leadEmail = requiredInputValue(elements.positiveLeadEmail, "Lead email is required before preparing a reply.");
-    const positiveSignal = requiredInputValue(elements.positiveSignal, "Positive signal is required before preparing a reply.");
-    elements.preparedReplyResult.textContent = "Preparing positive outreach reply...";
+    const leadEmail = requiredInputValue(elements.positiveLeadEmail, "Email leadu je povinny pred pripravenim odpovede.");
+    const positiveSignal = requiredInputValue(elements.positiveSignal, "Pozitivny signal je povinny pred pripravenim odpovede.");
+    elements.preparedReplyResult.textContent = "Pripravujem odpoved na pozitivny outreach...";
     const result = await arcigyApi.preparePositiveOutreachReply({
       leadEmail,
       subject: elements.positiveReplySubject.value,
@@ -2083,13 +2083,13 @@ elements.preparePositiveReply.addEventListener("click", async () => {
 elements.approvePreparedReply.addEventListener("click", async () => {
   try {
     if (!state.lastPreparedReplies.length) {
-      elements.preparedReplyResult.textContent = "Load prepared replies before approving.";
+      elements.preparedReplyResult.textContent = "Pred schvalenim nacitaj pripravene odpovede.";
       return;
     }
     const first = state.lastPreparedReplies[0];
-    const approved = window.confirm(`Approve prepared reply to ${first.leadEmail}${first.subject ? ` about ${first.subject}` : ""}?`);
+    const approved = window.confirm(`Schvalit pripravenu odpoved pre ${first.leadEmail}${first.subject ? ` k teme ${first.subject}` : ""}?`);
     if (!approved) {
-      elements.preparedReplyResult.textContent = "Prepared reply approval cancelled before any write.";
+      elements.preparedReplyResult.textContent = "Schvalenie pripravenej odpovede bolo zrusene pred zapisom.";
       return;
     }
     const result = await arcigyApi.approvePreparedOutreachReply({
@@ -2110,15 +2110,15 @@ elements.sendApprovedReply.addEventListener("click", async () => {
   try {
     const first = state.lastApprovedPreparedReply;
     if (!first) {
-      elements.preparedReplyResult.textContent = "Approve a prepared reply before sending.";
+      elements.preparedReplyResult.textContent = "Pred odoslanim schval pripravenu odpoved.";
       return;
     }
-    const approved = window.confirm(`Send approved reply to ${first.leadEmail}${first.subject ? ` about ${first.subject}` : ""} through Gmail?`);
+    const approved = window.confirm(`Odoslat schvalenu odpoved pre ${first.leadEmail}${first.subject ? ` k teme ${first.subject}` : ""} cez Gmail?`);
     if (!approved) {
-      elements.preparedReplyResult.textContent = "Approved reply send cancelled before any Gmail call.";
+      elements.preparedReplyResult.textContent = "Odoslanie schvalenej odpovede bolo zrusene pred Gmail volanim.";
       return;
     }
-    elements.preparedReplyResult.textContent = "Sending approved reply through Gmail...";
+    elements.preparedReplyResult.textContent = "Odosielam schvalenu odpoved cez Gmail...";
     const result = await arcigyApi.sendApprovedOutreachReply({
       preparedEventId: first.id,
       subject: first.subject,
@@ -2261,7 +2261,7 @@ elements.exportLocalMemorySnapshot.addEventListener("click", async () => {
 });
 elements.previewGmail.addEventListener("click", async () => {
   try {
-    elements.gmailResult.textContent = "Previewing Gmail without writing local records...";
+    elements.gmailResult.textContent = "Pripravujem Gmail nahlad bez zapisu lokalnych zaznamov...";
     const result = await arcigyApi.syncGmailRecentMessages({
       query: elements.gmailQuery.value,
       maxResults: 5,
@@ -2274,12 +2274,12 @@ elements.previewGmail.addEventListener("click", async () => {
 });
 elements.syncGmail.addEventListener("click", async () => {
   try {
-    const confirmed = window.confirm(`Sync recent Gmail messages into local client memory? Preview first when unsure.`);
+    const confirmed = window.confirm(`Synchronizovat posledne Gmail spravy do lokalnej klientskej pamate? Pri neistote najprv spusti nahlad.`);
     if (!confirmed) {
-      elements.gmailResult.textContent = "Gmail sync cancelled before local memory writes.";
+      elements.gmailResult.textContent = "Gmail synchronizacia bola zrusena pred zapisom do lokalnej pamate.";
       return;
     }
-    elements.gmailResult.textContent = "Syncing Gmail...";
+    elements.gmailResult.textContent = "Synchronizujem Gmail...";
     const result = await arcigyApi.syncGmailRecentMessages({
       query: elements.gmailQuery.value,
       maxResults: 5,
@@ -2292,7 +2292,7 @@ elements.syncGmail.addEventListener("click", async () => {
 });
 elements.checkSmartlead.addEventListener("click", async () => {
   try {
-    elements.smartleadResult.textContent = "Checking Smartlead...";
+    elements.smartleadResult.textContent = "Kontrolujem Smartlead...";
     const result = await arcigyApi.getSmartleadCampaignStatus({
       campaignId: elements.smartleadCampaignId.value,
     });
@@ -2304,7 +2304,7 @@ elements.checkSmartlead.addEventListener("click", async () => {
 elements.smartleadBrief.addEventListener("click", async () => {
   try {
     const campaignId = elements.smartleadCampaignId.value.trim();
-    elements.smartleadResult.textContent = campaignId ? "Building Smartlead Jarvis brief..." : "Building Smartlead Jarvis brief across campaigns...";
+    elements.smartleadResult.textContent = campaignId ? "Skladam Smartlead Jarvis brief..." : "Skladam Smartlead Jarvis brief napriec kampanami...";
     const result = await arcigyApi.getSmartleadOutreachBrief({
       campaignId,
       periodLabel: "poslednych 7 dni",
@@ -2318,7 +2318,7 @@ elements.smartleadBrief.addEventListener("click", async () => {
 });
 elements.checkWebBridge.addEventListener("click", async () => {
   try {
-    await refreshWebBridge({ loadingText: "Checking web bridge..." });
+    await refreshWebBridge({ loadingText: "Kontrolujem web bridge..." });
   } catch (error) {
     elements.webBridgeResult.textContent = safeUiErrorText(error);
   }
@@ -2477,7 +2477,7 @@ elements.fullLaunchCheck.addEventListener("click", async () => {
 });
 elements.discoverLeads.addEventListener("click", async () => {
   try {
-    elements.leadResult.textContent = "Searching...";
+    elements.leadResult.textContent = "Vyhladavam leady...";
     const result = await arcigyApi.discoverLeads({
       query: elements.leadQuery.value,
       maxResults: 8,
@@ -2492,21 +2492,21 @@ elements.discoverLeads.addEventListener("click", async () => {
 elements.exportLeads.addEventListener("click", async () => {
   try {
     if (!state.lastLeads.length) {
-      elements.leadResult.textContent = "Search leads before exporting.";
+      elements.leadResult.textContent = "Pred exportom najprv vyhladaj leady.";
       return;
     }
-    const approved = window.confirm(`Export ${state.lastLeads.length} lead(s) to Google Sheets?`);
+    const approved = window.confirm(`Exportovat ${state.lastLeads.length} leadov do Google Sheets?`);
     if (!approved) {
-      elements.leadResult.textContent = "Google Sheets export cancelled before any write.";
+      elements.leadResult.textContent = "Export do Google Sheets bol zruseny pred zapisom.";
       return;
     }
-    elements.leadResult.textContent = "Exporting leads to Google Sheets...";
+    elements.leadResult.textContent = "Exportujem leady do Google Sheets...";
     const result = await arcigyApi.appendLeadsToGoogleSheet({
       approval: { approved: true },
       range: "Leads!A1",
       rows: leadsToSheetRows(state.lastLeads),
     });
-    elements.leadResult.textContent = `Exported ${state.lastLeads.length} leads to Google Sheets.\n${JSON.stringify(result, null, 2)}`;
+    elements.leadResult.textContent = `Exportovane leady do Google Sheets: ${state.lastLeads.length}\n${JSON.stringify(result, null, 2)}`;
   } catch (error) {
     elements.leadResult.textContent = safeUiErrorText(error);
   }
