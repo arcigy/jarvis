@@ -1191,7 +1191,11 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
       });
     }
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
-    if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) return responseJson({ result: { session: { state: "idle" }, shouldStopRecording: true, speakText: "Integracie su pripravene." } });
+    if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
+      const speakText =
+        "Jarvis capability audit je ready. Coverage: 8/8 skupin ready, 0 attention, 0 blocked. MCP: 36 toolov, 6 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+      return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
+    }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
       return responseJson({
         result: {
@@ -3466,6 +3470,7 @@ function remoteSmokeQuickStartFixture() {
   return [
     call("arcigy.run_remote_mcp_smoke", {}),
     call("arcigy.get_production_verification_evidence", {}),
+    call("arcigy.jarvis_voice_event", { text: "Jarvis capability audit", session: { state: "idle", wakeWord: "jarvis" } }),
     call("arcigy.jarvis_voice_event", { text: "Jarvis production evidence", session: { state: "idle", wakeWord: "jarvis" } }),
     call("arcigy.get_operator_briefing", { periodLabel: "poslednych 7 dni", live: false }),
     call("arcigy.jarvis_voice_event", { text: "Jarvis integracie", session: { state: "idle", wakeWord: "jarvis" } }),

@@ -1010,7 +1010,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /hasUsableContractQuickStart/);
   assert.match(main, /hasDraftContractIntakeQuickStart/);
   assert.match(main, /hasVoiceQuickStart/);
-  assert.match(main, /hasSafeVoiceWakeResult/);
+  assert.match(main, /hasSafeCapabilityAuditVoiceResult/);
+  assert.match(main, /Read-only Jarvis voice MCP call returned a live secret-safe capability audit summary/);
   assert.match(main, /hasHandoffProof/);
   assert.match(main, /hasClientMemoryQuickStarts/);
   assert.match(main, /hasAuditQuickStart/);

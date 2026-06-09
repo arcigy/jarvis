@@ -2007,12 +2007,12 @@ async function runRemoteMcpSmoke(payload = {}) {
   );
   const health = await fetchJson(`${baseUrl}/api/mcp/arcigy.get_system_health`, token, { format: "json" });
   checks.push(smokeCheck(health.ok && Array.isArray(health.body?.result?.integrations), "read-only-tool-call", "Read-only MCP tool call returned integration health."));
-  const voice = await fetchJson(`${baseUrl}/api/mcp/arcigy.jarvis_voice_event`, token, { text: "Jarvis integracie", session: { state: "idle", wakeWord: "jarvis" } });
+  const voice = await fetchJson(`${baseUrl}/api/mcp/arcigy.jarvis_voice_event`, token, { text: "Jarvis capability audit", session: { state: "idle", wakeWord: "jarvis" } });
   checks.push(
     smokeCheck(
-      voice.ok && hasSafeVoiceWakeResult(voice.body?.result),
+      voice.ok && hasSafeCapabilityAuditVoiceResult(voice.body?.result),
       "voice-tool-call",
-      "Read-only Jarvis voice MCP call handled a wake command and returned secret-safe speech instructions."
+      "Read-only Jarvis voice MCP call returned a live secret-safe capability audit summary."
     )
   );
   const productionEvidence = await fetchJson(`${baseUrl}/api/mcp/arcigy.get_production_verification_evidence`, token, {});
@@ -2558,9 +2558,16 @@ function hasSafeReleaseProof(value) {
   );
 }
 
-function hasSafeVoiceWakeResult(value) {
+function hasSafeCapabilityAuditVoiceResult(value) {
   if (!value || typeof value !== "object") return false;
-  return value.session?.state === "idle" && value.shouldStopRecording === true && typeof value.speakText === "string" && /integr/i.test(value.speakText);
+  if (value.session?.state !== "idle" || value.shouldStopRecording !== true || typeof value.speakText !== "string") return false;
+  if (value.session.lastResponse !== value.speakText) return false;
+  return (
+    /Jarvis capability audit je/i.test(value.speakText) &&
+    /Coverage: \d+\/\d+ skupin ready/i.test(value.speakText) &&
+    /MCP: \d+ toolov/i.test(value.speakText) &&
+    /Evidence:/i.test(value.speakText)
+  );
 }
 
 function isEmptyRecord(value) {

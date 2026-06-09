@@ -273,14 +273,14 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
   const voice = await postJson(
     fetchImpl,
     `${baseUrl}/api/mcp/arcigy.jarvis_voice_event`,
-    { text: "Jarvis integracie", session: { state: "idle", wakeWord: "jarvis" } },
+    { text: "Jarvis capability audit", session: { state: "idle", wakeWord: "jarvis" } },
     input.bearerToken
   );
   checks.push(
     check(
-      voice.ok && hasSafeVoiceWakeResult(voice.body?.result),
+      voice.ok && hasSafeCapabilityAuditVoiceResult(voice.body?.result),
       "voice-tool-call",
-      "Read-only Jarvis voice MCP call handled a wake command and returned secret-safe speech instructions."
+      "Read-only Jarvis voice MCP call returned a live secret-safe capability audit summary."
     )
   );
   const productionEvidence = await postJson(fetchImpl, `${baseUrl}/api/mcp/arcigy.get_production_verification_evidence`, {}, input.bearerToken);
@@ -298,7 +298,7 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
   checks.push(check(topLevelApprovalGate.ok, "approval-shape-gate", 'All approval-required write tools rejected top-level {"approved":true}.'));
 
   const leakedSecret = hasSensitiveLeak(
-    { manifest: manifest.body, actionManifest: actionManifest.body, openApi: openApi.body, pack: pack.body, tunnelStatus: tunnelStatus.body, health: health.body, productionEvidence: productionEvidence.body, approvalGate: approvalGate.bodies, topLevelApprovalGate: topLevelApprovalGate.bodies },
+    { manifest: manifest.body, actionManifest: actionManifest.body, openApi: openApi.body, pack: pack.body, tunnelStatus: tunnelStatus.body, health: health.body, voice: voice.body, productionEvidence: productionEvidence.body, approvalGate: approvalGate.bodies, topLevelApprovalGate: topLevelApprovalGate.bodies },
     input.bearerToken
   );
   checks.push(check(!leakedSecret, "secret-redaction", "Smoke responses did not echo bearer tokens, API keys, OAuth tokens, or database URLs."));
@@ -853,10 +853,17 @@ function hasProductionEvidenceQuickStart(value: unknown, baseUrl: string): boole
   );
 }
 
-function hasSafeVoiceWakeResult(value: unknown): boolean {
+function hasSafeCapabilityAuditVoiceResult(value: unknown): boolean {
   if (!value || typeof value !== "object") return false;
-  const result = value as { session?: { state?: unknown }; shouldStopRecording?: unknown; speakText?: unknown };
-  return result.session?.state === "idle" && result.shouldStopRecording === true && typeof result.speakText === "string" && /integr/i.test(result.speakText);
+  const result = value as { session?: { state?: unknown; lastResponse?: unknown }; shouldStopRecording?: unknown; speakText?: unknown };
+  if (result.session?.state !== "idle" || result.shouldStopRecording !== true || typeof result.speakText !== "string") return false;
+  if (result.session.lastResponse !== result.speakText) return false;
+  return (
+    /Jarvis capability audit je/i.test(result.speakText) &&
+    /Coverage: \d+\/\d+ skupin ready/i.test(result.speakText) &&
+    /MCP: \d+ toolov/i.test(result.speakText) &&
+    /Evidence:/i.test(result.speakText)
+  );
 }
 
 function hasSafeProductionEvidenceResult(value: unknown): boolean {
