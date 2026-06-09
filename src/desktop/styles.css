@@ -551,6 +551,159 @@ h2 {
   color: #9cf8ed;
 }
 
+.operationsRadar {
+  position: relative;
+  display: grid;
+  grid-template-columns: 170px repeat(4, minmax(120px, 1fr)) minmax(180px, 0.8fr);
+  gap: 10px;
+  margin: 0 0 16px;
+  padding: 12px;
+  border: 1px solid #26302f;
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, rgb(67 217 196 / 6%) 1px, transparent 1px),
+    linear-gradient(0deg, rgb(67 217 196 / 5%) 1px, transparent 1px),
+    linear-gradient(135deg, rgb(7 12 13 / 96%), rgb(10 19 20 / 92%));
+  background-size: 24px 24px, 24px 24px, auto;
+  overflow: hidden;
+}
+
+.operationsRadar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgb(156 248 237 / 10%), transparent);
+  transform: translateX(-110%);
+  animation: radarPanelSweep 7s ease-in-out infinite;
+}
+
+.radarScope {
+  position: relative;
+  min-height: 112px;
+  border: 1px solid rgb(67 217 196 / 38%);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle, rgb(67 217 196 / 24%) 0 2px, transparent 3px),
+    radial-gradient(circle, transparent 0 37%, rgb(67 217 196 / 18%) 38% 39%, transparent 40% 54%, rgb(240 184 79 / 14%) 55% 56%, transparent 57%),
+    rgb(5 10 11 / 88%);
+  overflow: hidden;
+}
+
+.radarScope span,
+.radarScope i {
+  position: absolute;
+  inset: 14px;
+  border: 1px solid rgb(67 217 196 / 24%);
+  border-radius: 50%;
+}
+
+.radarScope i {
+  inset: 50%;
+  width: 46%;
+  height: 2px;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgb(67 217 196 / 78%), transparent);
+  transform-origin: 0 50%;
+  animation: radarSweep 4.2s linear infinite;
+}
+
+.radarNode,
+.radarSweepLabel {
+  position: relative;
+  z-index: 1;
+  min-height: 112px;
+  border: 1px solid #203331;
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgb(67 217 196 / 11%), transparent 52%),
+    rgb(8 14 15 / 90%);
+  padding: 12px;
+  overflow: hidden;
+}
+
+.radarNode::after {
+  content: "";
+  position: absolute;
+  inset: auto 12px 10px;
+  height: 3px;
+  border-radius: 999px;
+  background: #56615f;
+}
+
+.radarNode[data-state="ready"] {
+  border-color: rgb(67 217 196 / 55%);
+}
+
+.radarNode[data-state="ready"]::after {
+  background: #43d9c4;
+  box-shadow: 0 0 18px rgb(67 217 196 / 58%);
+}
+
+.radarNode[data-state="attention"] {
+  border-color: rgb(240 184 79 / 58%);
+}
+
+.radarNode[data-state="attention"]::after {
+  background: #f0b84f;
+  box-shadow: 0 0 18px rgb(240 184 79 / 48%);
+}
+
+.radarNode span {
+  display: block;
+  color: #91a19d;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.radarNode strong {
+  display: block;
+  margin-top: 18px;
+  color: #eef4f2;
+  font-size: 16px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.radarSweepLabel {
+  display: grid;
+  align-content: center;
+  color: #c8d6d2;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.operationsRadar[data-state="ready"] .radarSweepLabel {
+  color: #9cf8ed;
+}
+
+.sidebar .operationsRadar {
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin: 18px 0 0;
+  padding: 8px;
+}
+
+.sidebar .radarScope {
+  min-height: 86px;
+}
+
+.sidebar .radarNode,
+.sidebar .radarSweepLabel {
+  min-height: 58px;
+  padding: 10px;
+}
+
+.sidebar .radarNode strong {
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.sidebar .radarSweepLabel {
+  min-height: 52px;
+  font-size: 12px;
+}
+
 .cortexMap {
   position: relative;
   display: grid;
@@ -1252,6 +1405,19 @@ h2 {
   }
 }
 
+@keyframes radarSweep {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes radarPanelSweep {
+  55%,
+  100% {
+    transform: translateX(110%);
+  }
+}
+
 label {
   display: grid;
   gap: 8px;
@@ -1375,11 +1541,16 @@ ul {
     border-bottom: 1px solid #26302f;
   }
 
+  .sidebar .operationsRadar {
+    display: none;
+  }
+
   .statusGrid,
   .missionRail,
   .commandDeck,
   .briefingGrid,
   .launchQueue,
+  .operationsRadar,
   .cortexMap,
   .bridgeCockpit,
   .handoffGrid,

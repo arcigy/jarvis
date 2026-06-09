@@ -24,6 +24,10 @@ const state = {
   contractFormDirty: false,
   secureTunnelLogPath: null,
   lastSecureTunnelStatus: null,
+  lastSystemHealth: null,
+  lastBridgePreflight: null,
+  lastReadinessReport: null,
+  lastProductionEvidence: null,
 };
 
 const requiredRemoteSmokeGates = [
@@ -92,6 +96,12 @@ const elements = {
   verificationEvidence: document.querySelector("#verificationEvidence"),
   releaseProofGrid: document.querySelector("#releaseProofGrid"),
   launchChecklist: document.querySelector("#launchChecklist"),
+  operationsRadar: document.querySelector("#operationsRadar"),
+  radarRemoteProof: document.querySelector("#radarRemoteProof"),
+  radarLiveChecks: document.querySelector("#radarLiveChecks"),
+  radarApprovals: document.querySelector("#radarApprovals"),
+  radarClientAlerts: document.querySelector("#radarClientAlerts"),
+  radarSweepLabel: document.querySelector("#radarSweepLabel"),
   readinessReport: document.querySelector("#readinessReport"),
   operatorBriefing: document.querySelector("#operatorBriefing"),
   listenButton: document.querySelector("#listenButton"),
@@ -419,6 +429,8 @@ function renderHealth(health) {
 }
 
 function renderCommandDeck(health, bridge = null) {
+  state.lastSystemHealth = health;
+  state.lastBridgePreflight = bridge;
   const integrations = health.integrations ?? [];
   const readyCount = integrations.filter((item) => item.configured).length;
   const blockers = integrations.filter((item) => !item.configured && item.requiredForProduction !== false);
@@ -430,9 +442,11 @@ function renderCommandDeck(health, bridge = null) {
   elements.liveBlockerCount.textContent = String(blockers.length);
   elements.commandTimeline.textContent = buildCommandTimeline(blockers, bridge, advisories);
   renderMissionSignals(health, bridge);
+  updateOperationsRadar();
 }
 
 function renderLaunchQueue(report) {
+  state.lastReadinessReport = report;
   const status = report.status ?? "unknown";
   const attentionQueue = report.attentionQueue ?? [];
   const launchChecklist = report.launchChecklist ?? [];
@@ -453,9 +467,11 @@ function renderLaunchQueue(report) {
     node.append(statusNode, titleNode);
     elements.launchChecklist.appendChild(node);
   }
+  updateOperationsRadar();
 }
 
 function renderProductionVerificationEvidence(evidence) {
+  state.lastProductionEvidence = evidence;
   if (!elements.verificationEvidence) return;
   const status = evidence?.status ?? "missing";
   const freshness = evidence?.freshness && typeof evidence.freshness === "object" ? evidence.freshness : null;
@@ -468,6 +484,7 @@ function renderProductionVerificationEvidence(evidence) {
   elements.verificationEvidence.title = `${evidence?.summary ?? "Run npm run verify:production."} ${generatedAt}`;
   elements.verificationEvidence.closest("div")?.setAttribute("data-state", status === "ready" && fresh ? "ready" : "attention");
   renderReleaseProof(evidence, generatedAt);
+  updateOperationsRadar();
 }
 
 function renderReleaseProof(evidence, generatedAt) {
@@ -496,6 +513,44 @@ function renderReleaseProof(evidence, generatedAt) {
   elements.releaseProofGrid
     .closest(".releaseProof")
     ?.setAttribute("data-state", evidence?.status === "ready" && dirty === "clean" && freshness.fresh === true ? "ready" : "attention");
+}
+
+function updateOperationsRadar() {
+  if (!elements.operationsRadar) return;
+  const smokeProof = state.lastRemoteMcpSmoke ? summarizeRemoteProofGates(state.lastRemoteMcpSmoke) : null;
+  const release = state.lastProductionEvidence?.release && typeof state.lastProductionEvidence.release === "object" ? state.lastProductionEvidence.release : {};
+  const freshness =
+    state.lastProductionEvidence?.freshness && typeof state.lastProductionEvidence.freshness === "object" ? state.lastProductionEvidence.freshness : {};
+  const checks = Array.isArray(state.lastProductionEvidence?.checks) ? state.lastProductionEvidence.checks : [];
+  const readyChecks = checks.filter((check) => check?.status === "ready").length;
+  const gates = Array.isArray(release.requiredRemoteMcpSmokeGates) ? release.requiredRemoteMcpSmokeGates.length : 0;
+  const approvals = state.lastReadinessReport?.mcp?.approvalRequired ?? state.lastBridgePreflight?.riskyToolsRequiringApproval ?? [];
+  const clientAlerts = Number(state.lastClientNeedAlerts.length);
+  const proofReady =
+    smokeProof?.ready === true ||
+    (state.lastProductionEvidence?.status === "ready" && release.dirty === false && gates === requiredRemoteSmokeGates.length && freshness.fresh === true);
+  const checksReady = state.lastProductionEvidence?.status === "ready" && freshness.fresh === true && checks.length > 0 && readyChecks === checks.length;
+  setRadarNode(
+    elements.radarRemoteProof,
+    smokeProof ? smokeProof.text : gates ? `evidence ${gates}/${requiredRemoteSmokeGates.length} gates` : "smoke pending",
+    proofReady ? "ready" : "attention"
+  );
+  setRadarNode(elements.radarLiveChecks, checks.length ? `${readyChecks}/${checks.length} checks` : "evidence pending", checksReady ? "ready" : "attention");
+  setRadarNode(elements.radarApprovals, `${approvals.length} locked`, approvals.length ? "ready" : "attention");
+  setRadarNode(
+    elements.radarClientAlerts,
+    clientAlerts ? `${clientAlerts} open need(s)` : state.clientAlertWatchEnabled ? "watch clear" : "watch paused",
+    clientAlerts ? "attention" : state.clientAlertWatchEnabled ? "ready" : "attention"
+  );
+  const radarReady = proofReady && checksReady && !clientAlerts;
+  elements.operationsRadar.setAttribute("data-state", radarReady ? "ready" : "attention");
+  elements.radarSweepLabel.textContent = radarReady ? "Jarvis tactical radar stable" : "Jarvis tactical radar tracking attention";
+}
+
+function setRadarNode(node, text, stateName) {
+  if (!node) return;
+  node.textContent = text;
+  node.closest(".radarNode")?.setAttribute("data-state", stateName);
 }
 
 function buildCommandTimeline(blockers, bridge, advisories = []) {
@@ -985,6 +1040,7 @@ async function refreshClientNeedAlerts({ announceNew = false, loadingText = null
   const result = await arcigyApi.getClientNeedAlerts({ limit: 10 });
   const alerts = result.alerts ?? [];
   state.lastClientNeedAlerts = alerts;
+  updateOperationsRadar();
   const newAlerts = alerts.filter((alert) => {
     const key = clientAlertKey(alert);
     return key && !state.seenClientNeedAlertIds.has(key);
@@ -1010,6 +1066,7 @@ async function refreshClientNeedAlerts({ announceNew = false, loadingText = null
     notifyClientNeedAlert(newAlerts[0], result);
     speak(newAlerts[0].jarvisAlert ?? result.summary ?? "Jarvis: Mas novu klientsku poziadavku.");
   }
+  updateOperationsRadar();
   return result;
 }
 
@@ -1110,6 +1167,7 @@ function renderWebBridgePreflight(result) {
 }
 
 function renderBridgeCockpit(result) {
+  state.lastBridgePreflight = result;
   const warnings = result.warnings ?? [];
   elements.bridgeTunnelState.textContent = result.readyForTunnel ? "ready" : "locked";
   elements.bridgeAuthState.textContent = result.tokenConfigured ? "token set" : "needs token";
@@ -1122,6 +1180,7 @@ function renderBridgeCockpit(result) {
   if (warnings.length) elements.bridgeTunnelState.dataset.state = "attention";
   setMissionSignal(elements.missionRemote, result.readyForTunnel ? "ready" : "locked", result.readyForTunnel ? "ready" : "attention");
   setCortexSignal(elements.cortexRemote, result.readyForTunnel ? "tunnel ready" : "auth locked", result.readyForTunnel ? "ready" : "attention");
+  updateOperationsRadar();
 }
 
 async function refreshWebBridge({ loadingText = null } = {}) {
@@ -1320,6 +1379,7 @@ function buildRemoteAgentPrompt(pack, smokeReport = null) {
 
 function renderRemoteMcpSmoke(report) {
   state.lastRemoteMcpSmoke = report;
+  updateOperationsRadar();
   elements.remoteSmokeResult.dataset.state = report.status === "ready" ? "ready" : "attention";
   setMissionSignal(elements.missionRemote, report.status === "ready" ? "smoke ready" : "smoke blocked", report.status === "ready" ? "ready" : "attention");
   setCortexSignal(elements.cortexRemote, report.status === "ready" ? "smoke ready" : "smoke blocked", report.status === "ready" ? "ready" : "attention");

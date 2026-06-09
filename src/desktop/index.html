@@ -28,6 +28,30 @@
         <button data-target="operationsPanel">Integracie</button>
         <button data-target="mcpPanel">MCP</button>
       </nav>
+
+      <section class="operationsRadar" id="operationsRadar" aria-label="Live operations radar" data-state="checking">
+        <div class="radarScope" aria-hidden="true">
+          <span></span>
+          <i></i>
+        </div>
+        <div class="radarNode" data-state="checking">
+          <span>Remote proof</span>
+          <strong id="radarRemoteProof">smoke pending</strong>
+        </div>
+        <div class="radarNode" data-state="checking">
+          <span>Live checks</span>
+          <strong id="radarLiveChecks">evidence pending</strong>
+        </div>
+        <div class="radarNode" data-state="checking">
+          <span>Approval locks</span>
+          <strong id="radarApprovals">checking</strong>
+        </div>
+        <div class="radarNode" data-state="checking">
+          <span>Client watch</span>
+          <strong id="radarClientAlerts">starting</strong>
+        </div>
+        <div class="radarSweepLabel" id="radarSweepLabel">Jarvis tactical radar warming up</div>
+      </section>
     </aside>
 
     <main>
