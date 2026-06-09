@@ -61,6 +61,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.match(html, /copyRemotePack/);
     assert.match(html, /runRemoteSmoke/);
     assert.match(html, /verificationEvidence/);
+    assert.match(html, /releaseProofGrid/);
 
     const css = await fetch(`${baseUrl}/styles.css`);
     assert.equal(css.status, 200);
@@ -74,6 +75,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.match(styles, /handoffGrid/);
     assert.match(styles, /agentSetupGrid/);
     assert.match(styles, /agentSetupCard/);
+    assert.match(styles, /releaseProof/);
 
     const visual = await fetch(`${baseUrl}/assets/jarvis-command-core.png`);
     assert.equal(visual.status, 200);
@@ -93,6 +95,8 @@ test("local web bridge serves UI and API health", async () => {
     assert.match(rendererText, /findAgentSetupProfile/);
     assert.match(rendererText, /renderRemoteMcpSmoke/);
     assert.match(rendererText, /renderProductionVerificationEvidence/);
+    assert.match(rendererText, /renderReleaseProof/);
+    assert.match(rendererText, /releaseProofGrid/);
     assert.match(rendererText, /\/api\/production-verification-evidence/);
     assert.match(rendererText, /\/api\/remote-mcp-pack/);
     assert.match(rendererText, /\/api\/remote-mcp-smoke/);

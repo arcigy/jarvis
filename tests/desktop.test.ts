@@ -407,7 +407,10 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /\/api\/production-readiness/);
   assert.match(renderer, /\/api\/production-verification-evidence/);
   assert.match(renderer, /renderProductionVerificationEvidence/);
+  assert.match(renderer, /function renderReleaseProof/);
+  assert.match(renderer, /requiredRemoteMcpSmokeGates/);
   assert.match(html, /verificationEvidence/);
+  assert.match(html, /releaseProofGrid/);
   assert.match(main, /jarvis:productionVerificationEvidence/);
   assert.match(main, /function getProductionVerificationEvidence/);
   assert.match(main, /release: isPlainObject\(evidence\.release\) \? evidence\.release : undefined/);
@@ -476,6 +479,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(styles, /\.launchQueue/);
   assert.match(styles, /\.launchQueue\[data-state="ready"\]/);
   assert.match(styles, /\.launchQueue li\[data-state="blocked"\]/);
+  assert.match(styles, /\.releaseProof/);
+  assert.match(styles, /\.releaseProof\[data-state="ready"\]/);
   assert.match(styles, /\.launchQueue,\s+\.cortexMap/s);
   assert.match(styles, /\.diagnosticsGrid/);
   assert.match(styles, /\.diagnosticCard\[data-state="ready"\]/);

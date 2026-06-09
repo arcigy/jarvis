@@ -69,6 +69,7 @@ const elements = {
   launchNextAction: document.querySelector("#launchNextAction"),
   launchAttention: document.querySelector("#launchAttention"),
   verificationEvidence: document.querySelector("#verificationEvidence"),
+  releaseProofGrid: document.querySelector("#releaseProofGrid"),
   launchChecklist: document.querySelector("#launchChecklist"),
   readinessReport: document.querySelector("#readinessReport"),
   operatorBriefing: document.querySelector("#operatorBriefing"),
@@ -443,6 +444,31 @@ function renderProductionVerificationEvidence(evidence) {
   elements.verificationEvidence.textContent = status === "ready" ? `${ready} gates ready` : `${status}: ${failed} failed`;
   elements.verificationEvidence.title = `${evidence?.summary ?? "Run npm run verify:production."} ${generatedAt}`;
   elements.verificationEvidence.closest("div")?.setAttribute("data-state", status === "ready" ? "ready" : "attention");
+  renderReleaseProof(evidence, generatedAt);
+}
+
+function renderReleaseProof(evidence, generatedAt) {
+  if (!elements.releaseProofGrid) return;
+  const release = evidence?.release && typeof evidence.release === "object" ? evidence.release : {};
+  const gates = Array.isArray(release.requiredRemoteMcpSmokeGates) ? release.requiredRemoteMcpSmokeGates.length : 0;
+  const dirty = typeof release.dirty === "boolean" ? (release.dirty ? "dirty" : "clean") : "unknown";
+  const items = [
+    ["Commit", release.shortCommit || "not verified"],
+    ["Tree", dirty],
+    ["MCP gates", gates ? String(gates) : "not verified"],
+    ["Generated", generatedAt],
+  ];
+  elements.releaseProofGrid.replaceChildren();
+  for (const [label, value] of items) {
+    const row = document.createElement("div");
+    const key = document.createElement("dt");
+    const val = document.createElement("dd");
+    key.textContent = label;
+    val.textContent = String(value);
+    row.append(key, val);
+    elements.releaseProofGrid.appendChild(row);
+  }
+  elements.releaseProofGrid.closest(".releaseProof")?.setAttribute("data-state", evidence?.status === "ready" && dirty === "clean" ? "ready" : "attention");
 }
 
 function buildCommandTimeline(blockers, bridge, advisories = []) {

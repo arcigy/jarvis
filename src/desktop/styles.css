@@ -446,7 +446,7 @@ h2 {
 
 .launchQueue {
   display: grid;
-  grid-template-columns: 140px minmax(220px, 1.4fr) minmax(150px, 0.8fr) minmax(170px, 0.9fr) minmax(240px, 1.2fr);
+  grid-template-columns: 140px minmax(220px, 1.4fr) minmax(150px, 0.8fr) minmax(230px, 1.1fr) minmax(240px, 1.2fr);
   gap: 12px;
   margin-bottom: 16px;
 }
@@ -465,6 +465,10 @@ h2 {
 
 .launchQueue[data-state="ready"] > div {
   border-color: rgb(67 217 196 / 45%);
+}
+
+.launchQueue > div[data-state="attention"] {
+  border-color: rgb(240 184 79 / 58%);
 }
 
 .launchQueue span {
@@ -516,6 +520,35 @@ h2 {
 .launchQueue li[data-state="blocked"] span {
   border-color: rgb(240 184 79 / 55%);
   color: #ffd893;
+}
+
+.releaseProof dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  margin: 8px 0 0;
+}
+
+.releaseProof dl > div {
+  min-width: 0;
+}
+
+.releaseProof dt {
+  color: #91a19d;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.releaseProof dd {
+  margin: 4px 0 0;
+  color: #eef4f2;
+  font-size: 12px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.releaseProof[data-state="ready"] dd {
+  color: #9cf8ed;
 }
 
 .cortexMap {
