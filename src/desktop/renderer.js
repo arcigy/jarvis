@@ -571,6 +571,7 @@ function renderOperatorBriefing(briefing) {
     "",
     sections.readiness,
     sections.readinessAttention,
+    sections.productionEvidence,
     sections.coldOutreach,
     sections.liveSync,
     sections.clientNeeds,
@@ -586,6 +587,7 @@ function renderOperatorBriefingCards(briefing) {
   const readiness = sections.readiness ?? briefing.summary;
   const cards = [
     { key: "readiness", label: "Readiness", value: readiness, state: readinessCardState(readiness) },
+    { key: "productionEvidence", label: "Evidence", value: sections.productionEvidence, state: evidenceCardState(sections.productionEvidence) },
     { key: "coldOutreach", label: "Outreach", value: sections.coldOutreach, state: textHasAttention(sections.coldOutreach) ? "attention" : "ready" },
     { key: "clientNeeds", label: "Client needs", value: sections.clientNeeds, state: textHasAttention(sections.clientNeeds) ? "attention" : "ready" },
     { key: "preparedReplies", label: "Approvals", value: sections.preparedReplies, state: textHasAttention(sections.preparedReplies) ? "attention" : "ready" },
@@ -603,6 +605,12 @@ function renderOperatorBriefingCards(briefing) {
     node.append(label, value);
     elements.briefingGrid.appendChild(node);
   }
+}
+
+function evidenceCardState(value) {
+  const text = String(value ?? "");
+  if (/stale|missing|failed|needs attention|attention/i.test(text)) return "attention";
+  return /Production verification ready/i.test(text) ? "ready" : "attention";
 }
 
 function readinessCardState(value) {
