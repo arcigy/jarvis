@@ -202,6 +202,14 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
 
   const health = await postJson(fetchImpl, `${baseUrl}/api/mcp/arcigy.get_system_health`, { format: "json" }, input.bearerToken);
   checks.push(check(health.ok && Array.isArray(health.body?.result?.integrations), "read-only-tool-call", "Read-only MCP tool call returned integration health."));
+  const productionEvidence = await postJson(fetchImpl, `${baseUrl}/api/mcp/arcigy.get_production_verification_evidence`, {}, input.bearerToken);
+  checks.push(
+    check(
+      productionEvidence.ok && hasSafeProductionEvidenceResult(productionEvidence.body?.result),
+      "production-evidence-tool-call",
+      "Read-only production verification evidence MCP tool returned a secret-safe evidence artifact shape."
+    )
+  );
 
   const approvalGate = await checkApprovalGates(fetchImpl, baseUrl, input.bearerToken, false);
   checks.push(check(approvalGate.ok, "approval-gate", "All approval-required write tools rejected unapproved calls."));
@@ -209,7 +217,7 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
   checks.push(check(topLevelApprovalGate.ok, "approval-shape-gate", 'All approval-required write tools rejected top-level {"approved":true}.'));
 
   const leakedSecret = hasSensitiveLeak(
-    { manifest: manifest.body, actionManifest: actionManifest.body, openApi: openApi.body, pack: pack.body, tunnelStatus: tunnelStatus.body, health: health.body, approvalGate: approvalGate.bodies, topLevelApprovalGate: topLevelApprovalGate.bodies },
+    { manifest: manifest.body, actionManifest: actionManifest.body, openApi: openApi.body, pack: pack.body, tunnelStatus: tunnelStatus.body, health: health.body, productionEvidence: productionEvidence.body, approvalGate: approvalGate.bodies, topLevelApprovalGate: topLevelApprovalGate.bodies },
     input.bearerToken
   );
   checks.push(check(!leakedSecret, "secret-redaction", "Smoke responses did not echo bearer tokens, API keys, OAuth tokens, or database URLs."));
@@ -222,7 +230,7 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
     baseUrl,
     summary:
       status === "ready"
-        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, action manifest, OpenAPI action schema, CORS preflight, external auth gate, auth throttle policy, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, production evidence quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
+        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, action manifest, OpenAPI action schema, CORS preflight, external auth gate, auth throttle policy, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, production evidence quick-start, production evidence tool call, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((item) => item.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -603,6 +611,16 @@ function hasProductionEvidenceQuickStart(value: unknown, baseUrl: string): boole
     | { approvalRequired?: unknown; method?: unknown; url?: unknown; body?: unknown }
     | undefined;
   return call?.approvalRequired === false && call.method === "POST" && call.url === `${baseUrl}/api/mcp/arcigy.get_production_verification_evidence` && isEmptyRecord(call.body);
+}
+
+function hasSafeProductionEvidenceResult(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const evidence = value as { mode?: unknown; status?: unknown; generatedAt?: unknown; summary?: unknown; checks?: unknown };
+  if (evidence.mode !== "arcigy-jarvis-production-verification") return false;
+  if (typeof evidence.status !== "string" || !["ready", "attention", "missing"].includes(evidence.status)) return false;
+  if (!(typeof evidence.generatedAt === "string" || evidence.generatedAt === null)) return false;
+  if (typeof evidence.summary !== "string" || !evidence.summary.trim()) return false;
+  return Array.isArray(evidence.checks);
 }
 
 function isEmptyRecord(value: unknown): boolean {

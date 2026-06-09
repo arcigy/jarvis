@@ -1386,11 +1386,19 @@ async function runRemoteMcpSmoke(payload = {}) {
   );
   const health = await fetchJson(`${baseUrl}/api/mcp/arcigy.get_system_health`, token, { format: "json" });
   checks.push(smokeCheck(health.ok && Array.isArray(health.body?.result?.integrations), "read-only-tool-call", "Read-only MCP tool call returned integration health."));
+  const productionEvidence = await fetchJson(`${baseUrl}/api/mcp/arcigy.get_production_verification_evidence`, token, {});
+  checks.push(
+    smokeCheck(
+      productionEvidence.ok && hasSafeProductionEvidenceResult(productionEvidence.body?.result),
+      "production-evidence-tool-call",
+      "Read-only production verification evidence MCP tool returned a secret-safe evidence artifact shape."
+    )
+  );
   const approvalGate = await checkApprovalGates(baseUrl, token, false);
   checks.push(smokeCheck(approvalGate.ok, "approval-gate", "All approval-required write tools rejected unapproved calls."));
   const topLevelApprovalGate = await checkApprovalGates(baseUrl, token, true);
   checks.push(smokeCheck(topLevelApprovalGate.ok, "approval-shape-gate", 'All approval-required write tools rejected top-level {"approved":true}.'));
-  const leakedSecret = hasSensitiveLeak({ manifest: manifest.body, actionManifest: actionManifest.body, openApi: openApi.body, pack: pack.body, tunnelStatus: tunnelStatus.body, health: health.body, approvalGate: approvalGate.bodies, topLevelApprovalGate: topLevelApprovalGate.bodies }, token);
+  const leakedSecret = hasSensitiveLeak({ manifest: manifest.body, actionManifest: actionManifest.body, openApi: openApi.body, pack: pack.body, tunnelStatus: tunnelStatus.body, health: health.body, productionEvidence: productionEvidence.body, approvalGate: approvalGate.bodies, topLevelApprovalGate: topLevelApprovalGate.bodies }, token);
   checks.push(smokeCheck(!leakedSecret, "secret-redaction", "Smoke responses did not echo bearer tokens, API keys, OAuth tokens, or database URLs."));
   const status = checks.every((check) => check.status === "ready") ? "ready" : "blocked";
   return {
@@ -1400,7 +1408,7 @@ async function runRemoteMcpSmoke(payload = {}) {
     baseUrl,
     summary:
       status === "ready"
-      ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, action manifest, OpenAPI action schema, CORS preflight, external auth gate, auth throttle policy, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, production evidence quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
+      ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, action manifest, OpenAPI action schema, CORS preflight, external auth gate, auth throttle policy, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, production evidence quick-start, production evidence tool call, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((check) => check.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -1714,6 +1722,15 @@ function hasProductionEvidenceQuickStart(value, baseUrl) {
   if (!Array.isArray(value.quickStartCalls)) return false;
   const call = value.quickStartCalls.find((item) => item?.tool === "arcigy.get_production_verification_evidence");
   return call?.approvalRequired === false && call?.method === "POST" && call?.url === `${baseUrl}/api/mcp/arcigy.get_production_verification_evidence` && isEmptyRecord(call.body);
+}
+
+function hasSafeProductionEvidenceResult(value) {
+  if (!value || typeof value !== "object") return false;
+  if (value.mode !== "arcigy-jarvis-production-verification") return false;
+  if (typeof value.status !== "string" || !["ready", "attention", "missing"].includes(value.status)) return false;
+  if (!(typeof value.generatedAt === "string" || value.generatedAt === null)) return false;
+  if (typeof value.summary !== "string" || !value.summary.trim()) return false;
+  return Array.isArray(value.checks);
 }
 
 function isEmptyRecord(value) {
