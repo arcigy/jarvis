@@ -472,7 +472,10 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /status === "attention"/);
   assert.match(renderer, /function textHasAttention/);
   assert.match(renderer, /otvoren\|caka\|čaká/);
-  assert.match(renderer, /Loading operator briefing/);
+  assert.match(renderer, /Nacitavam operator briefing/);
+  assert.match(renderer, /Readiness sa kontroluje/);
+  assert.match(renderer, /Outreach brief sa nacitava/);
+  assert.match(renderer, /Schvalovacia fronta sa nacitava/);
   assert.match(renderer, /sections\.liveSync/);
   assert.match(renderer, /sections\.readinessAttention/);
   assert.match(renderer, /sections\.productionEvidence/);
@@ -490,9 +493,13 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /live: true/);
   assert.match(renderer, /live = true/);
   assert.match(renderer, /productionReadiness\(\{ live: true \}\)/);
-  assert.match(renderer, /Building live operator briefing/);
-  assert.match(renderer, /Building live production readiness report/);
-  assert.match(renderer, /Running full Jarvis launch proof/);
+  assert.match(renderer, /Skladam live operator briefing/);
+  assert.match(renderer, /Skladam live production readiness report/);
+  assert.match(renderer, /Spustam kompletny Jarvis launch proof/);
+  assert.match(renderer, /Spustam live diagnostiku/);
+  assert.match(renderer, /Nacitavam audit trail/);
+  assert.match(renderer, /Nacitavam redigovany snapshot lokalnej pamate/);
+  assert.doesNotMatch(renderer, /Loading operator briefing|Readiness is checking|Outreach brief is loading|Client memory watch is starting|Approval queue is loading|Loading next action|Building live operator briefing|Building live production readiness report|Running full Jarvis launch proof|Running live diagnostics|Loading audit trail|Loading redacted local memory snapshot/);
   assert.match(renderer, /function runFullLaunchCheck/);
   assert.match(renderer, /function renderFullLaunchProof/);
   assert.match(renderer, /ready with advisory/);

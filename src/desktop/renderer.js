@@ -785,7 +785,7 @@ async function refreshHealth() {
 }
 
 async function runFullLaunchCheck() {
-  elements.commandTimeline.textContent = "Running full Jarvis launch proof...";
+  elements.commandTimeline.textContent = "Spustam kompletny Jarvis launch proof...";
   const health = await arcigyApi.systemHealth();
   renderHealth(health);
   const bridge = await arcigyApi.webBridgePreflight();
@@ -2207,7 +2207,7 @@ elements.draftReply.addEventListener("click", async () => {
 });
 elements.runDiagnostics.addEventListener("click", async () => {
   try {
-    elements.diagnosticsResult.textContent = "Running live diagnostics...";
+    elements.diagnosticsResult.textContent = "Spustam live diagnostiku...";
     elements.diagnosticsGrid.replaceChildren();
     const result = await arcigyApi.runDiagnostics({ live: true });
     renderDiagnosticsGrid(result);
@@ -2219,7 +2219,7 @@ elements.runDiagnostics.addEventListener("click", async () => {
 });
 elements.auditEvents.addEventListener("click", async () => {
   try {
-    elements.auditResult.textContent = "Loading audit trail...";
+    elements.auditResult.textContent = "Nacitavam audit trail...";
     const result = await arcigyApi.getAuditEvents({ limit: 20 });
     elements.auditResult.textContent = renderAuditEvents(result);
   } catch (error) {
@@ -2228,7 +2228,7 @@ elements.auditEvents.addEventListener("click", async () => {
 });
 elements.localMemorySnapshot.addEventListener("click", async () => {
   try {
-    elements.auditResult.textContent = "Loading redacted local memory snapshot...";
+    elements.auditResult.textContent = "Nacitavam redigovany snapshot lokalnej pamate...";
     const result = await arcigyApi.getLocalMemorySnapshot({ limit: 10 });
     elements.auditResult.textContent = renderLocalMemorySnapshot(result);
   } catch (error) {
@@ -2450,7 +2450,7 @@ elements.runRemoteSmoke.addEventListener("click", async () => {
 });
 elements.readinessReport.addEventListener("click", async () => {
   try {
-    elements.commandTimeline.textContent = "Building live production readiness report...";
+    elements.commandTimeline.textContent = "Skladam live production readiness report...";
     const report = await arcigyApi.productionReadiness({ live: true });
     renderLaunchQueue(report);
     elements.commandTimeline.textContent = report.summary;
@@ -2461,7 +2461,7 @@ elements.readinessReport.addEventListener("click", async () => {
 });
 elements.operatorBriefing.addEventListener("click", async () => {
   try {
-    await refreshOperatorBriefing({ speakResult: true, loadingText: "Building live operator briefing...", live: true });
+    await refreshOperatorBriefing({ speakResult: true, loadingText: "Skladam live operator briefing...", live: true });
   } catch (error) {
     elements.commandTimeline.textContent = safeUiErrorText(error);
   }
@@ -2579,13 +2579,13 @@ elements.clientMessage.value = "Potrebujem upravit onboarding automatizaciu do p
 elements.gmailQuery.value = "in:inbox newer_than:7d";
 elements.leadQuery.value = "automation agency Bratislava";
 renderOperatorBriefingCards({
-  summary: "Loading operator briefing...",
+  summary: "Nacitavam operator briefing...",
   sections: {
-    readiness: "Readiness is checking.",
-    coldOutreach: "Outreach brief is loading.",
-    clientNeeds: "Client memory watch is starting.",
-    preparedReplies: "Approval queue is loading.",
-    nextAction: "Loading next action.",
+    readiness: "Readiness sa kontroluje.",
+    coldOutreach: "Outreach brief sa nacitava.",
+    clientNeeds: "Client memory watch sa spusta.",
+    preparedReplies: "Schvalovacia fronta sa nacitava.",
+    nextAction: "Nacitavam dalsi krok.",
   },
 });
 void refreshHealth();
