@@ -37,6 +37,7 @@ Server tools:
 - `arcigy.get_system_health`
 - `arcigy.run_integration_diagnostics`
 - `arcigy.get_production_readiness`
+- `arcigy.get_production_verification_evidence`
 - `arcigy.get_remote_mcp_pack`
 - `arcigy.run_remote_mcp_smoke`
 - `arcigy.get_operator_briefing`
@@ -148,6 +149,7 @@ npm run local:memory:smoke
 ```
 
 Full production verification writes and validates a secret-safe machine-readable evidence file at `generated\production-verification\latest.json`.
+Remote agents can inspect the same proof through `arcigy.get_production_verification_evidence` or `GET /api/production-verification-evidence`.
 
 Doctor removes its own generated smoke artifacts after a successful run. Use `npm run doctor -- --keep-doctor-artifacts` when debugging generated outputs.
 
@@ -192,6 +194,7 @@ It serves the same UI at `http://127.0.0.1:8765` and exposes local HTTP endpoint
 - `POST /api/mcp/arcigy.get_system_health`
 - `POST /api/mcp/arcigy.run_integration_diagnostics`
 - `POST /api/mcp/arcigy.get_production_readiness`
+- `POST /api/mcp/arcigy.get_production_verification_evidence`
 - `POST /api/mcp/arcigy.get_remote_mcp_pack`
 - `POST /api/mcp/arcigy.run_remote_mcp_smoke`
 - `POST /api/mcp/arcigy.get_operator_briefing`
@@ -221,7 +224,7 @@ External agent setup flow:
 3. The runner starts `npm run web` if needed, checks `/api/web-bridge-preflight`, starts ngrok, finds the public HTTPS URL, verifies the protected manifest, and runs `/api/remote-mcp-smoke`.
 4. Give Claude, ChatGPT, Grok, or another remote agent the printed external action manifest URL, Jarvis manifest URL, `/api/openapi.json`, `/api/remote-mcp-pack`, `/api/remote-mcp-smoke`, `/api/secure-tunnel-status`, plus `Authorization: Bearer <JARVIS_WEB_TOKEN>`.
 5. For agents that expect plugin/action manifests, import `/.well-known/ai-plugin.json`. For ChatGPT custom actions or Grok-compatible OpenAPI setup, import `/api/openapi.json`. Browser-based clients can run CORS `OPTIONS` preflight, but every real external `GET` or `POST` still needs the bearer header. Otherwise use the returned `tools[].url` values for web MCP-style calls. Each tool expects JSON in the POST body and returns `{ "result": ... }`.
-6. Use `quickStartCalls[]` from the connection pack for safe first calls: smoke proof, operator briefing, audit review, Smartlead outreach brief, Gemini reply draft, lead discovery, and approval-gated contract generation.
+6. Use `quickStartCalls[]` from the connection pack for safe first calls: smoke proof, production verification evidence, operator briefing, audit review, Smartlead outreach brief, Gemini reply draft, lead discovery, and approval-gated contract generation.
 7. Run `arcigy.run_remote_mcp_smoke` or `GET /api/remote-mcp-smoke` before handoff when you need proof that action manifest, OpenAPI schema, CORS preflight, external auth gate, auth throttle policy, Jarvis manifest, tunnel controls, exact tool registry, read-only calls, audit quick-start, approval gates, and token redaction work.
 8. For manifest tools with `requiresApproval: true`, include `"approval": { "approved": true }` only after explicit user confirmation.
 

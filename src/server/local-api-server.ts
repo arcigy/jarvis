@@ -15,6 +15,7 @@ import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerpe
 import { buildContractGenerationCommand, getColdOutreachMcpAnswer, listJarvisMcpTools, localStateWriteToolNames } from "../automation-system/mcp-tools.ts";
 import { buildOperatorBriefing } from "../automation-system/operator-briefing.ts";
 import { buildProductionReadinessReport } from "../automation-system/production-readiness.ts";
+import { getProductionVerificationEvidence } from "../automation-system/production-verification-evidence.ts";
 import { buildRemoteMcpOpenApiDocument } from "../automation-system/remote-mcp-openapi.ts";
 import { buildRemoteMcpConnectionPack } from "../automation-system/remote-mcp-pack.ts";
 import { runRemoteMcpSmoke } from "../automation-system/remote-mcp-smoke.ts";
@@ -23,7 +24,6 @@ import { getSmartleadCampaignStatus, getSmartleadOutreachBrief } from "../automa
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
 const desktopRoot = join(repoRoot, "src", "desktop");
 const defaultDbPath = join(repoRoot, "data", "jarvis-local.db");
-const productionVerificationEvidencePath = join(repoRoot, "generated", "production-verification", "latest.json");
 const defaultMaxJsonBytes = 1_000_000;
 const defaultAuthFailureLimit = 20;
 const defaultAuthFailureWindowMs = 60_000;
@@ -144,7 +144,7 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
   }
 
   if (request.method === "GET" && url.pathname === "/api/production-verification-evidence") {
-    writeJson(response, 200, getProductionVerificationEvidence());
+    writeJson(response, 200, getProductionVerificationEvidence(repoRoot));
     return;
   }
 
@@ -581,49 +581,6 @@ function buildWebBridgePreflight(request: IncomingMessage) {
   };
 }
 
-function getProductionVerificationEvidence() {
-  if (!existsSync(productionVerificationEvidencePath)) {
-    return {
-      mode: "arcigy-jarvis-production-verification",
-      status: "missing",
-      generatedAt: null,
-      evidencePath: productionVerificationEvidencePath,
-      summary: "Run npm run verify:production to create the latest secret-safe verification evidence artifact.",
-      checks: [],
-    };
-  }
-  try {
-    const raw = redactSensitiveText(readFileSync(productionVerificationEvidencePath, "utf-8"));
-    const evidence = JSON.parse(raw) as Record<string, unknown>;
-    return {
-      mode: evidence.mode === "arcigy-jarvis-production-verification" ? evidence.mode : "arcigy-jarvis-production-verification",
-      status: typeof evidence.status === "string" ? evidence.status : "attention",
-      generatedAt: typeof evidence.generatedAt === "string" ? evidence.generatedAt : null,
-      webUrl: typeof evidence.webUrl === "string" ? evidence.webUrl : undefined,
-      secretPolicy: typeof evidence.secretPolicy === "string" ? evidence.secretPolicy : "Secret-safe verification evidence.",
-      evidencePath: productionVerificationEvidencePath,
-      checks: Array.isArray(evidence.checks) ? evidence.checks : [],
-      summary: summarizeProductionVerificationEvidence(evidence),
-    };
-  } catch (error) {
-    return {
-      mode: "arcigy-jarvis-production-verification",
-      status: "attention",
-      generatedAt: null,
-      evidencePath: productionVerificationEvidencePath,
-      summary: `Production verification evidence exists but could not be parsed: ${safeErrorMessage(error)}`,
-      checks: [],
-    };
-  }
-}
-
-function summarizeProductionVerificationEvidence(evidence: Record<string, unknown>) {
-  const checks = Array.isArray(evidence.checks) ? evidence.checks : [];
-  const ready = checks.filter((check) => check && typeof check === "object" && (check as { status?: unknown }).status === "ready").length;
-  const failed = checks.filter((check) => check && typeof check === "object" && (check as { status?: unknown }).status === "failed").length;
-  return `Production verification ${evidence.status === "ready" ? "ready" : "needs attention"}: ${ready} ready, ${failed} failed.`;
-}
-
 function getSecureTunnelStatus() {
   const logPath = secureTunnelLogPath();
   const running = Boolean(webTunnelProcess && webTunnelProcess.exitCode === null && !webTunnelProcess.killed);
@@ -886,6 +843,10 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
     writeJson(response, 200, {
       result: await buildProductionReadinessReport({ live: payload.live === true, dbPath: resolveRepoPath(payload.dbPath, defaultDbPath, "dbPath") }),
     });
+    return;
+  }
+  if (name === "arcigy.get_production_verification_evidence") {
+    writeJson(response, 200, { result: getProductionVerificationEvidence(repoRoot) });
     return;
   }
   if (name === "arcigy.get_remote_mcp_pack") {

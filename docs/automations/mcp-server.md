@@ -82,6 +82,7 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.get_system_health`: checks runtime configuration without exposing secrets.
 - `arcigy.run_integration_diagnostics`: runs configured checks or explicit live read-only probes, including Postgres TCP and Redis PING.
 - `arcigy.get_production_readiness`: summarizes production readiness, blockers, next actions, MCP tool count, approval locks, and optional live diagnostics.
+- `arcigy.get_production_verification_evidence`: returns the latest secret-safe `npm run verify:production` evidence artifact.
 - `arcigy.get_remote_mcp_pack`: returns a secret-safe connection pack for Claude, ChatGPT, Grok, or another remote MCP agent.
 - `arcigy.run_remote_mcp_smoke`: verifies remote web MCP manifest, action manifest, OpenAPI schema, CORS preflight, external auth gate, connection pack, read-only tool call, approval gate, and token redaction.
 - `arcigy.get_operator_briefing`: combines readiness, cold outreach, open client requests, and prepared reply approvals into one Jarvis briefing; with `live=true`, it syncs recent Gmail messages, cold outreach prefers live Smartlead statistics, and both fall back safely.

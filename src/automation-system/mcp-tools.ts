@@ -25,6 +25,7 @@ export type JarvisMcpToolName =
   | "arcigy.get_system_health"
   | "arcigy.run_integration_diagnostics"
   | "arcigy.get_production_readiness"
+  | "arcigy.get_production_verification_evidence"
   | "arcigy.get_remote_mcp_pack"
   | "arcigy.run_remote_mcp_smoke"
   | "arcigy.get_operator_briefing"
@@ -179,6 +180,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.get_production_readiness",
       description: "Vrati produkcny readiness report s blockermi, next actions, MCP stavom a volitelnymi live diagnostikami.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.get_production_verification_evidence",
+      description: "Vrati posledny secret-safe production verification artifact z npm run verify:production.",
       requiresApproval: false,
     },
     {

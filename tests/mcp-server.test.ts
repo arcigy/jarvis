@@ -45,6 +45,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(names.includes("arcigy.get_system_health"));
   assert.ok(names.includes("arcigy.run_integration_diagnostics"));
   assert.ok(names.includes("arcigy.get_production_readiness"));
+  assert.ok(names.includes("arcigy.get_production_verification_evidence"));
   assert.ok(names.includes("arcigy.get_remote_mcp_pack"));
   assert.ok(names.includes("arcigy.run_remote_mcp_smoke"));
   assert.ok(names.includes("arcigy.get_operator_briefing"));
@@ -130,6 +131,16 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
     /dbPath must stay inside the Jarvis repository/
   );
 
+  const evidenceResult = await client.callTool({
+    name: "arcigy.get_production_verification_evidence",
+    arguments: {},
+  });
+  const evidence = getStructuredResult(evidenceResult) as { mode: string; status: string; summary: string; checks: unknown[] };
+  assert.equal(evidence.mode, "arcigy-jarvis-production-verification");
+  assert.ok(["ready", "attention", "missing"].includes(evidence.status));
+  assert.ok(Array.isArray(evidence.checks));
+  assert.doesNotMatch(JSON.stringify(evidence), /AIza|GOCSPX|1\/\/|postgresql:\/\/|redis:\/\//);
+
   const packResult = await client.callTool({
     name: "arcigy.get_remote_mcp_pack",
     arguments: { baseUrl: "https://jarvis.example.ngrok-free.app", includeReadiness: false },
@@ -139,6 +150,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
     actionManifestUrl: string;
     openApiSchemaUrl: string;
     smokeTestUrl: string;
+    productionVerificationEvidenceUrl: string;
     auth: { header: string; tokenValueReturned: boolean };
     limits: { maxJsonBytes: number; pathPolicy: string; writesRequireExplicitToolCall: boolean; authFailureThrottle: { enabled: boolean; limit: number; windowMs: number; scope: string } };
     tools: { count: number; approvalRequired: string[]; readOnlyOrDraft: string[]; localStateWrite: string[] };
@@ -152,6 +164,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.equal(pack.actionManifestUrl, "https://jarvis.example.ngrok-free.app/.well-known/ai-plugin.json");
   assert.equal(pack.openApiSchemaUrl, "https://jarvis.example.ngrok-free.app/api/openapi.json");
   assert.equal(pack.smokeTestUrl, "https://jarvis.example.ngrok-free.app/api/remote-mcp-smoke");
+  assert.equal(pack.productionVerificationEvidenceUrl, "https://jarvis.example.ngrok-free.app/api/production-verification-evidence");
   assert.equal(pack.auth.header, "Authorization: Bearer <JARVIS_WEB_TOKEN>");
   assert.equal(pack.auth.tokenValueReturned, false);
   assert.equal(pack.limits.pathPolicy, "repo-only");
@@ -168,6 +181,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.equal(pack.tools.readOnlyOrDraft.includes("arcigy.sync_gmail_recent_messages"), false);
   assert.equal(pack.tools.readOnlyOrDraft.includes("arcigy.upsert_local_person"), false);
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.run_remote_mcp_smoke" && call.approvalRequired === false));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_production_verification_evidence" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.every((call) => call.method === "POST" && call.url === `https://jarvis.example.ngrok-free.app/api/mcp/${call.tool}`));
   assert.ok(pack.quickStartCalls.every((call) => call.approvalRequired === pack.tools.approvalRequired.includes(call.tool)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.identify_email" && call.approvalRequired === false && typeof call.body.email === "string"));

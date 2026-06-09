@@ -26,6 +26,7 @@ export type RemoteMcpConnectionPack = {
   actionManifestUrl: string;
   openApiSchemaUrl: string;
   smokeTestUrl: string;
+  productionVerificationEvidenceUrl: string;
   mcpBaseUrl: string;
   mcpToolCallPattern: string;
   auth: {
@@ -134,6 +135,7 @@ export async function buildRemoteMcpConnectionPack(
     actionManifestUrl: `${baseUrl}/.well-known/ai-plugin.json`,
     openApiSchemaUrl: `${baseUrl}/api/openapi.json`,
     smokeTestUrl: `${baseUrl}/api/remote-mcp-smoke`,
+    productionVerificationEvidenceUrl: `${baseUrl}/api/production-verification-evidence`,
     mcpBaseUrl: `${baseUrl}/api/mcp`,
     mcpToolCallPattern: `${baseUrl}/api/mcp/{toolName}`,
     auth: {
@@ -197,6 +199,7 @@ export async function buildRemoteMcpConnectionPack(
       "Fetch the manifestUrl first to list live tools and schemas.",
       "Fetch actionManifestUrl when the remote agent supports ai-plugin/action manifests.",
       "Import openApiSchemaUrl when the remote agent supports ChatGPT custom actions, Grok actions, or OpenAPI-based HTTP tool setup.",
+      "Fetch productionVerificationEvidenceUrl or call arcigy.get_production_verification_evidence to inspect the latest verified production proof.",
       "Run the smokeTestUrl before handoff and require ready checks for action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, approval-gate, approval-shape-gate, and secret-redaction.",
       "Call MCP tools with POST JSON to mcpToolCallPattern.",
       "Use the bearer auth header placeholder; the real token must be supplied by the operator and is never returned by this pack.",
@@ -231,6 +234,7 @@ function buildAgentCompatibility(): RemoteMcpConnectionPack["agentCompatibility"
       "Fetch manifestUrl.",
       "Fetch actionManifestUrl if the agent supports ai-plugin/action manifests.",
       "Import openApiSchemaUrl if the agent supports OpenAPI or custom actions.",
+      "Fetch productionVerificationEvidenceUrl or call arcigy.get_production_verification_evidence and cite its status.",
       "Fetch handoff.connectionPackUrl and confirm tokenValueReturned=false plus repo-only limits.",
       "Run smokeTestUrl and require status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, approval-gate, approval-shape-gate, and secret-redaction ready.",
       "Inspect tunnel.statusUrl after any tunnel start and never ask for the real bearer token.",
@@ -260,6 +264,7 @@ function buildHandoffRunbook(baseUrl: string): RemoteMcpConnectionPack["handoff"
       "Fetch connectionPackUrl with Authorization: Bearer <JARVIS_WEB_TOKEN>.",
       "Fetch actionManifestUrl if the agent supports ai-plugin/action manifests.",
       "Fetch openApiSchemaUrl if the agent supports OpenAPI/custom actions.",
+      "Fetch productionVerificationEvidenceUrl or call arcigy.get_production_verification_evidence and cite its status.",
       "Run smokeTestUrl and require status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, approval-gate, approval-shape-gate, and secret-redaction ready before using MCP tools.",
       "Fetch tunnel.statusUrl if the operator needs the current public tunnel URLs; token values must remain redacted.",
       "Call arcigy.get_operator_briefing before proposing work.",
@@ -293,6 +298,11 @@ function buildHandoffRunbook(baseUrl: string): RemoteMcpConnectionPack["handoff"
         expected: "HTTP 200, redacted log tail, public MCP URLs when a tunnel is ready, and no bearer token value.",
       },
       {
+        key: "production-verification-evidence",
+        url: `${baseUrl}/api/production-verification-evidence`,
+        expected: "HTTP 200, latest secret-safe npm run verify:production evidence, no token or provider secret values.",
+      },
+      {
         key: "remote-smoke",
         url: `${baseUrl}/api/remote-mcp-smoke`,
         expected: 'status=ready, including action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, secret-redaction, approval-gate, and approval-shape-gate for top-level {"approved":true} payload rejection.',
@@ -310,6 +320,14 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       tool: "arcigy.run_remote_mcp_smoke",
       method: "POST",
       url: toolUrl("arcigy.run_remote_mcp_smoke"),
+      body: {},
+      approvalRequired: false,
+    },
+    {
+      label: "Get latest production verification evidence",
+      tool: "arcigy.get_production_verification_evidence",
+      method: "POST",
+      url: toolUrl("arcigy.get_production_verification_evidence"),
       body: {},
       approvalRequired: false,
     },

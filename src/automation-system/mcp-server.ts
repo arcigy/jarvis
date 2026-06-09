@@ -20,6 +20,7 @@ import {
 } from "./mcp-tools.ts";
 import { buildOperatorBriefing } from "./operator-briefing.ts";
 import { buildProductionReadinessReport } from "./production-readiness.ts";
+import { getProductionVerificationEvidence } from "./production-verification-evidence.ts";
 import { buildRemoteMcpConnectionPack } from "./remote-mcp-pack.ts";
 import { runRemoteMcpSmoke } from "./remote-mcp-smoke.ts";
 import { getSmartleadCampaignStatus, getSmartleadOutreachBrief } from "./smartlead.ts";
@@ -645,6 +646,22 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async ({ live, dbPath }) => jsonResult(await buildProductionReadinessReport({ live, dbPath: resolveOptionalRepoPath(dbPath, "dbPath") }))
+  );
+
+  server.registerTool(
+    "arcigy.get_production_verification_evidence",
+    {
+      title: "Production verification evidence",
+      description: "Return the latest secret-safe npm run verify:production evidence artifact.",
+      inputSchema: {},
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async () => jsonResult(getProductionVerificationEvidence(repoRoot))
   );
 
   server.registerTool(

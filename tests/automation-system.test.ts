@@ -60,6 +60,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.get_system_health",
     "arcigy.run_integration_diagnostics",
     "arcigy.get_production_readiness",
+    "arcigy.get_production_verification_evidence",
     "arcigy.get_remote_mcp_pack",
     "arcigy.run_remote_mcp_smoke",
     "arcigy.get_operator_briefing",
@@ -122,6 +123,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.equal(paths.length, listJarvisMcpTools().length);
   assert.ok(paths.includes("/api/mcp/arcigy.get_operator_briefing"));
   assert.ok(paths.includes("/api/mcp/arcigy.generate_contract_documents"));
+  assert.ok(paths.includes("/api/mcp/arcigy.get_production_verification_evidence"));
   const operatorBriefing = document.paths["/api/mcp/arcigy.get_operator_briefing"] as OpenApiPathFixture;
   const gmailSync = document.paths["/api/mcp/arcigy.sync_gmail_recent_messages"] as OpenApiPathFixture;
   const contractGenerate = document.paths["/api/mcp/arcigy.generate_contract_documents"] as OpenApiPathFixture;
@@ -827,8 +829,10 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.readiness?.fixGuide.some((step) => step.id === "redis-real-password"));
   assert.equal(pack.actionManifestUrl, "https://jarvis.example/.well-known/ai-plugin.json");
   assert.equal(pack.openApiSchemaUrl, "https://jarvis.example/api/openapi.json");
+  assert.equal(pack.productionVerificationEvidenceUrl, "https://jarvis.example/api/production-verification-evidence");
   assert.deepEqual(pack.agentCompatibility.supportedAgents.slice(0, 3), ["Claude", "ChatGPT", "Grok"]);
   assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("openApiSchemaUrl")));
+  assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("productionVerificationEvidenceUrl")));
   assert.equal(pack.agentCompatibility.protocol, "HTTP JSON MCP bridge");
   assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("status=ready")));
   assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("cors-preflight") && step.includes("external-auth-gate") && step.includes("pack-auth-throttle-policy") && step.includes("action-manifest")));
@@ -840,12 +844,15 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.equal(pack.tunnel.browserStartRequiresStrongToken, true);
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "action-manifest" && item.url.endsWith("/.well-known/ai-plugin.json")));
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "secure-tunnel-status"));
+  assert.ok(pack.handoff.requiredProof.some((item) => item.key === "production-verification-evidence" && item.url.endsWith("/api/production-verification-evidence")));
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "openapi-schema" && item.url.endsWith("/api/openapi.json")));
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("cors-preflight") && item.expected.includes("external-auth-gate") && item.expected.includes("pack-auth-throttle-policy") && item.expected.includes("action-manifest")));
   assert.match(pack.agentPromptTemplates.grok, /xAI-compatible agents/);
   assert.match(pack.agentPromptTemplates.grok, /remote smoke/);
   assert.match(pack.agentPromptTemplates.chatgpt, /POST https:\/\/jarvis\.example\/api\/mcp\/\{toolName\}/);
   assert.match(pack.agentPromptTemplates.claude, /external HTTP MCP bridge/);
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_production_verification_evidence" && call.approvalRequired === false));
+  assert.ok(pack.agentInstructions.some((step) => step.includes("arcigy.get_production_verification_evidence")));
   assert.equal(JSON.stringify(pack).includes("PASSWORD"), false);
 });
 
