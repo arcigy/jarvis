@@ -428,8 +428,8 @@ function buildHandoffRunbook(baseUrl: string): RemoteMcpConnectionPack["handoff"
   return {
     connectionPackUrl: `${baseUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`,
     operatorChecklist: [
-      "Run npm run web:tunnel:secure and keep the process open while the remote agent works.",
-      "If using browser mode, configure a strong JARVIS_WEB_TOKEN first, then use Start tunnel or POST /api/start-secure-tunnel.",
+      "Spusti npm run web:tunnel:secure a nechaj proces otvoreny, kym remote agent pracuje.",
+      "Ak pouzivas browser mode, najprv nastav silny JARVIS_WEB_TOKEN, potom pouzi Spustit tunel alebo POST /api/start-secure-tunnel.",
       "Give the remote agent the external action manifest, Jarvis manifest, connection pack, smoke test URL, MCP base URL, and bearer auth header placeholder.",
       "For ChatGPT custom actions or Grok-compatible OpenAPI setup, give the remote agent the external openApiSchemaUrl too.",
       "Approve approvalRequired tools only after reviewing the exact payload the agent will send.",
@@ -491,7 +491,7 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
   const contractIntake = buildQuickStartContractIntake();
   return [
     {
-      label: "Run remote MCP smoke proof",
+      label: "Spustit remote MCP smoke proof",
       tool: "arcigy.run_remote_mcp_smoke",
       method: "POST",
       url: toolUrl("arcigy.run_remote_mcp_smoke"),
@@ -499,7 +499,7 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
-      label: "Get latest production verification evidence",
+      label: "Ziskat najnovsiu production verification evidence",
       tool: "arcigy.get_production_verification_evidence",
       method: "POST",
       url: toolUrl("arcigy.get_production_verification_evidence"),
@@ -507,7 +507,7 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
-      label: "Ask Jarvis for production evidence",
+      label: "Spytat sa Jarvisa na production evidence",
       tool: "arcigy.jarvis_voice_event",
       method: "POST",
       url: toolUrl("arcigy.jarvis_voice_event"),
@@ -515,7 +515,7 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
-      label: "Ask Jarvis for full launch proof",
+      label: "Spytat sa Jarvisa na full launch proof",
       tool: "arcigy.jarvis_voice_event",
       method: "POST",
       url: toolUrl("arcigy.jarvis_voice_event"),

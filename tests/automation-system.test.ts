@@ -1214,6 +1214,8 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.equal(pack.tunnel.startUrl, "https://jarvis.example/api/start-secure-tunnel");
   assert.equal(pack.tunnel.stopUrl, "https://jarvis.example/api/stop-secure-tunnel");
   assert.equal(pack.tunnel.browserStartRequiresStrongToken, true);
+  assert.ok(pack.handoff.operatorChecklist.some((step) => step.includes("Spusti npm run web:tunnel:secure")));
+  assert.ok(pack.handoff.operatorChecklist.some((step) => step.includes("Spustit tunel")));
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "action-manifest" && item.url.endsWith("/.well-known/ai-plugin.json")));
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "secure-tunnel-status"));
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "production-verification-evidence" && item.url.endsWith("/api/production-verification-evidence")));
@@ -1248,6 +1250,10 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.agentLaunchBundle.proofPolicy.beforeWrites.some((step) => step.includes("approval.approved=true")));
   assert.ok(pack.agentLaunchBundle.safetyRails.some((rail) => rail.includes("OAuth refresh tokens")));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_production_verification_evidence" && call.approvalRequired === false));
+  assert.ok(pack.quickStartCalls.some((call) => call.label === "Spustit remote MCP smoke proof"));
+  assert.ok(pack.quickStartCalls.some((call) => call.label === "Ziskat najnovsiu production verification evidence"));
+  assert.ok(pack.quickStartCalls.some((call) => call.label === "Spytat sa Jarvisa na production evidence"));
+  assert.ok(pack.quickStartCalls.some((call) => call.label === "Spytat sa Jarvisa na full launch proof"));
   assert.ok(
     pack.quickStartCalls.some(
       (call) =>

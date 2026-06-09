@@ -105,7 +105,7 @@ export async function buildProductionReadinessReport(
   const readyIntegrations = health.filter((item) => item.configured).length;
   const fixGuide = buildFixGuide(uniqueBlockers);
   const launchChecklist = buildLaunchChecklist(health, tools, uniqueBlockers, diagnostics);
-  const nextActions = uniqueBlockers.length ? uniqueBlockers.map((blocker) => blocker.nextAction) : ["No action needed. Keep secrets out of git and run doctor before changes."];
+  const nextActions = uniqueBlockers.length ? uniqueBlockers.map((blocker) => blocker.nextAction) : ["Netreba akciu. Drz secrets mimo gitu a pred zmenami spusti doctor."];
 
   return {
     status,
@@ -154,14 +154,14 @@ function buildLaunchEvidence(
     })),
     remoteHandoff: {
       requiredBeforeExternalAgent: [
-        "Run npm run web:tunnel:secure or use the browser Start tunnel button with a strong JARVIS_WEB_TOKEN.",
+        "Spusti npm run web:tunnel:secure alebo pouzi browser tlacidlo Spustit tunel so silnym JARVIS_WEB_TOKEN.",
         "Fetch /.well-known/ai-plugin.json, /api/openapi.json, /.well-known/arcigy-jarvis.json, and /api/remote-mcp-pack?includeReadiness=true&live=true through the external URL.",
         "Run /api/remote-mcp-smoke and require status=ready with all 36 required remote MCP smoke gates ready, including manifest, tool-count, manifest-tool-registry, manifest-tool-metadata, auth-placeholder, manifest-local-write-policy, action-manifest, openapi-schema, cors-preflight, external-auth-gate, connection-pack, pack-secret-policy, pack-auth-throttle-policy, pack-limits, pack-tunnel-controls, secure-tunnel-status, pack-local-write-policy, pack-tool-registry, pack-quick-start-urls, pack-quick-start-approval-policy, pack-contract-quick-start, pack-contract-draft-quick-start, pack-agent-setup-profiles, pack-agent-launch-bundle, pack-voice-quick-start, pack-handoff-proof, pack-agent-compatibility, pack-client-memory-quick-start, pack-audit-quick-start, voice-tool-call, pack-production-evidence-quick-start, read-only-tool-call, production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction; production evidence must also be status=ready with release proof, dirty=false, and freshness.fresh=true within 24h before any remote agent uses write-capable tools.",
       ],
       smokeCommand: "npm run remote:mcp:smoke -- --url <external-url>",
       tunnelCommand: "npm run web:tunnel:secure",
     },
-    operatorNextAction: nextActions[0] ?? "No action needed.",
+    operatorNextAction: nextActions[0] ?? "Netreba akciu.",
   };
 }
 
@@ -200,7 +200,7 @@ function buildLaunchChecklist(
       title: "Optional advisories",
       status: warnings.length ? "attention" : "ready",
       proof: warnings.length ? `${warnings.length} non-blocking warning(s): ${warnings.map((item) => item.key).join(", ")}.` : "No non-blocking warnings.",
-      nextAction: warnings[0]?.nextAction ?? "No action needed.",
+      nextAction: warnings[0]?.nextAction ?? "Netreba akciu.",
     },
     {
       id: "mcp-registry",

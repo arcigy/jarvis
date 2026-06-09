@@ -517,7 +517,7 @@ async function getProductionReadiness(payload) {
   const launchChecklist = buildReadinessLaunchChecklist(health.integrations, bridge, uniqueBlockers, diagnostics);
   const nextActions = uniqueBlockers.length
     ? uniqueBlockers.map((blocker) => blocker.nextAction)
-    : ["No action needed. Keep secrets out of git and run doctor before changes."];
+    : ["Netreba akciu. Drz secrets mimo gitu a pred zmenami spusti doctor."];
   return {
     status,
     checkedAt: new Date().toISOString(),
@@ -573,7 +573,7 @@ function buildReadinessLaunchEvidence(status, launchChecklist, nextActions) {
       smokeCommand: "npm run remote:mcp:smoke -- --url <external-url>",
       tunnelCommand: "npm run web:tunnel:secure",
     },
-    operatorNextAction: nextActions[0] || "No action needed.",
+    operatorNextAction: nextActions[0] || "Netreba akciu.",
   };
 }
 
@@ -607,7 +607,7 @@ function buildReadinessLaunchChecklist(integrations, bridge, blockers, diagnosti
       title: "Optional advisories",
       status: warnings.length ? "attention" : "ready",
       proof: warnings.length ? `${warnings.length} non-blocking warning(s): ${warnings.map((item) => item.key).join(", ")}.` : "No non-blocking warnings.",
-      nextAction: warnings[0]?.nextAction || "No action needed.",
+      nextAction: warnings[0]?.nextAction || "Netreba akciu.",
     },
     {
       id: "mcp-registry",
@@ -1162,7 +1162,7 @@ function buildRemoteMcpHandoffRunbook(baseUrl) {
   return {
     connectionPackUrl: `${baseUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`,
     operatorChecklist: [
-      "Run npm run web:tunnel:secure and keep the process open while the remote agent works.",
+      "Spusti npm run web:tunnel:secure a nechaj proces otvoreny, kym remote agent pracuje.",
       "Ak pouzivas browser mode, najprv nastav silny JARVIS_WEB_TOKEN, potom pouzi Spustit tunel alebo POST /api/start-secure-tunnel.",
       "Give the remote agent the external action manifest, Jarvis manifest, connection pack, smoke test URL, MCP base URL, and bearer auth header placeholder.",
       "For ChatGPT custom actions or Grok-compatible OpenAPI setup, give the remote agent the external openApiSchemaUrl too.",
@@ -1235,7 +1235,7 @@ function buildRemoteMcpQuickStartCalls(baseUrl) {
   const contractIntake = buildQuickStartContractIntake();
   return [
     {
-      label: "Run remote MCP smoke proof",
+      label: "Spustit remote MCP smoke proof",
       tool: "arcigy.run_remote_mcp_smoke",
       method: "POST",
       url: toolUrl("arcigy.run_remote_mcp_smoke"),
@@ -1243,7 +1243,7 @@ function buildRemoteMcpQuickStartCalls(baseUrl) {
       approvalRequired: false,
     },
     {
-      label: "Get latest production verification evidence",
+      label: "Ziskat najnovsiu production verification evidence",
       tool: "arcigy.get_production_verification_evidence",
       method: "POST",
       url: toolUrl("arcigy.get_production_verification_evidence"),
@@ -1251,7 +1251,7 @@ function buildRemoteMcpQuickStartCalls(baseUrl) {
       approvalRequired: false,
     },
     {
-      label: "Ask Jarvis for production evidence",
+      label: "Spytat sa Jarvisa na production evidence",
       tool: "arcigy.jarvis_voice_event",
       method: "POST",
       url: toolUrl("arcigy.jarvis_voice_event"),
@@ -1259,7 +1259,7 @@ function buildRemoteMcpQuickStartCalls(baseUrl) {
       approvalRequired: false,
     },
     {
-      label: "Ask Jarvis for full launch proof",
+      label: "Spytat sa Jarvisa na full launch proof",
       tool: "arcigy.jarvis_voice_event",
       method: "POST",
       url: toolUrl("arcigy.jarvis_voice_event"),
