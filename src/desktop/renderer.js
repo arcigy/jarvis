@@ -2367,21 +2367,21 @@ elements.checkTunnelStatus.addEventListener("click", async () => {
 });
 elements.startSecureTunnel.addEventListener("click", async () => {
   try {
-    const confirmed = window.confirm(`Start a secure Jarvis MCP tunnel for remote agents? Keep the tunnel log private because it can contain a one-time bearer token.`);
+    const confirmed = window.confirm(`Spustit bezpecny Jarvis MCP tunel pre remote agentov? Log tunela nechaj privatny, lebo moze obsahovat jednorazovy bearer token.`);
     if (!confirmed) {
-      elements.remoteAgentPrompt.textContent = "Secure tunnel launch cancelled.";
+      elements.remoteAgentPrompt.textContent = "Spustenie bezpecneho tunela bolo zrusene.";
       return;
     }
-    elements.remoteAgentPrompt.textContent = "Starting secure Jarvis MCP tunnel...";
+    elements.remoteAgentPrompt.textContent = "Spustam bezpecny Jarvis MCP tunel...";
     const result = await arcigyApi.startSecureTunnel();
     if (result.logPath) state.secureTunnelLogPath = result.logPath;
-    const status = result.alreadyRunning ? "Secure tunnel is already running." : result.started ? "Secure tunnel launch requested." : "Secure tunnel was not started.";
+    const status = result.alreadyRunning ? "Bezpecny tunel uz bezi." : result.started ? "Spustenie bezpecneho tunela bolo vyziadane." : "Bezpecny tunel nebol spusteny.";
     elements.remoteAgentPrompt.textContent = [
       status,
-      `Command: ${result.command ?? "npm run web:tunnel:secure"}`,
+      `Prikaz: ${result.command ?? "npm run web:tunnel:secure"}`,
       result.pid ? `Process id: ${result.pid}` : null,
       result.logPath ? `Log: ${result.logPath}` : null,
-      "After the tunnel prints ready, run smoke before giving the MCP pack to Claude, ChatGPT, or Grok.",
+      "Ked tunel vypise ready, spusti smoke test pred odovzdanim MCP packu pre Claude, ChatGPT alebo Grok.",
     ]
       .filter(Boolean)
       .join("\n");
@@ -2396,18 +2396,18 @@ elements.startSecureTunnel.addEventListener("click", async () => {
 });
 elements.stopSecureTunnel.addEventListener("click", async () => {
   try {
-    const confirmed = window.confirm(`Stop the secure Jarvis MCP tunnel started from this desktop session? Remote agents will lose access immediately.`);
+    const confirmed = window.confirm(`Zastavit bezpecny Jarvis MCP tunel spusteny z tejto desktop session? Remote agenti okamzite stratia pristup.`);
     if (!confirmed) {
-      elements.remoteAgentPrompt.textContent = "Secure tunnel stop cancelled.";
+      elements.remoteAgentPrompt.textContent = "Zastavenie bezpecneho tunela bolo zrusene.";
       return;
     }
     const result = await arcigyApi.stopSecureTunnel();
     if (result.logPath) state.secureTunnelLogPath = result.logPath;
     elements.remoteAgentPrompt.textContent = [
-      result.stopped ? "Secure tunnel stop requested." : "No secure tunnel process is tracked in this desktop session.",
+      result.stopped ? "Zastavenie bezpecneho tunela bolo vyziadane." : "V tejto desktop session nie je sledovany ziadny proces bezpecneho tunela.",
       result.pid ? `Process id: ${result.pid}` : null,
       result.logPath ? `Log: ${result.logPath}` : null,
-      "Run Preflight before starting a new remote MCP handoff.",
+      "Pred novym remote MCP handoffom spusti Preflight.",
     ]
       .filter(Boolean)
       .join("\n");
@@ -2419,31 +2419,31 @@ elements.stopSecureTunnel.addEventListener("click", async () => {
 elements.openTunnelLog.addEventListener("click", async () => {
   try {
     if (!state.secureTunnelLogPath) {
-      elements.remoteAgentPrompt.textContent = "Start or stop the secure tunnel first so Jarvis knows which local log to open.";
+      elements.remoteAgentPrompt.textContent = "Najprv spusti alebo zastav bezpecny tunel, aby Jarvis vedel, ktory lokalny log otvorit.";
       return;
     }
-    const confirmed = window.confirm(`Open the secure tunnel log? It can contain a one-time bearer token and should stay private.`);
+    const confirmed = window.confirm(`Otvorit log bezpecneho tunela? Moze obsahovat jednorazovy bearer token a ma ostat privatny.`);
     if (!confirmed) {
-      elements.remoteAgentPrompt.textContent = "Secure tunnel log open cancelled.";
+      elements.remoteAgentPrompt.textContent = "Otvorenie logu bezpecneho tunela bolo zrusene.";
       return;
     }
     const result = await arcigyApi.openPath(state.secureTunnelLogPath);
-    elements.remoteAgentPrompt.textContent = result ? `Tunnel log open result: ${result}` : `Opened tunnel log: ${state.secureTunnelLogPath}`;
+    elements.remoteAgentPrompt.textContent = result ? `Vysledok otvorenia logu tunela: ${result}` : `Otvoreny log tunela: ${state.secureTunnelLogPath}`;
   } catch (error) {
     elements.remoteAgentPrompt.textContent = safeUiErrorText(error);
   }
 });
 elements.runRemoteSmoke.addEventListener("click", async () => {
   try {
-    elements.remoteSmokeResult.textContent = "Running remote MCP smoke test...";
-    elements.handoffProofGates.textContent = "checking safety gates";
+    elements.remoteSmokeResult.textContent = "Spustam remote MCP smoke test...";
+    elements.handoffProofGates.textContent = "kontrolujem safety gates";
     elements.handoffProofGates.dataset.state = "attention";
     const report = await arcigyApi.remoteMcpSmoke({ baseUrl: state.lastRemoteMcpPack?.baseUrl });
     renderRemoteMcpSmoke(report);
   } catch (error) {
     state.lastRemoteMcpSmoke = null;
     elements.remoteSmokeResult.textContent = safeUiErrorText(error);
-    elements.handoffProofGates.textContent = "blocked: smoke error";
+    elements.handoffProofGates.textContent = "blokovane: smoke chyba";
     elements.handoffProofGates.dataset.state = "attention";
     if (state.lastRemoteMcpPack) elements.remoteAgentPrompt.textContent = buildRemoteAgentPrompt(state.lastRemoteMcpPack, null);
   }
