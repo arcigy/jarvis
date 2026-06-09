@@ -36,6 +36,8 @@ async function main() {
   });
   runSecretScan();
   writeEvidence();
+  validateEvidenceArtifact();
+  writeEvidence();
   process.stdout.write(renderSummary());
 }
 
@@ -158,6 +160,62 @@ function writeEvidence() {
   };
   mkdirSync(join(repoRoot, "generated", "production-verification"), { recursive: true });
   writeFileSync(evidencePath, `${redactSensitiveText(JSON.stringify(payload, null, 2))}\n`, "utf-8");
+}
+
+function validateEvidenceArtifact() {
+  process.stdout.write(`\n[verify] evidence-artifact\n`);
+  try {
+    const raw = readFileSync(evidencePath, "utf-8");
+    if (hasSecretPattern(raw)) {
+      checks.push({ name: "evidence-artifact", status: "failed", detail: "Evidence artifact contains a sensitive pattern." });
+      writeEvidence();
+      process.stdout.write(renderSummary());
+      process.exit(1);
+    }
+    const evidence = JSON.parse(raw) as {
+      mode?: unknown;
+      status?: unknown;
+      generatedAt?: unknown;
+      checks?: Array<{ name?: unknown; status?: unknown; detail?: unknown }>;
+    };
+    const expectedChecks = checks.map((check) => check.name);
+    const evidenceChecks = Array.isArray(evidence.checks) ? evidence.checks : [];
+    const evidenceNames = new Set(evidenceChecks.map((check) => String(check.name ?? "")));
+    const missingChecks = expectedChecks.filter((name) => !evidenceNames.has(name));
+    const invalid =
+      evidence.mode !== "arcigy-jarvis-production-verification" ||
+      evidence.status !== "ready" ||
+      typeof evidence.generatedAt !== "string" ||
+      missingChecks.length > 0 ||
+      evidenceChecks.some((check) => check.status !== "ready" || typeof check.detail !== "string");
+    if (invalid) {
+      checks.push({
+        name: "evidence-artifact",
+        status: "failed",
+        detail: missingChecks.length ? `Evidence artifact is missing check(s): ${missingChecks.join(", ")}.` : "Evidence artifact shape is invalid.",
+      });
+      writeEvidence();
+      process.stdout.write(renderSummary());
+      process.exit(1);
+    }
+    checks.push({ name: "evidence-artifact", status: "ready", detail: "Latest production verification evidence is valid and secret-safe." });
+  } catch (error) {
+    checks.push({ name: "evidence-artifact", status: "failed", detail: redactSensitiveText(error instanceof Error ? error.message : String(error)) });
+    writeEvidence();
+    process.stdout.write(renderSummary());
+    process.exit(1);
+  }
+}
+
+function hasSecretPattern(value: string): boolean {
+  return [
+    /AIza[0-9A-Za-z_-]{20,}/,
+    /GOCSPX-[0-9A-Za-z_-]{10,}/,
+    /1\/\/[0-9A-Za-z_-]{20,}/,
+    /(postgres(?:ql)?|redis):\/\/[^:\s/@]+:[^@\s]+@/i,
+    /\b[0-9a-f]{32,}\b/i,
+    /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_[A-Za-z0-9_-]{8,}\b/i,
+  ].some((pattern) => pattern.test(value));
 }
 
 function shouldSkipSecretScan(file: string): boolean {

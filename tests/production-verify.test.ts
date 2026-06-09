@@ -19,6 +19,10 @@ test("production verifier wires every live release gate", () => {
   assert.match(script, /ui:smoke/);
   assert.match(script, /runSecretScan/);
   assert.match(script, /writeEvidence/);
+  assert.match(script, /validateEvidenceArtifact/);
+  assert.match(script, /\[verify\] evidence-artifact/);
+  assert.match(script, /Latest production verification evidence is valid and secret-safe/);
+  assert.match(script, /hasSecretPattern/);
   assert.match(script, /generated", "production-verification", "latest\.json"/);
   assert.match(script, /arcigy-jarvis-production-verification/);
   assert.match(script, /Secret-safe: command output is streamed through redactSensitiveText/);
