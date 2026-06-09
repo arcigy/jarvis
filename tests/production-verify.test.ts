@@ -8,8 +8,10 @@ test("production verifier wires every live release gate", () => {
   const localMemorySmoke = readFileSync("scripts/local_memory_smoke.ts", "utf-8");
 
   assert.equal(packageJson.scripts["verify:production"], "node scripts/verify_production.ts");
+  assert.equal(packageJson.scripts["secrets:audit"], "node scripts/jarvis_env_audit.ts");
   assert.match(script, /runNpm\("typecheck", \["run", "typecheck"\]\)/);
   assert.match(script, /runNpm\("tests", \["test"\]\)/);
+  assert.match(script, /runNpm\("secrets-audit", \["run", "secrets:audit", "--", "--json"\]\)/);
   assert.equal(packageJson.scripts["local:memory:smoke"], "node scripts/local_memory_smoke.ts");
   assert.match(script, /runNpm\("local-memory-smoke", \["run", "local:memory:smoke"\]\)/);
   assert.match(script, /process\.env\.npm_execpath/);

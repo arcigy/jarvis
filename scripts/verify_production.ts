@@ -22,6 +22,7 @@ try {
 async function main() {
   runNpm("typecheck", ["run", "typecheck"]);
   runNpm("tests", ["test"]);
+  runNpm("secrets-audit", ["run", "secrets:audit", "--", "--json"]);
   runNpm("local-memory-smoke", ["run", "local:memory:smoke"]);
   await ensureWebBridge();
   runNpm("doctor-live", ["run", "doctor", "--", "--live-integrations"]);

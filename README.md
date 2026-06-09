@@ -117,6 +117,13 @@ Serper is treated as an optional lead provider in readiness because Google Place
 
 Use `arcigy.get_production_readiness` or `POST /api/production-readiness` for a secret-safe status report. It returns blockers, next actions, and a `fixGuide` with env key names and validation commands, never the secret values.
 
+Run the secret-safe local setup audit before sharing any live MCP handoff. It loads `.env.local` when present, but only prints key names, configured/missing/placeholder state, value lengths, and one-way fingerprints:
+
+```powershell
+npm run secrets:audit
+npm run secrets:audit -- --json
+```
+
 Tauri is the preferred target for a production desktop build, but this machine currently has no Rust/Cargo toolchain available. Electron is used here as the working desktop fallback.
 
 ## Local web bridge
