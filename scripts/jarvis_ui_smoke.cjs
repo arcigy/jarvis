@@ -157,6 +157,7 @@ async function run() {
           mcpToolCountText: document.querySelector("#mcpToolCount")?.textContent.trim() || "",
           approvalLockCountText: document.querySelector("#approvalLockCount")?.textContent.trim() || "",
           handoffProofGatesText: document.querySelector("#handoffProofGates")?.textContent.trim() || "",
+          agentSetupProfilesText: document.querySelector("#agentSetupProfiles")?.textContent.trim() || "",
           voiceModeText: document.querySelector("#voiceMode")?.textContent.trim() || "",
           voiceInputText: document.querySelector("#voiceInput")?.textContent.trim() || "",
           voiceOutputText: document.querySelector("#voiceOutput")?.textContent.trim() || "",
@@ -197,8 +198,12 @@ async function run() {
       // Initial and blocked states are valid render states for the first smoke pass.
     } else if (!proofReadyMatch) {
       fail(`Remote proof gates are not rendered: ${proofGateText}.`);
-    } else if (proofReadyMatch[1] !== proofReadyMatch[2] || Number(proofReadyMatch[1]) < 13) {
+    } else if (proofReadyMatch[1] !== proofReadyMatch[2] || Number(proofReadyMatch[1]) < 14) {
       fail(`Remote proof gates are stale or incomplete: ${proofGateText}.`);
+    }
+    const agentSetupText = String(dom.agentSetupProfilesText ?? "");
+    for (const expected of ["Claude", "ChatGPT", "Grok", "openapi-custom-action", "openapi-or-http-json", "external-http-mcp"]) {
+      if (!agentSetupText.includes(expected)) fail(`Agent setup profiles are not rendered: missing ${expected}.`);
     }
     if (!/^idle$|^listening$|^awake$|^processing$/i.test(dom.voiceModeText)) fail(`Voice mode is not rendered: ${dom.voiceModeText}.`);
     if (!/microphone ready|text fallback/i.test(dom.voiceInputText)) fail(`Voice input capability is not rendered: ${dom.voiceInputText}.`);

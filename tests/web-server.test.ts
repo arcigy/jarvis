@@ -50,6 +50,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.match(html, /commandDeck/);
     assert.match(html, /readyIntegrations/);
     assert.match(html, /remoteAgentPrompt/);
+    assert.match(html, /agentSetupProfiles/);
     assert.match(html, /copyRemotePack/);
     assert.match(html, /runRemoteSmoke/);
     assert.match(html, /verificationEvidence/);
@@ -64,6 +65,8 @@ test("local web bridge serves UI and API health", async () => {
     assert.match(styles, /bridgeSweep/);
     assert.match(styles, /handoffPanel/);
     assert.match(styles, /handoffGrid/);
+    assert.match(styles, /agentSetupGrid/);
+    assert.match(styles, /agentSetupCard/);
 
     const visual = await fetch(`${baseUrl}/assets/jarvis-command-core.png`);
     assert.equal(visual.status, 200);
@@ -79,6 +82,8 @@ test("local web bridge serves UI and API health", async () => {
     assert.match(rendererText, /buildCommandTimeline/);
     assert.match(rendererText, /startWebBridgeWatch/);
     assert.match(rendererText, /renderRemoteMcpPack/);
+    assert.match(rendererText, /renderAgentSetupProfiles/);
+    assert.match(rendererText, /findAgentSetupProfile/);
     assert.match(rendererText, /renderRemoteMcpSmoke/);
     assert.match(rendererText, /renderProductionVerificationEvidence/);
     assert.match(rendererText, /\/api\/production-verification-evidence/);
@@ -458,6 +463,7 @@ test("local web bridge serves UI and API health", async () => {
       handoff: { connectionPackUrl: string; requiredProof: Array<{ key: string; url: string; expected: string }>; agentFirstSteps: string[] };
       agentCompatibility: { supportedAgents: string[]; safetyRules: string[]; requiredBeforeWork: string[] };
       agentPromptTemplates: { claude: string; chatgpt: string; grok: string; generic: string };
+      agentSetupProfiles: Array<{ agent: string; setupMode: string; importUrl: string; fallbackUrl: string; firstTool: string; writePolicy: string; localWritePolicy: string; requiredProofGates: string[] }>;
       tunnel: { secureCommand: string; statusUrl: string; startUrl: string; stopUrl: string; browserStartRequiresStrongToken: boolean };
     };
     assert.match(remotePackBody.manifestUrl, /\/\.well-known\/arcigy-jarvis\.json$/);
@@ -499,6 +505,10 @@ test("local web bridge serves UI and API health", async () => {
     assert.match(remotePackBody.agentPromptTemplates.grok, /xAI-compatible agents/);
     assert.match(remotePackBody.agentPromptTemplates.grok, /approvalRequired tools/);
     assert.match(remotePackBody.agentPromptTemplates.chatgpt, /POST http:\/\/127\.0\.0\.1:\d+\/api\/mcp\/\{toolName\}/);
+    assert.ok(remotePackBody.agentSetupProfiles.some((profile) => profile.agent === "ChatGPT" && profile.setupMode === "openapi-custom-action" && profile.importUrl.endsWith("/api/openapi.json")));
+    assert.ok(remotePackBody.agentSetupProfiles.some((profile) => profile.agent === "Grok" && profile.fallbackUrl.endsWith("/api/mcp/{toolName}")));
+    assert.ok(remotePackBody.agentSetupProfiles.every((profile) => profile.firstTool === "arcigy.get_operator_briefing" && profile.writePolicy === "approval.approved-required" && profile.localWritePolicy === "dry-run-first"));
+    assert.ok(remotePackBody.agentSetupProfiles.every((profile) => profile.requiredProofGates.includes("pack-agent-setup-profiles")));
     assert.ok(remotePackBody.quickStartCalls.every((call) => call.method === "POST" && call.url.endsWith(`/api/mcp/${call.tool}`)));
     assert.ok(remotePackBody.quickStartCalls.every((call) => call.approvalRequired === remotePackBody.tools.approvalRequired.includes(call.tool)));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_production_verification_evidence" && call.approvalRequired === false));

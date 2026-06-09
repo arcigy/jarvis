@@ -33,6 +33,7 @@ const requiredRemoteSmokeGates = [
   "external-auth-gate",
   "pack-auth-throttle-policy",
   "pack-limits",
+  "pack-agent-setup-profiles",
   "pack-voice-quick-start",
   "voice-tool-call",
   "pack-production-evidence-quick-start",
@@ -137,6 +138,7 @@ const elements = {
   handoffApprovalTools: document.querySelector("#handoffApprovalTools"),
   handoffLocalWriteTools: document.querySelector("#handoffLocalWriteTools"),
   handoffProofGates: document.querySelector("#handoffProofGates"),
+  agentSetupProfiles: document.querySelector("#agentSetupProfiles"),
   mcpToolListStatus: document.querySelector("#mcpToolListStatus"),
   mcpToolList: document.querySelector("#mcpToolList"),
   remoteAgentPrompt: document.querySelector("#remoteAgentPrompt"),
@@ -1090,8 +1092,48 @@ function renderRemoteMcpPack(pack) {
   const proof = matchingSmoke ? summarizeRemoteProofGates(matchingSmoke) : { ready: false, text: "smoke not run" };
   elements.handoffProofGates.textContent = proof.text;
   elements.handoffProofGates.dataset.state = proof.ready ? "ready" : "attention";
+  renderAgentSetupProfiles(pack.agentSetupProfiles ?? [], matchingSmoke);
   renderMcpToolList(pack);
   elements.remoteAgentPrompt.textContent = buildRemoteAgentPrompt(pack, matchingSmoke);
+}
+
+function renderAgentSetupProfiles(profiles, smokeReport = null) {
+  elements.agentSetupProfiles.replaceChildren();
+  if (!profiles.length) {
+    const node = document.createElement("div");
+    const label = document.createElement("span");
+    const title = document.createElement("strong");
+    const meta = document.createElement("code");
+    node.className = "agentSetupCard";
+    node.dataset.state = "attention";
+    label.textContent = "Agent setup";
+    title.textContent = "missing";
+    meta.textContent = "Connection pack has no profiles.";
+    node.append(label, title, meta);
+    elements.agentSetupProfiles.appendChild(node);
+    return;
+  }
+  const gateSummary = smokeReport ? summarizeRemoteProofGates(smokeReport) : { ready: false, text: "smoke not run" };
+  for (const profile of profiles) {
+    const gates = Array.isArray(profile.requiredProofGates) ? profile.requiredProofGates : [];
+    const node = document.createElement("div");
+    const label = document.createElement("span");
+    const title = document.createElement("strong");
+    const meta = document.createElement("code");
+    node.className = "agentSetupCard";
+    node.dataset.state = gateSummary.ready ? "ready" : "attention";
+    label.textContent = profile.setupMode ?? "remote setup";
+    title.textContent = profile.agent ?? "Agent";
+    meta.textContent = [
+      `Import: ${profile.importUrl ?? "--"}`,
+      `Fallback: ${profile.fallbackUrl ?? "--"}`,
+      `First: ${profile.firstTool ?? "arcigy.get_operator_briefing"}`,
+      `Policy: ${profile.writePolicy ?? "approval.approved-required"} / ${profile.localWritePolicy ?? "dry-run-first"}`,
+      `Proof: ${gates.length ? gates.join(", ") : "not declared"}`,
+    ].join("\n");
+    node.append(label, title, meta);
+    elements.agentSetupProfiles.appendChild(node);
+  }
 }
 
 function renderSecureTunnelStatus(status) {
@@ -1170,6 +1212,12 @@ function buildRemoteAgentPrompt(pack, smokeReport = null) {
         .map(([agent, prompt]) => `- ${agent}: ${prompt}`)
         .join("\n")
     : "";
+  const agentProfiles = (pack.agentSetupProfiles ?? [])
+    .map(
+      (profile) =>
+        `- ${profile.agent}: setupMode=${profile.setupMode}, importUrl=${profile.importUrl}, fallbackUrl=${profile.fallbackUrl}, firstTool=${profile.firstTool}, writePolicy=${profile.writePolicy}, localWritePolicy=${profile.localWritePolicy}, requiredProofGates=${(profile.requiredProofGates ?? []).join(", ")}`
+    )
+    .join("\n");
   const limits = pack.limits
     ? `Limits: pathPolicy=${pack.limits.pathPolicy}, maxJsonBytes=${pack.limits.maxJsonBytes}, writesRequireExplicitToolCall=${pack.limits.writesRequireExplicitToolCall}`
     : "";
@@ -1198,6 +1246,7 @@ function buildRemoteAgentPrompt(pack, smokeReport = null) {
     pack.tunnel?.stopUrl ? `Browser tunnel stop: ${pack.tunnel.stopUrl}` : "",
     `Smoke test: ${pack.smokeTestUrl ?? "--"}`,
     proof ? `Required proof:\n${proof}` : "",
+    agentProfiles ? `Agent setup profiles:\n${agentProfiles}` : "",
     agentFirstSteps ? `Agent first steps:\n${agentFirstSteps}` : "",
     agentPrompts ? `Agent-specific startup prompts:\n${agentPrompts}` : "",
     safetyRules ? `Safety rules:\n${safetyRules}` : "",
@@ -1280,12 +1329,27 @@ async function copyAgentPrompt(agentKey, agentLabel, button) {
   const prompt =
     pack.agentPromptTemplates?.[agentKey] ??
     "Use the Arcigy Jarvis HTTP JSON MCP bridge. Run smoke first and never call approvalRequired tools without approval.";
+  const profile = findAgentSetupProfile(pack, agentLabel);
   const payload = [
     handoffStatus.text,
     "",
     `${agentLabel} startup prompt:`,
     prompt,
     "",
+    profile
+      ? [
+          `${agentLabel} setup profile:`,
+          `Setup mode: ${profile.setupMode}`,
+          `Import URL: ${profile.importUrl}`,
+          `Fallback URL: ${profile.fallbackUrl}`,
+          `First tool: ${profile.firstTool}`,
+          `First tool URL: ${profile.firstToolUrl}`,
+          `Write policy: ${profile.writePolicy}`,
+          `Local write policy: ${profile.localWritePolicy}`,
+          `Required proof gates: ${(profile.requiredProofGates ?? []).join(", ")}`,
+          "",
+        ].join("\n")
+      : "",
     `Manifest: ${pack.manifestUrl}`,
     `Action manifest: ${pack.actionManifestUrl ?? `${pack.baseUrl}/.well-known/ai-plugin.json`}`,
     `OpenAPI schema: ${pack.openApiSchemaUrl ?? `${pack.baseUrl}/api/openapi.json`}`,
@@ -1300,6 +1364,11 @@ async function copyAgentPrompt(agentKey, agentLabel, button) {
   window.setTimeout(() => {
     button.textContent = `Copy ${agentLabel}`;
   }, 1400);
+}
+
+function findAgentSetupProfile(pack, agentLabel) {
+  const profiles = pack.agentSetupProfiles ?? [];
+  return profiles.find((profile) => String(profile.agent ?? "").toLowerCase() === agentLabel.toLowerCase());
 }
 
 async function copyTunnelCommand() {

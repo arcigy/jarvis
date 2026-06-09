@@ -869,6 +869,66 @@ h2 {
   color: #ffd893;
 }
 
+.agentSetupGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.agentSetupCard {
+  min-width: 0;
+  border: 1px solid #203331;
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgb(36 217 196 / 10%), transparent 44%),
+    rgb(10 17 18 / 88%);
+  padding: 10px;
+  position: relative;
+  overflow: hidden;
+}
+
+.agentSetupCard::after {
+  content: "";
+  position: absolute;
+  inset: auto 10px 8px 10px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgb(73 226 205 / 52%), transparent);
+}
+
+.agentSetupCard[data-state="ready"] {
+  border-color: rgb(67 217 196 / 42%);
+}
+
+.agentSetupCard[data-state="attention"] {
+  border-color: rgb(240 184 79 / 38%);
+}
+
+.agentSetupCard span {
+  display: block;
+  color: #91a19d;
+  font-size: 10px;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.agentSetupCard strong {
+  display: block;
+  margin-top: 5px;
+  color: #eef4f2;
+  font-size: 13px;
+}
+
+.agentSetupCard code {
+  display: block;
+  margin-top: 8px;
+  color: #dffaf6;
+  font-size: 11px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
 .handoffPrompt {
   margin-top: 10px;
   max-height: 220px;
@@ -1290,6 +1350,7 @@ ul {
   .cortexMap,
   .bridgeCockpit,
   .handoffGrid,
+  .agentSetupGrid,
   .diagnosticsGrid,
   .clientAlertGrid,
   .toolMatrix,

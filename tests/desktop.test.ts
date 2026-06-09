@@ -69,6 +69,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /id="handoffApprovalTools"/);
   assert.match(html, /id="handoffLocalWriteTools"/);
   assert.match(html, /id="handoffProofGates"/);
+  assert.match(html, /id="agentSetupProfiles"/);
+  assert.match(html, /agentSetupCard/);
   assert.match(html, /id="mcpToolListStatus"/);
   assert.match(html, /id="mcpToolList"/);
   assert.match(html, /Live MCP tool registry/);
@@ -202,6 +204,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /textContent = name/);
   assert.match(renderer, /handoffLocalWriteTools/);
   assert.match(renderer, /handoffProofGates/);
+  assert.match(renderer, /renderAgentSetupProfiles/);
+  assert.match(renderer, /findAgentSetupProfile/);
+  assert.match(renderer, /pack-agent-setup-profiles/);
   assert.match(renderer, /state\.lastRemoteMcpSmoke\?\.baseUrl === pack\.baseUrl/);
   assert.match(renderer, /if \(state\.lastRemoteMcpSmoke && !matchingSmoke\) state\.lastRemoteMcpSmoke = null/);
   assert.match(renderer, /buildRemoteAgentPrompt\(pack, matchingSmoke\)/);
@@ -508,7 +513,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(uiSmoke, /Command core image did not load/);
   assert.match(uiSmoke, /handoffProofGatesText/);
   assert.match(uiSmoke, /proofReadyMatch/);
-  assert.match(uiSmoke, /Number\(proofReadyMatch\[1\]\) < 13/);
+  assert.match(uiSmoke, /Number\(proofReadyMatch\[1\]\) < 14/);
+  assert.match(uiSmoke, /agentSetupProfilesText/);
+  assert.match(uiSmoke, /Agent setup profiles are not rendered/);
   assert.match(uiSmoke, /Remote proof gates are not rendered/);
   assert.doesNotMatch(uiSmoke, /ready: 11\\\/11 safety gates/);
   assert.equal(existsSync("src/desktop/assets/jarvis-command-core.png"), true);
