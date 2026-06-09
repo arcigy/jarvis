@@ -1643,6 +1643,15 @@ h2 {
   color: #ffd893;
 }
 
+.approvalQueueCopy {
+  width: 100%;
+  margin-top: 8px;
+  justify-content: center;
+  text-align: center;
+  color: #9cf8ed;
+  font-size: 12px;
+}
+
 .clientAlertGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

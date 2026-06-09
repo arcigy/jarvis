@@ -703,6 +703,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /function renderApprovalQueueGrid/);
   assert.match(renderer, /alternateApprovalPayloads/);
   assert.match(renderer, /JSON\.stringify\(item\.approvalPayload \?\? \{\}, null, 2\)/);
+  assert.match(renderer, /className = "approvalQueueCopy"/);
+  assert.match(renderer, /await writeClipboardText\(payloadText\)/);
+  assert.match(renderer, /Copy approval payload for/);
   assert.match(renderer, /\/api\/approve-prepared-outreach-reply/);
   assert.match(renderer, /\/api\/mcp\/arcigy\.send_approved_outreach_reply/);
   assert.match(renderer, /\/api\/system-health/);
@@ -788,6 +791,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(styles, /\.approvalQueueGrid/);
   assert.match(styles, /\.approvalQueueCard\[data-priority="high"\]/);
   assert.match(styles, /\.approvalQueueCard code \+ code/);
+  assert.match(styles, /\.approvalQueueCopy/);
   assert.match(styles, /\.diagnosticsGrid,\s+\.providerFallbackGrid,\s+\.approvalQueueGrid,\s+\.clientAlertGrid/s);
   assert.match(styles, /\.clientAlertGrid/);
   assert.match(styles, /\.clientAlertCard/);

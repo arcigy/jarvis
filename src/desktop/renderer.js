@@ -1046,14 +1046,27 @@ function renderApprovalQueueGrid(items) {
     const meta = document.createElement("span");
     const summary = document.createElement("p");
     const payload = document.createElement("code");
+    const copyButton = document.createElement("button");
     const alternatePayloads = Array.isArray(item.alternateApprovalPayloads) ? item.alternateApprovalPayloads : [];
+    const payloadText = JSON.stringify(item.approvalPayload ?? {}, null, 2);
     card.className = "approvalQueueCard";
     card.dataset.priority = item.priority ?? "normal";
     title.textContent = item.title ?? item.type ?? "Approval item";
     meta.textContent = [item.approvalTool, item.priority].filter(Boolean).join(" / ") || "approval payload";
     summary.textContent = item.summary ?? "Caka na operatora.";
-    payload.textContent = JSON.stringify(item.approvalPayload ?? {}, null, 2);
-    card.append(title, meta, summary, payload);
+    payload.textContent = payloadText;
+    copyButton.type = "button";
+    copyButton.className = "approvalQueueCopy";
+    copyButton.textContent = "Copy payload";
+    copyButton.setAttribute("aria-label", `Copy approval payload for ${item.approvalTool ?? item.title ?? item.type ?? "approval item"}`);
+    copyButton.addEventListener("click", async () => {
+      await writeClipboardText(payloadText);
+      copyButton.textContent = "Copied";
+      window.setTimeout(() => {
+        copyButton.textContent = "Copy payload";
+      }, 1400);
+    });
+    card.append(title, meta, summary, payload, copyButton);
     for (const alternate of alternatePayloads.slice(0, 2)) {
       const alternateCode = document.createElement("code");
       alternateCode.textContent = `alternate: ${JSON.stringify(alternate, null, 2)}`;
@@ -1877,7 +1890,7 @@ async function writeClipboardText(text) {
   textarea.select();
   const copied = document.execCommand("copy");
   textarea.remove();
-  if (!copied) throw new Error("Kopirovanie do clipboardu zlyhalo. Oznac a skopiruj remote pack manualne.");
+  if (!copied) throw new Error("Kopirovanie do clipboardu zlyhalo. Oznac text a skopiruj ho manualne.");
 }
 
 function startWebBridgeWatch() {
