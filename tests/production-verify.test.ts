@@ -18,6 +18,11 @@ test("production verifier wires every live release gate", () => {
   assert.match(script, /outputSafety: "structured"/);
   assert.match(script, /sanitizeAiDraftOutput/);
   assert.match(script, /hasUnsafeAiActionClaim/);
+  assert.match(script, /runVoiceOutreachStyleInvariants/);
+  assert.match(script, /\[verify\] voice-outreach-style/);
+  assert.match(script, /Jarvis wake-word voice flow returns a spoken cold outreach briefing/);
+  assert.match(script, /buildColdOutreachBrief/);
+  assert.match(script, /handleJarvisVoiceEvent/);
   assert.match(script, /runNpm\("secrets-audit", \["run", "secrets:audit", "--", "--json"\]\)/);
   assert.equal(packageJson.scripts["local:memory:smoke"], "node scripts/local_memory_smoke.ts");
   assert.match(script, /runNpm\("local-memory-smoke", \["run", "local:memory:smoke"\]\)/);

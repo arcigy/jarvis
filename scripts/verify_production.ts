@@ -6,7 +6,9 @@ import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 
 import { hasUnsafeAiActionClaim, redactSensitiveText, sanitizeAiDraftOutput } from "../src/automation-system/ai-safety.ts";
+import { buildColdOutreachBrief } from "../src/automation-system/cold-outreach-summary.ts";
 import { generateGeminiText } from "../src/automation-system/gemini.ts";
+import { createJarvisVoiceSession, handleJarvisVoiceEvent } from "../src/automation-system/jarvis-voice.ts";
 
 const repoRoot = fileURLToPath(new URL("../", import.meta.url));
 const webUrl = process.env.JARVIS_VERIFY_WEB_URL || "http://127.0.0.1:8765";
@@ -64,6 +66,7 @@ async function main() {
   runNpm("typecheck", ["run", "typecheck"]);
   runNpm("tests", ["test"]);
   await runAiDraftSafetyInvariants();
+  runVoiceOutreachStyleInvariants();
   runNpm("secrets-audit", ["run", "secrets:audit", "--", "--json"]);
   runNpm("local-memory-smoke", ["run", "local:memory:smoke"]);
   await ensureWebBridge();
@@ -85,6 +88,44 @@ async function main() {
   validateEvidenceArtifact();
   writeEvidence();
   process.stdout.write(renderSummary());
+}
+
+function runVoiceOutreachStyleInvariants() {
+  process.stdout.write(`\n[verify] voice-outreach-style\n`);
+  try {
+    const session = createJarvisVoiceSession();
+    const voice = handleJarvisVoiceEvent(session, { type: "transcript", text: "Jarvis cold outreach status" });
+    const brief = buildColdOutreachBrief({
+      periodLabel: "poslednych 7 dni",
+      contacted: 100,
+      opened: 51,
+      replied: 12,
+      positiveReplies: 4,
+      preparedPositiveReplyCount: 4,
+      pendingApprovalCount: 4,
+    });
+    const combined = `${voice.speakText ?? ""} ${brief.summary} ${brief.approvalPrompt ?? ""}`;
+    const ok =
+      voice.shouldStopRecording === true &&
+      voice.session.state === "idle" &&
+      /cold outreach/i.test(combined) &&
+      combined.includes("100") &&
+      combined.includes("51%") &&
+      combined.includes("12") &&
+      combined.includes("4") &&
+      /potvrdenie|schv/i.test(combined);
+    if (!ok) throw new Error("Jarvis voice cold outreach invariant failed.");
+    checks.push({
+      name: "voice-outreach-style",
+      status: "ready",
+      detail: "Jarvis wake-word voice flow returns a spoken cold outreach briefing with contacted, open-rate, replies, positives, and approval wording.",
+    });
+  } catch (error) {
+    checks.push({ name: "voice-outreach-style", status: "failed", detail: redactSensitiveText(error instanceof Error ? error.message : String(error)) });
+    writeEvidence();
+    process.stdout.write(renderSummary());
+    process.exit(1);
+  }
 }
 
 async function runAiDraftSafetyInvariants() {

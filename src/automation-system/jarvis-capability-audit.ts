@@ -65,7 +65,7 @@ const capabilityDefinitions: CapabilityDefinition[] = [
       "arcigy.send_approved_outreach_reply",
     ],
     approvalRequired: ["arcigy.send_approved_outreach_reply"],
-    evidence: ["local-memory-smoke", "tests", "doctor-live"],
+    evidence: ["local-memory-smoke", "tests", "doctor-live", "voice-outreach-style"],
     envKeys: ["smartlead", "gmail", "gemini"],
   },
   {
@@ -89,7 +89,7 @@ const capabilityDefinitions: CapabilityDefinition[] = [
     title: "Jarvis wake-word desktop voice loop",
     tools: ["arcigy.jarvis_voice_event", "arcigy.get_operator_briefing", "arcigy.get_production_verification_evidence"],
     approvalRequired: [],
-    evidence: ["ui-smoke", "ui-smoke-narrow", "voice-tool-call", "pack-voice-quick-start"],
+    evidence: ["ui-smoke", "ui-smoke-narrow", "voice-tool-call", "pack-voice-quick-start", "voice-outreach-style"],
   },
   {
     id: "proactive-digest",
