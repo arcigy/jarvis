@@ -42,10 +42,12 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /id="approvalLockCount"/);
   assert.match(html, /id="liveBlockerCount"/);
   assert.match(html, /id="commandTimeline"/);
+  assert.match(html, /Nacitavam production gates/);
   assert.match(html, /id="briefingGrid"/);
   assert.match(html, /id="launchQueue"/);
   assert.match(html, /id="launchStatus"/);
   assert.match(html, /id="launchNextAction"/);
+  assert.match(html, /Nacitavam readiness/);
   assert.match(html, /id="launchAttention"/);
   assert.match(html, /id="launchChecklist"/);
   assert.match(html, /id="operationsRadar"/);
@@ -499,7 +501,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /Spustam live diagnostiku/);
   assert.match(renderer, /Nacitavam audit trail/);
   assert.match(renderer, /Nacitavam redigovany snapshot lokalnej pamate/);
-  assert.doesNotMatch(renderer, /Loading operator briefing|Readiness is checking|Outreach brief is loading|Client memory watch is starting|Approval queue is loading|Loading next action|Building live operator briefing|Building live production readiness report|Running full Jarvis launch proof|Running live diagnostics|Loading audit trail|Loading redacted local memory snapshot/);
+  assert.match(renderer, /Nacitavam client alerty/);
+  assert.doesNotMatch(renderer, /Loading operator briefing|Readiness is checking|Outreach brief is loading|Client memory watch is starting|Approval queue is loading|Loading next action|Building live operator briefing|Building live production readiness report|Running full Jarvis launch proof|Running live diagnostics|Loading audit trail|Loading redacted local memory snapshot|Loading client alerts/);
+  assert.doesNotMatch(html, /Loading production gates|Loading readiness/);
   assert.match(renderer, /function runFullLaunchCheck/);
   assert.match(renderer, /function renderFullLaunchProof/);
   assert.match(renderer, /ready with advisory/);

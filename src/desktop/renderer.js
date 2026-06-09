@@ -2161,7 +2161,7 @@ elements.ingestClientMessage.addEventListener("click", async () => {
 elements.clientNeedAlerts.addEventListener("click", async () => {
   try {
     await maybeSyncGmailForClientAlerts({ force: true });
-    const result = await refreshClientNeedAlerts({ announceNew: false, loadingText: "Loading client alerts..." });
+    const result = await refreshClientNeedAlerts({ announceNew: false, loadingText: "Nacitavam client alerty..." });
     if (result.count > 0 && result.summary) speak(result.summary);
   } catch (error) {
     elements.clientAlertsResult.textContent = safeUiErrorText(error);
