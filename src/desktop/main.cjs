@@ -1377,6 +1377,13 @@ async function runRemoteMcpSmoke(payload = {}) {
       "Connection pack includes a read-only audit trail quick-start call."
     )
   );
+  checks.push(
+    smokeCheck(
+      hasProductionEvidenceQuickStart(pack.body, baseUrl),
+      "pack-production-evidence-quick-start",
+      "Connection pack includes the production verification evidence URL and read-only MCP quick-start call."
+    )
+  );
   const health = await fetchJson(`${baseUrl}/api/mcp/arcigy.get_system_health`, token, { format: "json" });
   checks.push(smokeCheck(health.ok && Array.isArray(health.body?.result?.integrations), "read-only-tool-call", "Read-only MCP tool call returned integration health."));
   const approvalGate = await checkApprovalGates(baseUrl, token, false);
@@ -1393,7 +1400,7 @@ async function runRemoteMcpSmoke(payload = {}) {
     baseUrl,
     summary:
       status === "ready"
-      ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, action manifest, OpenAPI action schema, CORS preflight, external auth gate, auth throttle policy, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
+      ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, action manifest, OpenAPI action schema, CORS preflight, external auth gate, auth throttle policy, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, production evidence quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((check) => check.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -1661,6 +1668,7 @@ function hasHandoffProof(value, baseUrl) {
     proofKeys.has("manifest") &&
     proofKeys.has("connection-pack") &&
     proofKeys.has("secure-tunnel-status") &&
+    proofKeys.has("production-verification-evidence") &&
     proofKeys.has("remote-smoke") &&
     ["action-manifest", "openapi-schema", "cors-preflight", "external-auth-gate", "pack-auth-throttle-policy", "approval-shape-gate", "secret-redaction"].every((key) => remoteSmokeExpected.includes(key)) &&
     agentFirstSteps.some((step) => typeof step === "string" && step.includes("arcigy.get_operator_briefing")) &&
@@ -1698,6 +1706,18 @@ function hasAuditQuickStart(value) {
   if (!Array.isArray(value)) return false;
   const call = value.find((item) => item?.tool === "arcigy.get_audit_events");
   return call?.approvalRequired === false && call?.body?.limit === 20 && !("automationKey" in (call.body ?? {})) && !("status" in (call.body ?? {}));
+}
+
+function hasProductionEvidenceQuickStart(value, baseUrl) {
+  if (!value || typeof value !== "object") return false;
+  if (value.productionVerificationEvidenceUrl !== `${baseUrl}/api/production-verification-evidence`) return false;
+  if (!Array.isArray(value.quickStartCalls)) return false;
+  const call = value.quickStartCalls.find((item) => item?.tool === "arcigy.get_production_verification_evidence");
+  return call?.approvalRequired === false && call?.method === "POST" && call?.url === `${baseUrl}/api/mcp/arcigy.get_production_verification_evidence` && isEmptyRecord(call.body);
+}
+
+function isEmptyRecord(value) {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === 0);
 }
 
 async function fetchJson(url, token, payload = null) {

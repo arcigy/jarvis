@@ -192,6 +192,13 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
       "Connection pack includes a read-only audit trail quick-start call."
     )
   );
+  checks.push(
+    check(
+      hasProductionEvidenceQuickStart(pack.body, baseUrl),
+      "pack-production-evidence-quick-start",
+      "Connection pack includes the production verification evidence URL and read-only MCP quick-start call."
+    )
+  );
 
   const health = await postJson(fetchImpl, `${baseUrl}/api/mcp/arcigy.get_system_health`, { format: "json" }, input.bearerToken);
   checks.push(check(health.ok && Array.isArray(health.body?.result?.integrations), "read-only-tool-call", "Read-only MCP tool call returned integration health."));
@@ -215,7 +222,7 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
     baseUrl,
     summary:
       status === "ready"
-        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, action manifest, OpenAPI action schema, CORS preflight, external auth gate, auth throttle policy, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
+        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, action manifest, OpenAPI action schema, CORS preflight, external auth gate, auth throttle policy, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, production evidence quick-start, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((item) => item.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -540,6 +547,7 @@ function hasHandoffProof(value: unknown, baseUrl: string): boolean {
     proofKeys.has("manifest") &&
     proofKeys.has("connection-pack") &&
     proofKeys.has("secure-tunnel-status") &&
+    proofKeys.has("production-verification-evidence") &&
     proofKeys.has("remote-smoke") &&
     ["action-manifest", "openapi-schema", "cors-preflight", "external-auth-gate", "pack-auth-throttle-policy", "approval-shape-gate", "secret-redaction"].every((key) => remoteSmokeExpected.includes(key)) &&
     agentFirstSteps.some((step) => typeof step === "string" && step.includes("arcigy.get_operator_briefing")) &&
@@ -584,6 +592,21 @@ function hasAuditQuickStart(value: unknown): boolean {
     | { approvalRequired?: unknown; body?: { limit?: unknown; automationKey?: unknown; status?: unknown } }
     | undefined;
   return call?.approvalRequired === false && call.body?.limit === 20 && !("automationKey" in (call.body ?? {})) && !("status" in (call.body ?? {}));
+}
+
+function hasProductionEvidenceQuickStart(value: unknown, baseUrl: string): boolean {
+  if (!value || typeof value !== "object") return false;
+  const pack = value as { productionVerificationEvidenceUrl?: unknown; quickStartCalls?: unknown };
+  if (pack.productionVerificationEvidenceUrl !== `${baseUrl}/api/production-verification-evidence`) return false;
+  if (!Array.isArray(pack.quickStartCalls)) return false;
+  const call = pack.quickStartCalls.find((item) => item && typeof item === "object" && (item as { tool?: unknown }).tool === "arcigy.get_production_verification_evidence") as
+    | { approvalRequired?: unknown; method?: unknown; url?: unknown; body?: unknown }
+    | undefined;
+  return call?.approvalRequired === false && call.method === "POST" && call.url === `${baseUrl}/api/mcp/arcigy.get_production_verification_evidence` && isEmptyRecord(call.body);
+}
+
+function isEmptyRecord(value: unknown): boolean {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === 0);
 }
 
 async function getJson(fetchImpl: typeof fetch, url: string, bearerToken?: string) {

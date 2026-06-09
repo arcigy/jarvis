@@ -570,6 +570,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /pack-handoff-proof/);
   assert.match(main, /pack-client-memory-quick-start/);
   assert.match(main, /pack-audit-quick-start/);
+  assert.match(main, /pack-production-evidence-quick-start/);
   assert.match(main, /List operator approval queue/);
   assert.match(main, /Get redacted local memory snapshot/);
   assert.match(main, /Export redacted local memory snapshot after approval/);
@@ -579,6 +580,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /hasHandoffProof/);
   assert.match(main, /hasClientMemoryQuickStarts/);
   assert.match(main, /hasAuditQuickStart/);
+  assert.match(main, /hasProductionEvidenceQuickStart/);
   assert.match(main, /approvalGate: approvalGate\.bodies/);
   assert.match(main, /function hasSensitiveLeak/);
   assert.match(main, /API keys, OAuth tokens, or database URLs/);
