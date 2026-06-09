@@ -1229,6 +1229,19 @@ function notifyClientNeedAlert(alert, result) {
   notifyOperator("Arcigy Jarvis: klientska poziadavka", `${name}: ${summary}${more}`.slice(0, 240), "arcigy-client-need");
 }
 
+function confirmApprovalPayload(title, payload, context = "") {
+  return window.confirm(
+    [
+      title,
+      context,
+      "Jarvis vykona zapis iba po tomto potvrdeni. Exact payload:",
+      JSON.stringify(payload, null, 2),
+    ]
+      .filter(Boolean)
+      .join("\n\n")
+  );
+}
+
 function latestClientNeedAlert() {
   return state.lastClientNeedAlerts.find((alert) => alert?.needSignal?.id);
 }
@@ -1240,15 +1253,16 @@ async function updateLatestClientNeedStatus(status) {
   const need = alert.needSignal ?? {};
   const name = person.displayName ?? person.companyName ?? person.primaryEmail ?? "client";
   const label = status === "ignored" ? "ignore" : "resolve";
-  const ok = window.confirm(`Jarvis will ${label} this client request:\n\n${name}\n${need.summary ?? "Open request"}`);
-  if (!ok) return null;
-  const result = await arcigyApi.updateClientNeedStatus({
+  const payload = {
     needSignalId: need.id,
     status,
     note: `Marked ${status} from Jarvis desktop UI.`,
     updatedBy: "desktop",
     approval: { approved: true },
-  });
+  };
+  const ok = confirmApprovalPayload(`Jarvis will ${label} this client request`, payload, `${name}\n${need.summary ?? "Open request"}`);
+  if (!ok) return null;
+  const result = await arcigyApi.updateClientNeedStatus(payload);
   state.seenClientNeedAlertIds.delete(clientAlertKey(alert));
   await refreshClientNeedAlerts({ announceNew: false, loadingText: "Refreshing client alerts..." });
   return result;
@@ -2186,16 +2200,21 @@ elements.approvePreparedReply.addEventListener("click", async () => {
       return;
     }
     const first = state.lastPreparedReplies[0];
-    const approved = window.confirm(`Schvalit pripravenu odpoved pre ${first.leadEmail}${first.subject ? ` k teme ${first.subject}` : ""}?`);
+    const payload = {
+      preparedEventId: first.id,
+      approval: { approved: true },
+      approvedBy: "operator",
+    };
+    const approved = confirmApprovalPayload(
+      "Schvalit pripravenu odpoved",
+      payload,
+      `${first.leadEmail}${first.subject ? `\nTema: ${first.subject}` : ""}`
+    );
     if (!approved) {
       elements.preparedReplyResult.textContent = "Schvalenie pripravenej odpovede bolo zrusene pred zapisom.";
       return;
     }
-    const result = await arcigyApi.approvePreparedOutreachReply({
-      preparedEventId: first.id,
-      approval: { approved: true },
-      approvedBy: "operator",
-    });
+    const result = await arcigyApi.approvePreparedOutreachReply(payload);
     elements.preparedReplyResult.textContent = result.summary;
     speak(result.summary);
     state.lastApprovedPreparedReply = result.preparedReply ?? first;
@@ -2212,18 +2231,23 @@ elements.sendApprovedReply.addEventListener("click", async () => {
       elements.preparedReplyResult.textContent = "Pred odoslanim schval pripravenu odpoved.";
       return;
     }
-    const approved = window.confirm(`Odoslat schvalenu odpoved pre ${first.leadEmail}${first.subject ? ` k teme ${first.subject}` : ""} cez Gmail?`);
+    const payload = {
+      preparedEventId: first.id,
+      subject: first.subject,
+      approval: { approved: true },
+      sentBy: "operator",
+    };
+    const approved = confirmApprovalPayload(
+      "Odoslat schvalenu odpoved cez Gmail",
+      payload,
+      `${first.leadEmail}${first.subject ? `\nTema: ${first.subject}` : ""}`
+    );
     if (!approved) {
       elements.preparedReplyResult.textContent = "Odoslanie schvalenej odpovede bolo zrusene pred Gmail volanim.";
       return;
     }
     elements.preparedReplyResult.textContent = "Odosielam schvalenu odpoved cez Gmail...";
-    const result = await arcigyApi.sendApprovedOutreachReply({
-      preparedEventId: first.id,
-      subject: first.subject,
-      approval: { approved: true },
-      sentBy: "operator",
-    });
+    const result = await arcigyApi.sendApprovedOutreachReply(payload);
     elements.preparedReplyResult.textContent = result.summary;
     speak(result.summary);
     state.lastApprovedPreparedReply = null;
@@ -2336,17 +2360,18 @@ elements.localMemorySnapshot.addEventListener("click", async () => {
 });
 elements.exportLocalMemorySnapshot.addEventListener("click", async () => {
   try {
-    const approved = window.confirm("Export a redacted local memory snapshot to generated/local-memory/local-memory-snapshot.json?");
+    const payload = {
+      outputPath: "generated/local-memory/local-memory-snapshot.json",
+      limit: 10,
+      approval: { approved: true },
+    };
+    const approved = confirmApprovalPayload("Export redigovaneho snapshotu lokalnej pamate", payload);
     if (!approved) {
       elements.auditResult.textContent = "Export snapshotu lokalnej pamate bol zruseny pred zapisom suboru.";
       return;
     }
     elements.auditResult.textContent = "Exporting redacted local memory snapshot...";
-    const result = await arcigyApi.exportLocalMemorySnapshot({
-      outputPath: "generated/local-memory/local-memory-snapshot.json",
-      limit: 10,
-      approval: { approved: true },
-    });
+    const result = await arcigyApi.exportLocalMemorySnapshot(payload);
     elements.auditResult.textContent = [
       result.summary ?? "Local memory snapshot exported.",
       `Output: ${result.outputPath}`,
@@ -2595,17 +2620,22 @@ elements.exportLeads.addEventListener("click", async () => {
       elements.leadResult.textContent = "Pred exportom najprv vyhladaj leady.";
       return;
     }
-    const approved = window.confirm(`Exportovat ${state.lastLeads.length} leadov do Google Sheets?`);
+    const payload = {
+      approval: { approved: true },
+      range: "Leads!A1",
+      rows: leadsToSheetRows(state.lastLeads),
+    };
+    const approved = confirmApprovalPayload(
+      `Exportovat ${state.lastLeads.length} leadov do Google Sheets`,
+      payload,
+      "Toto zapise pripravene lead rows do nakonfigurovaneho Google Sheetu."
+    );
     if (!approved) {
       elements.leadResult.textContent = "Export do Google Sheets bol zruseny pred zapisom.";
       return;
     }
     elements.leadResult.textContent = "Exportujem leady do Google Sheets...";
-    const result = await arcigyApi.appendLeadsToGoogleSheet({
-      approval: { approved: true },
-      range: "Leads!A1",
-      rows: leadsToSheetRows(state.lastLeads),
-    });
+    const result = await arcigyApi.appendLeadsToGoogleSheet(payload);
     elements.leadResult.textContent = `Exportovane leady do Google Sheets: ${state.lastLeads.length}\n${JSON.stringify(result, null, 2)}`;
   } catch (error) {
     elements.leadResult.textContent = safeUiErrorText(error);
@@ -2647,13 +2677,18 @@ elements.generateContracts.addEventListener("click", async () => {
     const intake = JSON.parse(elements.contractIntake.value);
     const clientName = intake.client?.businessName ?? "vybrany klient";
     const projectName = intake.project?.name ?? "vybrany projekt";
-    const approved = window.confirm(`Vygenerovat DOCX zmluvy pre ${clientName} / ${projectName}?`);
+    const payload = { intake, approval: { approved: true } };
+    const approved = confirmApprovalPayload(
+      "Vygenerovat DOCX zmluvy",
+      payload,
+      `${clientName} / ${projectName}`
+    );
     if (!approved) {
       elements.contractResult.textContent = "Generovanie zmluv bolo zrusene pred zapisom suborov.";
       return;
     }
     elements.contractResult.textContent = "Generujem zmluvy...";
-    const result = await arcigyApi.generateContracts({ intake, approval: { approved: true } });
+    const result = await arcigyApi.generateContracts(payload);
     elements.contractResult.textContent = [
       `Vygenerovane subory: ${result.generatedFiles.length}`,
       `Manifest: ${result.manifestPath}`,
