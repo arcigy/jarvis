@@ -911,7 +911,8 @@ def build_approval_queue_summary(items: list[dict[str, Any]]) -> str:
     if need_count:
         parts.append(f"{need_count} klientskych poziadaviek caka na rozhodnutie")
     first = items[0]
-    return f"Jarvis: Na tvoje potvrdenie caka {len(items)} veci: {', '.join(parts)}. Najblizsie: {first['title']}."
+    approval_tool = first.get("approvalTool") or "approval tool"
+    return f"Jarvis: Na tvoje potvrdenie caka {len(items)} veci: {', '.join(parts)}. Najblizsie: {first['title']}. Schvalovaci tool: {approval_tool}, payload musi mat approval.approved=true."
 
 
 def build_local_memory_snapshot_summary(counts: dict[str, Any]) -> str:

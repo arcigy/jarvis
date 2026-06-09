@@ -953,6 +953,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /runRemoteMcpSmoke/);
   assert.match(main, /isApprovalQueueVoiceCommand/);
   assert.match(main, /summarizeApprovalQueueForVoice/);
+  assert.match(main, /Schvalovaci tool/);
+  assert.match(main, /approval\.approved=true/);
   assert.match(main, /manifest-local-write-policy/);
   assert.match(main, /manifest-tool-registry/);
   assert.match(main, /manifest-tool-metadata/);

@@ -967,6 +967,8 @@ test("local web bridge serves UI and API health", async () => {
     const voiceApprovalQueueBody = (await voiceApprovalQueue.json()) as { shouldStopRecording: boolean; speakText?: string };
     assert.equal(voiceApprovalQueueBody.shouldStopRecording, true);
     assert.match(voiceApprovalQueueBody.speakText ?? "", /Na tvoje potvrdenie caka 1/);
+    assert.match(voiceApprovalQueueBody.speakText ?? "", /arcigy\.update_client_need_status/);
+    assert.match(voiceApprovalQueueBody.speakText ?? "", /approval\.approved=true/);
     assert.match(voiceApprovalQueueBody.speakText ?? "", /Nic neposlem ani neuzavriem/);
 
     const memoryOperatorBriefing = await fetch(`${baseUrl}/api/operator-briefing`, {

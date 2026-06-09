@@ -1881,14 +1881,17 @@ function summarizeApprovalQueueForVoice(result: { count?: unknown; items?: unkno
   const topItems = items
     .slice(0, 3)
     .map((raw) => {
-      const item = raw as { title?: unknown; type?: unknown; summary?: unknown };
+      const item = raw as { title?: unknown; type?: unknown; summary?: unknown; approvalTool?: unknown; approvalPayload?: unknown };
       const title = typeof item.title === "string" ? item.title : typeof item.type === "string" ? item.type : "approval item";
       const summary = typeof item.summary === "string" ? item.summary : "bez detailu";
-      return `${title}: ${summary}`;
+      const approvalTool = typeof item.approvalTool === "string" ? item.approvalTool : null;
+      const payload = item.approvalPayload && typeof item.approvalPayload === "object" && !Array.isArray(item.approvalPayload) ? (item.approvalPayload as { approval?: { approved?: unknown } }) : {};
+      const approvalLock = payload.approval?.approved === true ? "payload musi mat approval.approved=true" : "payload vyzaduje explicitne schvalenie";
+      return `${title}: ${summary}${approvalTool ? `. Schvalovaci tool: ${approvalTool}, ${approvalLock}` : ""}`;
     })
     .filter(Boolean);
   const detail = topItems.length ? `Najblizsie: ${topItems.join("; ")}.` : "";
-  return `Na tvoje potvrdenie caka ${count} veci. ${detail} Nic neposlem ani neuzavriem bez explicitneho schvalenia.`;
+  return `Na tvoje potvrdenie caka ${count} veci. ${detail} Nic neposlem ani neuzavriem bez explicitneho schvalenia v approval queue.`;
 }
 
 function extractEmail(text: string) {

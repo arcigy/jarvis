@@ -3040,6 +3040,8 @@ test("local SQLite CLI returns a unified approval queue", () => {
   assert.ok(tools.includes("arcigy.send_approved_outreach_reply"));
   assert.ok(tools.includes("arcigy.update_client_need_status"));
   assert.match(queue.summary, /Na tvoje potvrdenie/);
+  assert.match(queue.summary, /arcigy\.send_approved_outreach_reply/);
+  assert.match(queue.summary, /approval\.approved=true/);
 });
 
 test("local SQLite CLI summarizes cold outreach events by period", () => {

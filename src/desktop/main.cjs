@@ -3507,11 +3507,13 @@ function summarizeApprovalQueueForVoice(result) {
     .map((item) => {
       const title = item?.title || item?.type || "approval item";
       const summary = item?.summary || "bez detailu";
-      return `${title}: ${summary}`;
+      const approvalTool = typeof item?.approvalTool === "string" ? item.approvalTool : null;
+      const approvalLock = item?.approvalPayload?.approval?.approved === true ? "payload musi mat approval.approved=true" : "payload vyzaduje explicitne schvalenie";
+      return `${title}: ${summary}${approvalTool ? `. Schvalovaci tool: ${approvalTool}, ${approvalLock}` : ""}`;
     })
     .filter(Boolean);
   const detail = topItems.length ? `Najblizsie: ${topItems.join("; ")}.` : "";
-  return `Na tvoje potvrdenie caka ${count} veci. ${detail} Nic neposlem ani neuzavriem bez explicitneho schvalenia.`;
+  return `Na tvoje potvrdenie caka ${count} veci. ${detail} Nic neposlem ani neuzavriem bez explicitneho schvalenia v approval queue.`;
 }
 
 function identifyEmail(payload) {
