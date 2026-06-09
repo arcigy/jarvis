@@ -208,8 +208,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /redactSensitiveText\(text\)\.trim\(\)\.slice\(0, 240\)/);
   assert.match(renderer, /Invalid JSON response/);
   assert.match(renderer, /function requiredInputValue/);
-  assert.match(renderer, /Client message is required before drafting/);
-  assert.match(renderer, /Contract brief is required before AI drafting/);
+  assert.match(renderer, /Klientska sprava je povinna pred draftovanim odpovede/);
+  assert.match(renderer, /Brief zmluvy je povinny pred AI draftom/);
   assert.match(renderer, /return redactSensitiveText\(error instanceof Error \? error\.message : String\(error\)\)/);
   assert.doesNotMatch(renderer, /textContent = error instanceof Error \? error\.message : String\(error\)/);
   assert.match(renderer, /elements\.healthGrid\.replaceChildren\(\)/);
@@ -335,8 +335,14 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /arcigyApi\.getClientNeedAlerts/);
   assert.match(renderer, /arcigyApi\.getAuditEvents/);
   assert.match(renderer, /arcigyApi\.generateContracts/);
-  assert.match(renderer, /Generate contract DOCX files for/);
-  assert.match(renderer, /Contract generation cancelled before any files were written/);
+  assert.match(renderer, /Vygenerovat DOCX zmluvy pre/);
+  assert.match(renderer, /Generovanie zmluv bolo zrusene pred zapisom suborov/);
+  assert.match(renderer, /Draftujem zmluvny intake cez Gemini/);
+  assert.match(renderer, /AI zmluvny intake je aplikovany/);
+  assert.match(renderer, /Zmluvny formular je aplikovany do intake JSON/);
+  assert.match(renderer, /Pred generovanim aplikuj zmluvny formular/);
+  assert.match(renderer, /Vygenerovane subory: \$\{result\.generatedFiles\.length\}/);
+  assert.doesNotMatch(renderer, /Client message is required before drafting|Contract brief is required before AI drafting|Generate contract DOCX files for|Contract generation cancelled before any files were written|Drafting contract intake with Gemini|AI contract intake draft applied|Contract form applied to intake JSON|Apply the contract form before generating|Generated \$\{result\.generatedFiles\.length\} files/);
   assert.match(renderer, /arcigyApi\.draftContractIntake/);
   assert.match(renderer, /arcigyApi\.systemHealth/);
   assert.match(renderer, /arcigyApi\.generateAiReply/);
@@ -545,7 +551,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /Contract form changed\. Apply form before generating DOCX files/);
   assert.match(renderer, /buildContractIntakeFromForm/);
   assert.match(renderer, /fillContractForm/);
-  assert.match(renderer, /Apply the contract form before generating so the visible form and intake JSON match/);
+  assert.match(renderer, /Pred generovanim aplikuj zmluvny formular/);
   assert.match(renderer, /state\.contractFormDirty = false/);
   assert.match(renderer, /renderClientNeedAlerts/);
   assert.match(renderer, /function renderClientAlertGrid/);

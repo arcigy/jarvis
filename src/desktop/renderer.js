@@ -2193,7 +2193,7 @@ elements.toggleClientNeedWatch.addEventListener("click", () => {
 });
 elements.draftReply.addEventListener("click", async () => {
   try {
-    const message = requiredInputValue(elements.clientMessage, "Client message is required before drafting.");
+    const message = requiredInputValue(elements.clientMessage, "Klientska sprava je povinna pred draftovanim odpovede.");
     elements.draftResult.textContent = "Drafting...";
     const result = await arcigyApi.generateAiReply({
       message,
@@ -2513,8 +2513,8 @@ elements.exportLeads.addEventListener("click", async () => {
 });
 elements.draftContractIntake.addEventListener("click", async () => {
   try {
-    const brief = requiredInputValue(elements.contractBrief, "Contract brief is required before AI drafting.");
-    elements.contractResult.textContent = "Drafting contract intake with Gemini...";
+    const brief = requiredInputValue(elements.contractBrief, "Brief zmluvy je povinny pred AI draftom.");
+    elements.contractResult.textContent = "Draftujem zmluvny intake cez Gemini...";
     const baseIntake = safeParseContractIntake();
     const intake = await arcigyApi.draftContractIntake({
       brief,
@@ -2523,7 +2523,7 @@ elements.draftContractIntake.addEventListener("click", async () => {
     fillContractForm(intake);
     elements.contractIntake.value = JSON.stringify(intake, null, 2);
     state.contractFormDirty = false;
-    elements.contractResult.textContent = "AI contract intake draft applied. Review it before generating DOCX files.";
+    elements.contractResult.textContent = "AI zmluvny intake je aplikovany. Skontroluj ho pred generovanim DOCX suborov.";
   } catch (error) {
     elements.contractResult.textContent = safeUiErrorText(error);
   }
@@ -2533,7 +2533,7 @@ elements.applyContractForm.addEventListener("click", () => {
     const intake = buildContractIntakeFromForm();
     elements.contractIntake.value = JSON.stringify(intake, null, 2);
     state.contractFormDirty = false;
-    elements.contractResult.textContent = "Contract form applied to intake JSON.";
+    elements.contractResult.textContent = "Zmluvny formular je aplikovany do intake JSON.";
   } catch (error) {
     elements.contractResult.textContent = safeUiErrorText(error);
   }
@@ -2541,21 +2541,21 @@ elements.applyContractForm.addEventListener("click", () => {
 elements.generateContracts.addEventListener("click", async () => {
   try {
     if (state.contractFormDirty) {
-      elements.contractResult.textContent = "Apply the contract form before generating so the visible form and intake JSON match.";
+      elements.contractResult.textContent = "Pred generovanim aplikuj zmluvny formular, aby viditelny formular a intake JSON sedeli.";
       return;
     }
     const intake = JSON.parse(elements.contractIntake.value);
-    const clientName = intake.client?.businessName ?? "selected client";
-    const projectName = intake.project?.name ?? "selected project";
-    const approved = window.confirm(`Generate contract DOCX files for ${clientName} / ${projectName}?`);
+    const clientName = intake.client?.businessName ?? "vybrany klient";
+    const projectName = intake.project?.name ?? "vybrany projekt";
+    const approved = window.confirm(`Vygenerovat DOCX zmluvy pre ${clientName} / ${projectName}?`);
     if (!approved) {
-      elements.contractResult.textContent = "Contract generation cancelled before any files were written.";
+      elements.contractResult.textContent = "Generovanie zmluv bolo zrusene pred zapisom suborov.";
       return;
     }
-    elements.contractResult.textContent = "Generating...";
+    elements.contractResult.textContent = "Generujem zmluvy...";
     const result = await arcigyApi.generateContracts({ intake, approval: { approved: true } });
     elements.contractResult.textContent = [
-      `Generated ${result.generatedFiles.length} files.`,
+      `Vygenerovane subory: ${result.generatedFiles.length}`,
       `Manifest: ${result.manifestPath}`,
       ...result.generatedFiles,
     ].join("\n");
