@@ -120,6 +120,13 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /positiveSignal/);
   assert.match(html, /Lead chce cenu, termin callu alebo viac detailov/);
   assert.doesNotMatch(html, /Lead wants pricing, call, demo, or more details/);
+  assert.match(html, /Ziadne pripravene odpovede este nie su nacitane/);
+  assert.match(html, /prazdne = vsetky kampane/);
+  assert.match(html, /Poziadavka klienta alebo telo emailu/);
+  assert.match(html, /Ziadne otvorene poziadavky klientov este nie su nacitane/);
+  assert.match(html, /Klient, rozsah projektu, moduly, cena, obdobie, datum spustenia, specialne podmienky/);
+  assert.match(html, /Pripravene generovat lokalne DOCX subory/);
+  assert.doesNotMatch(html, /No prepared replies loaded|empty = all campaigns|Client request or email body|No client alerts loaded|Ready to generate local DOCX files/);
   assert.match(html, /Smartlead live/);
   assert.match(html, /Live \+ SQLite fallback/);
   assert.match(html, /Manual send lock/);
