@@ -564,6 +564,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(remotePackBody.agentSetupProfiles.some((profile) => profile.agent === "Grok" && profile.fallbackUrl.endsWith("/api/mcp/{toolName}")));
     assert.ok(remotePackBody.agentSetupProfiles.every((profile) => profile.firstTool === "arcigy.get_operator_briefing" && profile.writePolicy === "approval.approved-required" && profile.localWritePolicy === "dry-run-first"));
     assert.ok(remotePackBody.agentSetupProfiles.every((profile) => profile.requiredProofGates.includes("pack-agent-setup-profiles")));
+    assert.ok(remotePackBody.agentSetupProfiles.every((profile) => profile.requiredProofGates.includes("pack-production-evidence-quick-start") && profile.requiredProofGates.includes("production-evidence-tool-call")));
     assert.ok(remotePackBody.quickStartCalls.every((call) => call.method === "POST" && call.url.endsWith(`/api/mcp/${call.tool}`)));
     assert.ok(remotePackBody.quickStartCalls.every((call) => call.approvalRequired === remotePackBody.tools.approvalRequired.includes(call.tool)));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_production_verification_evidence" && call.approvalRequired === false));

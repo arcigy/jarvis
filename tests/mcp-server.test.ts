@@ -235,6 +235,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(pack.agentSetupProfiles.some((profile) => profile.agent === "Grok" && profile.fallbackUrl === "https://jarvis.example.ngrok-free.app/api/mcp/{toolName}"));
   assert.ok(pack.agentSetupProfiles.every((profile) => profile.firstTool === "arcigy.get_operator_briefing" && profile.writePolicy === "approval.approved-required" && profile.localWritePolicy === "dry-run-first"));
   assert.ok(pack.agentSetupProfiles.every((profile) => profile.requiredProofGates.includes("pack-agent-setup-profiles") && profile.requiredProofGates.includes("secret-redaction")));
+  assert.ok(pack.agentSetupProfiles.every((profile) => profile.requiredProofGates.includes("pack-production-evidence-quick-start") && profile.requiredProofGates.includes("production-evidence-tool-call")));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_outreach_brief" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_outreach_brief" && !("campaignId" in call.body)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.sync_gmail_recent_messages" && call.body.dryRun === true));

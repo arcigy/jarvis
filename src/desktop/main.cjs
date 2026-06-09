@@ -990,6 +990,8 @@ function buildRemoteMcpAgentSetupProfiles(baseUrl) {
     "pack-agent-setup-profiles",
     "pack-voice-quick-start",
     "voice-tool-call",
+    "pack-production-evidence-quick-start",
+    "production-evidence-tool-call",
     "approval-gate",
     "approval-shape-gate",
     "secret-redaction",
@@ -1919,7 +1921,22 @@ function hasAgentSetupProfiles(value, baseUrl) {
       profile?.firstToolUrl === `${baseUrl}/api/mcp/arcigy.get_operator_briefing` &&
       profile?.writePolicy === "approval.approved-required" &&
       profile?.localWritePolicy === "dry-run-first" &&
-      ["action-manifest", "openapi-schema", "external-auth-gate", "pack-agent-setup-profiles", "approval-shape-gate", "secret-redaction"].every((gate) => gates.includes(gate))
+      [
+        "action-manifest",
+        "openapi-schema",
+        "cors-preflight",
+        "external-auth-gate",
+        "pack-auth-throttle-policy",
+        "pack-limits",
+        "pack-agent-setup-profiles",
+        "pack-voice-quick-start",
+        "voice-tool-call",
+        "pack-production-evidence-quick-start",
+        "production-evidence-tool-call",
+        "approval-gate",
+        "approval-shape-gate",
+        "secret-redaction",
+      ].every((gate) => gates.includes(gate))
     );
   });
 }

@@ -248,6 +248,8 @@ function buildAgentSetupProfiles(baseUrl: string): RemoteMcpConnectionPack["agen
     "pack-agent-setup-profiles",
     "pack-voice-quick-start",
     "voice-tool-call",
+    "pack-production-evidence-quick-start",
+    "production-evidence-tool-call",
     "approval-gate",
     "approval-shape-gate",
     "secret-redaction",

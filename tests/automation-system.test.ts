@@ -1217,6 +1217,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.agentSetupProfiles.some((profile) => profile.agent === "ChatGPT" && profile.setupMode === "openapi-custom-action" && profile.importUrl === "https://jarvis.example/api/openapi.json"));
   assert.ok(pack.agentSetupProfiles.some((profile) => profile.agent === "Grok" && profile.fallbackUrl === "https://jarvis.example/api/mcp/{toolName}"));
   assert.ok(pack.agentSetupProfiles.every((profile) => profile.firstTool === "arcigy.get_operator_briefing" && profile.writePolicy === "approval.approved-required"));
+  assert.ok(pack.agentSetupProfiles.every((profile) => profile.requiredProofGates.includes("pack-production-evidence-quick-start") && profile.requiredProofGates.includes("production-evidence-tool-call")));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_production_verification_evidence" && call.approvalRequired === false));
   assert.ok(
     pack.quickStartCalls.some(
@@ -3124,7 +3125,22 @@ function remoteAgentSetupProfilesFixture() {
   const base = {
     firstTool: "arcigy.get_operator_briefing",
     firstToolUrl: `${baseUrl}/api/mcp/arcigy.get_operator_briefing`,
-    requiredProofGates: ["action-manifest", "openapi-schema", "external-auth-gate", "pack-agent-setup-profiles", "approval-shape-gate", "secret-redaction"],
+    requiredProofGates: [
+      "action-manifest",
+      "openapi-schema",
+      "cors-preflight",
+      "external-auth-gate",
+      "pack-auth-throttle-policy",
+      "pack-limits",
+      "pack-agent-setup-profiles",
+      "pack-voice-quick-start",
+      "voice-tool-call",
+      "pack-production-evidence-quick-start",
+      "production-evidence-tool-call",
+      "approval-gate",
+      "approval-shape-gate",
+      "secret-redaction",
+    ],
     writePolicy: "approval.approved-required",
     localWritePolicy: "dry-run-first",
   };
