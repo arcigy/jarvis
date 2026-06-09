@@ -33,6 +33,7 @@ const requiredRemoteMcpSmokeGates = [
   "pack-tool-registry",
   "pack-quick-start-urls",
   "pack-quick-start-approval-policy",
+  "pack-quick-start-exact-mcp-calls",
   "pack-contract-quick-start",
   "pack-contract-draft-quick-start",
   "pack-agent-setup-profiles",

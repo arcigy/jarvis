@@ -21,7 +21,7 @@ const gateSources: GateSource[] = [
 test("remote MCP release proof gates stay in parity across production surfaces", () => {
   const canonical = extractStringArray(gateSources[0]);
 
-  assert.equal(canonical.length, 36);
+  assert.equal(canonical.length, 37);
   assert.deepEqual(new Set(canonical).size, canonical.length);
   assert.deepEqual(canonical.slice(0, 6), [
     "manifest",

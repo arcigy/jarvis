@@ -597,7 +597,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /buildReadinessLaunchEvidence/);
   assert.match(main, /production-launch-evidence/);
   assert.match(main, /\.well-known\/ai-plugin\.json, \/api\/openapi\.json/);
-  assert.match(main, /all 36 required remote MCP smoke gates/);
+  assert.match(main, /all 37 required remote MCP smoke gates/);
   assert.match(main, /manifest-tool-metadata/);
   assert.match(main, /pack-contract-draft-quick-start/);
   assert.match(main, /pack-client-memory-quick-start/);
@@ -853,7 +853,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(uiSmoke, /Command core image did not load/);
   assert.match(uiSmoke, /handoffProofGatesText/);
   assert.match(uiSmoke, /proofReadyMatch/);
-  assert.match(uiSmoke, /requiredRemoteSmokeGateCount = 36/);
+  assert.match(uiSmoke, /requiredRemoteSmokeGateCount = 37/);
   assert.match(uiSmoke, /proofMatrixReadyCount/);
   assert.match(uiSmoke, /agentSetupProfilesText/);
   assert.match(uiSmoke, /Agent setup profiles are not rendered/);
@@ -863,7 +863,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.equal(visualAsset.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
   assert.equal(statSync("src/desktop/assets/jarvis-command-core.png").size > 200000, true);
   assert.doesNotMatch(renderer, /demoColdOutreachMetrics/);
-  assert.doesNotMatch(renderer, /Â/);
+  assert.doesNotMatch(renderer, /Ă‚/);
   assert.doesNotMatch(renderer, /Za dnes sme napísali/);
   assert.doesNotMatch(html, /[\u0102\u00c4\u0139\u00e2]/);
   assert.doesNotMatch(main, /[\u0102\u00c4\u0139\u00e2]/);
@@ -912,7 +912,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /buildRemoteMcpHandoffRunbook/);
   assert.match(main, /connectionPackUrl/);
   assert.match(main, /repo-only limits/);
-  assert.match(main, /all 36 required remote MCP smoke gates/);
+  assert.match(main, /all 37 required remote MCP smoke gates/);
   assert.match(main, /manifest-tool-metadata/);
   assert.match(main, /pack-contract-draft-quick-start/);
   assert.match(main, /pack-client-memory-quick-start/);

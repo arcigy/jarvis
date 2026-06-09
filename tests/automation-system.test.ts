@@ -119,7 +119,7 @@ test("production readiness report returns blockers and next actions without secr
   assert.ok(
     report.launchEvidence.remoteHandoff.requiredBeforeExternalAgent.some(
       (step) =>
-        step.includes("all 36 required remote MCP smoke gates") &&
+        step.includes("all 37 required remote MCP smoke gates") &&
         step.includes("pack-contract-draft-quick-start") &&
         step.includes("pack-client-memory-quick-start") &&
         step.includes("pack-production-evidence-quick-start") &&
@@ -329,6 +329,63 @@ test("remote MCP smoke requires quick-start approval policy parity", async () =>
   assert.equal(report.status, "blocked");
   assert.ok(report.checks.some((check) => check.key === "pack-quick-start-approval-policy" && check.status === "blocked"));
   assert.ok(report.checks.some((check) => check.key === "pack-quick-start-urls" && check.status === "ready"));
+});
+
+test("remote MCP smoke requires exact MCP call parity in quick-starts", async () => {
+  const expectedNames = listJarvisMcpTools().map((tool) => tool.name);
+  const tools = remoteSmokeManifestToolsFixture();
+  const fetchImpl = async (target: string | URL) => {
+    const url = String(target);
+    if (url.endsWith("/.well-known/arcigy-jarvis.json")) {
+      return responseJson({
+        tools,
+        auth: { header: "Authorization: Bearer <JARVIS_WEB_TOKEN>" },
+        toolPolicy: {
+          localStateWrite: ["arcigy.sync_gmail_recent_messages"],
+          readOnlyOrDraft: ["arcigy.generate_ai_reply"],
+        },
+      });
+    }
+    if (url.includes("/api/remote-mcp-pack")) {
+      return responseJson({
+        auth: { tokenValueReturned: false },
+        limits: remoteSmokePackLimitsFixture(),
+        agentCompatibility: remoteAgentCompatibilityFixture(),
+        agentSetupProfiles: remoteAgentSetupProfilesFixture(),
+        handoff: {
+          connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
+          requiredProof: [{ key: "manifest" }, { key: "connection-pack" }, { key: "remote-smoke" }],
+          agentFirstSteps: ["Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
+        },
+        tools: {
+          names: expectedNames,
+          localStateWrite: ["arcigy.sync_gmail_recent_messages"],
+          readOnlyOrDraft: ["arcigy.generate_ai_reply"],
+        },
+        quickStartCalls: remoteSmokeQuickStartFixture().map((call) =>
+          call.tool === "arcigy.identify_email" ? { ...call, exactMcpCall: { ...call.exactMcpCall, body: { email: "wrong@example.com" } } } : call
+        ),
+      });
+    }
+    if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
+    if (
+      url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
+      url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
+      url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
+      url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
+    ) {
+      return responseJson({ error: "approval required" }, 409);
+    }
+    return responseJson({ error: "unexpected URL" }, 404);
+  };
+
+  const report = await runRemoteMcpSmoke({ baseUrl: "https://jarvis.example", fetchImpl: fetchImpl as typeof fetch });
+
+  assert.equal(report.status, "blocked");
+  assert.ok(report.checks.some((check) => check.key === "pack-quick-start-exact-mcp-calls" && check.status === "blocked"));
+  assert.ok(report.checks.some((check) => check.key === "pack-quick-start-approval-policy" && check.status === "ready"));
 });
 
 test("remote MCP smoke redacts secrets from fetch failures", async () => {
@@ -1210,7 +1267,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(
     pack.agentCompatibility.requiredBeforeWork.some(
       (step) =>
-        step.includes("all 36 required remote MCP smoke gates") &&
+        step.includes("all 37 required remote MCP smoke gates") &&
         step.includes("manifest-tool-metadata") &&
         step.includes("pack-contract-draft-quick-start") &&
         step.includes("pack-client-memory-quick-start") &&
@@ -1234,7 +1291,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
     pack.handoff.requiredProof.some(
       (item) =>
         item.key === "remote-smoke" &&
-        item.expected.includes("all 36 required remote MCP smoke gates") &&
+        item.expected.includes("all 37 required remote MCP smoke gates") &&
         item.expected.includes("manifest-tool-metadata") &&
         item.expected.includes("pack-contract-draft-quick-start") &&
         item.expected.includes("pack-client-memory-quick-start") &&
@@ -1297,7 +1354,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(
     pack.agentInstructions.some(
       (step) =>
-        step.includes("all 36 required remote MCP smoke gates") &&
+        step.includes("all 37 required remote MCP smoke gates") &&
         step.includes("pack-client-memory-quick-start") &&
         step.includes("pack-production-evidence-quick-start") &&
         step.includes("production-evidence-tool-call") &&
@@ -1310,7 +1367,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
     pack.handoff.requiredProof.some(
       (item) =>
         item.key === "remote-smoke" &&
-        item.expected.includes("all 36 required remote MCP smoke gates") &&
+        item.expected.includes("all 37 required remote MCP smoke gates") &&
         item.expected.includes("pack-client-memory-quick-start") &&
         item.expected.includes("production-evidence-tool-call") &&
         item.expected.includes("dirty=false") &&
@@ -3210,6 +3267,7 @@ function remoteSmokeRequiredGateFixture() {
     "pack-tool-registry",
     "pack-quick-start-urls",
     "pack-quick-start-approval-policy",
+    "pack-quick-start-exact-mcp-calls",
     "pack-contract-quick-start",
     "pack-contract-draft-quick-start",
     "pack-agent-setup-profiles",
@@ -3323,13 +3381,16 @@ function remoteSmokeManifestToolsFixture() {
 
 function remoteSmokeQuickStartFixture() {
   const baseUrl = "https://jarvis.example";
-  const call = (tool: string, body: Record<string, unknown>, approvalRequired = false) => ({
-    tool,
-    method: "POST",
-    url: `${baseUrl}/api/mcp/${tool}`,
-    approvalRequired,
-    body,
-  });
+  const call = (tool: string, body: Record<string, unknown>, approvalRequired = false) => {
+    const item = {
+      tool,
+      method: "POST" as const,
+      url: `${baseUrl}/api/mcp/${tool}`,
+      approvalRequired,
+      body,
+    };
+    return { ...item, exactMcpCall: { ...item } };
+  };
   return [
     call("arcigy.run_remote_mcp_smoke", {}),
     call("arcigy.get_production_verification_evidence", {}),

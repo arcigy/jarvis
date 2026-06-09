@@ -125,7 +125,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(
     readiness.launchEvidence.remoteHandoff.requiredBeforeExternalAgent.some(
       (step) =>
-        step.includes("all 36 required remote MCP smoke gates") &&
+        step.includes("all 37 required remote MCP smoke gates") &&
         step.includes("pack-client-memory-quick-start") &&
         step.includes("pack-production-evidence-quick-start") &&
         step.includes("secret-redaction")

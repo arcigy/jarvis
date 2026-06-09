@@ -18,7 +18,7 @@ const viewport = {
   height: Number(args.get("--height") || 960),
 };
 const isNarrowViewport = viewport.width < 700;
-const requiredRemoteSmokeGateCount = 36;
+const requiredRemoteSmokeGateCount = 37;
 
 const failures = [];
 const consoleErrors = [];

@@ -47,6 +47,7 @@ const requiredReleaseProofGates = [
   "pack-tool-registry",
   "pack-quick-start-urls",
   "pack-quick-start-approval-policy",
+  "pack-quick-start-exact-mcp-calls",
   "pack-contract-quick-start",
   "pack-contract-draft-quick-start",
   "pack-agent-setup-profiles",
@@ -187,6 +188,13 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
       hasQuickStartApprovalParity(pack.body?.quickStartCalls),
       "pack-quick-start-approval-policy",
       "Connection pack quick-start calls match the MCP registry approval policy."
+    )
+  );
+  checks.push(
+    check(
+      hasExactQuickStartMcpCalls(pack.body?.quickStartCalls),
+      "pack-quick-start-exact-mcp-calls",
+      "Connection pack quick-start calls include exact MCP call objects in parity with tool, URL, body, and approval policy."
     )
   );
   checks.push(
@@ -582,6 +590,28 @@ function hasQuickStartApprovalParity(value: unknown): boolean {
     if (!item || typeof item !== "object") return false;
     const call = item as { tool?: unknown; approvalRequired?: unknown };
     return typeof call.tool === "string" && policy.has(call.tool) && call.approvalRequired === policy.get(call.tool);
+  });
+}
+
+function hasExactQuickStartMcpCalls(value: unknown): boolean {
+  if (!Array.isArray(value) || value.length === 0) return false;
+  return value.every((item) => {
+    if (!item || typeof item !== "object") return false;
+    const call = item as {
+      tool?: unknown;
+      method?: unknown;
+      url?: unknown;
+      body?: unknown;
+      approvalRequired?: unknown;
+      exactMcpCall?: { tool?: unknown; method?: unknown; url?: unknown; body?: unknown; approvalRequired?: unknown };
+    };
+    return (
+      call.exactMcpCall?.tool === call.tool &&
+      call.exactMcpCall?.method === call.method &&
+      call.exactMcpCall?.url === call.url &&
+      call.exactMcpCall?.approvalRequired === call.approvalRequired &&
+      JSON.stringify(call.exactMcpCall?.body ?? null) === JSON.stringify(call.body ?? null)
+    );
   });
 }
 

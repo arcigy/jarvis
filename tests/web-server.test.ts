@@ -393,7 +393,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(
       readinessBody.launchEvidence.remoteHandoff.requiredBeforeExternalAgent.some(
         (step) =>
-          step.includes("all 36 required remote MCP smoke gates") &&
+          step.includes("all 37 required remote MCP smoke gates") &&
           step.includes("pack-contract-draft-quick-start") &&
           step.includes("pack-client-memory-quick-start") &&
           step.includes("pack-production-evidence-quick-start") &&
@@ -973,6 +973,7 @@ function remoteSmokeRequiredGateFixture() {
     "pack-tool-registry",
     "pack-quick-start-urls",
     "pack-quick-start-approval-policy",
+    "pack-quick-start-exact-mcp-calls",
     "pack-contract-quick-start",
     "pack-contract-draft-quick-start",
     "pack-agent-setup-profiles",
