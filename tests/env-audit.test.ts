@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 
 test("Jarvis secrets audit reports local setup without leaking secret values", () => {
@@ -78,4 +80,58 @@ test("Jarvis secrets audit strict mode blocks missing required production secret
   assert.equal(body.status, "blocked");
   assert.ok(body.nextActions.some((action) => action.includes("gemini")));
   assert.ok(body.nextActions.some((action) => action.includes("postgres")));
+});
+
+test("Jarvis env bootstrap writes a strong web token without printing it", () => {
+  const source = readFileSync("scripts/jarvis_env_bootstrap.ts", "utf-8");
+  assert.match(source, /arcigy-jarvis-env-bootstrap/);
+  assert.match(source, /randomBytes\(32\)\.toString\("base64url"\)/);
+  assert.match(source, /redactSensitiveText\(output\)/);
+  assert.match(source, /Secret-safe: generated token is written to \.env\.local and never printed/);
+
+  const root = mkdtempSync(join(tmpdir(), "jarvis-env-bootstrap-"));
+  writeFileSync(join(root, ".env.local"), "GEMINI_API_KEY=existing\n", "utf-8");
+
+  const result = spawnSync("node", ["scripts/jarvis_env_bootstrap.ts", "--json", "--repo-root", root], {
+    cwd: process.cwd(),
+    encoding: "utf-8",
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  const body = JSON.parse(result.stdout) as { mode: string; changed: boolean; tokenLength: number; tokenFingerprint: string; secretPolicy: string };
+  const envFile = readFileSync(join(root, ".env.local"), "utf-8");
+  const token = envFile.match(/^JARVIS_WEB_TOKEN=(.+)$/m)?.[1] ?? "";
+
+  assert.equal(body.mode, "arcigy-jarvis-env-bootstrap");
+  assert.equal(body.changed, true);
+  assert.equal(body.tokenLength, token.length);
+  assert.ok(token.length >= 32);
+  assert.match(body.tokenFingerprint, /^sha256:[0-9a-f]{12}$/);
+  assert.equal(result.stdout.includes(token), false);
+  assert.match(body.secretPolicy, /never printed/);
+});
+
+test("Jarvis env bootstrap preserves strong token unless forced", () => {
+  const root = mkdtempSync(join(tmpdir(), "jarvis-env-bootstrap-existing-"));
+  const existingToken = "existing-strong-jarvis-web-token-value";
+  writeFileSync(join(root, ".env.local"), `JARVIS_WEB_TOKEN=${existingToken}\n`, "utf-8");
+
+  const noForce = spawnSync("node", ["scripts/jarvis_env_bootstrap.ts", "--json", "--repo-root", root], {
+    cwd: process.cwd(),
+    encoding: "utf-8",
+  });
+  assert.equal(noForce.status, 0, noForce.stderr);
+  assert.equal(JSON.parse(noForce.stdout).changed, false);
+  assert.equal(readFileSync(join(root, ".env.local"), "utf-8").includes(existingToken), true);
+
+  const forced = spawnSync("node", ["scripts/jarvis_env_bootstrap.ts", "--json", "--force", "--repo-root", root], {
+    cwd: process.cwd(),
+    encoding: "utf-8",
+  });
+  assert.equal(forced.status, 0, forced.stderr);
+  assert.equal(JSON.parse(forced.stdout).changed, true);
+  const envFile = readFileSync(join(root, ".env.local"), "utf-8");
+  assert.equal(envFile.includes(existingToken), false);
+  const nextToken = envFile.match(/^JARVIS_WEB_TOKEN=(.+)$/m)?.[1] ?? "";
+  assert.equal(forced.stdout.includes(nextToken), false);
 });

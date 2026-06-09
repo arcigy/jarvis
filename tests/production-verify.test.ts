@@ -9,6 +9,7 @@ test("production verifier wires every live release gate", () => {
 
   assert.equal(packageJson.scripts["verify:production"], "node scripts/verify_production.ts");
   assert.equal(packageJson.scripts["secrets:audit"], "node scripts/jarvis_env_audit.ts");
+  assert.equal(packageJson.scripts["secrets:bootstrap"], "node scripts/jarvis_env_bootstrap.ts");
   assert.match(script, /runNpm\("typecheck", \["run", "typecheck"\]\)/);
   assert.match(script, /runNpm\("tests", \["test"\]\)/);
   assert.match(script, /runNpm\("secrets-audit", \["run", "secrets:audit", "--", "--json"\]\)/);

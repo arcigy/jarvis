@@ -14,6 +14,10 @@ test("local web bridge serves UI and API health", async () => {
   assert.match(source, /return redactSensitiveText\(lines\.at\(-1\) \|\| String\(message\)\)/);
   const evidencePath = join(process.cwd(), "generated", "production-verification", "latest.json");
   const previousEvidence = existsSync(evidencePath) ? readFileSync(evidencePath, "utf-8") : null;
+  const previousWebToken = process.env.JARVIS_WEB_TOKEN;
+  const previousApiSecret = process.env.API_SECRET_KEY;
+  delete process.env.JARVIS_WEB_TOKEN;
+  process.env.API_SECRET_KEY = "dummy";
   const syntheticGoogleKey = "AI" + "za" + "S" + "y" + "C".repeat(32);
   mkdirSync(join(process.cwd(), "generated", "production-verification"), { recursive: true });
   writeFileSync(
@@ -706,6 +710,10 @@ test("local web bridge serves UI and API health", async () => {
   } finally {
     if (previousEvidence === null) rmSync(evidencePath, { force: true });
     else writeFileSync(evidencePath, previousEvidence, "utf-8");
+    if (previousWebToken === undefined) delete process.env.JARVIS_WEB_TOKEN;
+    else process.env.JARVIS_WEB_TOKEN = previousWebToken;
+    if (previousApiSecret === undefined) delete process.env.API_SECRET_KEY;
+    else process.env.API_SECRET_KEY = previousApiSecret;
     await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   }
 });
