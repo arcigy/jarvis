@@ -89,6 +89,17 @@ export type RemoteMcpConnectionPack = {
     grok: string;
     generic: string;
   };
+  agentSetupProfiles: Array<{
+    agent: "Claude" | "ChatGPT" | "Grok" | "Generic HTTP agent";
+    setupMode: "external-http-mcp" | "openapi-custom-action" | "openapi-or-http-json";
+    importUrl: string;
+    fallbackUrl: string;
+    firstTool: "arcigy.get_operator_briefing";
+    firstToolUrl: string;
+    requiredProofGates: string[];
+    writePolicy: "approval.approved-required";
+    localWritePolicy: "dry-run-first";
+  }>;
   limits: {
     maxJsonBytes: number;
     pathPolicy: "repo-only";
@@ -171,6 +182,7 @@ export async function buildRemoteMcpConnectionPack(
     },
     agentCompatibility: buildAgentCompatibility(),
     agentPromptTemplates: buildAgentPromptTemplates(baseUrl),
+    agentSetupProfiles: buildAgentSetupProfiles(baseUrl),
     limits: {
       maxJsonBytes: input.maxJsonBytes ?? 1_000_000,
       pathPolicy: "repo-only",
@@ -200,7 +212,7 @@ export async function buildRemoteMcpConnectionPack(
       "Fetch actionManifestUrl when the remote agent supports ai-plugin/action manifests.",
       "Import openApiSchemaUrl when the remote agent supports ChatGPT custom actions, Grok actions, or OpenAPI-based HTTP tool setup.",
       "Fetch productionVerificationEvidenceUrl or call arcigy.get_production_verification_evidence to inspect the latest verified production proof.",
-      "Run the smokeTestUrl before handoff and require ready checks for action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-voice-quick-start, voice-tool-call, approval-gate, approval-shape-gate, and secret-redaction.",
+      "Run the smokeTestUrl before handoff and require ready checks for action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-agent-setup-profiles, pack-voice-quick-start, voice-tool-call, approval-gate, approval-shape-gate, and secret-redaction.",
       "Call MCP tools with POST JSON to mcpToolCallPattern.",
       "Use the bearer auth header placeholder; the real token must be supplied by the operator and is never returned by this pack.",
       "Use tunnel.statusUrl to inspect public tunnel URLs from the redacted secure-tunnel log. Browser-launched tunnel start requires a strong JARVIS_WEB_TOKEN.",
@@ -225,6 +237,60 @@ function buildAgentPromptTemplates(baseUrl: string): RemoteMcpConnectionPack["ag
   };
 }
 
+function buildAgentSetupProfiles(baseUrl: string): RemoteMcpConnectionPack["agentSetupProfiles"] {
+  const requiredProofGates = [
+    "action-manifest",
+    "openapi-schema",
+    "cors-preflight",
+    "external-auth-gate",
+    "pack-auth-throttle-policy",
+    "pack-limits",
+    "pack-agent-setup-profiles",
+    "pack-voice-quick-start",
+    "voice-tool-call",
+    "approval-gate",
+    "approval-shape-gate",
+    "secret-redaction",
+  ];
+  const base = {
+    firstTool: "arcigy.get_operator_briefing" as const,
+    firstToolUrl: `${baseUrl}/api/mcp/arcigy.get_operator_briefing`,
+    requiredProofGates,
+    writePolicy: "approval.approved-required" as const,
+    localWritePolicy: "dry-run-first" as const,
+  };
+  return [
+    {
+      agent: "Claude",
+      setupMode: "external-http-mcp",
+      importUrl: `${baseUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`,
+      fallbackUrl: `${baseUrl}/.well-known/arcigy-jarvis.json`,
+      ...base,
+    },
+    {
+      agent: "ChatGPT",
+      setupMode: "openapi-custom-action",
+      importUrl: `${baseUrl}/api/openapi.json`,
+      fallbackUrl: `${baseUrl}/.well-known/ai-plugin.json`,
+      ...base,
+    },
+    {
+      agent: "Grok",
+      setupMode: "openapi-or-http-json",
+      importUrl: `${baseUrl}/api/openapi.json`,
+      fallbackUrl: `${baseUrl}/api/mcp/{toolName}`,
+      ...base,
+    },
+    {
+      agent: "Generic HTTP agent",
+      setupMode: "openapi-or-http-json",
+      importUrl: `${baseUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`,
+      fallbackUrl: `${baseUrl}/api/mcp/{toolName}`,
+      ...base,
+    },
+  ];
+}
+
 function buildAgentCompatibility(): RemoteMcpConnectionPack["agentCompatibility"] {
   return {
     supportedAgents: ["Claude", "ChatGPT", "Grok", "xAI-compatible HTTP agents", "generic MCP-capable HTTP agents"],
@@ -236,7 +302,7 @@ function buildAgentCompatibility(): RemoteMcpConnectionPack["agentCompatibility"
       "Import openApiSchemaUrl if the agent supports OpenAPI or custom actions.",
       "Fetch productionVerificationEvidenceUrl or call arcigy.get_production_verification_evidence and cite its status.",
       "Fetch handoff.connectionPackUrl and confirm tokenValueReturned=false plus repo-only limits.",
-      "Run smokeTestUrl and require status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-voice-quick-start, voice-tool-call, approval-gate, approval-shape-gate, and secret-redaction ready.",
+      "Run smokeTestUrl and require status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-agent-setup-profiles, pack-voice-quick-start, voice-tool-call, approval-gate, approval-shape-gate, and secret-redaction ready.",
       "Inspect tunnel.statusUrl after any tunnel start and never ask for the real bearer token.",
     ],
     safetyRules: [
@@ -265,7 +331,7 @@ function buildHandoffRunbook(baseUrl: string): RemoteMcpConnectionPack["handoff"
       "Fetch actionManifestUrl if the agent supports ai-plugin/action manifests.",
       "Fetch openApiSchemaUrl if the agent supports OpenAPI/custom actions.",
       "Fetch productionVerificationEvidenceUrl or call arcigy.get_production_verification_evidence and cite its status.",
-      "Run smokeTestUrl and require status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-voice-quick-start, voice-tool-call, approval-gate, approval-shape-gate, and secret-redaction ready before using MCP tools.",
+      "Run smokeTestUrl and require status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-agent-setup-profiles, pack-voice-quick-start, voice-tool-call, approval-gate, approval-shape-gate, and secret-redaction ready before using MCP tools.",
       "Fetch tunnel.statusUrl if the operator needs the current public tunnel URLs; token values must remain redacted.",
       "Call arcigy.get_operator_briefing before proposing work.",
       "Use read-only or draft tools first; use dryRun: true before Gmail sync writes.",
@@ -305,7 +371,7 @@ function buildHandoffRunbook(baseUrl: string): RemoteMcpConnectionPack["handoff"
       {
         key: "remote-smoke",
         url: `${baseUrl}/api/remote-mcp-smoke`,
-        expected: 'status=ready, including action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-voice-quick-start, voice-tool-call, secret-redaction, approval-gate, and approval-shape-gate for top-level {"approved":true} payload rejection.',
+        expected: 'status=ready, including action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-agent-setup-profiles, pack-voice-quick-start, voice-tool-call, secret-redaction, approval-gate, and approval-shape-gate for top-level {"approved":true} payload rejection.',
       },
     ],
   };

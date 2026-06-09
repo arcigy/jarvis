@@ -556,7 +556,7 @@ function buildReadinessLaunchEvidence(status, launchChecklist, nextActions) {
       requiredBeforeExternalAgent: [
         "Run npm run web:tunnel:secure or use the browser Start tunnel button with a strong JARVIS_WEB_TOKEN.",
         "Fetch /.well-known/ai-plugin.json, /api/openapi.json, /.well-known/arcigy-jarvis.json, and /api/remote-mcp-pack?includeReadiness=true&live=true through the external URL.",
-        "Run /api/remote-mcp-smoke and require status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-voice-quick-start, voice-tool-call, approval-gate, approval-shape-gate, and secret-redaction ready before any remote agent uses write-capable tools.",
+        "Run /api/remote-mcp-smoke and require status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-agent-setup-profiles, pack-voice-quick-start, voice-tool-call, approval-gate, approval-shape-gate, and secret-redaction ready before any remote agent uses write-capable tools.",
       ],
       smokeCommand: "npm run remote:mcp:smoke -- --url <external-url>",
       tunnelCommand: "npm run web:tunnel:secure",
@@ -885,6 +885,7 @@ async function getRemoteMcpPack(payload = {}) {
     },
     agentCompatibility: buildRemoteMcpAgentCompatibility(),
     agentPromptTemplates: buildRemoteMcpAgentPromptTemplates(baseUrl),
+    agentSetupProfiles: buildRemoteMcpAgentSetupProfiles(baseUrl),
     limits: {
       maxJsonBytes: getMaxJsonBytes(),
       pathPolicy: "repo-only",
@@ -914,7 +915,7 @@ async function getRemoteMcpPack(payload = {}) {
       "Fetch actionManifestUrl when the remote agent supports ai-plugin/action manifests.",
       "Import openApiSchemaUrl when the remote agent supports ChatGPT custom actions, Grok actions, or OpenAPI-based HTTP tool setup.",
       "Fetch productionVerificationEvidenceUrl or call arcigy.get_production_verification_evidence to inspect the latest verified production proof.",
-      "Run the smokeTestUrl before handoff and require ready checks for action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-voice-quick-start, voice-tool-call, approval-gate, approval-shape-gate, and secret-redaction.",
+      "Run the smokeTestUrl before handoff and require ready checks for action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-agent-setup-profiles, pack-voice-quick-start, voice-tool-call, approval-gate, approval-shape-gate, and secret-redaction.",
       "Call MCP tools with POST JSON to mcpToolCallPattern.",
       "Use the bearer auth header placeholder; the real token must be supplied by the operator and is never returned by this pack.",
       "Use tunnel.statusUrl to inspect public tunnel URLs from the redacted secure-tunnel log. Browser-launched tunnel start requires a strong JARVIS_WEB_TOKEN.",
@@ -923,6 +924,60 @@ async function getRemoteMcpPack(payload = {}) {
       "Use get_operator_briefing for a Jarvis-style daily status before making recommendations.",
     ],
   };
+}
+
+function buildRemoteMcpAgentSetupProfiles(baseUrl) {
+  const requiredProofGates = [
+    "action-manifest",
+    "openapi-schema",
+    "cors-preflight",
+    "external-auth-gate",
+    "pack-auth-throttle-policy",
+    "pack-limits",
+    "pack-agent-setup-profiles",
+    "pack-voice-quick-start",
+    "voice-tool-call",
+    "approval-gate",
+    "approval-shape-gate",
+    "secret-redaction",
+  ];
+  const base = {
+    firstTool: "arcigy.get_operator_briefing",
+    firstToolUrl: `${baseUrl}/api/mcp/arcigy.get_operator_briefing`,
+    requiredProofGates,
+    writePolicy: "approval.approved-required",
+    localWritePolicy: "dry-run-first",
+  };
+  return [
+    {
+      agent: "Claude",
+      setupMode: "external-http-mcp",
+      importUrl: `${baseUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`,
+      fallbackUrl: `${baseUrl}/.well-known/arcigy-jarvis.json`,
+      ...base,
+    },
+    {
+      agent: "ChatGPT",
+      setupMode: "openapi-custom-action",
+      importUrl: `${baseUrl}/api/openapi.json`,
+      fallbackUrl: `${baseUrl}/.well-known/ai-plugin.json`,
+      ...base,
+    },
+    {
+      agent: "Grok",
+      setupMode: "openapi-or-http-json",
+      importUrl: `${baseUrl}/api/openapi.json`,
+      fallbackUrl: `${baseUrl}/api/mcp/{toolName}`,
+      ...base,
+    },
+    {
+      agent: "Generic HTTP agent",
+      setupMode: "openapi-or-http-json",
+      importUrl: `${baseUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`,
+      fallbackUrl: `${baseUrl}/api/mcp/{toolName}`,
+      ...base,
+    },
+  ];
 }
 
 function buildRemoteMcpAgentPromptTemplates(baseUrl) {
@@ -950,7 +1005,7 @@ function buildRemoteMcpAgentCompatibility() {
       "Import openApiSchemaUrl if the agent supports OpenAPI or custom actions.",
       "Fetch productionVerificationEvidenceUrl or call arcigy.get_production_verification_evidence and cite its status.",
       "Fetch handoff.connectionPackUrl and confirm tokenValueReturned=false plus repo-only limits.",
-      "Run smokeTestUrl and require status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-voice-quick-start, voice-tool-call, approval-gate, approval-shape-gate, and secret-redaction ready.",
+      "Run smokeTestUrl and require status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-agent-setup-profiles, pack-voice-quick-start, voice-tool-call, approval-gate, approval-shape-gate, and secret-redaction ready.",
       "Inspect tunnel.statusUrl after any tunnel start and never ask for the real bearer token.",
     ],
     safetyRules: [
@@ -979,7 +1034,7 @@ function buildRemoteMcpHandoffRunbook(baseUrl) {
       "Fetch actionManifestUrl if the agent supports ai-plugin/action manifests.",
       "Fetch openApiSchemaUrl if the agent supports OpenAPI/custom actions.",
       "Fetch productionVerificationEvidenceUrl or call arcigy.get_production_verification_evidence and cite its status.",
-      "Run smokeTestUrl and require status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-voice-quick-start, voice-tool-call, approval-gate, approval-shape-gate, and secret-redaction ready before using MCP tools.",
+      "Run smokeTestUrl and require status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-agent-setup-profiles, pack-voice-quick-start, voice-tool-call, approval-gate, approval-shape-gate, and secret-redaction ready before using MCP tools.",
       "Fetch tunnel.statusUrl if the operator needs the current public tunnel URLs; token values must remain redacted.",
       "Call arcigy.get_operator_briefing before proposing work.",
       "Use read-only or draft tools first; use dryRun: true before Gmail sync writes.",
@@ -1019,7 +1074,7 @@ function buildRemoteMcpHandoffRunbook(baseUrl) {
       {
         key: "remote-smoke",
         url: `${baseUrl}/api/remote-mcp-smoke`,
-        expected: 'status=ready, including action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-voice-quick-start, voice-tool-call, secret-redaction, approval-gate, and approval-shape-gate for top-level {"approved":true} payload rejection.',
+        expected: 'status=ready, including action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-agent-setup-profiles, pack-voice-quick-start, voice-tool-call, secret-redaction, approval-gate, and approval-shape-gate for top-level {"approved":true} payload rejection.',
       },
     ],
   };
@@ -1408,6 +1463,13 @@ async function runRemoteMcpSmoke(payload = {}) {
   );
   checks.push(
     smokeCheck(
+      hasAgentSetupProfiles(pack.body?.agentSetupProfiles, baseUrl),
+      "pack-agent-setup-profiles",
+      "Connection pack exposes structured setup profiles for Claude, ChatGPT, Grok, and generic HTTP agents."
+    )
+  );
+  checks.push(
+    smokeCheck(
       hasClientMemoryQuickStarts(pack.body?.quickStartCalls),
       "pack-client-memory-quick-start",
       "Connection pack includes read-only client identity and open-need quick-start calls."
@@ -1459,7 +1521,7 @@ async function runRemoteMcpSmoke(payload = {}) {
     baseUrl,
     summary:
       status === "ready"
-      ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, action manifest, OpenAPI action schema, CORS preflight, external auth gate, auth throttle policy, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, voice quick-start, voice tool call, client memory quick-start, audit quick-start, production evidence quick-start, production evidence tool call, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
+        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, action manifest, OpenAPI action schema, CORS preflight, external auth gate, auth throttle policy, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, voice quick-start, voice tool call, client memory quick-start, audit quick-start, production evidence quick-start, production evidence tool call, agent compatibility, structured agent setup profiles, handoff proof, read-only call, approval gates, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((check) => check.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -1742,7 +1804,7 @@ function hasHandoffProof(value, baseUrl) {
     proofKeys.has("secure-tunnel-status") &&
     proofKeys.has("production-verification-evidence") &&
     proofKeys.has("remote-smoke") &&
-    ["action-manifest", "openapi-schema", "cors-preflight", "external-auth-gate", "pack-auth-throttle-policy", "pack-voice-quick-start", "voice-tool-call", "approval-shape-gate", "secret-redaction"].every((key) => remoteSmokeExpected.includes(key)) &&
+    ["action-manifest", "openapi-schema", "cors-preflight", "external-auth-gate", "pack-auth-throttle-policy", "pack-agent-setup-profiles", "pack-voice-quick-start", "voice-tool-call", "approval-shape-gate", "secret-redaction"].every((key) => remoteSmokeExpected.includes(key)) &&
     agentFirstSteps.some((step) => typeof step === "string" && step.includes("arcigy.get_operator_briefing")) &&
     agentFirstSteps.some((step) => typeof step === "string" && step.includes("status=ready"))
   );
@@ -1759,6 +1821,30 @@ function hasAgentCompatibility(value) {
     safetyRules.some((rule) => typeof rule === "string" && rule.includes("approvalRequired")) &&
     safetyRules.some((rule) => typeof rule === "string" && rule.includes("family-friendly"))
   );
+}
+
+function hasAgentSetupProfiles(value, baseUrl) {
+  if (!Array.isArray(value)) return false;
+  const profiles = new Map(value.filter((item) => item && typeof item === "object").map((item) => [item.agent, item]));
+  const expected = [
+    ["Claude", "external-http-mcp", `${baseUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`],
+    ["ChatGPT", "openapi-custom-action", `${baseUrl}/api/openapi.json`],
+    ["Grok", "openapi-or-http-json", `${baseUrl}/api/openapi.json`],
+    ["Generic HTTP agent", "openapi-or-http-json", `${baseUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`],
+  ];
+  return expected.every(([agent, setupMode, importUrl]) => {
+    const profile = profiles.get(agent);
+    const gates = Array.isArray(profile?.requiredProofGates) ? profile.requiredProofGates : [];
+    return (
+      profile?.setupMode === setupMode &&
+      profile?.importUrl === importUrl &&
+      profile?.firstTool === "arcigy.get_operator_briefing" &&
+      profile?.firstToolUrl === `${baseUrl}/api/mcp/arcigy.get_operator_briefing` &&
+      profile?.writePolicy === "approval.approved-required" &&
+      profile?.localWritePolicy === "dry-run-first" &&
+      ["action-manifest", "openapi-schema", "external-auth-gate", "pack-agent-setup-profiles", "approval-shape-gate", "secret-redaction"].every((gate) => gates.includes(gate))
+    );
+  });
 }
 
 function hasClientMemoryQuickStarts(value) {

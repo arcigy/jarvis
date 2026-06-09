@@ -187,6 +187,13 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
   );
   checks.push(
     check(
+      hasAgentSetupProfiles(pack.body?.agentSetupProfiles, baseUrl),
+      "pack-agent-setup-profiles",
+      "Connection pack exposes structured setup profiles for Claude, ChatGPT, Grok, and generic HTTP agents."
+    )
+  );
+  checks.push(
+    check(
       hasClientMemoryQuickStarts(pack.body?.quickStartCalls),
       "pack-client-memory-quick-start",
       "Connection pack includes read-only client identity and open-need quick-start calls."
@@ -250,7 +257,7 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
     baseUrl,
     summary:
       status === "ready"
-        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, action manifest, OpenAPI action schema, CORS preflight, external auth gate, auth throttle policy, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, voice quick-start, voice tool call, client memory quick-start, audit quick-start, production evidence quick-start, production evidence tool call, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
+        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, action manifest, OpenAPI action schema, CORS preflight, external auth gate, auth throttle policy, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, voice quick-start, voice tool call, client memory quick-start, audit quick-start, production evidence quick-start, production evidence tool call, agent compatibility, structured agent setup profiles, handoff proof, read-only call, approval gates, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((item) => item.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -593,7 +600,7 @@ function hasHandoffProof(value: unknown, baseUrl: string): boolean {
     proofKeys.has("secure-tunnel-status") &&
     proofKeys.has("production-verification-evidence") &&
     proofKeys.has("remote-smoke") &&
-    ["action-manifest", "openapi-schema", "cors-preflight", "external-auth-gate", "pack-auth-throttle-policy", "pack-voice-quick-start", "voice-tool-call", "approval-shape-gate", "secret-redaction"].every((key) => remoteSmokeExpected.includes(key)) &&
+    ["action-manifest", "openapi-schema", "cors-preflight", "external-auth-gate", "pack-auth-throttle-policy", "pack-agent-setup-profiles", "pack-voice-quick-start", "voice-tool-call", "approval-shape-gate", "secret-redaction"].every((key) => remoteSmokeExpected.includes(key)) &&
     agentFirstSteps.some((step) => typeof step === "string" && step.includes("arcigy.get_operator_briefing")) &&
     agentFirstSteps.some((step) => typeof step === "string" && step.includes("status=ready"))
   );
@@ -611,6 +618,34 @@ function hasAgentCompatibility(value: unknown): boolean {
     safetyRules.some((rule) => typeof rule === "string" && rule.includes("approvalRequired")) &&
     safetyRules.some((rule) => typeof rule === "string" && rule.includes("family-friendly"))
   );
+}
+
+function hasAgentSetupProfiles(value: unknown, baseUrl: string): boolean {
+  if (!Array.isArray(value)) return false;
+  const profiles = new Map(
+    value
+      .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
+      .map((item) => [item.agent, item])
+  );
+  const expected = [
+    ["Claude", "external-http-mcp", `${baseUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`],
+    ["ChatGPT", "openapi-custom-action", `${baseUrl}/api/openapi.json`],
+    ["Grok", "openapi-or-http-json", `${baseUrl}/api/openapi.json`],
+    ["Generic HTTP agent", "openapi-or-http-json", `${baseUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`],
+  ];
+  return expected.every(([agent, setupMode, importUrl]) => {
+    const profile = profiles.get(agent);
+    const gates = Array.isArray(profile?.requiredProofGates) ? profile.requiredProofGates : [];
+    return (
+      profile?.setupMode === setupMode &&
+      profile?.importUrl === importUrl &&
+      profile?.firstTool === "arcigy.get_operator_briefing" &&
+      profile?.firstToolUrl === `${baseUrl}/api/mcp/arcigy.get_operator_briefing` &&
+      profile?.writePolicy === "approval.approved-required" &&
+      profile?.localWritePolicy === "dry-run-first" &&
+      ["action-manifest", "openapi-schema", "external-auth-gate", "pack-agent-setup-profiles", "approval-shape-gate", "secret-redaction"].every((gate) => gates.includes(gate))
+    );
+  });
 }
 
 function hasClientMemoryQuickStarts(value: unknown): boolean {

@@ -157,6 +157,7 @@ test("remote MCP smoke checks every response for bearer token leaks", async () =
         auth: { tokenValueReturned: false },
         limits: remoteSmokePackLimitsFixture(),
         agentCompatibility: remoteAgentCompatibilityFixture(),
+        agentSetupProfiles: remoteAgentSetupProfilesFixture(),
         handoff: {
           connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
           requiredProof: [{ key: "manifest" }, { key: "connection-pack" }, { key: "remote-smoke" }],
@@ -213,6 +214,7 @@ test("remote MCP smoke requires valid quick-start URLs", async () => {
         auth: { tokenValueReturned: false },
         limits: remoteSmokePackLimitsFixture(),
         agentCompatibility: remoteAgentCompatibilityFixture(),
+        agentSetupProfiles: remoteAgentSetupProfilesFixture(),
         handoff: {
           connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
           requiredProof: [{ key: "manifest" }, { key: "connection-pack" }, { key: "remote-smoke" }],
@@ -269,6 +271,7 @@ test("remote MCP smoke requires quick-start approval policy parity", async () =>
         auth: { tokenValueReturned: false },
         limits: remoteSmokePackLimitsFixture(),
         agentCompatibility: remoteAgentCompatibilityFixture(),
+        agentSetupProfiles: remoteAgentSetupProfilesFixture(),
         handoff: {
           connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
           requiredProof: [{ key: "manifest" }, { key: "connection-pack" }, { key: "remote-smoke" }],
@@ -348,6 +351,7 @@ test("remote MCP smoke blocks generic secret patterns in response bodies", async
         leakedGoogleKey,
         leakedDatabaseUrl,
         agentCompatibility: remoteAgentCompatibilityFixture(),
+        agentSetupProfiles: remoteAgentSetupProfilesFixture(),
         handoff: {
           connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
           requiredProof: [{ key: "manifest" }, { key: "connection-pack" }, { key: "remote-smoke" }],
@@ -402,6 +406,7 @@ test("remote MCP smoke requires exact manifest and pack tool registries", async 
         auth: { tokenValueReturned: false },
         limits: remoteSmokePackLimitsFixture(),
         agentCompatibility: remoteAgentCompatibilityFixture(),
+        agentSetupProfiles: remoteAgentSetupProfilesFixture(),
         handoff: {
           connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
           requiredProof: [{ key: "manifest" }, { key: "connection-pack" }, { key: "remote-smoke" }],
@@ -459,6 +464,7 @@ test("remote MCP smoke requires valid manifest tool metadata", async () => {
         auth: { tokenValueReturned: false },
         limits: remoteSmokePackLimitsFixture(),
         agentCompatibility: remoteAgentCompatibilityFixture(),
+        agentSetupProfiles: remoteAgentSetupProfilesFixture(),
         handoff: {
           connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
           requiredProof: [{ key: "manifest" }, { key: "connection-pack" }, { key: "remote-smoke" }],
@@ -512,6 +518,7 @@ test("remote MCP smoke requires exact manifest and pack tool policies", async ()
         auth: { tokenValueReturned: false },
         limits: remoteSmokePackLimitsFixture(),
         agentCompatibility: remoteAgentCompatibilityFixture(),
+        agentSetupProfiles: remoteAgentSetupProfilesFixture(),
         handoff: {
           connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
           requiredProof: [{ key: "manifest" }, { key: "connection-pack" }, { key: "remote-smoke" }],
@@ -567,6 +574,7 @@ test("remote MCP smoke requires guarded connection pack limits", async () => {
         auth: { tokenValueReturned: false },
         limits: { maxJsonBytes: 0, pathPolicy: "anywhere", writesRequireExplicitToolCall: false },
         agentCompatibility: remoteAgentCompatibilityFixture(),
+        agentSetupProfiles: remoteAgentSetupProfilesFixture(),
         handoff: {
           connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
           requiredProof: [{ key: "manifest" }, { key: "connection-pack" }, { key: "remote-smoke" }],
@@ -621,6 +629,7 @@ test("remote MCP smoke requires the handoff proof runbook", async () => {
         auth: { tokenValueReturned: false },
         limits: remoteSmokePackLimitsFixture(),
         agentCompatibility: remoteAgentCompatibilityFixture(),
+        agentSetupProfiles: remoteAgentSetupProfilesFixture(),
         tools: {
           localStateWrite: ["arcigy.sync_gmail_recent_messages"],
           readOnlyOrDraft: ["arcigy.generate_ai_reply"],
@@ -686,6 +695,7 @@ test("remote MCP smoke requires the contract draft quick-start", async () => {
         auth: { tokenValueReturned: false },
         limits: remoteSmokePackLimitsFixture(),
         agentCompatibility: remoteAgentCompatibilityFixture(),
+        agentSetupProfiles: remoteAgentSetupProfilesFixture(),
         handoff: {
           connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
           requiredProof: [{ key: "manifest" }, { key: "connection-pack" }, { key: "remote-smoke" }],
@@ -751,6 +761,7 @@ test("remote MCP smoke requires the Jarvis voice quick-start", async () => {
         auth: { tokenValueReturned: false },
         limits: remoteSmokePackLimitsFixture(),
         agentCompatibility: remoteAgentCompatibilityFixture(),
+        agentSetupProfiles: remoteAgentSetupProfilesFixture(),
         handoff: {
           connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
           requiredProof: [{ key: "manifest" }, { key: "connection-pack" }, { key: "remote-smoke" }],
@@ -794,6 +805,7 @@ test("remote MCP smoke requires the audit trail quick-start", async () => {
         auth: { tokenValueReturned: false },
         limits: remoteSmokePackLimitsFixture(),
         agentCompatibility: remoteAgentCompatibilityFixture(),
+        agentSetupProfiles: remoteAgentSetupProfilesFixture(),
         handoff: {
           connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
           requiredProof: [{ key: "manifest" }, { key: "connection-pack" }, { key: "remote-smoke" }],
@@ -849,6 +861,7 @@ test("remote MCP smoke requires the production evidence quick-start", async () =
         auth: { tokenValueReturned: false },
         limits: remoteSmokePackLimitsFixture(),
         agentCompatibility: remoteAgentCompatibilityFixture(),
+        agentSetupProfiles: remoteAgentSetupProfilesFixture(),
         handoff: {
           connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
           requiredProof: [
@@ -858,7 +871,7 @@ test("remote MCP smoke requires the production evidence quick-start", async () =
             { key: "connection-pack" },
             { key: "secure-tunnel-status" },
             { key: "production-verification-evidence" },
-            { key: "remote-smoke", expected: "action-manifest openapi-schema cors-preflight external-auth-gate pack-auth-throttle-policy pack-voice-quick-start voice-tool-call approval-shape-gate secret-redaction" },
+            { key: "remote-smoke", expected: "action-manifest openapi-schema cors-preflight external-auth-gate pack-auth-throttle-policy pack-agent-setup-profiles pack-voice-quick-start voice-tool-call approval-shape-gate secret-redaction" },
           ],
           agentFirstSteps: ["Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
         },
@@ -959,6 +972,9 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.match(pack.agentPromptTemplates.grok, /remote smoke/);
   assert.match(pack.agentPromptTemplates.chatgpt, /POST https:\/\/jarvis\.example\/api\/mcp\/\{toolName\}/);
   assert.match(pack.agentPromptTemplates.claude, /external HTTP MCP bridge/);
+  assert.ok(pack.agentSetupProfiles.some((profile) => profile.agent === "ChatGPT" && profile.setupMode === "openapi-custom-action" && profile.importUrl === "https://jarvis.example/api/openapi.json"));
+  assert.ok(pack.agentSetupProfiles.some((profile) => profile.agent === "Grok" && profile.fallbackUrl === "https://jarvis.example/api/mcp/{toolName}"));
+  assert.ok(pack.agentSetupProfiles.every((profile) => profile.firstTool === "arcigy.get_operator_briefing" && profile.writePolicy === "approval.approved-required"));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_production_verification_evidence" && call.approvalRequired === false));
   assert.ok(
     pack.quickStartCalls.some(
@@ -2825,6 +2841,47 @@ function remoteAgentCompatibilityFixture() {
     requiredBeforeWork: ["Run smokeTestUrl and require status=ready before using MCP tools."],
     safetyRules: ["Do not call approvalRequired tools without approval.", "Keep outputs family-friendly and secret-redacted."],
   };
+}
+
+function remoteAgentSetupProfilesFixture() {
+  const baseUrl = "https://jarvis.example";
+  const base = {
+    firstTool: "arcigy.get_operator_briefing",
+    firstToolUrl: `${baseUrl}/api/mcp/arcigy.get_operator_briefing`,
+    requiredProofGates: ["action-manifest", "openapi-schema", "external-auth-gate", "pack-agent-setup-profiles", "approval-shape-gate", "secret-redaction"],
+    writePolicy: "approval.approved-required",
+    localWritePolicy: "dry-run-first",
+  };
+  return [
+    {
+      agent: "Claude",
+      setupMode: "external-http-mcp",
+      importUrl: `${baseUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`,
+      fallbackUrl: `${baseUrl}/.well-known/arcigy-jarvis.json`,
+      ...base,
+    },
+    {
+      agent: "ChatGPT",
+      setupMode: "openapi-custom-action",
+      importUrl: `${baseUrl}/api/openapi.json`,
+      fallbackUrl: `${baseUrl}/.well-known/ai-plugin.json`,
+      ...base,
+    },
+    {
+      agent: "Grok",
+      setupMode: "openapi-or-http-json",
+      importUrl: `${baseUrl}/api/openapi.json`,
+      fallbackUrl: `${baseUrl}/api/mcp/{toolName}`,
+      ...base,
+    },
+    {
+      agent: "Generic HTTP agent",
+      setupMode: "openapi-or-http-json",
+      importUrl: `${baseUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`,
+      fallbackUrl: `${baseUrl}/api/mcp/{toolName}`,
+      ...base,
+    },
+  ];
 }
 
 function remoteSmokePackLimitsFixture() {
