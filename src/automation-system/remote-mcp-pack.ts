@@ -238,9 +238,9 @@ export async function buildRemoteMcpConnectionPack(
       : undefined,
     agentInstructions: [
       "Fetch the manifestUrl first to list live tools and schemas.",
-      "Fetch actionManifestUrl when the remote agent supports ai-plugin/action manifests.",
+      "Nacitaj actionManifestUrl, ked remote agent podporuje ai-plugin/action manifests.",
       "Import openApiSchemaUrl when the remote agent supports ChatGPT custom actions, Grok actions, or OpenAPI-based HTTP tool setup.",
-      "Fetch productionVerificationEvidenceUrl or call arcigy.get_production_verification_evidence to inspect the latest verified production proof.",
+      "Nacitaj productionVerificationEvidenceUrl alebo zavolaj arcigy.get_production_verification_evidence pre najnovsi overeny production proof.",
       "Run the smokeTestUrl before handoff and require status=ready with all 36 required remote MCP smoke gates ready, including manifest, tool-count, manifest-tool-registry, manifest-tool-metadata, auth-placeholder, manifest-local-write-policy, action-manifest, openapi-schema, cors-preflight, external-auth-gate, connection-pack, pack-secret-policy, pack-auth-throttle-policy, pack-limits, pack-tunnel-controls, secure-tunnel-status, pack-local-write-policy, pack-tool-registry, pack-quick-start-urls, pack-quick-start-approval-policy, pack-contract-quick-start, pack-contract-draft-quick-start, pack-agent-setup-profiles, pack-agent-launch-bundle, pack-voice-quick-start, pack-handoff-proof, pack-agent-compatibility, pack-client-memory-quick-start, pack-audit-quick-start, voice-tool-call, pack-production-evidence-quick-start, read-only-tool-call, production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction. Production evidence must be status=ready with release proof, dirty=false, and freshness.fresh=true within 24h.",
       "Call MCP tools with POST JSON to mcpToolCallPattern.",
       "Use the bearer auth header placeholder; the real token must be supplied by the operator and is never returned by this pack.",
@@ -290,7 +290,7 @@ function buildAgentLaunchBundle(baseUrl: string, status: ProductionReadinessRepo
       freshnessMaxAgeHours: 24,
       beforeAnyWork: [
         "Fetch the connection pack and confirm tokenValueReturned=false.",
-        "Fetch productionVerificationEvidenceUrl or call arcigy.get_production_verification_evidence.",
+        "Nacitaj productionVerificationEvidenceUrl alebo zavolaj arcigy.get_production_verification_evidence.",
         "Run smokeTestUrl and require status=ready.",
       ],
       beforeWrites: [
@@ -313,7 +313,7 @@ function buildAgentPromptTemplates(baseUrl: string): RemoteMcpConnectionPack["ag
     `Use Arcigy Jarvis remote MCP at ${baseUrl}. ` +
     "First fetch the connection pack, action manifest, manifest, and OpenAPI schema with Authorization: Bearer <JARVIS_WEB_TOKEN>, then run remote smoke. " +
     "Do not ask for or reveal secrets. Start with arcigy.get_operator_briefing. Use read-only/draft tools first. " +
-    "Never call approvalRequired tools until the operator confirms the exact payload.";
+    "Nikdy nevolaj approvalRequired tooly, kym operator nepotvrdi presny payload.";
   return {
     claude: `${shared} In Claude, treat this as an external HTTP MCP bridge and cite the smoke status before any write proposal.`,
     chatgpt: `${shared} In ChatGPT, import ${baseUrl}/api/openapi.json as the custom action schema, then use tool calls only through POST ${baseUrl}/api/mcp/{toolName} and keep outputs family-friendly.`,
@@ -407,9 +407,9 @@ function buildAgentCompatibility(): RemoteMcpConnectionPack["agentCompatibility"
     authentication: "Authorization bearer header",
     requiredBeforeWork: [
       "Fetch manifestUrl.",
-      "Fetch actionManifestUrl if the agent supports ai-plugin/action manifests.",
+      "Nacitaj actionManifestUrl, ak agent podporuje ai-plugin/action manifests.",
       "Import openApiSchemaUrl if the agent supports OpenAPI or custom actions.",
-      "Fetch productionVerificationEvidenceUrl or call arcigy.get_production_verification_evidence and cite its status.",
+      "Nacitaj productionVerificationEvidenceUrl alebo zavolaj arcigy.get_production_verification_evidence a cituj status.",
       "Fetch handoff.connectionPackUrl and confirm tokenValueReturned=false plus repo-only limits.",
       "Run smokeTestUrl and require status=ready with all 36 required remote MCP smoke gates ready, including manifest, tool-count, manifest-tool-registry, manifest-tool-metadata, auth-placeholder, manifest-local-write-policy, action-manifest, openapi-schema, cors-preflight, external-auth-gate, connection-pack, pack-secret-policy, pack-auth-throttle-policy, pack-limits, pack-tunnel-controls, secure-tunnel-status, pack-local-write-policy, pack-tool-registry, pack-quick-start-urls, pack-quick-start-approval-policy, pack-contract-quick-start, pack-contract-draft-quick-start, pack-agent-setup-profiles, pack-agent-launch-bundle, pack-voice-quick-start, pack-handoff-proof, pack-agent-compatibility, pack-client-memory-quick-start, pack-audit-quick-start, voice-tool-call, pack-production-evidence-quick-start, read-only-tool-call, production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction. Production evidence must include release proof, dirty=false, and freshness.fresh=true within 24h.",
       "Inspect tunnel.statusUrl after any tunnel start and never ask for the real bearer token.",
@@ -418,7 +418,7 @@ function buildAgentCompatibility(): RemoteMcpConnectionPack["agentCompatibility"
       "Never request, print, store, or infer the real bearer token from this pack.",
       "Start with read-only or draft tools before proposing any write action.",
       "Use dryRun: true before Gmail sync writes.",
-      "Do not call approvalRequired tools until the operator confirms the exact payload.",
+      "Nevolaj approvalRequired tooly, kym operator nepotvrdi presny payload.",
       "Keep outputs family-friendly, client-safe, and secret-redacted.",
     ],
   };
@@ -430,21 +430,21 @@ function buildHandoffRunbook(baseUrl: string): RemoteMcpConnectionPack["handoff"
     operatorChecklist: [
       "Spusti npm run web:tunnel:secure a nechaj proces otvoreny, kym remote agent pracuje.",
       "Ak pouzivas browser mode, najprv nastav silny JARVIS_WEB_TOKEN, potom pouzi Spustit tunel alebo POST /api/start-secure-tunnel.",
-      "Give the remote agent the external action manifest, Jarvis manifest, connection pack, smoke test URL, MCP base URL, and bearer auth header placeholder.",
-      "For ChatGPT custom actions or Grok-compatible OpenAPI setup, give the remote agent the external openApiSchemaUrl too.",
-      "Approve approvalRequired tools only after reviewing the exact payload the agent will send.",
-      "Run the smoke test again after any tunnel restart because ngrok URLs can change.",
+      "Remote agentovi daj external action manifest, Jarvis manifest, connection pack, smoke test URL, MCP base URL a bearer auth header placeholder.",
+      "Pre ChatGPT custom actions alebo Grok-compatible OpenAPI setup mu daj aj external openApiSchemaUrl.",
+      "approvalRequired tooly schval az po kontrole presneho payloadu, ktory agent odosle.",
+      "Po kazdom restarte tunela spusti smoke test znova, lebo ngrok URL sa moze zmenit.",
     ],
     agentFirstSteps: [
-      "Fetch connectionPackUrl with Authorization: Bearer <JARVIS_WEB_TOKEN>.",
-      "Fetch actionManifestUrl if the agent supports ai-plugin/action manifests.",
-      "Fetch openApiSchemaUrl if the agent supports OpenAPI/custom actions.",
-      "Fetch productionVerificationEvidenceUrl or call arcigy.get_production_verification_evidence and cite its status.",
+      "Nacitaj connectionPackUrl s Authorization: Bearer <JARVIS_WEB_TOKEN>.",
+      "Nacitaj actionManifestUrl, ak agent podporuje ai-plugin/action manifests.",
+      "Nacitaj openApiSchemaUrl, ak agent podporuje OpenAPI/custom actions.",
+      "Nacitaj productionVerificationEvidenceUrl alebo zavolaj arcigy.get_production_verification_evidence a cituj status.",
       "Run smokeTestUrl and require status=ready with all 36 required remote MCP smoke gates ready, including manifest, tool-count, manifest-tool-registry, manifest-tool-metadata, auth-placeholder, manifest-local-write-policy, action-manifest, openapi-schema, cors-preflight, external-auth-gate, connection-pack, pack-secret-policy, pack-auth-throttle-policy, pack-limits, pack-tunnel-controls, secure-tunnel-status, pack-local-write-policy, pack-tool-registry, pack-quick-start-urls, pack-quick-start-approval-policy, pack-contract-quick-start, pack-contract-draft-quick-start, pack-agent-setup-profiles, pack-agent-launch-bundle, pack-voice-quick-start, pack-handoff-proof, pack-agent-compatibility, pack-client-memory-quick-start, pack-audit-quick-start, voice-tool-call, pack-production-evidence-quick-start, read-only-tool-call, production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction before using MCP tools. Production evidence must include release proof, dirty=false, and freshness.fresh=true within 24h.",
-      "Fetch tunnel.statusUrl if the operator needs the current public tunnel URLs; token values must remain redacted.",
-      "Call arcigy.get_operator_briefing before proposing work.",
-      "Use read-only or draft tools first; use dryRun: true before Gmail sync writes.",
-      "Never call approvalRequired tools until the operator confirms the exact action.",
+      "Nacitaj tunnel.statusUrl, ak operator potrebuje aktualne public tunnel URL; token values musia ostat redigovane.",
+      "Pred navrhom prace zavolaj arcigy.get_operator_briefing.",
+      "Najprv pouzi read-only alebo draft tooly; pred Gmail sync zapisom pouzi dryRun: true.",
+      "Nikdy nevolaj approvalRequired tooly, kym operator nepotvrdi presnu akciu.",
     ],
     requiredProof: [
       {

@@ -1193,7 +1193,11 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.equal(pack.openApiSchemaUrl, "https://jarvis.example/api/openapi.json");
   assert.equal(pack.productionVerificationEvidenceUrl, "https://jarvis.example/api/production-verification-evidence");
   assert.deepEqual(pack.agentCompatibility.supportedAgents.slice(0, 3), ["Claude", "ChatGPT", "Grok"]);
+  assert.ok(pack.agentInstructions.some((step) => step.includes("Nacitaj actionManifestUrl, ked remote agent podporuje")));
+  assert.ok(pack.agentInstructions.some((step) => step.includes("najnovsi overeny production proof")));
   assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("openApiSchemaUrl")));
+  assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("Nacitaj actionManifestUrl, ak agent podporuje")));
+  assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("a cituj status")));
   assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("productionVerificationEvidenceUrl")));
   assert.equal(pack.agentCompatibility.protocol, "HTTP JSON MCP bridge");
   assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("status=ready")));
@@ -1234,6 +1238,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   );
   assert.match(pack.agentPromptTemplates.grok, /xAI-compatible agents/);
   assert.match(pack.agentPromptTemplates.grok, /remote smoke/);
+  assert.match(pack.agentPromptTemplates.grok, /operator nepotvrdi presny payload/);
   assert.match(pack.agentPromptTemplates.chatgpt, /POST https:\/\/jarvis\.example\/api\/mcp\/\{toolName\}/);
   assert.match(pack.agentPromptTemplates.claude, /external HTTP MCP bridge/);
   assert.ok(pack.agentSetupProfiles.some((profile) => profile.agent === "ChatGPT" && profile.setupMode === "openapi-custom-action" && profile.importUrl === "https://jarvis.example/api/openapi.json"));
@@ -1247,6 +1252,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.equal(pack.agentLaunchBundle.operatorControls.secureTunnelCommand, "npm run web:tunnel:secure");
   assert.match(pack.agentLaunchBundle.firstPrompts.Grok, /POST https:\/\/jarvis\.example\/api\/mcp\/\{toolName\}/);
   assert.match(pack.agentLaunchBundle.firstPrompts.ChatGPT, /custom action schema/);
+  assert.ok(pack.agentLaunchBundle.proofPolicy.beforeAnyWork.some((step) => step.includes("Nacitaj productionVerificationEvidenceUrl")));
   assert.ok(pack.agentLaunchBundle.proofPolicy.beforeWrites.some((step) => step.includes("approval.approved=true")));
   assert.ok(pack.agentLaunchBundle.safetyRails.some((rail) => rail.includes("OAuth refresh tokens")));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_production_verification_evidence" && call.approvalRequired === false));

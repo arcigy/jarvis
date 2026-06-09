@@ -571,7 +571,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(remotePackBody.agentCompatibility.requiredBeforeWork.some((step) => step.includes("cors-preflight") && step.includes("external-auth-gate") && step.includes("pack-auth-throttle-policy") && step.includes("action-manifest")));
     assert.ok(remotePackBody.agentCompatibility.safetyRules.some((rule) => rule.includes("family-friendly")));
     assert.match(remotePackBody.agentPromptTemplates.grok, /xAI-compatible agents/);
-    assert.match(remotePackBody.agentPromptTemplates.grok, /approvalRequired tools/);
+    assert.match(remotePackBody.agentPromptTemplates.grok, /approvalRequired tooly/);
     assert.match(remotePackBody.agentPromptTemplates.chatgpt, /POST http:\/\/127\.0\.0\.1:\d+\/api\/mcp\/\{toolName\}/);
     assert.ok(remotePackBody.agentSetupProfiles.some((profile) => profile.agent === "ChatGPT" && profile.setupMode === "openapi-custom-action" && profile.importUrl.endsWith("/api/openapi.json")));
     assert.ok(remotePackBody.agentSetupProfiles.some((profile) => profile.agent === "Grok" && profile.fallbackUrl.endsWith("/api/mcp/{toolName}")));
