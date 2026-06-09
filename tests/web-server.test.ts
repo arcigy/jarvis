@@ -591,6 +591,44 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(voiceDirectCommandBody.shouldStopRecording, true);
     assert.match(voiceDirectCommandBody.speakText ?? "", /integracie/i);
 
+    const voiceProduction = await fetch(`${baseUrl}/api/jarvis/voice-event`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text: "Jarvis skontroluj production readiness", session: { state: "idle", wakeWord: "jarvis" } }),
+    });
+    assert.equal(voiceProduction.status, 200);
+    const voiceProductionBody = (await voiceProduction.json()) as { session: { state: string }; speakText?: string };
+    assert.equal(voiceProductionBody.session.state, "idle");
+    assert.match(voiceProductionBody.speakText ?? "", /Production readiness/i);
+
+    const voiceRemoteMcp = await fetch(`${baseUrl}/api/jarvis/voice-event`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text: "Jarvis priprav remote MCP handoff pre Grok", session: { state: "idle", wakeWord: "jarvis" } }),
+    });
+    assert.equal(voiceRemoteMcp.status, 200);
+    const voiceRemoteMcpBody = (await voiceRemoteMcp.json()) as { speakText?: string };
+    assert.match(voiceRemoteMcpBody.speakText ?? "", /Remote MCP pack/i);
+    assert.match(voiceRemoteMcpBody.speakText ?? "", /bearer placeholder/i);
+
+    const voiceContracts = await fetch(`${baseUrl}/api/jarvis/voice-event`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text: "Jarvis zmluvy", session: { state: "idle", wakeWord: "jarvis" } }),
+    });
+    assert.equal(voiceContracts.status, 200);
+    const voiceContractsBody = (await voiceContracts.json()) as { speakText?: string };
+    assert.match(voiceContractsBody.speakText ?? "", /Zmluvny modul je pripraveny/i);
+
+    const voiceGmail = await fetch(`${baseUrl}/api/jarvis/voice-event`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text: "Jarvis skontroluj Gmail inbox", accountEnvKey: "MISSING_TEST_ACCOUNT", session: { state: "idle", wakeWord: "jarvis" } }),
+    });
+    assert.equal(voiceGmail.status, 200);
+    const voiceGmailBody = (await voiceGmail.json()) as { speakText?: string };
+    assert.match(voiceGmailBody.speakText ?? "", /Gmail preview/i);
+
     const dbPath = join(makeRepoTempDir("jarvis-web-"), "memory.db");
     const ingested = await fetch(`${baseUrl}/api/ingest-client-message`, {
       method: "POST",
@@ -625,6 +663,16 @@ test("local web bridge serves UI and API health", async () => {
     const clientAlertsBody = (await clientAlerts.json()) as { count: number; alerts: Array<{ person: { primaryEmail: string }; needSignal: { id: string } }> };
     assert.equal(clientAlertsBody.count, 1);
     assert.equal(clientAlertsBody.alerts[0].person.primaryEmail, "client@example.com");
+
+    const voiceClientNeeds = await fetch(`${baseUrl}/api/jarvis/voice-event`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ dbPath, text: "Jarvis ake su klientske poziadavky", session: { state: "idle", wakeWord: "jarvis" } }),
+    });
+    assert.equal(voiceClientNeeds.status, 200);
+    const voiceClientNeedsBody = (await voiceClientNeeds.json()) as { speakText?: string };
+    assert.match(voiceClientNeedsBody.speakText ?? "", /Klientske poziadavky: 1/);
+    assert.match(voiceClientNeedsBody.speakText ?? "", /onboarding automatizaciu/);
 
     const approvalQueue = await fetch(`${baseUrl}/api/approval-queue`, {
       method: "POST",

@@ -156,7 +156,7 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
 
   if (request.method === "POST" && url.pathname === "/api/jarvis/voice-event") {
     const payload = await readJson(request);
-    writeJson(response, 200, await handleWebVoiceEvent(payload));
+    writeJson(response, 200, await handleWebVoiceEvent(payload, request));
     return;
   }
 
@@ -826,7 +826,7 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
     return;
   }
   if (name === "arcigy.jarvis_voice_event") {
-    writeJson(response, 200, { result: await handleWebVoiceEvent(payload) });
+    writeJson(response, 200, { result: await handleWebVoiceEvent(payload, request) });
     return;
   }
   if (name === "arcigy.get_system_health") {
@@ -1465,7 +1465,7 @@ function isCommandAvailable(command: string): boolean {
   return check.status === 0;
 }
 
-async function handleWebVoiceEvent(payload: Record<string, unknown>) {
+async function handleWebVoiceEvent(payload: Record<string, unknown>, request?: IncomingMessage) {
   let session = (payload.session ?? { state: "idle", wakeWord: "jarvis" }) as JarvisVoiceSession;
   let text = String(payload.text ?? "").trim();
 
@@ -1498,13 +1498,55 @@ async function handleWebVoiceEvent(payload: Record<string, unknown>) {
     return voiceDone(session, text, briefing.speechText);
   }
 
+  if (isProductionReadinessVoiceCommand(lowered)) {
+    const report = await buildProductionReadinessReport({ live: payload.live === true || lowered.includes("live"), dbPath: resolveRepoPath(payload.dbPath, defaultDbPath, "dbPath") });
+    return voiceDone(session, text, summarizeReadinessForVoice(report));
+  }
+
+  if (isRemoteMcpVoiceCommand(lowered)) {
+    const pack = request ? await getRemoteMcpPack(request, null, { ...payload, includeReadiness: true, live: false }) : null;
+    return voiceDone(session, text, pack ? summarizeRemoteMcpForVoice(pack) : "Remote MCP pack viem pripravit cez web bridge request kontext.");
+  }
+
   if (isApprovalQueueVoiceCommand(lowered)) {
     const queue = runDbTool("list-approval-queue", { dbPath: payload.dbPath, limit: 20 });
     return voiceDone(session, text, summarizeApprovalQueueForVoice(queue));
   }
 
+  if (isContractVoiceCommand(lowered)) {
+    const brief = cleanVoiceQuery(text, ["jarvis", "zmluva", "zmluvy", "contract", "kontrakt", "formular", "intake", "navrhni", "draft"]);
+    if (lowered.includes("vygeneruj") || lowered.includes("generuj")) {
+      return voiceDone(session, text, "Zmluvy vygenerujem az po vyplnenom intake a explicitnom schvaleni payloadu. Hlasom mozem pripravit draft intake.");
+    }
+    if (brief.length >= 24 && (lowered.includes("intake") || lowered.includes("formular") || lowered.includes("navrh") || lowered.includes("draft"))) {
+      const intake = await draftContractIntake({ brief });
+      return voiceDone(session, text, summarizeContractDraftForVoice(intake));
+    }
+    return voiceDone(session, text, "Zmluvny modul je pripraveny. Povedz klienta, projekt, cenu a rozsah; pripravim intake a finalne DOCX az po tvojom schvaleni.");
+  }
+
   if (lowered.includes("cold") || lowered.includes("outreach")) {
     return voiceDone(session, text, await getColdOutreachBriefSummary({ ...payload, text }, payload.live !== false));
+  }
+
+  if (isClientNeedsVoiceCommand(lowered)) {
+    const result = getClientNeedAlerts({ dbPath: payload.dbPath, status: "new", limit: 10 });
+    return voiceDone(session, text, summarizeClientNeeds(Number(result.count || 0), Array.isArray(result.alerts) ? result.alerts : []));
+  }
+
+  if (isGmailVoiceCommand(lowered)) {
+    try {
+      const result = await syncGmailRecentMessages({
+        dbPath: payload.dbPath,
+        accountEnvKey: payload.accountEnvKey,
+        query: payload.gmailQuery || defaultGmailBriefingQuery,
+        maxResults: typeof payload.gmailMaxResults === "number" ? payload.gmailMaxResults : 5,
+        dryRun: true,
+      });
+      return voiceDone(session, text, summarizeGmailPreviewForVoice(result));
+    } catch (error) {
+      return voiceDone(session, text, `Gmail preview teraz nie je dostupny: ${safeErrorMessage(error)}`);
+    }
   }
 
   if (lowered.includes("integracie") || lowered.includes("system") || lowered.includes("health")) {
@@ -1535,7 +1577,7 @@ async function handleWebVoiceEvent(payload: Record<string, unknown>) {
   return voiceDone(
     session,
     text,
-    "Rozumiem. Viem hlasom pripravit briefing, precitat approval queue, skontrolovat cold outreach, integracie, identifikovat email, vyhladat leady alebo pripravit Gemini odpoved."
+    "Rozumiem. Viem hlasom pripravit briefing, precitat approval queue, skontrolovat produkciu, remote MCP, zmluvy, cold outreach, Gmail, klientske poziadavky, integracie, email, leady alebo Gemini odpoved."
   );
 }
 
@@ -1562,6 +1604,100 @@ function summarizeHealthForVoice(health: { integrations: Array<{ key: string; co
   ].join(" ");
 }
 
+function summarizeReadinessForVoice(report: {
+  status?: unknown;
+  summary?: unknown;
+  attentionQueue?: Array<{ key?: unknown; title?: unknown }>;
+  launchChecklist?: Array<{ status?: unknown }>;
+  nextActions?: unknown[];
+}) {
+  const queue = Array.isArray(report.attentionQueue) ? report.attentionQueue : [];
+  const launch = Array.isArray(report.launchChecklist) ? report.launchChecklist : [];
+  const topQueue = queue
+    .slice(0, 3)
+    .map((item) => `${String(item.key ?? "attention")}: ${String(item.title ?? "needs review")}`)
+    .join("; ");
+  const checklistReady = launch.filter((item) => item.status === "ready").length;
+  const nextAction = Array.isArray(report.nextActions) && report.nextActions.length ? `Najblizsi krok: ${String(report.nextActions[0])}` : "Najblizsi krok: ziadny urgentny.";
+  return [
+    `Production readiness je ${String(report.status ?? "unknown")}.`,
+    typeof report.summary === "string" ? report.summary : null,
+    launch.length ? `Launch checklist: ${checklistReady}/${launch.length} ready.` : null,
+    topQueue ? `Attention queue: ${topQueue}.` : "Attention queue je prazdna.",
+    nextAction,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function summarizeRemoteMcpForVoice(pack: {
+  tools?: { count?: unknown; approvalRequired?: unknown[]; localStateWrite?: unknown[] };
+  quickStartCalls?: unknown[];
+  readiness?: { status?: unknown };
+  manifestUrl?: unknown;
+  smokeTestUrl?: unknown;
+}) {
+  const tools = pack.tools ?? {};
+  const approvalRequired = Array.isArray(tools.approvalRequired) ? tools.approvalRequired : [];
+  const localWrites = Array.isArray(tools.localStateWrite) ? tools.localStateWrite : [];
+  const quickStarts = Array.isArray(pack.quickStartCalls) ? pack.quickStartCalls.length : 0;
+  const readiness = pack.readiness?.status ? `Readiness: ${String(pack.readiness.status)}.` : "";
+  return [
+    `Remote MCP pack je pripraveny pre ${String(tools.count ?? 0)} toolov.`,
+    readiness,
+    `Approval locky: ${approvalRequired.length}. Lokalnych zapisov: ${localWrites.length}. Quick-start volani: ${quickStarts}.`,
+    `Manifest: ${String(pack.manifestUrl ?? "not loaded")}. Smoke test: ${String(pack.smokeTestUrl ?? "not loaded")}.`,
+    "Token nevraciam; pouziva sa iba bearer placeholder.",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function summarizeContractDraftForVoice(intake: {
+  client?: { businessName?: unknown; name?: unknown };
+  project?: { name?: unknown; goal?: unknown };
+  pricing?: { implementationFeeEur?: unknown; implementationFee?: unknown; monthlyFee?: unknown };
+}) {
+  const client = intake.client ?? {};
+  const project = intake.project ?? {};
+  const pricing = intake.pricing ?? {};
+  const clientName = client.businessName || client.name || "klient nie je doplneny";
+  const projectName = project.name || project.goal || "projekt nie je doplneny";
+  const fee = pricing.implementationFeeEur ?? pricing.implementationFee ?? pricing.monthlyFee ?? null;
+  return [
+    `Pripravil som draft intake pre ${String(clientName)}.`,
+    `Projekt: ${String(projectName)}.`,
+    fee !== null ? `Cena v intake: ${String(fee)} EUR.` : "Cena este nie je jasna.",
+    "DOCX zmluvu a prilohy vygenerujem az po tvojej kontrole a explicitnom schvaleni.",
+  ].join(" ");
+}
+
+function summarizeGmailPreviewForVoice(result: { synced?: Array<{ fetched?: unknown; preview?: Array<{ fromEmail?: unknown; subject?: unknown }> }> }) {
+  const synced = Array.isArray(result.synced) ? result.synced : [];
+  const fetched = synced.reduce((sum, item) => sum + Number(item.fetched || 0), 0);
+  const preview = synced.flatMap((item) => item.preview || []).slice(0, 3);
+  const previewText = preview.length
+    ? `Top preview: ${preview.map((item) => `${String(item.fromEmail ?? "unknown")}: ${String(item.subject || "bez predmetu")}`).join("; ")}.`
+    : "Preview nenasiel ziadne spravy.";
+  return `Gmail preview bez lokalneho zapisu skontroloval ${synced.length} account(s) a nasiel ${fetched} sprav. ${previewText}`;
+}
+
+function summarizeClientNeeds(count: number, highlights: Array<{ person?: Record<string, unknown>; needSignal?: Record<string, unknown> }>) {
+  if (count <= 0) return "Klientske poziadavky: ziadne otvorene.";
+  const topItems = highlights
+    .slice(0, 3)
+    .map((item) => {
+      const person = item.person ?? {};
+      const need = item.needSignal ?? {};
+      const name = person.displayName || person.companyName || person.primaryEmail || "neznamy kontakt";
+      const summary = need.summary || "bez detailu";
+      return `${String(name)}: ${String(summary)}`;
+    })
+    .filter(Boolean);
+  if (!topItems.length) return `Klientske poziadavky: ${count} otvorenych.`;
+  return `Klientske poziadavky: ${count} otvorenych. Najnovsie: ${topItems.join("; ")}.`;
+}
+
 function summarizeIdentityForVoice(result: { email: string; person?: { displayName?: string; companyName?: string; primaryEmail: string; kind: string } | null; openNeedSignals?: Array<{ summary: string }> }) {
   if (!result.person) return `Email ${result.email} zatial nepoznam v lokalnej pamati.`;
   const name = result.person.displayName || result.person.companyName || result.person.primaryEmail;
@@ -1580,6 +1716,26 @@ function summarizeLeadsForVoice(result: { leads: Array<{ name: string }>; source
 
 function isApprovalQueueVoiceCommand(text: string) {
   return ["approval", "schvalenie", "schvalit", "potvrdenie", "potvrdit", "na moje znamenie", "cakaju na mna", "co caka"].some((term) => text.includes(term));
+}
+
+function isProductionReadinessVoiceCommand(text: string) {
+  return ["production", "produkcia", "readiness", "launch", "checklist", "nasadenie"].some((term) => text.includes(term));
+}
+
+function isRemoteMcpVoiceCommand(text: string) {
+  return ["remote mcp", "mcp", "tunel", "tunnel", "handoff", "claude", "chatgpt", "grok", "xai", "x ai"].some((term) => text.includes(term));
+}
+
+function isContractVoiceCommand(text: string) {
+  return ["zmluva", "zmluvy", "contract", "kontrakt", "priloha", "docx", "intake"].some((term) => text.includes(term));
+}
+
+function isClientNeedsVoiceCommand(text: string) {
+  return ["klientske poziadavky", "poziadavky klientov", "co chce klient", "co chcu klienti", "client need"].some((term) => text.includes(term));
+}
+
+function isGmailVoiceCommand(text: string) {
+  return ["gmail", "inbox", "posta", "mail sync"].some((term) => text.includes(term));
 }
 
 function summarizeApprovalQueueForVoice(result: { count?: unknown; items?: unknown }) {
