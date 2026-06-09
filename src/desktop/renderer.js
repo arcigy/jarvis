@@ -884,18 +884,18 @@ function leadsToSheetRows(leads) {
 
 function renderGmailSync(result) {
   const synced = result.synced ?? [];
-  if (!synced.length) return "No Gmail accounts were synced.";
+  if (!synced.length) return "Nebol synchronizovany ziadny Gmail ucet.";
   const fetched = synced.reduce((sum, item) => sum + Number(item.fetched ?? 0), 0);
   const alerts = synced.reduce((sum, item) => sum + (item.alerts ?? []).length, 0);
-  setCortexSignal(elements.cortexMemory, alerts ? `${alerts} alert(s)` : `${fetched} mail(s)`, alerts ? "attention" : "ready");
-  const modeLine = result.dryRun ? "Preview only: wrote 0 local records." : "Local memory sync wrote new records and skipped duplicates.";
+  setCortexSignal(elements.cortexMemory, alerts ? `${alerts} alertov` : `${fetched} emailov`, alerts ? "attention" : "ready");
+  const modeLine = result.dryRun ? "Nahlad bez zapisu: 0 lokalnych zaznamov." : "Lokalna pamat ulozila nove zaznamy a preskocila duplicity.";
   return synced
     .map((item) =>
       [
         modeLine,
-        `${item.account}: fetched ${item.fetched}, created ${item.created ?? item.ingested}, skipped ${item.duplicates ?? 0} duplicates`,
+        `${item.account}: nacitane ${item.fetched}, ulozene ${item.created ?? item.ingested}, preskocene duplicity ${item.duplicates ?? 0}`,
         ...(item.alerts ?? []).map((alert) => `Alert: ${alert}`),
-        ...(item.preview ?? []).map((event) => `Preview: ${event.fromEmail} - ${event.subject ?? "no subject"}`),
+        ...(item.preview ?? []).map((event) => `Nahlad: ${event.fromEmail} - ${event.subject ?? "bez predmetu"}`),
       ].join("\n")
     )
     .join("\n\n");
@@ -903,17 +903,17 @@ function renderGmailSync(result) {
 
 function renderPreparedReplies(result) {
   const replies = result.replies ?? [];
-  if (!replies.length) return result.summary ?? "No prepared replies are waiting for approval.";
+  if (!replies.length) return result.summary ?? "Ziadne pripravene odpovede necakaju na schvalenie.";
   return [
-    result.summary ?? `Prepared replies: ${replies.length}`,
+    result.summary ?? `Pripravene odpovede: ${replies.length}`,
     "",
     ...replies.slice(0, 8).map((reply, index) =>
       [
         `${index + 1}. ${reply.leadEmail}`,
-        reply.campaignName ? `   Campaign: ${reply.campaignName}` : null,
-        reply.subject ? `   Subject: ${reply.subject}` : null,
+        reply.campaignName ? `   Kampan: ${reply.campaignName}` : null,
+        reply.subject ? `   Predmet: ${reply.subject}` : null,
         reply.positiveSignal ? `   Signal: ${reply.positiveSignal}` : null,
-        `   Reply: ${reply.replyText ?? "-"}`,
+        `   Odpoved: ${reply.replyText ?? "-"}`,
       ]
         .filter(Boolean)
         .join("\n")
@@ -923,16 +923,16 @@ function renderPreparedReplies(result) {
 
 function renderApprovalQueue(result) {
   const items = result.items ?? [];
-  if (!items.length) return result.summary ?? "Approval queue is empty.";
+  if (!items.length) return result.summary ?? "Schvalovacia fronta je prazdna.";
   return [
-    result.summary ?? `Approval queue: ${items.length}`,
+    result.summary ?? `Schvalovacia fronta: ${items.length}`,
     "",
     ...items.slice(0, 10).map((item, index) =>
       [
         `${index + 1}. ${item.title ?? item.type}`,
-        `   Type: ${item.type ?? "-"}`,
-        `   Summary: ${item.summary ?? "-"}`,
-        `   Approval tool: ${item.approvalTool ?? "-"}`,
+        `   Typ: ${item.type ?? "-"}`,
+        `   Zhrnutie: ${item.summary ?? "-"}`,
+        `   Schvalovaci tool: ${item.approvalTool ?? "-"}`,
         `   Payload: ${JSON.stringify(item.approvalPayload ?? {})}`,
       ].join("\n")
     ),

@@ -342,7 +342,12 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /window\.confirm\(`Sync recent Gmail messages into local client memory\? Preview first when unsure\.`\)/);
   assert.match(renderer, /Gmail sync cancelled before local memory writes/);
   assert.match(renderer, /dryRun: false/);
-  assert.match(renderer, /Preview only: wrote 0 local records/);
+  assert.match(renderer, /Nahlad bez zapisu: 0 lokalnych zaznamov/);
+  assert.match(renderer, /Lokalna pamat ulozila nove zaznamy a preskocila duplicity/);
+  assert.match(renderer, /Ziadne pripravene odpovede necakaju na schvalenie/);
+  assert.match(renderer, /Pripravene odpovede: \$\{replies\.length\}/);
+  assert.match(renderer, /Schvalovacia fronta je prazdna/);
+  assert.doesNotMatch(renderer, /No Gmail accounts were synced|Preview only: wrote 0 local records|Local memory sync wrote new records|No prepared replies are waiting for approval|Approval queue is empty/);
   assert.match(renderer, /in:inbox newer_than:7d/);
   assert.match(renderer, /arcigyApi\.getSmartleadCampaignStatus/);
   assert.match(renderer, /arcigyApi\.getSmartleadOutreachBrief/);
