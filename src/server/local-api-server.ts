@@ -11,6 +11,7 @@ import { getIntegrationHealth, loadLocalEnv } from "../automation-system/env.ts"
 import { buildClientReplyPrompt, buildPositiveOutreachReplyPrompt, generateGeminiText } from "../automation-system/gemini.ts";
 import { defaultGmailBriefingQuery, defaultGmailSyncQuery, listConfiguredGmailAccounts, listRecentGmailMessageEvents, sendGmailTextMessage } from "../automation-system/gmail.ts";
 import { containsWakeWord, extractCommandAfterWakeWord, type JarvisVoiceSession } from "../automation-system/jarvis-voice.ts";
+import { buildJarvisCapabilityAudit } from "../automation-system/jarvis-capability-audit.ts";
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "../automation-system/lead-discovery.ts";
 import { buildContractGenerationCommand, getColdOutreachMcpAnswer, listJarvisMcpTools, localStateWriteToolNames } from "../automation-system/mcp-tools.ts";
 import { buildOperatorBriefing } from "../automation-system/operator-briefing.ts";
@@ -150,6 +151,11 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
 
   if (request.method === "GET" && url.pathname === "/api/production-verification-evidence") {
     writeJson(response, 200, getProductionVerificationEvidence(repoRoot));
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/jarvis-capability-audit") {
+    writeJson(response, 200, await getJarvisCapabilityAudit({ live: url.searchParams.get("live") === "true" }));
     return;
   }
 
@@ -855,6 +861,10 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
     writeJson(response, 200, { result: getProductionVerificationEvidence(repoRoot) });
     return;
   }
+  if (name === "arcigy.get_jarvis_capability_audit") {
+    writeJson(response, 200, { result: await getJarvisCapabilityAudit({ live: payload.live === true, dbPath: payload.dbPath }) });
+    return;
+  }
   if (name === "arcigy.get_remote_mcp_pack") {
     writeJson(response, 200, { result: await getRemoteMcpPack(request, null, payload) });
     return;
@@ -1275,6 +1285,16 @@ async function sendApprovedOutreachReply(payload: Record<string, unknown>) {
     }
   }
   throw httpError(502, lastError?.message ?? "Gmail send failed.");
+}
+
+async function getJarvisCapabilityAudit(payload: Record<string, unknown>) {
+  return buildJarvisCapabilityAudit({
+    readiness: await buildProductionReadinessReport({
+      live: payload.live === true,
+      dbPath: resolveRepoPath(payload.dbPath, defaultDbPath, "dbPath"),
+    }),
+    productionEvidence: getProductionVerificationEvidence(repoRoot),
+  });
 }
 
 async function getOperatorBriefing(payload: Record<string, unknown>) {

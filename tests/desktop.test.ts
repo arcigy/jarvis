@@ -574,6 +574,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /\/api\/remote-mcp-smoke/);
   assert.match(renderer, /arcigy\.get_remote_mcp_pack/);
   assert.match(renderer, /arcigy\.run_remote_mcp_smoke/);
+  assert.match(main, /arcigy\.get_jarvis_capability_audit/);
   assert.match(renderer, /openApiSchemaUrl/);
   assert.match(renderer, /actionManifestUrl/);
   assert.match(main, /actionManifestUrl/);

@@ -288,7 +288,13 @@ const coreWorkflowSurfaces: CoreWorkflowSurface[] = [
   {
     id: "remote-agent-workflow",
     title: "Remote agent workflow",
-    tools: ["arcigy.get_remote_mcp_pack", "arcigy.run_remote_mcp_smoke", "arcigy.get_production_readiness", "arcigy.get_production_verification_evidence"],
+    tools: [
+      "arcigy.get_remote_mcp_pack",
+      "arcigy.run_remote_mcp_smoke",
+      "arcigy.get_production_readiness",
+      "arcigy.get_production_verification_evidence",
+      "arcigy.get_jarvis_capability_audit",
+    ],
     approvalRequired: [],
     proof: "Remote MCP pack, smoke proof, readiness, and production evidence tools are registered.",
   },

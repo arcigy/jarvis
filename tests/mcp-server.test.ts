@@ -46,6 +46,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(names.includes("arcigy.run_integration_diagnostics"));
   assert.ok(names.includes("arcigy.get_production_readiness"));
   assert.ok(names.includes("arcigy.get_production_verification_evidence"));
+  assert.ok(names.includes("arcigy.get_jarvis_capability_audit"));
   assert.ok(names.includes("arcigy.get_remote_mcp_pack"));
   assert.ok(names.includes("arcigy.run_remote_mcp_smoke"));
   assert.ok(names.includes("arcigy.get_operator_briefing"));
@@ -157,6 +158,21 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(["ready", "attention", "missing"].includes(evidence.status));
   assert.ok(Array.isArray(evidence.checks));
   assert.doesNotMatch(JSON.stringify(evidence), /AIza|GOCSPX|1\/\/|postgresql:\/\/|redis:\/\//);
+
+  const auditResult = await client.callTool({
+    name: "arcigy.get_jarvis_capability_audit",
+    arguments: { live: false },
+  });
+  const audit = getStructuredResult(auditResult) as {
+    mode: string;
+    toolCount: number;
+    capabilities: Array<{ id: string; tools: string[]; approvalRequired: string[] }>;
+  };
+  assert.equal(audit.mode, "arcigy-jarvis-capability-audit");
+  assert.equal(audit.toolCount, listJarvisMcpTools().length);
+  assert.ok(audit.capabilities.some((item) => item.id === "remote-mcp" && item.tools.includes("arcigy.get_jarvis_capability_audit")));
+  assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.append_leads_to_google_sheet")));
+  assert.doesNotMatch(JSON.stringify(audit), /AIza|GOCSPX|1\/\/|postgresql:\/\/|redis:\/\//);
 
   const packResult = await client.callTool({
     name: "arcigy.get_remote_mcp_pack",

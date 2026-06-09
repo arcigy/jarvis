@@ -154,6 +154,7 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
   if (toolName === "arcigy.run_remote_mcp_smoke") return {};
   if (toolName === "arcigy.get_operator_briefing") return { periodLabel: "poslednych 7 dni", live: false, syncGmail: false };
   if (toolName === "arcigy.get_production_readiness") return { live: false };
+  if (toolName === "arcigy.get_jarvis_capability_audit") return { live: false };
   if (toolName === "arcigy.get_approval_queue") return { limit: 20 };
   if (toolName === "arcigy.identify_email") return { email: "client@example.com" };
   if (toolName === "arcigy.get_client_need_alerts") return { status: "new", limit: 10 };

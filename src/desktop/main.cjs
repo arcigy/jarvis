@@ -690,7 +690,13 @@ const coreWebWorkflowSurfaces = [
   {
     id: "remote-agent-workflow",
     title: "Remote agent workflow",
-    tools: ["arcigy.get_remote_mcp_pack", "arcigy.run_remote_mcp_smoke", "arcigy.get_production_readiness", "arcigy.get_production_verification_evidence"],
+    tools: [
+      "arcigy.get_remote_mcp_pack",
+      "arcigy.run_remote_mcp_smoke",
+      "arcigy.get_production_readiness",
+      "arcigy.get_production_verification_evidence",
+      "arcigy.get_jarvis_capability_audit",
+    ],
     approvalRequired: [],
     proof: "Remote MCP pack, smoke proof, readiness, and production evidence tools are registered.",
   },
@@ -1368,6 +1374,14 @@ function buildRemoteMcpQuickStartCalls(baseUrl) {
       method: "POST",
       url: toolUrl("arcigy.get_production_verification_evidence"),
       body: {},
+      approvalRequired: false,
+    },
+    {
+      label: "Auditovat Jarvis capability coverage",
+      tool: "arcigy.get_jarvis_capability_audit",
+      method: "POST",
+      url: toolUrl("arcigy.get_jarvis_capability_audit"),
+      body: { live: false },
       approvalRequired: false,
     },
     {
@@ -2453,6 +2467,7 @@ function listWebMcpTools() {
     { name: "arcigy.run_integration_diagnostics", requiresApproval: false },
     { name: "arcigy.get_production_readiness", requiresApproval: false },
     { name: "arcigy.get_production_verification_evidence", requiresApproval: false },
+    { name: "arcigy.get_jarvis_capability_audit", requiresApproval: false },
     { name: "arcigy.get_remote_mcp_pack", requiresApproval: false },
     { name: "arcigy.run_remote_mcp_smoke", requiresApproval: false },
     { name: "arcigy.get_operator_briefing", requiresApproval: false },

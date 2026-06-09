@@ -12,6 +12,7 @@ import { getIntegrationHealth, loadLocalEnv, summarizeIntegrationHealth } from "
 import { buildClientReplyPrompt, buildPositiveOutreachReplyPrompt, generateGeminiText } from "./gemini.ts";
 import { defaultGmailBriefingQuery, defaultGmailSyncQuery, listConfiguredGmailAccounts, listRecentGmailMessageEvents, sendGmailTextMessage } from "./gmail.ts";
 import { handleJarvisVoiceEvent, type JarvisVoiceSession } from "./jarvis-voice.ts";
+import { buildJarvisCapabilityAudit } from "./jarvis-capability-audit.ts";
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "./lead-discovery.ts";
 import {
   buildContractGenerationCommand,
@@ -662,6 +663,33 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async () => jsonResult(getProductionVerificationEvidence(repoRoot))
+  );
+
+  server.registerTool(
+    "arcigy.get_jarvis_capability_audit",
+    {
+      title: "Jarvis capability audit",
+      description: "Return a secret-safe audit of Jarvis capability coverage across tools, approvals, integrations, remote MCP, and production evidence.",
+      inputSchema: {
+        live: z.boolean().default(false),
+        dbPath: z.string().optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async ({ live, dbPath }) => {
+      const safeDbPath = resolveOptionalRepoPath(dbPath, "dbPath");
+      return jsonResult(
+        buildJarvisCapabilityAudit({
+          readiness: await buildProductionReadinessReport({ live, dbPath: safeDbPath }),
+          productionEvidence: getProductionVerificationEvidence(repoRoot),
+        })
+      );
+    }
   );
 
   server.registerTool(

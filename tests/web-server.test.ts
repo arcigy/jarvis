@@ -132,6 +132,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.send_approved_outreach_reply" && tool.approval.required === true && tool.approval.field === "approval.approved"));
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.get_smartlead_outreach_brief" && tool.method === "POST"));
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.get_production_verification_evidence" && tool.readOnlyOrDraft === true));
+    assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.get_jarvis_capability_audit" && tool.readOnlyOrDraft === true));
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.sync_gmail_recent_messages" && tool.localStateWrite === true && tool.readOnlyOrDraft === false));
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.prepare_positive_outreach_reply" && tool.localStateWrite === true && tool.readOnlyOrDraft === false));
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.generate_ai_reply" && tool.localStateWrite === false && tool.readOnlyOrDraft === true));
@@ -452,6 +453,23 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(mcpEvidence.result.release.shortCommit, "0123456789ab");
     assert.equal(JSON.stringify(mcpEvidence).includes(syntheticGoogleKey), false);
 
+    const capabilityAudit = await fetch(`${baseUrl}/api/jarvis-capability-audit`);
+    assert.equal(capabilityAudit.status, 200);
+    const capabilityAuditBody = (await capabilityAudit.json()) as {
+      mode: string;
+      toolCount: number;
+      capabilities: Array<{ id: string; tools: string[]; approvalRequired: string[] }>;
+    };
+    assert.equal(capabilityAuditBody.mode, "arcigy-jarvis-capability-audit");
+    assert.equal(capabilityAuditBody.toolCount, listJarvisMcpTools().length);
+    assert.ok(capabilityAuditBody.capabilities.some((item) => item.id === "remote-mcp" && item.tools.includes("arcigy.get_jarvis_capability_audit")));
+    assert.ok(capabilityAuditBody.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.append_leads_to_google_sheet")));
+    assert.equal(JSON.stringify(capabilityAuditBody).includes(syntheticGoogleKey), false);
+
+    const mcpCapabilityAudit = await postJson(`${baseUrl}/api/mcp/arcigy.get_jarvis_capability_audit`, { live: false });
+    assert.equal(mcpCapabilityAudit.result.mode, "arcigy-jarvis-capability-audit");
+    assert.equal(mcpCapabilityAudit.result.toolCount, listJarvisMcpTools().length);
+
     const actionManifest = await fetch(`${baseUrl}/.well-known/ai-plugin.json`);
     assert.equal(actionManifest.status, 200);
     const actionManifestText = await actionManifest.text();
@@ -489,6 +507,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(Object.keys(openApiBody.paths).length, listJarvisMcpTools().length);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.get_operator_briefing"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.generate_contract_documents"]);
+    assert.ok(openApiBody.paths["/api/mcp/arcigy.get_jarvis_capability_audit"]);
     const openApiOperator = openApiBody.paths["/api/mcp/arcigy.get_operator_briefing"] as OpenApiPathFixture;
     const openApiGmailSync = openApiBody.paths["/api/mcp/arcigy.sync_gmail_recent_messages"] as OpenApiPathFixture;
     const openApiContract = openApiBody.paths["/api/mcp/arcigy.generate_contract_documents"] as OpenApiPathFixture;
@@ -601,6 +620,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(remotePackBody.quickStartCalls.every((call) => call.exactMcpCall.method === call.method && call.exactMcpCall.approvalRequired === call.approvalRequired));
     assert.ok(remotePackBody.quickStartCalls.every((call) => JSON.stringify(call.exactMcpCall.body) === JSON.stringify(call.body)));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_production_verification_evidence" && call.approvalRequired === false));
+    assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_jarvis_capability_audit" && call.body.live === false && call.approvalRequired === false));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.identify_email" && typeof call.body.email === "string"));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_client_need_alerts" && call.body.status === "new"));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_audit_events" && call.body.limit === 20));

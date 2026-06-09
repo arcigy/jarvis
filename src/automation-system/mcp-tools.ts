@@ -26,6 +26,7 @@ export type JarvisMcpToolName =
   | "arcigy.run_integration_diagnostics"
   | "arcigy.get_production_readiness"
   | "arcigy.get_production_verification_evidence"
+  | "arcigy.get_jarvis_capability_audit"
   | "arcigy.get_remote_mcp_pack"
   | "arcigy.run_remote_mcp_smoke"
   | "arcigy.get_operator_briefing"
@@ -185,6 +186,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.get_production_verification_evidence",
       description: "Vrati posledny secret-safe production verification artifact z npm run verify:production.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.get_jarvis_capability_audit",
+      description: "Vrati secret-safe audit pokrytia celeho Jarvis ciela: tooly, approval locky, integracie, remote MCP a production evidence.",
       requiresApproval: false,
     },
     {
