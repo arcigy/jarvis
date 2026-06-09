@@ -436,6 +436,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /Running full Jarvis launch proof/);
   assert.match(renderer, /function runFullLaunchCheck/);
   assert.match(renderer, /function renderFullLaunchProof/);
+  assert.match(renderer, /ready with advisory/);
+  assert.match(renderer, /blocking, \$\{advisories\.length\} advisory/);
   assert.match(renderer, /startOperatorBriefingWatch/);
   assert.match(renderer, /operatorBriefingPollMs: 300000/);
   assert.match(renderer, /Fix guide/);

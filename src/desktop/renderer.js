@@ -801,23 +801,34 @@ function renderFullLaunchProof({ health, bridge, readiness, evidence, smoke }) {
   const freshness = evidence?.freshness && typeof evidence.freshness === "object" ? evidence.freshness : {};
   const gates = Array.isArray(release.requiredRemoteMcpSmokeGates) ? release.requiredRemoteMcpSmokeGates.length : 0;
   const smokeGates = summarizeRemoteProofGates(smoke);
-  const ready =
-    readiness?.status === "ready" &&
+  const blockers = Array.isArray(readiness?.blockers) ? readiness.blockers : [];
+  const blocking = blockers.filter((item) => item?.severity === "blocking");
+  const advisories = blockers.filter((item) => item?.severity === "warning");
+  const coreProofReady =
     bridge?.readyForTunnel === true &&
     evidence?.status === "ready" &&
     release.dirty === false &&
     freshness.fresh === true &&
     smoke?.status === "ready";
+  const headline = !coreProofReady || blocking.length
+    ? "Jarvis full launch proof needs attention."
+    : advisories.length
+      ? "Jarvis full launch proof is ready with advisory."
+      : "Jarvis full launch proof is ready.";
   return [
-    ready ? "Jarvis full launch proof is ready." : "Jarvis full launch proof needs attention.",
+    headline,
     `Integrations: ${productionSafeIntegrations}/${integrations.length || "--"} production-safe.`,
     `Bridge: ${bridge?.readyForTunnel ? "ready for tunnel" : "needs token or preflight attention"}.`,
-    `Readiness: ${readiness?.status ?? "unknown"}.`,
+    `Readiness: ${readiness?.status ?? "unknown"}; ${blocking.length} blocking, ${advisories.length} advisory.`,
     `Production evidence: ${evidence?.status ?? "missing"}, tree ${release.dirty === false ? "clean" : "not clean"}, freshness ${
       freshness.fresh === true ? `fresh ${freshness.ageHours}h` : "stale or missing"
     }.`,
     `Remote MCP smoke: ${smokeGates ? smokeGates.text : smoke?.status ?? "not verified"}; required gates ${gates}/${requiredRemoteSmokeGates.length}.`,
-    readiness?.nextActions?.[0] ? `Next: ${readiness.nextActions[0]}` : "Next: keep proof fresh before remote agent handoff.",
+    blocking[0]?.nextAction
+      ? `Next: ${blocking[0].nextAction}`
+      : advisories[0]?.nextAction
+        ? `Advisory: ${advisories[0].nextAction}`
+        : "Next: keep proof fresh before remote agent handoff.",
   ].join("\n");
 }
 
