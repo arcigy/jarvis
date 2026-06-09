@@ -1,7 +1,7 @@
 import { runIntegrationDiagnostics, type DiagnosticCheck, type DiagnosticsResult } from "./diagnostics.ts";
 import { getIntegrationHealth, isUnusedRedisPlaceholderIssue, type IntegrationHealth, type RuntimeEnv } from "./env.ts";
 import type { FetchLike } from "./gemini.ts";
-import { listJarvisMcpTools } from "./mcp-tools.ts";
+import { listJarvisMcpTools, type JarvisMcpTool, type JarvisMcpToolName } from "./mcp-tools.ts";
 
 export type ReadinessStatus = "ready" | "attention" | "blocked";
 
@@ -99,6 +99,7 @@ export async function buildProductionReadinessReport(
   const blockers = [
     ...health.flatMap(integrationHealthBlockers),
     ...diagnosticChecks.flatMap((check) => diagnosticBlockers(check, diagnosticChecks)),
+    ...buildWorkflowSurfaceBlockers(tools),
   ];
   const uniqueBlockers = dedupeBlockers(blockers);
   const blockingCount = uniqueBlockers.filter((blocker) => blocker.severity === "blocking").length;
@@ -138,6 +139,7 @@ function buildLaunchEvidence(
 ): ReadinessLaunchEvidence {
   const gateCommand = (id: string) => {
     if (id === "mcp-registry" || id === "approval-locks") return "npm test";
+    if (id.endsWith("-workflow")) return "npm test && npm run doctor";
     if (id === "live-diagnostics" || id === "required-integrations") return "npm run doctor -- --live-integrations";
     return "npm run verify:production";
   };
@@ -176,6 +178,7 @@ function buildLaunchChecklist(
   const readyRequired = requiredIntegrations.filter((item) => item.configured);
   const warnings = blockers.filter((blocker) => blocker.severity === "warning");
   const blocking = blockers.filter((blocker) => blocker.severity === "blocking");
+  const runtimeBlocking = blocking.filter((blocker) => !isWorkflowSurfaceKey(blocker.key));
   const approvalTools = tools.filter((tool) => tool.requiresApproval).map((tool) => String(tool.name));
   const requiredApprovalTools = [
     "arcigy.generate_contract_documents",
@@ -193,9 +196,9 @@ function buildLaunchChecklist(
     {
       id: "required-integrations",
       title: "Required integrations",
-      status: blocking.length ? "blocked" : "ready",
+      status: runtimeBlocking.length ? "blocked" : "ready",
       proof: `${readyRequired.length}/${requiredIntegrations.length} required integration group(s) configured.`,
-      nextAction: blocking[0]?.nextAction ?? "Keep required integration secrets in .env.local and rerun doctor before live work.",
+      nextAction: runtimeBlocking[0]?.nextAction ?? "Keep required integration secrets in .env.local and rerun doctor before live work.",
     },
     {
       id: "optional-advisories",
@@ -227,7 +230,113 @@ function buildLaunchChecklist(
         : "Live diagnostics were not requested for this report.",
       nextAction: diagnostics ? liveBlocking[0]?.message ?? liveWarnings[0]?.message ?? "Live diagnostics are ready." : "Run npm run doctor -- --live-integrations.",
     },
+    ...coreWorkflowSurfaces.map((surface) => workflowChecklistItem(surface, tools)),
   ];
+}
+
+type CoreWorkflowSurface = {
+  id: string;
+  title: string;
+  tools: JarvisMcpToolName[];
+  approvalRequired: JarvisMcpToolName[];
+  proof: string;
+};
+
+const coreWorkflowSurfaces: CoreWorkflowSurface[] = [
+  {
+    id: "contract-workflow",
+    title: "Contract automation workflow",
+    tools: ["arcigy.draft_contract_intake", "arcigy.generate_contract_documents"],
+    approvalRequired: ["arcigy.generate_contract_documents"],
+    proof: "Gemini intake draft and approval-gated DOCX contract generation are registered.",
+  },
+  {
+    id: "outreach-workflow",
+    title: "Cold outreach workflow",
+    tools: [
+      "arcigy.get_smartlead_outreach_brief",
+      "arcigy.get_cold_outreach_brief_from_db",
+      "arcigy.prepare_positive_outreach_reply",
+      "arcigy.get_prepared_outreach_replies",
+      "arcigy.get_approval_queue",
+      "arcigy.send_approved_outreach_reply",
+    ],
+    approvalRequired: ["arcigy.send_approved_outreach_reply"],
+    proof: "Smartlead/local outreach briefs, Gemini positive reply drafts, approval queue, and approval-gated Gmail send are registered.",
+  },
+  {
+    id: "client-memory-workflow",
+    title: "Client memory workflow",
+    tools: [
+      "arcigy.identify_email",
+      "arcigy.ingest_client_message",
+      "arcigy.get_client_need_alerts",
+      "arcigy.update_client_need_status",
+      "arcigy.get_local_memory_snapshot",
+      "arcigy.export_local_memory_snapshot",
+    ],
+    approvalRequired: ["arcigy.update_client_need_status", "arcigy.export_local_memory_snapshot"],
+    proof: "Email identity, client need alerts, status updates, and redacted memory snapshot export are registered.",
+  },
+  {
+    id: "voice-workflow",
+    title: "Jarvis voice workflow",
+    tools: ["arcigy.jarvis_voice_event", "arcigy.get_operator_briefing", "arcigy.get_production_verification_evidence"],
+    approvalRequired: [],
+    proof: "Wake-word command handling, operator briefing, and production evidence voice path are registered.",
+  },
+  {
+    id: "remote-agent-workflow",
+    title: "Remote agent workflow",
+    tools: ["arcigy.get_remote_mcp_pack", "arcigy.run_remote_mcp_smoke", "arcigy.get_production_readiness", "arcigy.get_production_verification_evidence"],
+    approvalRequired: [],
+    proof: "Remote MCP pack, smoke proof, readiness, and production evidence tools are registered.",
+  },
+];
+
+function buildWorkflowSurfaceBlockers(tools: JarvisMcpTool[]): ReadinessBlocker[] {
+  return coreWorkflowSurfaces.flatMap((surface) => {
+    const missing = missingWorkflowTools(surface, tools);
+    const missingApprovals = missingWorkflowApprovalLocks(surface, tools);
+    if (!missing.length && !missingApprovals.length) return [];
+    return [
+      {
+        key: surface.id,
+        severity: "blocking",
+        message: `Core Jarvis workflow surface is incomplete: ${[...missing.map((tool) => `missing ${tool}`), ...missingApprovals.map((tool) => `missing approval lock for ${tool}`)].join("; ")}.`,
+        nextAction: `Restore ${surface.title} MCP surface and rerun npm test.`,
+      },
+    ];
+  });
+}
+
+function workflowChecklistItem(surface: CoreWorkflowSurface, tools: JarvisMcpTool[]): ReadinessLaunchChecklistItem {
+  const missing = missingWorkflowTools(surface, tools);
+  const missingApprovals = missingWorkflowApprovalLocks(surface, tools);
+  const ready = missing.length === 0 && missingApprovals.length === 0;
+  return {
+    id: surface.id,
+    title: surface.title,
+    status: ready ? "ready" : "blocked",
+    proof: ready
+      ? surface.proof
+      : `Missing ${missing.length} tool(s) and ${missingApprovals.length} approval lock(s).`,
+    nextAction: ready ? "Keep this workflow covered by npm test, doctor, and production verification." : `Restore ${surface.title} MCP surface and rerun npm test.`,
+  };
+}
+
+function missingWorkflowTools(surface: CoreWorkflowSurface, tools: JarvisMcpTool[]): JarvisMcpToolName[] {
+  const registered = new Set(tools.map((tool) => tool.name));
+  return surface.tools.filter((tool) => !registered.has(tool));
+}
+
+function missingWorkflowApprovalLocks(surface: CoreWorkflowSurface, tools: JarvisMcpTool[]): JarvisMcpToolName[] {
+  const approvalTools = new Set(tools.filter((tool) => tool.requiresApproval).map((tool) => tool.name));
+  return surface.approvalRequired.filter((tool) => !approvalTools.has(tool));
+}
+
+function isWorkflowSurfaceKey(key: string): boolean {
+  return coreWorkflowSurfaces.some((surface) => surface.id === key);
 }
 
 function integrationHealthBlockers(item: IntegrationHealth): ReadinessBlocker[] {

@@ -105,9 +105,15 @@ test("production readiness report returns blockers and next actions without secr
   assert.ok(report.attentionQueue.every((item) => item.validationCommand.includes("doctor")));
   assert.ok(report.launchChecklist.some((item) => item.id === "required-integrations" && item.status === "blocked"));
   assert.ok(report.launchChecklist.some((item) => item.id === "approval-locks" && item.status === "ready"));
+  assert.ok(report.launchChecklist.some((item) => item.id === "contract-workflow" && item.status === "ready"));
+  assert.ok(report.launchChecklist.some((item) => item.id === "outreach-workflow" && item.status === "ready"));
+  assert.ok(report.launchChecklist.some((item) => item.id === "client-memory-workflow" && item.status === "ready"));
+  assert.ok(report.launchChecklist.some((item) => item.id === "voice-workflow" && item.status === "ready"));
+  assert.ok(report.launchChecklist.some((item) => item.id === "remote-agent-workflow" && item.status === "ready"));
   assert.equal(report.launchEvidence.mode, "production-launch-evidence");
   assert.equal(report.launchEvidence.decision, "blocked");
   assert.ok(report.launchEvidence.proofGates.some((gate) => gate.id === "approval-locks" && gate.validationCommand === "npm test"));
+  assert.ok(report.launchEvidence.proofGates.some((gate) => gate.id === "remote-agent-workflow" && gate.validationCommand === "npm test && npm run doctor"));
   assert.match(report.launchEvidence.remoteHandoff.smokeCommand, /remote:mcp:smoke/);
   assert.ok(report.launchEvidence.remoteHandoff.requiredBeforeExternalAgent.some((step) => step.includes("/.well-known/ai-plugin.json") && step.includes("/api/openapi.json")));
   assert.ok(
