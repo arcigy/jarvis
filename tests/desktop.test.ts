@@ -493,6 +493,12 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(uiSmoke, /JARVIS_UI_SMOKE_URL/);
   assert.match(uiSmoke, /function redactSensitiveText/);
   assert.match(uiSmoke, /function safeErrorText/);
+  assert.match(uiSmoke, /fetchUiPreflight/);
+  assert.match(uiSmoke, /\/api\/web-bridge-preflight/);
+  assert.match(uiSmoke, /displayedToolCount !== preflight\.mcpToolCount/);
+  assert.match(uiSmoke, /displayedApprovalLockCount !== preflight\.riskyToolsRequiringApproval\.length/);
+  assert.match(uiSmoke, /mcpToolCount < 35/);
+  assert.match(uiSmoke, /riskyToolsRequiringApproval\.length < 6/);
   assert.match(uiSmoke, /console\.error\(safeErrorText\(error\)\)/);
   assert.match(uiSmoke, /consoleErrors\.push\(redactSensitiveText\(details\.message\)\)/);
   assert.match(uiSmoke, /Jarvis UI smoke failed for \$\{redactSensitiveText\(targetUrl\)\}/);

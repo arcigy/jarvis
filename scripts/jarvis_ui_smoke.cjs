@@ -175,6 +175,9 @@ async function run() {
       })()
     `);
 
+    const preflight = await fetchUiPreflight();
+    const displayedToolCount = Number(dom.mcpToolCountText);
+    const displayedApprovalLockCount = Number(dom.approvalLockCountText);
     if (dom.title !== "Arcigy Jarvis") fail(`Unexpected page title: ${dom.title}.`);
     if (!dom.coreImageComplete || dom.coreImageNaturalWidth < 100) fail("Command core image did not load.");
     if (dom.visibleMissionSignals !== 5) fail(`Expected 5 mission signals, found ${dom.visibleMissionSignals}.`);
@@ -182,8 +185,12 @@ async function run() {
     if (/undefined|null|\[object Object\]/i.test(dom.bodyText)) fail("UI contains raw undefined/null/object text.");
     if (dom.scrollWidth > dom.clientWidth + 2) fail(`UI has horizontal overflow: ${dom.scrollWidth}px > ${dom.clientWidth}px.`);
     if (!/^[0-9]+\/[0-9]+$/.test(dom.readyIntegrationsText)) fail(`Ready integration count is not loaded: ${dom.readyIntegrationsText}.`);
-    if (!/^[0-9]+$/.test(dom.mcpToolCountText) || Number(dom.mcpToolCountText) < 28) fail(`MCP tool count is not loaded: ${dom.mcpToolCountText}.`);
-    if (!/^[0-9]+$/.test(dom.approvalLockCountText) || Number(dom.approvalLockCountText) < 3) fail(`Approval lock count is not loaded: ${dom.approvalLockCountText}.`);
+    if (!/^[0-9]+$/.test(dom.mcpToolCountText) || displayedToolCount < 35) fail(`MCP tool count is stale or not loaded: ${dom.mcpToolCountText}.`);
+    if (!/^[0-9]+$/.test(dom.approvalLockCountText) || displayedApprovalLockCount < 6) fail(`Approval lock count is stale or not loaded: ${dom.approvalLockCountText}.`);
+    if (displayedToolCount !== preflight.mcpToolCount) fail(`MCP tool count mismatch: UI ${displayedToolCount}, preflight ${preflight.mcpToolCount}.`);
+    if (displayedApprovalLockCount !== preflight.riskyToolsRequiringApproval.length) {
+      fail(`Approval lock count mismatch: UI ${displayedApprovalLockCount}, preflight ${preflight.riskyToolsRequiringApproval.length}.`);
+    }
     const proofGateText = String(dom.handoffProofGatesText ?? "");
     const proofReadyMatch = proofGateText.match(/^ready:\s*(\d+)\/(\d+)\s+safety gates$/i);
     if (/smoke not run|blocked:/i.test(proofGateText)) {
@@ -249,6 +256,21 @@ async function waitForPaint(window) {
       requestAnimationFrame(() => requestAnimationFrame(resolve));
     })
   `);
+}
+
+async function fetchUiPreflight() {
+  const preflightUrl = new URL("/api/web-bridge-preflight", targetUrl);
+  const response = await fetch(preflightUrl, { headers: { connection: "close" } });
+  const body = await response.json().catch(() => null);
+  if (!response.ok || !body || typeof body !== "object") {
+    fail(`Web bridge preflight did not return JSON: HTTP ${response.status}.`);
+    return { mcpToolCount: 0, riskyToolsRequiringApproval: [] };
+  }
+  const mcpToolCount = Number(body.mcpToolCount);
+  const riskyToolsRequiringApproval = Array.isArray(body.riskyToolsRequiringApproval) ? body.riskyToolsRequiringApproval : [];
+  if (!Number.isInteger(mcpToolCount) || mcpToolCount < 35) fail(`Preflight MCP tool count is stale: ${body.mcpToolCount}.`);
+  if (riskyToolsRequiringApproval.length < 6) fail(`Preflight approval lock count is stale: ${riskyToolsRequiringApproval.length}.`);
+  return { mcpToolCount, riskyToolsRequiringApproval };
 }
 
 function assertScreenshotPixels(image, png) {
