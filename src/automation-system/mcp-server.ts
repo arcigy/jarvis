@@ -747,6 +747,7 @@ export function createJarvisMcpServer(): McpServer {
       const clientNeeds = runDbCommand("list-open-needs", { status: "new", limit: 10 }, safeDbPath);
       const preparedReplies = runDbCommand("list-prepared-replies", { status: "pending", limit: 10 }, safeDbPath);
       const readiness = await buildProductionReadinessReport({ live, dbPath: safeDbPath });
+      const productionEvidence = getProductionVerificationEvidence(repoRoot);
       const preparedReplyCount = Number(preparedReplies.count ?? 0);
       const preparedPositiveReplyCount = Number(localCold.metrics?.preparedPositiveReplyCount ?? preparedReplyCount);
       const pendingPositiveApprovalCount = Number(localCold.metrics?.pendingPositiveApprovalCount ?? preparedPositiveReplyCount);
@@ -759,6 +760,7 @@ export function createJarvisMcpServer(): McpServer {
           readinessStatus: readiness.status,
           readinessSummary: readiness.summary,
           readinessAttentionQueue: readiness.attentionQueue,
+          productionEvidenceSummary: productionEvidence.summary,
           coldOutreachSummary,
           liveSyncSummary,
           openClientNeedCount: Number(clientNeeds.count ?? 0),

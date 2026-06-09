@@ -8,6 +8,7 @@ export type OperatorBriefingInput = {
     source: string;
     nextAction: string;
   }>;
+  productionEvidenceSummary?: string | null;
   coldOutreachSummary: string;
   liveSyncSummary?: string | null;
   openClientNeedCount: number;
@@ -32,6 +33,7 @@ export type OperatorBriefing = {
   sections: {
     readiness: string;
     readinessAttention?: string;
+    productionEvidence?: string;
     coldOutreach: string;
     liveSync?: string;
     clientNeeds: string;
@@ -47,6 +49,7 @@ export function buildOperatorBriefing(input: OperatorBriefingInput): OperatorBri
   const sections = {
     readiness: `Readiness: ${input.readinessStatus}. ${input.readinessSummary}`,
     readinessAttention,
+    productionEvidence: input.productionEvidenceSummary ? `Production evidence: ${input.productionEvidenceSummary}` : undefined,
     coldOutreach: `Cold outreach: ${input.coldOutreachSummary}`,
     liveSync: input.liveSyncSummary ? `Live sync: ${input.liveSyncSummary}` : undefined,
     clientNeeds,
@@ -60,6 +63,7 @@ export function buildOperatorBriefing(input: OperatorBriefingInput): OperatorBri
     "Jarvis briefing.",
     sections.readiness,
     sections.readinessAttention,
+    sections.productionEvidence,
     sections.coldOutreach,
     sections.liveSync,
     sections.clientNeeds,

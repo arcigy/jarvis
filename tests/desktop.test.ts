@@ -543,6 +543,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /ipcMain\.handle\("jarvis:runDiagnostics"/);
   assert.match(main, /ipcMain\.handle\("jarvis:productionReadiness"/);
   assert.match(main, /ipcMain\.handle\("jarvis:operatorBriefing"/);
+  assert.match(main, /productionEvidenceSummary: productionEvidence\.summary/);
+  assert.match(main, /sections\.productionEvidence/);
   assert.match(main, /ipcMain\.handle\("jarvis:webBridgePreflight"/);
   assert.match(main, /ipcMain\.handle\("jarvis:startSecureTunnel"/);
   assert.match(main, /ipcMain\.handle\("jarvis:stopSecureTunnel"/);

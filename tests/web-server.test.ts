@@ -351,8 +351,10 @@ test("local web bridge serves UI and API health", async () => {
       body: JSON.stringify({ dbPath: mcpDbPath, since: "2026-06-01T00:00:00Z", until: "2026-06-08T00:00:00Z", periodLabel: "poslednych 7 dni" }),
     });
     assert.equal(operatorBriefing.status, 200);
-    const operatorBriefingBody = (await operatorBriefing.json()) as { speechText: string };
+    const operatorBriefingBody = (await operatorBriefing.json()) as { speechText: string; sections: { productionEvidence?: string } };
     assert.match(operatorBriefingBody.speechText, /Jarvis briefing/);
+    assert.match(operatorBriefingBody.speechText, /Production evidence:/);
+    assert.match(operatorBriefingBody.sections.productionEvidence ?? "", /Production verification/);
 
     const mcpOperatorBriefing = await postJson(`${baseUrl}/api/mcp/arcigy.get_operator_briefing`, {
       dbPath: mcpDbPath,
@@ -361,6 +363,7 @@ test("local web bridge serves UI and API health", async () => {
       periodLabel: "poslednych 7 dni",
     });
     assert.match(mcpOperatorBriefing.result.speechText, /Jarvis briefing/);
+    assert.match(mcpOperatorBriefing.result.speechText, /Production evidence:/);
 
     const readiness = await fetch(`${baseUrl}/api/production-readiness`, {
       method: "POST",

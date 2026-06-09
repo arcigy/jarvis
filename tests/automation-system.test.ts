@@ -1197,6 +1197,7 @@ test("operator briefing combines readiness, outreach, client needs, and approval
         nextAction: "Replace REDIS_URL.",
       },
     ],
+    productionEvidenceSummary: "Production verification ready: 12 ready, 0 failed. Commit abc123. Fresh evidence (0h old).",
     coldOutreachSummary: "Za dnes sme napisali 10 ludom.",
     liveSyncSummary: "Gmail checked 4 account(s), fetched 8 message(s), created 6 new record(s), skipped 2 duplicate(s), raised 2 alert(s).",
     openClientNeedCount: 2,
@@ -1212,6 +1213,8 @@ test("operator briefing combines readiness, outreach, client needs, and approval
 
   assert.match(briefing.speechText, /Jarvis briefing/);
   assert.match(briefing.speechText, /Production attention queue: 1 item/);
+  assert.match(briefing.speechText, /Production evidence: Production verification ready/);
+  assert.match(briefing.sections.productionEvidence ?? "", /Fresh evidence/);
   assert.match(briefing.sections.readinessAttention ?? "", /redis: Replace Redis placeholder password/);
   assert.match(briefing.speechText, /Cold outreach/);
   assert.match(briefing.speechText, /Live sync/);

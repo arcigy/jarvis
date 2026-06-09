@@ -1280,6 +1280,7 @@ async function getOperatorBriefing(payload: Record<string, unknown>) {
   const clientNeeds = getClientNeedAlerts({ dbPath, status: "new", limit: 10 });
   const preparedReplies = runDbTool("list-prepared-replies", { dbPath, status: "pending", limit: 10 });
   const readiness = await buildProductionReadinessReport({ live: payload.live === true, dbPath });
+  const productionEvidence = getProductionVerificationEvidence(repoRoot);
   const preparedReplyCount = Number(preparedReplies.count ?? 0);
   const preparedPositiveReplyCount = Number(cold.metrics?.preparedPositiveReplyCount ?? preparedReplyCount);
   const pendingPositiveApprovalCount = Number(cold.metrics?.pendingPositiveApprovalCount ?? preparedPositiveReplyCount);
@@ -1291,6 +1292,7 @@ async function getOperatorBriefing(payload: Record<string, unknown>) {
     readinessStatus: readiness.status,
     readinessSummary: readiness.summary,
     readinessAttentionQueue: readiness.attentionQueue,
+    productionEvidenceSummary: productionEvidence.summary,
     coldOutreachSummary,
     liveSyncSummary,
     openClientNeedCount: Number(clientNeeds.count ?? 0),

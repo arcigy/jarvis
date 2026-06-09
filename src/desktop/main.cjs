@@ -2660,6 +2660,7 @@ async function getOperatorBriefing(payload = {}) {
   const clientNeeds = getClientNeedAlerts({ dbPath, status: "new", limit: 10 });
   const preparedReplies = getPreparedOutreachReplies({ dbPath, status: "pending", limit: 10 });
   const readiness = getProductionReadiness({ live: payload?.live === true, dbPath });
+  const productionEvidence = getProductionVerificationEvidence();
   const preparedReplyCount = Number(preparedReplies.count || 0);
   const coldOutreachSummary = await getOperatorColdOutreachSummary(payload?.live === true, String(payload?.periodLabel || period.periodLabel), cold.summary, {
     preparedPositiveReplyCount: preparedReplyCount,
@@ -2669,6 +2670,7 @@ async function getOperatorBriefing(payload = {}) {
     readinessStatus: readiness.status,
     readinessSummary: readiness.summary,
     readinessAttentionQueue: readiness.attentionQueue || [],
+    productionEvidenceSummary: productionEvidence.summary,
     coldOutreachSummary,
     liveSyncSummary,
     openClientNeedCount: Number(clientNeeds.count || 0),
@@ -2717,6 +2719,7 @@ function buildOperatorBriefing(input) {
   const sections = {
     readiness: `Readiness: ${input.readinessStatus}. ${input.readinessSummary}`,
     readinessAttention,
+    productionEvidence: input.productionEvidenceSummary ? `Production evidence: ${input.productionEvidenceSummary}` : undefined,
     coldOutreach: `Cold outreach: ${input.coldOutreachSummary}`,
     liveSync: input.liveSyncSummary ? `Live sync: ${input.liveSyncSummary}` : undefined,
     clientNeeds,
@@ -2730,6 +2733,7 @@ function buildOperatorBriefing(input) {
     "Jarvis briefing.",
     sections.readiness,
     sections.readinessAttention,
+    sections.productionEvidence,
     sections.coldOutreach,
     sections.liveSync,
     sections.clientNeeds,

@@ -809,8 +809,10 @@ test("Jarvis MCP server summarizes cold outreach from local SQLite events", asyn
       periodLabel: "poslednych 7 dni",
     },
   });
-  const operatorBody = getStructuredResult(operatorBriefing) as { speechText: string; sections: { coldOutreach: string; clientNeeds: string } };
+  const operatorBody = getStructuredResult(operatorBriefing) as { speechText: string; sections: { productionEvidence?: string; coldOutreach: string; clientNeeds: string } };
   assert.match(operatorBody.speechText, /Jarvis briefing/);
+  assert.match(operatorBody.speechText, /Production evidence:/);
+  assert.match(operatorBody.sections.productionEvidence ?? "", /Production verification/);
   assert.match(operatorBody.sections.coldOutreach, /Cold outreach/);
   assert.match(operatorBody.sections.clientNeeds, /Client Contact/);
   assert.match(operatorBody.sections.clientNeeds, /update onboarding automation/);
