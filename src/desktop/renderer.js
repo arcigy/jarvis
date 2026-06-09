@@ -195,6 +195,7 @@ const elements = {
   copyRemotePack: document.querySelector("#copyRemotePack"),
   runRemoteSmoke: document.querySelector("#runRemoteSmoke"),
   remoteSmokeResult: document.querySelector("#remoteSmokeResult"),
+  remoteProofMatrix: document.querySelector("#remoteProofMatrix"),
   leadQuery: document.querySelector("#leadQuery"),
   discoverLeads: document.querySelector("#discoverLeads"),
   exportLeads: document.querySelector("#exportLeads"),
@@ -1337,6 +1338,7 @@ function renderRemoteMcpPack(pack) {
   const proof = matchingSmoke ? summarizeRemoteProofGates(matchingSmoke) : { ready: false, text: "smoke not run" };
   elements.handoffProofGates.textContent = proof.text;
   elements.handoffProofGates.dataset.state = proof.ready ? "ready" : "attention";
+  renderRemoteProofMatrix(matchingSmoke);
   renderRemoteAgentLaunchBundle(launchBundle, matchingSmoke);
   renderAgentSetupProfiles(pack.agentSetupProfiles ?? [], matchingSmoke);
   renderMcpToolList(pack);
@@ -1552,6 +1554,7 @@ function renderRemoteMcpSmoke(report) {
   const proof = summarizeRemoteProofGates(report);
   elements.handoffProofGates.textContent = proof.text;
   elements.handoffProofGates.dataset.state = proof.ready ? "ready" : "attention";
+  renderRemoteProofMatrix(report);
   if (state.lastRemoteMcpPack) elements.remoteAgentPrompt.textContent = buildRemoteAgentPrompt(state.lastRemoteMcpPack, report);
   if (state.lastRemoteAgentLaunchBundle) renderRemoteAgentLaunchBundle(state.lastRemoteAgentLaunchBundle, report);
   elements.remoteSmokeResult.textContent = [
@@ -1559,6 +1562,23 @@ function renderRemoteMcpSmoke(report) {
     "",
     ...(report.checks ?? []).map((check) => `${check.status.toUpperCase()} ${check.key}: ${check.message}`),
   ].join("\n");
+}
+
+function renderRemoteProofMatrix(report) {
+  elements.remoteProofMatrix.replaceChildren();
+  const checks = new Map((report?.checks ?? []).map((check) => [check.key, check.status]));
+  for (const gate of requiredRemoteSmokeGates) {
+    const status = checks.get(gate) ?? "waiting";
+    const node = document.createElement("div");
+    const label = document.createElement("span");
+    const title = document.createElement("strong");
+    node.className = "proofGateCard";
+    node.dataset.state = status === "ready" ? "ready" : "attention";
+    label.textContent = status === "ready" ? "ready" : "blocked";
+    title.textContent = gate;
+    node.append(label, title);
+    elements.remoteProofMatrix.appendChild(node);
+  }
 }
 
 function summarizeRemoteProofGates(report) {

@@ -99,6 +99,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /id="copyRemotePack"/);
   assert.match(html, /id="runRemoteSmoke"/);
   assert.match(html, /id="remoteSmokeResult"/);
+  assert.match(html, /id="remoteProofMatrix"/);
   assert.match(html, /checkWebBridge/);
   assert.match(html, /webBridgeResult/);
   assert.match(html, /Contract generator/);
@@ -261,6 +262,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /Local memory writes:/);
   assert.match(renderer, /preview Gmail with dryRun: true first/);
   assert.match(renderer, /renderRemoteMcpSmoke/);
+  assert.match(renderer, /function renderRemoteProofMatrix/);
+  assert.match(renderer, /proofGateCard/);
   assert.match(renderer, /buildRemoteAgentPrompt/);
   assert.match(renderer, /Quick-start calls/);
   assert.match(renderer, /Supported agents:/);
@@ -559,6 +562,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(styles, /\.clientAlertGrid,\s+\.toolMatrix/s);
   assert.match(styles, /\.cortexMap/);
   assert.match(styles, /\.cortexNode\[data-state="ready"\]/);
+  assert.match(styles, /\.remoteProofMatrix/);
+  assert.match(styles, /\.proofGateCard\[data-state="ready"\]/);
   assert.match(styles, /@keyframes cortexSweep/);
   assert.match(styles, /@keyframes cortexPulse/);
   assert.match(styles, /@keyframes signalSweep/);
@@ -598,7 +603,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(uiSmoke, /Command core image did not load/);
   assert.match(uiSmoke, /handoffProofGatesText/);
   assert.match(uiSmoke, /proofReadyMatch/);
-  assert.match(uiSmoke, /Number\(proofReadyMatch\[1\]\) < 35/);
+  assert.match(uiSmoke, /requiredRemoteSmokeGateCount = 36/);
+  assert.match(uiSmoke, /proofMatrixReadyCount/);
   assert.match(uiSmoke, /agentSetupProfilesText/);
   assert.match(uiSmoke, /Agent setup profiles are not rendered/);
   assert.match(uiSmoke, /Remote proof gates are not rendered/);

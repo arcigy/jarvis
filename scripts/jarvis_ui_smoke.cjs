@@ -18,6 +18,7 @@ const viewport = {
   height: Number(args.get("--height") || 960),
 };
 const isNarrowViewport = viewport.width < 700;
+const requiredRemoteSmokeGateCount = 36;
 
 const failures = [];
 const consoleErrors = [];
@@ -271,8 +272,14 @@ async function run() {
     const proofReadyMatch = proofGateText.match(/^ready:\s*(\d+)\/(\d+)\s+safety gates$/i);
     if (!proofReadyMatch) {
       fail(`Remote proof gates are not rendered: ${proofGateText}.`);
-    } else if (proofReadyMatch[1] !== proofReadyMatch[2] || Number(proofReadyMatch[1]) < 35) {
+    } else if (
+      Number(proofReadyMatch[1]) !== requiredRemoteSmokeGateCount ||
+      Number(proofReadyMatch[2]) !== requiredRemoteSmokeGateCount
+    ) {
       fail(`Remote proof gates are stale or incomplete: ${proofGateText}.`);
+    }
+    if (remoteSmokeUi.proofMatrixTotalCount !== requiredRemoteSmokeGateCount || remoteSmokeUi.proofMatrixReadyCount !== requiredRemoteSmokeGateCount) {
+      fail(`Remote proof matrix is incomplete: ${remoteSmokeUi.proofMatrixReadyCount}/${remoteSmokeUi.proofMatrixTotalCount}.`);
     }
     if (!/Remote MCP smoke ready/i.test(remoteSmokeUi.remoteSmokeResultText) || !/READY manifest/i.test(remoteSmokeUi.remoteSmokeResultText)) {
       fail("Remote MCP smoke result was not rendered from the UI button flow.");
@@ -365,15 +372,17 @@ async function runRemoteSmokeFromUi(window) {
   `, 5000);
   if (!clicked) {
     fail("Remote MCP smoke button is missing.");
-    return { handoffProofGatesText: "", remoteSmokeResultText: "" };
+    return { handoffProofGatesText: "", remoteSmokeResultText: "", proofMatrixReadyCount: 0, proofMatrixTotalCount: 0 };
   }
   const deadline = Date.now() + 20000;
-  let state = { handoffProofGatesText: "", remoteSmokeResultText: "" };
+  let state = { handoffProofGatesText: "", remoteSmokeResultText: "", proofMatrixReadyCount: 0, proofMatrixTotalCount: 0 };
   while (Date.now() < deadline) {
     state = await executeRendererJson(window, `
       (() => ({
         handoffProofGatesText: document.querySelector("#handoffProofGates")?.textContent.trim() || "",
-        remoteSmokeResultText: document.querySelector("#remoteSmokeResult")?.textContent.trim() || ""
+        remoteSmokeResultText: document.querySelector("#remoteSmokeResult")?.textContent.trim() || "",
+        proofMatrixReadyCount: document.querySelectorAll("#remoteProofMatrix .proofGateCard[data-state='ready']").length,
+        proofMatrixTotalCount: document.querySelectorAll("#remoteProofMatrix .proofGateCard").length
       }))()
     `, 5000);
     if (new RegExp("^ready:\\s*\\d+/\\d+\\s+safety gates$", "i").test(state.handoffProofGatesText) || /^blocked:/i.test(state.handoffProofGatesText)) {
