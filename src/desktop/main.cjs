@@ -4289,6 +4289,7 @@ async function generateGeminiTextForContract(input) {
     prompt,
     model: "gemini-2.5-flash",
     temperature: 0.2,
+    outputSafety: "structured",
     systemInstruction: "You are Arcigy Jarvis. Return only valid JSON for the Arcigy contract intake schema. Do not return secrets or legal advice.",
   });
 }
@@ -4346,7 +4347,8 @@ async function requestGeminiText(input, apiKey, model) {
   const data = await response.json();
   const text = data?.candidates?.[0]?.content?.parts?.map((part) => part.text || "").join("").trim();
   if (!text) throw new Error("Gemini returned an empty response.");
-  return redactSensitiveText(text);
+  const redactedText = redactSensitiveText(text);
+  return input.outputSafety === "structured" ? redactedText : sanitizeAiDraftOutput(redactedText);
 }
 
 function getGeminiModels(input) {
@@ -4399,6 +4401,28 @@ function redactSensitiveText(value) {
     .replace(/1\/\/[0-9A-Za-z_-]{20,}/g, "[redacted-google-refresh-token]")
     .replace(/\b[0-9a-f]{32,}\b/gi, "[redacted-hex-secret]")
     .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_[A-Za-z0-9_-]{6,}\b/gi, "[redacted-provider-key]");
+}
+
+function hasUnsafeAiActionClaim(value) {
+  const text = redactSensitiveText(value);
+  return [
+    /\b(i|we|jarvis)\s+(already\s+)?(sent|emailed|approved|executed|called|exported|wrote|updated|created|deleted)\b/i,
+    /\b(email|reply|message|contract|lead export|gmail|tool|api call)\s+(has been|was)\s+(sent|approved|executed|exported|written|called)\b/i,
+    /\bapproval\.approved\s*=\s*true\b/i,
+    /"approved"\s*:\s*true/i,
+    /\b(call|invoke|run|execute)\s+(the\s+)?(tool|mcp|api)\b/i,
+    /\b(odoslal som|poslal som|schvalil som|spustil som|vykonal som|exportoval som|zapisal som)\b/i,
+    /\b(email|sprava|odpoved|zmluva|export)\s+(bol|bola|bolo)\s+(odoslan[ayoe]|schvalen[ayoe]|vykonan[ayoe]|exportovan[ayoe]|vygenerovan[ayoe])\b/i,
+  ].some((pattern) => pattern.test(text));
+}
+
+function sanitizeAiDraftOutput(value) {
+  const safeText = redactSensitiveText(value).trim();
+  if (!safeText || !hasUnsafeAiActionClaim(safeText)) return safeText;
+  return [
+    "Bezpecnostna kontrola zablokovala modelovy draft, pretoze tvrdil, ze akcia uz bola odoslana, schvalena alebo vykonana.",
+    "Nic nebolo vykonane. Priprav novy draft a odosli ho az po explicitnom schvaleni operatora.",
+  ].join(" ");
 }
 
 function safeAiPromptPart(value) {

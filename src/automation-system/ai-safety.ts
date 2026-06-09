@@ -24,6 +24,28 @@ export function redactSensitiveText(value: unknown): string {
     .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_[A-Za-z0-9_-]{6,}\b/gi, "[redacted-provider-key]");
 }
 
+export function hasUnsafeAiActionClaim(value: unknown): boolean {
+  const text = redactSensitiveText(value);
+  return [
+    /\b(i|we|jarvis)\s+(already\s+)?(sent|emailed|approved|executed|called|exported|wrote|updated|created|deleted)\b/i,
+    /\b(email|reply|message|contract|lead export|gmail|tool|api call)\s+(has been|was)\s+(sent|approved|executed|exported|written|called)\b/i,
+    /\bapproval\.approved\s*=\s*true\b/i,
+    /"approved"\s*:\s*true/i,
+    /\b(call|invoke|run|execute)\s+(the\s+)?(tool|mcp|api)\b/i,
+    /\b(odoslal som|poslal som|schvalil som|spustil som|vykonal som|exportoval som|zapisal som)\b/i,
+    /\b(email|sprava|odpoved|zmluva|export)\s+(bol|bola|bolo)\s+(odoslan[ayoe]|schvalen[ayoe]|vykonan[ayoe]|exportovan[ayoe]|vygenerovan[ayoe])\b/i,
+  ].some((pattern) => pattern.test(text));
+}
+
+export function sanitizeAiDraftOutput(value: unknown): string {
+  const safeText = redactSensitiveText(value).trim();
+  if (!safeText || !hasUnsafeAiActionClaim(safeText)) return safeText;
+  return [
+    "Bezpecnostna kontrola zablokovala modelovy draft, pretoze tvrdil, ze akcia uz bola odoslana, schvalena alebo vykonana.",
+    "Nic nebolo vykonane. Priprav novy draft a odosli ho az po explicitnom schvaleni operatora.",
+  ].join(" ");
+}
+
 export function safeAiPromptPart(value: unknown): string {
   return redactSensitiveText(value).trim();
 }

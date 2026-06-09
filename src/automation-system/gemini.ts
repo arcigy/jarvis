@@ -1,5 +1,5 @@
 import { requireEnv, type RuntimeEnv } from "./env.ts";
-import { redactSensitiveText, safeAiPromptPart, safeUntrustedAiPromptPart, withAiSafetySystemInstruction } from "./ai-safety.ts";
+import { redactSensitiveText, safeAiPromptPart, safeUntrustedAiPromptPart, sanitizeAiDraftOutput, withAiSafetySystemInstruction } from "./ai-safety.ts";
 
 export type FetchLike = typeof fetch;
 
@@ -8,6 +8,7 @@ export type GeminiTextInput = {
   systemInstruction?: string;
   model?: string;
   temperature?: number;
+  outputSafety?: "draft" | "structured";
 };
 
 export type GeminiTextResult = {
@@ -104,7 +105,8 @@ async function requestGeminiText(input: GeminiTextInput, apiKey: string, model: 
   if (!text) {
     throw new Error("Gemini returned an empty response.");
   }
-  return redactSensitiveText(text);
+  const redactedText = redactSensitiveText(text);
+  return input.outputSafety === "structured" ? redactedText : sanitizeAiDraftOutput(redactedText);
 }
 
 function getGeminiModels(input: GeminiTextInput, env: RuntimeEnv): string[] {

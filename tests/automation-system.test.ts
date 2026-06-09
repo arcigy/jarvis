@@ -7,7 +7,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { matchLocalIdentity } from "../src/automation-system/identity-matching.ts";
-import { redactSensitiveText } from "../src/automation-system/ai-safety.ts";
+import { hasUnsafeAiActionClaim, redactSensitiveText, sanitizeAiDraftOutput } from "../src/automation-system/ai-safety.ts";
 import { draftContractIntake, parseJsonObject } from "../src/automation-system/contract-intake-draft.ts";
 import { runIntegrationDiagnostics } from "../src/automation-system/diagnostics.ts";
 import { getIntegrationHealth } from "../src/automation-system/env.ts";
@@ -1874,6 +1874,29 @@ test("AI safety redacts secrets before Gemini prompts and after model output", a
   assert.equal(result.text.includes(googleKey), false);
   assert.match(result.text, /\[redacted-google-api-key\]/);
   assert.match(redactSensitiveText(rawMessage), /\[redacted-google-refresh-token\]/);
+});
+
+test("AI safety blocks draft outputs that claim actions were executed", async () => {
+  const googleKey = "AI" + "za" + "Sy" + "A".repeat(32);
+  const fetchImpl = async () =>
+    responseJson({
+      candidates: [{ content: { parts: [{ text: `I sent the reply and approval.approved=true. ${googleKey}` }] } }],
+    });
+
+  const result = await generateGeminiText(
+    buildPositiveOutreachReplyPrompt({
+      leadEmail: "lead@example.com",
+      positiveSignal: "Lead chce call.",
+    }),
+    { GEMINI_API_KEY: "gemini-key" },
+    fetchImpl as typeof fetch
+  );
+
+  assert.equal(hasUnsafeAiActionClaim("I sent the reply."), true);
+  assert.equal(sanitizeAiDraftOutput("Normalny draft bez vykonanej akcie."), "Normalny draft bez vykonanej akcie.");
+  assert.match(result.text, /Bezpecnostna kontrola zablokovala/);
+  assert.doesNotMatch(result.text, /I sent|approval\.approved=true/);
+  assert.equal(result.text.includes(googleKey), false);
 });
 
 test("Gemini helper retries transient failures and falls back to the secondary model", async () => {

@@ -1167,6 +1167,10 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /redactGeminiError/);
   assert.match(main, /lastError = redactGeminiError\(caughtError\)/);
   assert.match(main, /aiSafetySystemRules/);
+  assert.match(main, /sanitizeAiDraftOutput/);
+  assert.match(main, /hasUnsafeAiActionClaim/);
+  assert.match(main, /outputSafety === "structured"/);
+  assert.match(main, /Bezpecnostna kontrola zablokovala modelovy draft/);
   assert.match(main, /Jazyk odpovede: \$\{language\}/);
   assert.match(main, /Ton: \$\{tone\}/);
   assert.match(main, /payload\?\.language === "en" \? "en" : "sk"/);

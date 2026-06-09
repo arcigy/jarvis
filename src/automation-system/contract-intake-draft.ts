@@ -18,6 +18,7 @@ export async function draftContractIntake(
     {
       model: "gemini-2.5-flash",
       temperature: 0.2,
+      outputSafety: "structured",
       systemInstruction:
         "You are Arcigy Jarvis. Return only valid JSON for the Arcigy contract intake schema. Do not include markdown, comments, signatures, secrets, or legal advice.",
       prompt: [
