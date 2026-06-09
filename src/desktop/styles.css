@@ -1012,6 +1012,42 @@ h2 {
   overflow-wrap: anywhere;
 }
 
+.voiceRuntime {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 16px 0 2px;
+}
+
+.voiceRuntime div {
+  min-width: 0;
+  border: 1px solid #26302f;
+  border-radius: 8px;
+  background: rgb(9 15 16 / 74%);
+  padding: 8px;
+}
+
+.voiceRuntime dt {
+  color: #91a19d;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.voiceRuntime dd {
+  margin-top: 4px;
+  color: #9cf8ed;
+  font-size: 12px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.voiceRuntime[data-state="attention"] div {
+  border-color: rgb(240 184 79 / 46%);
+}
+
+.voiceRuntime[data-state="attention"] dd {
+  color: #ffd893;
+}
+
 .orb {
   position: relative;
   width: 150px;
@@ -1273,6 +1309,10 @@ ul {
   .listener {
     grid-column: auto;
     grid-row: auto;
+  }
+
+  .voiceRuntime {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .splitControls {

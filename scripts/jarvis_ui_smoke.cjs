@@ -149,6 +149,7 @@ async function run() {
           deck: box("#commandDeck"),
           visual: box(".deckVisual"),
           jarvisPanel: box("#jarvisPanel"),
+          voiceRuntime: box("#voiceRuntime"),
           responsePanel: box("#jarvisPanel + .panel"),
           missionReadiness: box("#missionReadiness"),
           missionRemote: box("#missionRemote"),
@@ -156,6 +157,10 @@ async function run() {
           mcpToolCountText: document.querySelector("#mcpToolCount")?.textContent.trim() || "",
           approvalLockCountText: document.querySelector("#approvalLockCount")?.textContent.trim() || "",
           handoffProofGatesText: document.querySelector("#handoffProofGates")?.textContent.trim() || "",
+          voiceModeText: document.querySelector("#voiceMode")?.textContent.trim() || "",
+          voiceInputText: document.querySelector("#voiceInput")?.textContent.trim() || "",
+          voiceOutputText: document.querySelector("#voiceOutput")?.textContent.trim() || "",
+          voiceLastEventText: document.querySelector("#voiceLastEvent")?.textContent.trim() || "",
           coreImageComplete: document.querySelector(".coreVisual")?.complete === true,
           coreImageNaturalWidth: document.querySelector(".coreVisual")?.naturalWidth || 0,
           visibleMissionSignals: [...document.querySelectorAll(".missionSignal")].filter((node) => {
@@ -180,6 +185,10 @@ async function run() {
     if (!/^[0-9]+$/.test(dom.mcpToolCountText) || Number(dom.mcpToolCountText) < 28) fail(`MCP tool count is not loaded: ${dom.mcpToolCountText}.`);
     if (!/^[0-9]+$/.test(dom.approvalLockCountText) || Number(dom.approvalLockCountText) < 3) fail(`Approval lock count is not loaded: ${dom.approvalLockCountText}.`);
     if (!/smoke not run|ready: 11\/11 safety gates|blocked:/i.test(dom.handoffProofGatesText)) fail(`Remote proof gates are not rendered: ${dom.handoffProofGatesText}.`);
+    if (!/^idle$|^listening$|^awake$|^processing$/i.test(dom.voiceModeText)) fail(`Voice mode is not rendered: ${dom.voiceModeText}.`);
+    if (!/microphone ready|text fallback/i.test(dom.voiceInputText)) fail(`Voice input capability is not rendered: ${dom.voiceInputText}.`);
+    if (!/speech ready|screen only/i.test(dom.voiceOutputText)) fail(`Voice output capability is not rendered: ${dom.voiceOutputText}.`);
+    if (!/standby|microphone|fallback|disabled|heard/i.test(dom.voiceLastEventText)) fail(`Voice event status is not rendered: ${dom.voiceLastEventText}.`);
     assertBox("sidebar", dom.sidebar, { width: isNarrowViewport ? 300 : 180, height: 60 });
     assertBox("navigation", dom.nav, { width: isNarrowViewport ? 300 : 150, height: 40 });
     assertBox("header", dom.header, { width: isNarrowViewport ? 300 : 400, height: 40 });
@@ -189,6 +198,7 @@ async function run() {
       assertSize("command deck", dom.deck, { width: 300, height: 90 });
       assertSize("deck visual", dom.visual, { width: 120, height: 80 });
       assertSize("Jarvis panel", dom.jarvisPanel, { width: 280, height: 180 });
+      assertSize("voice runtime", dom.voiceRuntime, { width: 260, height: 44 });
       assertSize("Jarvis response panel", dom.responsePanel, { width: 260, height: 90 });
     } else {
       assertBox("mission rail", dom.rail, { width: 600, height: 50 });
@@ -196,6 +206,7 @@ async function run() {
       assertBox("command deck", dom.deck, { width: 600, height: 90 });
       assertBox("deck visual", dom.visual, { width: 120, height: 80 });
       assertVisibleStart("Jarvis panel", dom.jarvisPanel, { width: 280, height: 180 });
+      assertVisibleStart("voice runtime", dom.voiceRuntime, { width: 260, height: 44 });
       assertVisibleStart("Jarvis response panel", dom.responsePanel, { width: 260, height: 90 });
     }
     assertBox("mission readiness", dom.missionReadiness, { width: 40, height: 16 });

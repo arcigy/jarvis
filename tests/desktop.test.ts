@@ -19,6 +19,11 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /object-src 'none'/);
   assert.match(html, /assets\/jarvis-command-core\.png/);
   assert.match(html, /Enable/);
+  assert.match(html, /id="voiceRuntime"/);
+  assert.match(html, /id="voiceMode"/);
+  assert.match(html, /id="voiceInput"/);
+  assert.match(html, /id="voiceOutput"/);
+  assert.match(html, /id="voiceLastEvent"/);
   assert.match(html, /data-target="jarvisPanel"/);
   assert.match(html, /data-target="leadPanel"/);
   assert.match(html, /id="operationsPanel"/);
@@ -134,6 +139,12 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /discoverLeads/);
   assert.match(html, /exportLeads/);
   assert.match(renderer, /SpeechRecognition/);
+  assert.match(renderer, /speechOutputAvailable/);
+  assert.match(renderer, /updateVoiceRuntimeStatus/);
+  assert.match(renderer, /microphone stream active/);
+  assert.match(renderer, /Speech recognition is unavailable; use transcript fallback/);
+  assert.match(renderer, /microphone error: \$\{errorName\}/);
+  assert.match(renderer, /microphone restart failed: \$\{safeUiErrorText\(error\)\}/);
   assert.match(renderer, /speechSynthesis/);
   assert.match(renderer, /setupNavigation/);
   assert.match(renderer, /IntersectionObserver/);

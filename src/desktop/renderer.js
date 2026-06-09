@@ -70,6 +70,11 @@ const elements = {
   readinessReport: document.querySelector("#readinessReport"),
   operatorBriefing: document.querySelector("#operatorBriefing"),
   listenButton: document.querySelector("#listenButton"),
+  voiceRuntime: document.querySelector("#voiceRuntime"),
+  voiceMode: document.querySelector("#voiceMode"),
+  voiceInput: document.querySelector("#voiceInput"),
+  voiceOutput: document.querySelector("#voiceOutput"),
+  voiceLastEvent: document.querySelector("#voiceLastEvent"),
   transcript: document.querySelector("#transcript"),
   response: document.querySelector("#response"),
   orb: document.querySelector("#orb"),
@@ -170,6 +175,7 @@ const elements = {
 };
 
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+const speechOutputAvailable = "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
 const webToken = resolveWebToken();
 const arcigyApi = window.arcigyDesktop ?? {
   openPath: async () => "desktop-only",
@@ -275,6 +281,17 @@ function setMode(mode) {
   elements.orb.dataset.mode = mode;
   setMissionSignal(elements.missionVoice, mode === "idle" ? "idle" : mode, mode === "idle" ? "ready" : "attention");
   setCortexSignal(elements.cortexVoice, mode === "idle" ? "standing by" : mode, mode === "idle" ? "ready" : "attention");
+  updateVoiceRuntimeStatus();
+}
+
+function updateVoiceRuntimeStatus(eventText) {
+  const inputReady = Boolean(SpeechRecognition);
+  const runtimeState = state.listening || state.mode === "awake" || state.mode === "processing" ? "attention" : "ready";
+  elements.voiceRuntime.dataset.state = runtimeState;
+  elements.voiceMode.textContent = state.listening ? "listening" : state.mode;
+  elements.voiceInput.textContent = inputReady ? "microphone ready" : "text fallback";
+  elements.voiceOutput.textContent = speechOutputAvailable ? "speech ready" : "screen only";
+  if (eventText) elements.voiceLastEvent.textContent = redactSensitiveText(eventText).replace(/\s+/g, " ").trim().slice(0, 96);
 }
 
 function setupNavigation() {
@@ -325,7 +342,7 @@ function setupNavigation() {
 
 function speak(text) {
   elements.response.textContent = text;
-  if ("speechSynthesis" in window) {
+  if (speechOutputAvailable) {
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = "sk-SK";
@@ -1540,6 +1557,7 @@ function numberFromInput(value) {
 async function handleTranscript(text) {
   const trimmed = text.trim();
   elements.transcript.value = trimmed;
+  updateVoiceRuntimeStatus(trimmed ? `heard: ${trimmed}` : "empty transcript ignored");
 
   const result = await arcigyApi.jarvisVoiceEvent({
     session: state.session,
@@ -1556,6 +1574,7 @@ async function handleTranscript(text) {
 
 function startRecognition() {
   if (!SpeechRecognition) {
+    updateVoiceRuntimeStatus("Speech recognition is unavailable; use transcript fallback.");
     speak("Hlasové rozpoznávanie nie je v tomto runtime dostupné. Použi textové pole alebo pripoj natívny speech bridge.");
     return;
   }
@@ -1568,23 +1587,51 @@ function startRecognition() {
   recognition.lang = "sk-SK";
   recognition.continuous = true;
   recognition.interimResults = false;
+  recognition.onstart = () => {
+    updateVoiceRuntimeStatus("microphone stream active");
+  };
   recognition.onresult = (event) => {
     const latest = event.results[event.results.length - 1];
     const text = latest?.[0]?.transcript ?? "";
     if (text) void handleTranscript(text);
   };
   recognition.onend = () => {
-    if (state.listening) recognition.start();
+    if (!state.listening) {
+      updateVoiceRuntimeStatus("microphone stream stopped");
+      return;
+    }
+    try {
+      recognition.start();
+    } catch (error) {
+      state.listening = false;
+      elements.listenButton.textContent = "Enable";
+      setMode("idle");
+      updateVoiceRuntimeStatus(`microphone restart failed: ${safeUiErrorText(error)}`);
+    }
   };
-  recognition.onerror = () => {
+  recognition.onerror = (event) => {
+    const errorName = event?.error ?? "unknown";
+    if (["not-allowed", "service-not-allowed", "audio-capture"].includes(errorName)) {
+      state.listening = false;
+      elements.listenButton.textContent = "Enable";
+    }
     setMode("idle");
+    updateVoiceRuntimeStatus(`microphone error: ${errorName}`);
   };
 
   state.recognition = recognition;
   state.listening = true;
-  recognition.start();
-  setMode("listening");
-  elements.listenButton.textContent = "Disable";
+  try {
+    recognition.start();
+    setMode("listening");
+    elements.listenButton.textContent = "Disable";
+    updateVoiceRuntimeStatus("waiting for Jarvis wake word");
+  } catch (error) {
+    state.listening = false;
+    elements.listenButton.textContent = "Enable";
+    setMode("idle");
+    updateVoiceRuntimeStatus(`microphone start failed: ${safeUiErrorText(error)}`);
+  }
 }
 
 function stopRecognition() {
@@ -1592,6 +1639,7 @@ function stopRecognition() {
   state.recognition?.stop();
   setMode("idle");
   elements.listenButton.textContent = "Enable";
+  updateVoiceRuntimeStatus("listening disabled");
 }
 
 elements.listenButton.addEventListener("click", () => {
