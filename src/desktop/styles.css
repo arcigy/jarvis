@@ -1055,6 +1055,40 @@ h2 {
   color: #ffd893;
 }
 
+.launchBundleStrip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.launchBundleStrip div {
+  min-width: 0;
+  border: 1px solid rgb(47 82 78 / 72%);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgb(61 236 214 / 12%), transparent 55%),
+    rgb(9 16 17 / 88%);
+  padding: 10px;
+}
+
+.launchBundleStrip span {
+  display: block;
+  color: #91a19d;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.launchBundleStrip strong {
+  display: block;
+  margin-top: 6px;
+  color: #e6faf7;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
 .agentSetupGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1630,6 +1664,7 @@ ul {
   .cortexMap,
   .bridgeCockpit,
   .handoffGrid,
+  .launchBundleStrip,
   .agentSetupGrid,
   .diagnosticsGrid,
   .providerFallbackGrid,

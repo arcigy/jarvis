@@ -76,6 +76,12 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /id="handoffApprovalTools"/);
   assert.match(html, /id="handoffLocalWriteTools"/);
   assert.match(html, /id="handoffProofGates"/);
+  assert.match(html, /id="handoffLaunchBundle"/);
+  assert.match(html, /id="handoffWritePolicy"/);
+  assert.match(html, /id="launchBundleStrip"/);
+  assert.match(html, /id="launchBeforeWork"/);
+  assert.match(html, /id="launchBeforeWrites"/);
+  assert.match(html, /id="launchAgentPrompt"/);
   assert.match(html, /id="agentSetupProfiles"/);
   assert.match(html, /agentSetupCard/);
   assert.match(html, /id="mcpToolListStatus"/);
@@ -210,6 +216,13 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /node\.setAttribute\("data-state", stateName\)/);
   assert.match(renderer, /renderBridgeCockpit/);
   assert.match(renderer, /renderRemoteMcpPack/);
+  assert.match(renderer, /renderRemoteAgentLaunchBundle/);
+  assert.match(renderer, /state\.lastRemoteAgentLaunchBundle = pack\.agentLaunchBundle \?\? null/);
+  assert.match(renderer, /Launch proof policy:/);
+  assert.match(renderer, /Agent launch bundle prompts:/);
+  assert.match(renderer, /launchBeforeWork/);
+  assert.match(renderer, /handoffLaunchBundle/);
+  assert.match(renderer, /handoffWritePolicy/);
   assert.match(renderer, /renderMcpToolList/);
   assert.match(renderer, /pack\.tools\?\.names/);
   assert.match(renderer, /read-only\/draft/);
@@ -691,6 +704,11 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /pack-audit-quick-start/);
   assert.match(main, /pack-production-evidence-quick-start/);
   assert.match(main, /production-evidence-tool-call/);
+  assert.match(main, /buildRemoteMcpAgentLaunchBundle/);
+  assert.match(main, /agentLaunchBundle: buildRemoteMcpAgentLaunchBundle/);
+  assert.match(main, /mode: "remote-agent-launch-bundle"/);
+  assert.match(main, /OAuth refresh tokens/);
+  assert.match(main, /Show the exact approvalRequired payload/);
   assert.match(main, /List operator approval queue/);
   assert.match(main, /Get redacted local memory snapshot/);
   assert.match(main, /Export redacted local memory snapshot after approval/);

@@ -418,6 +418,28 @@
                 <span>Proof gates</span>
                 <code id="handoffProofGates" data-state="attention">smoke not run</code>
               </div>
+              <div>
+                <span>Launch bundle</span>
+                <code id="handoffLaunchBundle" data-state="attention">not loaded</code>
+              </div>
+              <div>
+                <span>Write policy</span>
+                <code id="handoffWritePolicy">approval required</code>
+              </div>
+            </div>
+            <div class="launchBundleStrip" id="launchBundleStrip" aria-label="Remote launch bundle proof policy">
+              <div>
+                <span>Before any work</span>
+                <strong id="launchBeforeWork">Load launch bundle.</strong>
+              </div>
+              <div>
+                <span>Before writes</span>
+                <strong id="launchBeforeWrites">Require fresh proof and approval.</strong>
+              </div>
+              <div>
+                <span>Agent prompt</span>
+                <strong id="launchAgentPrompt">Claude / ChatGPT / Grok ready after pack load.</strong>
+              </div>
             </div>
             <div class="agentSetupGrid" id="agentSetupProfiles" aria-label="Remote agent setup profiles">
               <div class="agentSetupCard" data-state="attention">

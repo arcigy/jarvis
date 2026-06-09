@@ -11,6 +11,7 @@ const state = {
   webBridgeTimer: null,
   webBridgePollMs: 120000,
   lastRemoteMcpPack: null,
+  lastRemoteAgentLaunchBundle: null,
   lastRemoteMcpSmoke: null,
   lastReadinessNoticeSignature: null,
   clientAlertWatchEnabled: true,
@@ -172,6 +173,12 @@ const elements = {
   handoffApprovalTools: document.querySelector("#handoffApprovalTools"),
   handoffLocalWriteTools: document.querySelector("#handoffLocalWriteTools"),
   handoffProofGates: document.querySelector("#handoffProofGates"),
+  handoffLaunchBundle: document.querySelector("#handoffLaunchBundle"),
+  handoffWritePolicy: document.querySelector("#handoffWritePolicy"),
+  launchBundleStrip: document.querySelector("#launchBundleStrip"),
+  launchBeforeWork: document.querySelector("#launchBeforeWork"),
+  launchBeforeWrites: document.querySelector("#launchBeforeWrites"),
+  launchAgentPrompt: document.querySelector("#launchAgentPrompt"),
   agentSetupProfiles: document.querySelector("#agentSetupProfiles"),
   mcpToolListStatus: document.querySelector("#mcpToolListStatus"),
   mcpToolList: document.querySelector("#mcpToolList"),
@@ -244,6 +251,7 @@ const arcigyApi = window.arcigyDesktop ?? {
   webBridgePreflight: () => getJson("/api/web-bridge-preflight"),
   remoteMcpPack: (payload) =>
     payload ? postJson("/api/mcp/arcigy.get_remote_mcp_pack", payload).then((value) => value.result) : getJson("/api/remote-mcp-pack?includeReadiness=false"),
+  remoteAgentLaunchBundle: () => getJson("/api/remote-agent-launch-bundle?includeReadiness=false"),
   remoteMcpSmoke: (payload) =>
     payload ? postJson("/api/mcp/arcigy.run_remote_mcp_smoke", payload).then((value) => value.result) : getJson("/api/remote-mcp-smoke"),
   syncGmailRecentMessages: (payload) => postJson("/api/sync-gmail-recent-messages", payload),
@@ -1313,8 +1321,10 @@ function renderRemoteMcpPack(pack) {
   const matchingSmoke = state.lastRemoteMcpSmoke?.baseUrl === pack.baseUrl ? state.lastRemoteMcpSmoke : null;
   if (state.lastRemoteMcpSmoke && !matchingSmoke) state.lastRemoteMcpSmoke = null;
   state.lastRemoteMcpPack = pack;
+  state.lastRemoteAgentLaunchBundle = pack.agentLaunchBundle ?? null;
   const approvalTools = pack.tools?.approvalRequired ?? [];
   const localWriteTools = pack.tools?.localStateWrite ?? [];
+  const launchBundle = pack.agentLaunchBundle ?? null;
   elements.handoffStatus.textContent = pack.auth?.tokenConfigured ? "armed" : "local only";
   elements.handoffStatus.dataset.state = pack.auth?.tokenConfigured ? "ready" : "attention";
   elements.handoffManifestUrl.textContent = pack.manifestUrl ?? "--";
@@ -1326,9 +1336,41 @@ function renderRemoteMcpPack(pack) {
   const proof = matchingSmoke ? summarizeRemoteProofGates(matchingSmoke) : { ready: false, text: "smoke not run" };
   elements.handoffProofGates.textContent = proof.text;
   elements.handoffProofGates.dataset.state = proof.ready ? "ready" : "attention";
+  renderRemoteAgentLaunchBundle(launchBundle, matchingSmoke);
   renderAgentSetupProfiles(pack.agentSetupProfiles ?? [], matchingSmoke);
   renderMcpToolList(pack);
   elements.remoteAgentPrompt.textContent = buildRemoteAgentPrompt(pack, matchingSmoke);
+}
+
+function renderRemoteAgentLaunchBundle(bundle, smokeReport = null) {
+  if (!bundle) {
+    state.lastRemoteAgentLaunchBundle = null;
+    elements.handoffLaunchBundle.textContent = "not loaded";
+    elements.handoffLaunchBundle.dataset.state = "attention";
+    elements.handoffWritePolicy.textContent = "approval.approved-required";
+    elements.launchBeforeWork.textContent = "Load launch bundle.";
+    elements.launchBeforeWrites.textContent = "Require fresh proof and approval.";
+    elements.launchAgentPrompt.textContent = "Claude / ChatGPT / Grok ready after pack load.";
+    return;
+  }
+  state.lastRemoteAgentLaunchBundle = bundle;
+  const proof = smokeReport ? summarizeRemoteProofGates(smokeReport) : { ready: false, text: "smoke not run" };
+  const beforeAnyWork = bundle.proofPolicy?.beforeAnyWork ?? [];
+  const beforeWrites = bundle.proofPolicy?.beforeWrites ?? [];
+  const prompts = bundle.firstPrompts ?? {};
+  elements.handoffLaunchBundle.textContent = [
+    `${bundle.status ?? "unknown"} launch bundle`,
+    `Share: ${bundle.shareWithAgent?.connectionPackUrl ?? "--"}`,
+    `OpenAPI: ${bundle.shareWithAgent?.openApiSchemaUrl ?? "--"}`,
+  ].join("\n");
+  elements.handoffLaunchBundle.dataset.state = proof.ready ? "ready" : "attention";
+  elements.handoffWritePolicy.textContent = [
+    `Freshness: ${bundle.proofPolicy?.freshnessMaxAgeHours ?? 24}h`,
+    beforeWrites[beforeWrites.length - 1] ?? "Show exact approval payload before writes.",
+  ].join("\n");
+  elements.launchBeforeWork.textContent = beforeAnyWork.slice(0, 3).join(" | ") || "Fetch pack, evidence, and smoke.";
+  elements.launchBeforeWrites.textContent = beforeWrites.slice(0, 3).join(" | ") || "Require fresh proof and approval.";
+  elements.launchAgentPrompt.textContent = prompts.Grok ? "Claude, ChatGPT, Grok prompts loaded." : "Agent prompts not loaded.";
 }
 
 function renderAgentSetupProfiles(profiles, smokeReport = null) {
@@ -1439,6 +1481,7 @@ function buildRemoteAgentPrompt(pack, smokeReport = null) {
     .join("\n");
   const agentFirstSteps = (pack.handoff?.agentFirstSteps ?? []).map((step) => `- ${step}`).join("\n");
   const compatibility = pack.agentCompatibility;
+  const launchBundle = pack.agentLaunchBundle;
   const supportedAgents = (compatibility?.supportedAgents ?? []).join(", ");
   const safetyRules = (compatibility?.safetyRules ?? []).map((rule) => `- ${rule}`).join("\n");
   const agentPrompts = pack.agentPromptTemplates
@@ -1469,6 +1512,8 @@ function buildRemoteAgentPrompt(pack, smokeReport = null) {
     `Tool call pattern: ${pack.mcpToolCallPattern}`,
     `Auth header: ${pack.auth?.header ?? "Authorization: Bearer <JARVIS_WEB_TOKEN>"}`,
     `Tools: ${pack.tools?.count ?? 0}`,
+    launchBundle ? `Launch bundle: ${launchBundle.shareWithAgent?.connectionPackUrl}` : "",
+    launchBundle ? `Launch proof policy: beforeAnyWork=${(launchBundle.proofPolicy?.beforeAnyWork ?? []).join(" | ")}; beforeWrites=${(launchBundle.proofPolicy?.beforeWrites ?? []).join(" | ")}` : "",
     `Approval required: ${approvalTools.join(", ") || "none"}`,
     `Local memory writes: ${localWriteTools.join(", ") || "none"}`,
     limits,
@@ -1482,7 +1527,13 @@ function buildRemoteAgentPrompt(pack, smokeReport = null) {
     proof ? `Required proof:\n${proof}` : "",
     agentProfiles ? `Agent setup profiles:\n${agentProfiles}` : "",
     agentFirstSteps ? `Agent first steps:\n${agentFirstSteps}` : "",
-    agentPrompts ? `Agent-specific startup prompts:\n${agentPrompts}` : "",
+    launchBundle?.firstPrompts
+      ? `Agent launch bundle prompts:\n${Object.entries(launchBundle.firstPrompts)
+          .map(([agent, prompt]) => `- ${agent}: ${prompt}`)
+          .join("\n")}`
+      : agentPrompts
+        ? `Agent-specific startup prompts:\n${agentPrompts}`
+        : "",
     safetyRules ? `Safety rules:\n${safetyRules}` : "",
     "Rule: never call approval-required tools without explicit operator confirmation.",
     "Rule: treat local memory write tools as persistent local state changes; preview Gmail with dryRun: true first.",
@@ -1501,6 +1552,7 @@ function renderRemoteMcpSmoke(report) {
   elements.handoffProofGates.textContent = proof.text;
   elements.handoffProofGates.dataset.state = proof.ready ? "ready" : "attention";
   if (state.lastRemoteMcpPack) elements.remoteAgentPrompt.textContent = buildRemoteAgentPrompt(state.lastRemoteMcpPack, report);
+  if (state.lastRemoteAgentLaunchBundle) renderRemoteAgentLaunchBundle(state.lastRemoteAgentLaunchBundle, report);
   elements.remoteSmokeResult.textContent = [
     report.summary ?? `Remote MCP smoke: ${report.status}`,
     "",
@@ -1529,6 +1581,7 @@ async function copyRemotePack() {
       {
         handoffStatus,
         connectionPack: state.lastRemoteMcpPack,
+        launchBundle: state.lastRemoteAgentLaunchBundle,
         smokeTest: state.lastRemoteMcpSmoke,
       },
       null,
@@ -1560,8 +1613,10 @@ async function copyAgentPrompt(agentKey, agentLabel, button) {
     return;
   }
   const pack = state.lastRemoteMcpPack;
+  const bundlePrompt = pack.agentLaunchBundle?.firstPrompts?.[agentLabel];
   const handoffStatus = buildCopiedHandoffStatus(state.lastRemoteMcpSmoke);
   const prompt =
+    bundlePrompt ??
     pack.agentPromptTemplates?.[agentKey] ??
     "Use the Arcigy Jarvis HTTP JSON MCP bridge. Run smoke first and never call approvalRequired tools without approval.";
   const profile = findAgentSetupProfile(pack, agentLabel);
@@ -1589,6 +1644,8 @@ async function copyAgentPrompt(agentKey, agentLabel, button) {
     `Action manifest: ${pack.actionManifestUrl ?? `${pack.baseUrl}/.well-known/ai-plugin.json`}`,
     `OpenAPI schema: ${pack.openApiSchemaUrl ?? `${pack.baseUrl}/api/openapi.json`}`,
     `Connection pack: ${pack.handoff?.connectionPackUrl ?? `${pack.baseUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`}`,
+    pack.agentLaunchBundle?.shareWithAgent?.connectionPackUrl ? `Launch bundle connection pack: ${pack.agentLaunchBundle.shareWithAgent.connectionPackUrl}` : "",
+    pack.agentLaunchBundle?.proofPolicy ? `Launch proof policy: ${(pack.agentLaunchBundle.proofPolicy.beforeAnyWork ?? []).join(" | ")} / ${(pack.agentLaunchBundle.proofPolicy.beforeWrites ?? []).join(" | ")}` : "",
     `Smoke test: ${pack.smokeTestUrl}`,
     pack.tunnel?.statusUrl ? `Tunnel status: ${pack.tunnel.statusUrl}` : "",
     `Tool call pattern: ${pack.mcpToolCallPattern}`,
