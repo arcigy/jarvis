@@ -25,6 +25,7 @@ export type JarvisVoiceCapability =
   | "full_launch_proof"
   | "production_readiness"
   | "production_evidence"
+  | "capability_audit"
   | "remote_mcp"
   | "approval_queue"
   | "contract_generation"
@@ -66,6 +67,7 @@ function resolveVoiceCapability(text: string): JarvisVoiceCapability | null {
   if (hasAny(text, ["full proof", "launch proof", "full launch", "kompletny dokaz", "uplny dokaz", "dokaz spustenia"])) return "full_launch_proof";
   if (hasAny(text, ["briefing", "prehlad", "co sa deje", "co sa dialo", "operator"])) return "operator_briefing";
   if (hasAny(text, ["approval", "schvalenie", "schvalit", "potvrdenie", "potvrdit", "na moje znamenie", "cakaju na mna"])) return "approval_queue";
+  if (hasAny(text, ["capability audit", "coverage audit", "jarvis coverage", "pokrytie", "pokryte", "co vsetko funguje", "co vsetko je hotove"])) return "capability_audit";
   if (hasAny(text, ["production evidence", "verification evidence", "release proof", "evidence", "verifier", "overenie", "dokaz"])) return "production_evidence";
   if (hasAny(text, ["production", "produkcia", "readiness", "launch", "checklist", "nasadenie"])) return "production_readiness";
   if (hasAny(text, ["remote mcp", "mcp", "tunel", "tunnel", "handoff", "claude", "chatgpt", "grok", "xai", "x.ai"])) return "remote_mcp";
@@ -90,6 +92,8 @@ function answerVoiceCapability(capability: JarvisVoiceCapability): string {
       "Viem skontrolovať produkčný stav: integrácie, live diagnostiku, MCP registry, approval locks a launch checklist.",
     production_evidence:
       "Viem precitat najnovsi produkcny dokaz z npm run verify:production: status, release commit, clean alebo dirty tree, cerstvost evidence a pocet ready checks.",
+    capability_audit:
+      "Viem precitat Jarvis capability audit: kontrakty, cold outreach, klientsku pamat, hlas, remote MCP, Gemini, lead discovery, approval safety, dokazove gatey a najblizsi krok.",
     remote_mcp:
       "Viem pripraviť remote MCP handoff pre Claude, ChatGPT alebo Grok: manifest, connection pack, smoke test, bearer auth placeholder, agent prompt a quick-start volania.",
     approval_queue:

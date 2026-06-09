@@ -1567,6 +1567,11 @@ async function handleWebVoiceEvent(payload: Record<string, unknown>, request?: I
     return voiceDone(session, text, summarizeProductionEvidenceForVoice(evidence));
   }
 
+  if (isCapabilityAuditVoiceCommand(lowered)) {
+    const audit = await getJarvisCapabilityAudit({ ...payload, live: payload.live === true || lowered.includes("live") });
+    return voiceDone(session, text, summarizeCapabilityAuditForVoice(audit));
+  }
+
   if (isProductionReadinessVoiceCommand(lowered)) {
     const report = await buildProductionReadinessReport({ live: payload.live === true || lowered.includes("live"), dbPath: resolveRepoPath(payload.dbPath, defaultDbPath, "dbPath") });
     return voiceDone(session, text, summarizeReadinessForVoice(report));
@@ -1723,6 +1728,35 @@ function summarizeProductionEvidenceForVoice(evidence: {
     .join(" ");
 }
 
+function summarizeCapabilityAuditForVoice(audit: {
+  status?: unknown;
+  summary?: unknown;
+  toolCount?: unknown;
+  approvalRequiredCount?: unknown;
+  localStateWriteCount?: unknown;
+  productionEvidence?: { status?: unknown; fresh?: unknown; dirty?: unknown; requiredRemoteMcpSmokeGates?: unknown };
+  capabilities?: Array<{ title?: unknown; status?: unknown; nextAction?: unknown }>;
+  nextActions?: unknown[];
+}) {
+  const capabilities = Array.isArray(audit.capabilities) ? audit.capabilities : [];
+  const ready = capabilities.filter((item) => item.status === "ready").length;
+  const attention = capabilities.filter((item) => item.status === "attention").length;
+  const blocked = capabilities.filter((item) => item.status === "blocked").length;
+  const evidence = audit.productionEvidence ?? {};
+  const firstIssue = capabilities.find((item) => item.status !== "ready");
+  const next = firstIssue?.nextAction ?? (Array.isArray(audit.nextActions) ? audit.nextActions[0] : null) ?? "Drz production proof cerstvy pred remote agent handoffom.";
+  return [
+    `Jarvis capability audit je ${String(audit.status ?? "unknown")}.`,
+    typeof audit.summary === "string" ? audit.summary : null,
+    `Coverage: ${ready}/${capabilities.length} skupin ready, ${attention} attention, ${blocked} blocked.`,
+    `MCP: ${String(audit.toolCount ?? 0)} toolov, ${String(audit.approvalRequiredCount ?? 0)} schvalovacich zamkov, ${String(audit.localStateWriteCount ?? 0)} lokalnych zapisov.`,
+    `Evidence: ${String(evidence.status ?? "unknown")}, fresh=${evidence.fresh === true}, clean=${evidence.dirty === false}, gates=${String(evidence.requiredRemoteMcpSmokeGates ?? 0)}.`,
+    `Najblizsi krok: ${String(next)}`,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
 function summarizeFullLaunchProofForVoice(
   report: { status?: unknown; blockers?: Array<{ severity?: unknown; nextAction?: unknown }>; nextActions?: unknown[] },
   evidence: { status?: unknown; checks?: unknown[]; release?: unknown; freshness?: unknown },
@@ -1846,6 +1880,10 @@ function isFullLaunchProofVoiceCommand(text: string) {
 
 function isProductionEvidenceVoiceCommand(text: string) {
   return ["production evidence", "verification evidence", "release proof", "evidence", "verifier", "overenie", "dokaz"].some((term) => text.includes(term));
+}
+
+function isCapabilityAuditVoiceCommand(text: string) {
+  return ["capability audit", "coverage audit", "jarvis coverage", "pokrytie", "pokryte", "co vsetko funguje", "co vsetko je hotove"].some((term) => text.includes(term));
 }
 
 function isRemoteMcpVoiceCommand(text: string) {

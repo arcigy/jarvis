@@ -621,6 +621,15 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(remotePackBody.quickStartCalls.every((call) => JSON.stringify(call.exactMcpCall.body) === JSON.stringify(call.body)));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_production_verification_evidence" && call.approvalRequired === false));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_jarvis_capability_audit" && call.body.live === false && call.approvalRequired === false));
+    assert.ok(
+      remotePackBody.quickStartCalls.some(
+        (call) =>
+          call.tool === "arcigy.jarvis_voice_event" &&
+          call.approvalRequired === false &&
+          call.body.text === "Jarvis capability audit" &&
+          (call.body.session as { state?: string; wakeWord?: string } | undefined)?.wakeWord === "jarvis"
+      )
+    );
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.identify_email" && typeof call.body.email === "string"));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_client_need_alerts" && call.body.status === "new"));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_audit_events" && call.body.limit === 20));
@@ -794,6 +803,19 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(voiceProductionEvidenceBody.session.state, "idle");
     assert.match(voiceProductionEvidenceBody.speakText ?? "", /Production evidence je ready/i);
     assert.match(voiceProductionEvidenceBody.speakText ?? "", /Release commit 0123456789ab/);
+
+    const voiceCapabilityAudit = await fetch(`${baseUrl}/api/jarvis/voice-event`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text: "Jarvis capability audit co vsetko je pokryte", session: { state: "idle", wakeWord: "jarvis" } }),
+    });
+    assert.equal(voiceCapabilityAudit.status, 200);
+    const voiceCapabilityAuditBody = (await voiceCapabilityAudit.json()) as { session: { state: string }; speakText?: string };
+    assert.equal(voiceCapabilityAuditBody.session.state, "idle");
+    assert.match(voiceCapabilityAuditBody.speakText ?? "", /Jarvis capability audit je/i);
+    assert.match(voiceCapabilityAuditBody.speakText ?? "", /Coverage:/);
+    assert.match(voiceCapabilityAuditBody.speakText ?? "", /MCP: \d+ toolov/);
+    assert.doesNotMatch(voiceCapabilityAuditBody.speakText ?? "", /AIza|GOCSPX|1\/\/|postgresql:\/\/|redis:\/\//);
 
     const voiceRemoteMcp = await fetch(`${baseUrl}/api/jarvis/voice-event`, {
       method: "POST",

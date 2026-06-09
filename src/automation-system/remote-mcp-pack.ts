@@ -523,6 +523,14 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Spytat sa Jarvisa na capability audit",
+      tool: "arcigy.jarvis_voice_event",
+      method: "POST",
+      url: toolUrl("arcigy.jarvis_voice_event"),
+      body: { text: "Jarvis capability audit", session: { state: "idle", wakeWord: "jarvis" } },
+      approvalRequired: false,
+    },
+    {
       label: "Spytat sa Jarvisa na production evidence",
       tool: "arcigy.jarvis_voice_event",
       method: "POST",

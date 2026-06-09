@@ -2630,6 +2630,9 @@ test("Jarvis voice resolves production, remote MCP, contracts, Gmail, and client
   const evidenceIntent = resolveJarvisIntentFromTranscript("Jarvis precitaj production evidence");
   assert.equal(evidenceIntent?.kind, "voice_capability");
   assert.equal(evidenceIntent?.kind === "voice_capability" ? evidenceIntent.capability : null, "production_evidence");
+  const capabilityAuditIntent = resolveJarvisIntentFromTranscript("Jarvis capability audit co vsetko je pokryte");
+  assert.equal(capabilityAuditIntent?.kind, "voice_capability");
+  assert.equal(capabilityAuditIntent?.kind === "voice_capability" ? capabilityAuditIntent.capability : null, "capability_audit");
   assert.equal(resolveJarvisIntentFromTranscript("Jarvis priprav remote MCP handoff pre Claude")?.kind, "voice_capability");
   assert.equal(resolveJarvisIntentFromTranscript("Jarvis priprav MCP handoff pre Grok")?.kind, "voice_capability");
   assert.equal(resolveJarvisIntentFromTranscript("Jarvis priprav zmluvny intake")?.kind, "voice_capability");
@@ -2651,6 +2654,14 @@ test("Jarvis voice resolves production, remote MCP, contracts, Gmail, and client
   assert.equal(response.session.state, "idle");
   assert.match(response.speakText ?? "", /remote MCP handoff/);
   assert.match(response.speakText ?? "", /bearer auth placeholder/);
+
+  const auditResponse = handleJarvisVoiceEvent(createJarvisVoiceSession(), {
+    type: "transcript",
+    text: "Jarvis coverage audit",
+  });
+  assert.equal(auditResponse.session.state, "idle");
+  assert.match(auditResponse.speakText ?? "", /Jarvis capability audit/);
+  assert.match(auditResponse.speakText ?? "", /approval safety/);
 });
 
 test("local SQLite CLI persists people and need signals", () => {
