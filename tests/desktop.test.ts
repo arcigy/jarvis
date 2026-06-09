@@ -629,6 +629,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /hasAuditQuickStart/);
   assert.match(main, /hasProductionEvidenceQuickStart/);
   assert.match(main, /hasSafeProductionEvidenceResult/);
+  assert.match(main, /function hasSafeReleaseProof/);
+  assert.match(main, /requiredRemoteMcpSmokeGates\.includes\("pack-agent-setup-profiles"\)/);
   assert.match(main, /approvalGate: approvalGate\.bodies/);
   assert.match(main, /function hasSensitiveLeak/);
   assert.match(main, /API keys, OAuth tokens, or database URLs/);

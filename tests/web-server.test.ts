@@ -32,7 +32,7 @@ test("local web bridge serves UI and API health", async () => {
         branch: "main",
         shortCommit: "0123456789ab",
         dirty: false,
-        requiredRemoteMcpSmokeGates: ["secret-redaction"],
+        requiredRemoteMcpSmokeGates: ["secret-redaction", "pack-agent-setup-profiles"],
       },
       secretPolicy: `Secret-safe ${syntheticGoogleKey}`,
       checks: [
@@ -404,6 +404,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(verificationEvidenceBody.release?.shortCommit, "0123456789ab");
     assert.equal(verificationEvidenceBody.release?.dirty, false);
     assert.ok(verificationEvidenceBody.release?.requiredRemoteMcpSmokeGates?.includes("secret-redaction"));
+    assert.ok(verificationEvidenceBody.release?.requiredRemoteMcpSmokeGates?.includes("pack-agent-setup-profiles"));
     assert.ok(verificationEvidenceBody.checks.some((check) => check.name === "secret-scan" && check.status === "ready"));
     assert.match(verificationEvidenceText, /\[redacted-google-api-key\]/);
 

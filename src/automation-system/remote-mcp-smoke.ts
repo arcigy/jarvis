@@ -692,12 +692,27 @@ function hasSafeVoiceWakeResult(value: unknown): boolean {
 
 function hasSafeProductionEvidenceResult(value: unknown): boolean {
   if (!value || typeof value !== "object") return false;
-  const evidence = value as { mode?: unknown; status?: unknown; generatedAt?: unknown; summary?: unknown; checks?: unknown };
+  const evidence = value as { mode?: unknown; status?: unknown; generatedAt?: unknown; summary?: unknown; checks?: unknown; release?: unknown };
   if (evidence.mode !== "arcigy-jarvis-production-verification") return false;
   if (typeof evidence.status !== "string" || !["ready", "attention", "missing", "failed"].includes(evidence.status)) return false;
   if (!(typeof evidence.generatedAt === "string" || evidence.generatedAt === null)) return false;
   if (typeof evidence.summary !== "string" || !evidence.summary.trim()) return false;
-  return Array.isArray(evidence.checks);
+  if (!Array.isArray(evidence.checks)) return false;
+  return evidence.status !== "ready" || hasSafeReleaseProof(evidence.release);
+}
+
+function hasSafeReleaseProof(value: unknown): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const release = value as { repository?: unknown; branch?: unknown; shortCommit?: unknown; dirty?: unknown; requiredRemoteMcpSmokeGates?: unknown };
+  return (
+    release.repository === "arcigy/jarvis" &&
+    typeof release.branch === "string" &&
+    /^[0-9a-f]{7,12}$/i.test(String(release.shortCommit ?? "")) &&
+    release.dirty === false &&
+    Array.isArray(release.requiredRemoteMcpSmokeGates) &&
+    release.requiredRemoteMcpSmokeGates.includes("secret-redaction") &&
+    release.requiredRemoteMcpSmokeGates.includes("pack-agent-setup-profiles")
+  );
 }
 
 function isEmptyRecord(value: unknown): boolean {

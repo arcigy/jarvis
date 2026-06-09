@@ -155,6 +155,7 @@ test("remote MCP smoke checks every response for bearer token leaks", async () =
     if (url.includes("/api/remote-mcp-pack")) {
       return responseJson({
         auth: { tokenValueReturned: false },
+        productionVerificationEvidenceUrl: "https://jarvis.example/api/production-verification-evidence",
         limits: remoteSmokePackLimitsFixture(),
         agentCompatibility: remoteAgentCompatibilityFixture(),
         agentSetupProfiles: remoteAgentSetupProfilesFixture(),
@@ -212,6 +213,7 @@ test("remote MCP smoke requires valid quick-start URLs", async () => {
     if (url.includes("/api/remote-mcp-pack")) {
       return responseJson({
         auth: { tokenValueReturned: false },
+        productionVerificationEvidenceUrl: "https://jarvis.example/api/production-verification-evidence",
         limits: remoteSmokePackLimitsFixture(),
         agentCompatibility: remoteAgentCompatibilityFixture(),
         agentSetupProfiles: remoteAgentSetupProfilesFixture(),
@@ -903,6 +905,120 @@ test("remote MCP smoke requires the production evidence quick-start", async () =
   assert.equal(report.status, "blocked");
   assert.ok(report.checks.some((check) => check.key === "pack-production-evidence-quick-start" && check.status === "blocked"));
   assert.ok(report.checks.some((check) => check.key === "pack-audit-quick-start" && check.status === "ready"));
+});
+
+test("remote MCP smoke requires release proof for ready production evidence", async () => {
+  const expectedNames = listJarvisMcpTools().map((tool) => tool.name);
+  const tools = remoteSmokeManifestToolsFixture();
+  const token = "smoke-token";
+  const fetchImpl = async (target: string | URL, init?: RequestInit) => {
+    const url = String(target);
+    const authorized = JSON.stringify(init?.headers ?? {}).includes(token);
+    if (init?.method === "OPTIONS") {
+      return new Response("", {
+        status: 204,
+        headers: {
+          "access-control-allow-origin": "*",
+          "access-control-allow-methods": "POST, OPTIONS",
+          "access-control-allow-headers": "authorization,content-type",
+        },
+      });
+    }
+    if (!authorized && (url.endsWith("/.well-known/arcigy-jarvis.json") || url.endsWith("/api/mcp/arcigy.get_system_health"))) {
+      return responseJson({ error: "auth required" }, 401);
+    }
+    if (url.endsWith("/.well-known/arcigy-jarvis.json")) {
+      return responseJson({
+        tools,
+        auth: { header: "Authorization: Bearer <JARVIS_WEB_TOKEN>" },
+        toolPolicy: {
+          approvalRequired: approvalRequiredToolNames(),
+          localStateWrite: localStateWriteToolNamesList(),
+          readOnlyOrDraft: readOnlyOrDraftToolNames(),
+        },
+      });
+    }
+    if (url.endsWith("/.well-known/ai-plugin.json")) {
+      return responseJson({
+        schema_version: "v1",
+        name_for_model: "arcigy_jarvis",
+        auth: { type: "user_http", authorization_type: "bearer" },
+        api: { type: "openapi", url: "https://jarvis.example/api/openapi.json", is_user_authenticated: true },
+        "x-arcigy-policy": { tokenValueReturned: false, familyFriendly: true },
+      });
+    }
+    if (url.endsWith("/api/openapi.json")) return responseJson(buildRemoteMcpOpenApiDocument("https://jarvis.example"));
+    if (url.endsWith("/api/secure-tunnel-status")) return responseJson({ ready: false, tokenPresent: true, redactedTail: "One-time token: [redacted]" });
+    if (url.includes("/api/remote-mcp-pack")) {
+      return responseJson({
+        auth: { tokenValueReturned: false },
+        productionVerificationEvidenceUrl: "https://jarvis.example/api/production-verification-evidence",
+        limits: remoteSmokePackLimitsFixture(),
+        tunnel: {
+          provider: "ngrok",
+          secureCommand: "npm run web:tunnel:secure",
+          standardCommand: "npm run web:tunnel",
+          statusUrl: "https://jarvis.example/api/secure-tunnel-status",
+          startUrl: "https://jarvis.example/api/start-secure-tunnel",
+          stopUrl: "https://jarvis.example/api/stop-secure-tunnel",
+          browserStartRequiresStrongToken: true,
+        },
+        agentCompatibility: remoteAgentCompatibilityFixture(),
+        agentSetupProfiles: remoteAgentSetupProfilesFixture(),
+        handoff: {
+          connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
+          requiredProof: [
+            { key: "action-manifest" },
+            { key: "openapi-schema" },
+            { key: "manifest" },
+            { key: "connection-pack" },
+            { key: "secure-tunnel-status" },
+            { key: "production-verification-evidence" },
+            { key: "remote-smoke", expected: "action-manifest openapi-schema cors-preflight external-auth-gate pack-auth-throttle-policy pack-agent-setup-profiles pack-voice-quick-start voice-tool-call approval-shape-gate secret-redaction" },
+          ],
+          agentFirstSteps: ["Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
+        },
+        tools: {
+          names: expectedNames,
+          approvalRequired: approvalRequiredToolNames(),
+          localStateWrite: localStateWriteToolNamesList(),
+          readOnlyOrDraft: readOnlyOrDraftToolNames(),
+        },
+        quickStartCalls: remoteSmokeQuickStartFixture(),
+      });
+    }
+    if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
+    if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) return responseJson({ result: { session: { state: "idle" }, shouldStopRecording: true, speakText: "Integracie su pripravene." } });
+    if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
+      return responseJson({
+        result: {
+          mode: "arcigy-jarvis-production-verification",
+          status: "ready",
+          generatedAt: "2026-06-09T10:00:00.000Z",
+          summary: "Production verification ready: 12 ready, 0 failed.",
+          checks: [{ name: "secret-scan", status: "ready", detail: "OK" }],
+        },
+      });
+    }
+    if (
+      url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
+      url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
+      url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
+      url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
+    ) {
+      return responseJson({ error: "approval required" }, 409);
+    }
+    return responseJson({ error: "unexpected URL" }, 404);
+  };
+
+  const report = await runRemoteMcpSmoke({ baseUrl: "https://jarvis.example", bearerToken: token, fetchImpl: fetchImpl as typeof fetch });
+
+  assert.equal(report.status, "blocked");
+  assert.ok(report.checks.some((check) => check.key === "production-evidence-tool-call" && check.status === "blocked"));
+  assert.ok(report.checks.some((check) => check.key === "pack-production-evidence-quick-start" && check.status === "ready"));
+  assert.ok(report.checks.some((check) => check.key === "secret-redaction" && check.status === "ready"));
 });
 
 test("production readiness treats unused Redis as non-blocking advisory", async () => {

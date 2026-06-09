@@ -1886,7 +1886,21 @@ function hasSafeProductionEvidenceResult(value) {
   if (typeof value.status !== "string" || !["ready", "attention", "missing", "failed"].includes(value.status)) return false;
   if (!(typeof value.generatedAt === "string" || value.generatedAt === null)) return false;
   if (typeof value.summary !== "string" || !value.summary.trim()) return false;
-  return Array.isArray(value.checks);
+  if (!Array.isArray(value.checks)) return false;
+  return value.status !== "ready" || hasSafeReleaseProof(value.release);
+}
+
+function hasSafeReleaseProof(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  return (
+    value.repository === "arcigy/jarvis" &&
+    typeof value.branch === "string" &&
+    /^[0-9a-f]{7,12}$/i.test(String(value.shortCommit ?? "")) &&
+    value.dirty === false &&
+    Array.isArray(value.requiredRemoteMcpSmokeGates) &&
+    value.requiredRemoteMcpSmokeGates.includes("secret-redaction") &&
+    value.requiredRemoteMcpSmokeGates.includes("pack-agent-setup-profiles")
+  );
 }
 
 function hasSafeVoiceWakeResult(value) {
