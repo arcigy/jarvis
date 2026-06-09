@@ -310,6 +310,22 @@ function hasGuardedConnectionPackLimits(value: RemoteConnectionPack["limits"]): 
 function hasAgentSetupProfiles(value: RemoteConnectionPack["agentSetupProfiles"], publicUrl: string): boolean {
   if (!Array.isArray(value)) return false;
   const profiles = new Map(value.map((profile) => [profile.agent, profile]));
+  const requiredAgentSetupProofGates = [
+    "action-manifest",
+    "openapi-schema",
+    "cors-preflight",
+    "external-auth-gate",
+    "pack-auth-throttle-policy",
+    "pack-limits",
+    "pack-agent-setup-profiles",
+    "pack-voice-quick-start",
+    "voice-tool-call",
+    "pack-production-evidence-quick-start",
+    "production-evidence-tool-call",
+    "approval-gate",
+    "approval-shape-gate",
+    "secret-redaction",
+  ];
   const expected = [
     ["Claude", "external-http-mcp", `${publicUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`],
     ["ChatGPT", "openapi-custom-action", `${publicUrl}/api/openapi.json`],
@@ -325,8 +341,7 @@ function hasAgentSetupProfiles(value: RemoteConnectionPack["agentSetupProfiles"]
       profile?.firstTool === "arcigy.get_operator_briefing" &&
       profile?.writePolicy === "approval.approved-required" &&
       profile?.localWritePolicy === "dry-run-first" &&
-      gates.includes("pack-agent-setup-profiles") &&
-      gates.includes("secret-redaction")
+      requiredAgentSetupProofGates.every((gate) => gates.includes(gate))
     );
   });
 }

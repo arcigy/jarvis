@@ -26,6 +26,8 @@ test("web tunnel script orchestrates protected Jarvis MCP exposure", () => {
   assert.match(script, /profile\?\.firstTool === "arcigy\.get_operator_briefing"/);
   assert.match(script, /profile\?\.writePolicy === "approval\.approved-required"/);
   assert.match(script, /profile\?\.localWritePolicy === "dry-run-first"/);
+  assert.match(script, /requiredAgentSetupProofGates/);
+  assert.match(script, /requiredAgentSetupProofGates\.every\(\(gate\) => gates\.includes\(gate\)\)/);
   assert.match(script, /pathPolicy === "repo-only"/);
   assert.match(script, /writesRequireExplicitToolCall === true/);
   assert.match(script, /bounded JSON/);
