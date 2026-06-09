@@ -5,6 +5,7 @@ import test from "node:test";
 test("production verifier wires every live release gate", () => {
   const packageJson = JSON.parse(readFileSync("package.json", "utf-8")) as { scripts: Record<string, string> };
   const script = readFileSync("scripts/verify_production.ts", "utf-8");
+  const localMemorySmoke = readFileSync("scripts/local_memory_smoke.ts", "utf-8");
 
   assert.equal(packageJson.scripts["verify:production"], "node scripts/verify_production.ts");
   assert.match(script, /runNpm\("typecheck", \["run", "typecheck"\]\)/);
@@ -30,5 +31,9 @@ test("production verifier wires every live release gate", () => {
   assert.match(script, /redactSensitiveText\(check\.detail\)/);
   assert.match(script, /redactSensitiveText\(JSON\.stringify\(payload, null, 2\)\)/);
   assert.match(script, /Arcigy Jarvis production verification/);
+  assert.match(localMemorySmoke, /assertCleanSlovakText/);
+  assert.match(localMemorySmoke, /Za dnes sme napísali 2 ľuďom/);
+  assert.match(localMemorySmoke, /Slovak cold outreach brief is UTF-8 clean/);
+  assert.match(localMemorySmoke, /contains mojibake text/);
   assert.doesNotMatch(script, /API_SECRET_KEY=dummy/);
 });

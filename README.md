@@ -141,7 +141,7 @@ Run explicit live read-only probes only when you want to test configured provide
 npm run doctor -- --live-integrations
 ```
 
-Run the local memory smoke when you want proof that email identity, client need alerts, audit events, and redacted local snapshots work end-to-end:
+Run the local memory smoke when you want proof that email identity, client need alerts, audit events, Slovak cold outreach wording, and redacted local snapshots work end-to-end:
 
 ```powershell
 npm run local:memory:smoke

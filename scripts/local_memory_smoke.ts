@@ -49,6 +49,34 @@ try {
   }) as { status?: string };
   assert(duplicate.status === "duplicate", "ingest-message did not dedupe by source/externalId.");
 
+  for (const [leadEmail, eventType] of [
+    ["one.local-smoke@example.com", "sent"],
+    ["two.local-smoke@example.com", "sent"],
+    ["one.local-smoke@example.com", "opened"],
+    ["one.local-smoke@example.com", "replied"],
+    ["one.local-smoke@example.com", "positive_reply"],
+    ["one.local-smoke@example.com", "prepared_reply"],
+  ] as Array<[string, string]>) {
+    runDb("add-cold-event", {
+      leadEmail,
+      eventType,
+      occurredAt: "2026-06-09T08:00:00Z",
+      data: eventType === "prepared_reply" ? { positiveSignal: "Lead wants next step.", replyText: "Dakujem, posielam dalsi krok." } : {},
+    });
+  }
+
+  const coldBrief = runDb("cold-brief", {
+    since: "2026-06-09T00:00:00Z",
+    until: "2026-06-10T00:00:00Z",
+    periodLabel: "dnes",
+  }) as { summary?: string; metrics?: { contacted?: number; preparedPositiveReplyCount?: number } };
+  assert(coldBrief.metrics?.contacted === 2, "cold-brief did not count contacted leads.");
+  assert(coldBrief.metrics?.preparedPositiveReplyCount === 1, "cold-brief did not count the prepared positive reply.");
+  assertCleanSlovakText(coldBrief.summary, "cold-brief summary");
+  assert(String(coldBrief.summary).includes("Za dnes sme napísali 2 ľuďom."), "cold-brief summary did not use correct Slovak contacted wording.");
+  assert(String(coldBrief.summary).includes("1 človek odpísal"), "cold-brief summary did not use correct Slovak reply wording.");
+  assert(String(coldBrief.summary).includes("Pripravil som ti 1 odpoveď"), "cold-brief summary did not use correct Slovak prepared reply wording.");
+
   const identity = runIdentify("ceo.local-smoke@example.com") as { reason?: string; openNeedSignals?: unknown[] };
   assert(identity.reason === "exact_email_match", "identify did not return exact_email_match.");
   assert((identity.openNeedSignals ?? []).length === 1, "identify did not return exactly one open need signal.");
@@ -103,6 +131,7 @@ try {
       "redacted local memory snapshot exported",
       "audit event persisted",
       "client need status resolved",
+      "Slovak cold outreach brief is UTF-8 clean",
     ],
   };
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
@@ -144,4 +173,10 @@ function assertNoSecretLeak(value: unknown, label: string) {
   assert(!text.includes(syntheticDatabaseUrl), `${label} leaked the synthetic database URL.`);
   assert(/\[redacted-google-api-key\]/.test(text), `${label} did not include a redacted Google key marker.`);
   assert(/postgresql:\/\/postgres:\[redacted\]@example\.com:5432\/db/.test(text), `${label} did not redact the database URL password.`);
+}
+
+function assertCleanSlovakText(value: unknown, label: string) {
+  const text = String(value ?? "");
+  assert(/[áäčďéíľĺňóôŕšťúýž]/i.test(text), `${label} did not contain Slovak diacritics.`);
+  assert(!/[ĂÄĹÂâ][^\s]*/.test(text), `${label} contains mojibake text: ${text}`);
 }
