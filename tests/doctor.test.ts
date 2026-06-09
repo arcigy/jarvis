@@ -67,7 +67,7 @@ test("Jarvis doctor reports local readiness without leaking secrets", () => {
   assert.equal(existsSync(webBridgeDetails.webContractOutputDir ?? ""), false);
 });
 
-test("Jarvis doctor surfaces non-blocking runtime advisories as warnings", () => {
+test("Jarvis doctor treats unused Redis placeholder as optional disabled provider", () => {
   const result = spawnSync("node", ["scripts/jarvis_doctor.ts", "--json", "--no-env-file", "--skip-local-db", "--skip-contract-generation", "--skip-web-bridge"], {
     cwd: process.cwd(),
     encoding: "utf-8",
@@ -100,13 +100,13 @@ test("Jarvis doctor surfaces non-blocking runtime advisories as warnings", () =>
   };
   assert.equal(body.ok, true);
   assert.equal(body.failed, 0);
-  assert.equal(body.warnings, 1);
+  assert.equal(body.warnings, 0);
   const runtimeEnv = body.checks.find((check) => check.key === "runtimeEnv");
-  assert.equal(runtimeEnv?.status, "warning");
-  assert.equal(runtimeEnv?.details?.advisoryMissing?.length, 1);
+  assert.equal(runtimeEnv?.status, "ready");
+  assert.equal(runtimeEnv?.details?.advisoryMissing?.length, 0);
 });
 
-test("Jarvis doctor human output names advisory next actions without leaking placeholder credentials", () => {
+test("Jarvis doctor human output keeps unused Redis placeholder out of warnings", () => {
   const result = spawnSync("node", ["scripts/jarvis_doctor.ts", "--no-env-file", "--skip-local-db", "--skip-contract-generation", "--skip-web-bridge"], {
     cwd: process.cwd(),
     encoding: "utf-8",
@@ -131,7 +131,7 @@ test("Jarvis doctor human output names advisory next actions without leaking pla
 
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stdout.includes("PASSWORD"), false);
-  assert.match(result.stdout, /\[WARN\] runtimeEnv/);
-  assert.match(result.stdout, /redis: REDIS_URL contains a placeholder credential/);
-  assert.match(result.stdout, /Next: Replace REDIS_URL with the real Redis password/);
+  assert.match(result.stdout, /\[OK\] runtimeEnv/);
+  assert.doesNotMatch(result.stdout, /redis: REDIS_URL contains a placeholder credential/);
+  assert.doesNotMatch(result.stdout, /Replace REDIS_URL with the real Redis password/);
 });

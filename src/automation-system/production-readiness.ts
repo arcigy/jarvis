@@ -1,5 +1,5 @@
 import { runIntegrationDiagnostics, type DiagnosticCheck, type DiagnosticsResult } from "./diagnostics.ts";
-import { getIntegrationHealth, type IntegrationHealth, type RuntimeEnv } from "./env.ts";
+import { getIntegrationHealth, isUnusedRedisPlaceholderIssue, type IntegrationHealth, type RuntimeEnv } from "./env.ts";
 import type { FetchLike } from "./gemini.ts";
 import { listJarvisMcpTools } from "./mcp-tools.ts";
 
@@ -95,14 +95,15 @@ export async function buildProductionReadinessReport(
   const health = getIntegrationHealth(env);
   const tools = listJarvisMcpTools();
   const diagnostics = input.live ? await runIntegrationDiagnostics(input, env, fetchImpl) : undefined;
+  const diagnosticChecks = diagnostics?.checks ?? [];
   const blockers = [
     ...health.flatMap(integrationHealthBlockers),
-    ...(diagnostics?.checks ?? []).flatMap(diagnosticBlockers),
+    ...diagnosticChecks.flatMap((check) => diagnosticBlockers(check, diagnosticChecks)),
   ];
   const uniqueBlockers = dedupeBlockers(blockers);
   const blockingCount = uniqueBlockers.filter((blocker) => blocker.severity === "blocking").length;
   const status: ReadinessStatus = blockingCount ? "blocked" : uniqueBlockers.length ? "attention" : "ready";
-  const readyIntegrations = health.filter((item) => item.configured).length;
+  const readyIntegrations = health.filter(isOperationallyConfigured).length;
   const fixGuide = buildFixGuide(uniqueBlockers);
   const launchChecklist = buildLaunchChecklist(health, tools, uniqueBlockers, diagnostics);
   const nextActions = uniqueBlockers.length ? uniqueBlockers.map((blocker) => blocker.nextAction) : ["Netreba akciu. Drz secrets mimo gitu a pred zmenami spusti doctor."];
@@ -114,7 +115,7 @@ export async function buildProductionReadinessReport(
     integrations: {
       ready: readyIntegrations,
       total: health.length,
-    missing: health.filter((item) => !item.configured).map((item) => ({ key: item.key, missing: item.missing })),
+      missing: health.filter((item) => !isOperationallyConfigured(item)).map((item) => ({ key: item.key, missing: item.missing })),
     },
     mcp: {
       toolCount: tools.length,
@@ -184,9 +185,10 @@ function buildLaunchChecklist(
   ];
   const approvalReady = requiredApprovalTools.every((tool) => approvalTools.includes(tool));
   const liveChecks = diagnostics?.checks ?? [];
+  const visibleLiveChecks = liveChecks.filter((check) => !isCoveredOptionalDiagnosticIssue(check, liveChecks));
   const liveAdvisoryKeys = ["redis", "serper", "remoteMcp"];
-  const liveBlocking = liveChecks.filter((check) => check.status === "failed" && !liveAdvisoryKeys.includes(check.key));
-  const liveWarnings = liveChecks.filter((check) => check.status !== "ready" && liveAdvisoryKeys.includes(check.key));
+  const liveBlocking = visibleLiveChecks.filter((check) => check.status === "failed" && !liveAdvisoryKeys.includes(check.key));
+  const liveWarnings = visibleLiveChecks.filter((check) => check.status !== "ready" && liveAdvisoryKeys.includes(check.key));
   return [
     {
       id: "required-integrations",
@@ -221,7 +223,7 @@ function buildLaunchChecklist(
       title: "Live diagnostics",
       status: diagnostics ? (liveBlocking.length ? "blocked" : liveWarnings.length ? "attention" : "ready") : "attention",
       proof: diagnostics
-        ? `${liveChecks.filter((check) => check.status === "ready").length}/${liveChecks.length} live diagnostic check(s) ready.`
+        ? `${visibleLiveChecks.filter((check) => check.status === "ready").length}/${visibleLiveChecks.length} live diagnostic check(s) ready.`
         : "Live diagnostics were not requested for this report.",
       nextAction: diagnostics ? liveBlocking[0]?.message ?? liveWarnings[0]?.message ?? "Live diagnostics are ready." : "Run npm run doctor -- --live-integrations.",
     },
@@ -229,17 +231,24 @@ function buildLaunchChecklist(
 }
 
 function integrationHealthBlockers(item: IntegrationHealth): ReadinessBlocker[] {
-  if (item.configured) return [];
-  return item.missing.map((missing) => ({
-    key: item.key,
-    severity: item.requiredForProduction ? "blocking" : "warning",
-    message: `Missing or invalid runtime config: ${missing}`,
-    nextAction: nextActionFor(item.key, missing),
-  }));
+  if (isOperationallyConfigured(item)) return [];
+  return item.missing
+    .filter((missing) => !isUnusedRedisPlaceholderIssue(item.key, missing))
+    .map((missing) => ({
+      key: item.key,
+      severity: item.requiredForProduction ? "blocking" : "warning",
+      message: `Missing or invalid runtime config: ${missing}`,
+      nextAction: nextActionFor(item.key, missing),
+    }));
 }
 
-function diagnosticBlockers(check: DiagnosticCheck): ReadinessBlocker[] {
+function isOperationallyConfigured(item: IntegrationHealth): boolean {
+  return item.configured || item.missing.length > 0 && item.missing.every((missing) => isUnusedRedisPlaceholderIssue(item.key, missing));
+}
+
+function diagnosticBlockers(check: DiagnosticCheck, checks: DiagnosticCheck[]): ReadinessBlocker[] {
   if (check.status === "ready") return [];
+  if (isCoveredOptionalDiagnosticIssue(check, checks)) return [];
   const requiredForProduction = !["redis", "serper", "remoteMcp"].includes(check.key);
   return [
     {
@@ -249,6 +258,11 @@ function diagnosticBlockers(check: DiagnosticCheck): ReadinessBlocker[] {
       nextAction: nextActionFor(check.key, check.message),
     },
   ];
+}
+
+function isCoveredOptionalDiagnosticIssue(check: DiagnosticCheck, checks: DiagnosticCheck[]): boolean {
+  if (isUnusedRedisPlaceholderIssue(check.key, check.message)) return true;
+  return check.key === "serper" && checks.some((item) => item.key === "googleMaps" && item.status === "ready");
 }
 
 function nextActionFor(key: string, message: string): string {

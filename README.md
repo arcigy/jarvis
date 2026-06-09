@@ -107,7 +107,7 @@ Live integrations are runtime-only:
 - lead export: `GOOGLE_SHEET_ID` plus a Google OAuth refresh token with Sheets access
 - when multiple `GMAIL_REFRESH_TOKEN_*` values are configured, Sheets diagnostics and lead export try them in order unless a specific `accountEnvKey` is supplied
 
-Do not leave placeholder URL credentials such as `PASSWORD`, `changeme`, or `dummy` in `DATABASE_URL`. Redis is currently a non-blocking advisory because shipped Jarvis workflows use SQLite/local APIs for state; replace `REDIS_URL` before adding a Redis-backed queue or cache. If `npm run doctor -- --live-integrations` reports Serper credits exhausted after key `2/2`, replace or top up at least one Serper key.
+Do not leave placeholder URL credentials such as `PASSWORD`, `changeme`, or `dummy` in `DATABASE_URL`. Shipped Jarvis workflows use SQLite/local APIs for state, so a placeholder `REDIS_URL` is treated as an unused optional provider rather than a launch warning; replace it before enabling a Redis-backed queue or cache. If `npm run doctor -- --live-integrations` reports Serper credits exhausted after key `2/2`, replace or top up at least one Serper key.
 
 Gemini calls retry transient `429`, `500`, `502`, `503`, and `504` responses before trying `GEMINI_FALLBACK_MODEL`. Auth, quota, and invalid request errors still surface as live-readiness blockers.
 
@@ -115,7 +115,7 @@ Lead discovery returns provider-level status for Serper and Google Places. If Se
 
 Gmail sync defaults to `in:inbox newer_than:7d`; live operator briefing uses `in:inbox newer_than:2d` so Jarvis focuses on incoming client requests.
 
-Serper is treated as an optional lead provider in readiness because Google Places keeps the shipped lead discovery workflow functional. A failed Serper check remains visible as a warning until credits are restored.
+Serper is treated as an optional lead provider in readiness because Google Places keeps the shipped lead discovery workflow functional. If Google Places is live, exhausted Serper credits are reported only in the diagnostics detail and do not create a launch warning.
 
 Use `arcigy.get_production_readiness` or `POST /api/production-readiness` for a secret-safe status report. It returns blockers, next actions, and a `fixGuide` with env key names and validation commands, never the secret values.
 

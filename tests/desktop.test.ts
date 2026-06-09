@@ -341,7 +341,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /Lead provideri potrebuju attention/);
   assert.match(renderer, /Live registry: \$\{tools\.length\} toolov nacitanych/);
   assert.match(renderer, /Ziadne MCP tooly nie su nacitane/);
-  assert.match(renderer, /Optional Redis advisory; shipped state uses SQLite/);
+  assert.match(renderer, /SQLite local state active; Redis queue disabled/);
   assert.match(renderer, /node\.setAttribute\("data-state", stateName\)/);
   assert.match(renderer, /renderBridgeCockpit/);
   assert.match(renderer, /renderRemoteMcpPack/);

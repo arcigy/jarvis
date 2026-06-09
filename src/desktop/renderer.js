@@ -1060,8 +1060,8 @@ function renderProviderFallbackGrid(result) {
     {
       key: "cache-queue",
       label: "Cache queue",
-      state: byKey.get("redis")?.status === "ready" ? "ready" : "attention",
-      detail: byKey.get("redis")?.status === "ready" ? "Redis live" : "Optional Redis advisory; shipped state uses SQLite",
+      state: "ready",
+      detail: byKey.get("redis")?.status === "ready" ? "Redis live" : "SQLite local state active; Redis queue disabled",
     },
   ];
   elements.providerFallbackGrid.replaceChildren();

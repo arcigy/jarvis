@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { getIntegrationHealth, loadLocalEnv, type RuntimeEnv } from "../src/automation-system/env.ts";
+import { getIntegrationHealth, isUnusedRedisPlaceholderIssue, loadLocalEnv, type RuntimeEnv } from "../src/automation-system/env.ts";
 import { redactSensitiveText } from "../src/automation-system/ai-safety.ts";
 
 type AuditState = "configured" | "missing" | "placeholder";
@@ -44,9 +44,9 @@ function buildSecretsAudit(root: string, runtimeEnv: RuntimeEnv, loadedFiles: st
   const keys = readExampleKeys(root).map((key) => summarizeKey(key, runtimeEnv[key]));
   const health = getIntegrationHealth(runtimeEnv);
   const requiredMissing = health.filter((item) => !item.configured && item.requiredForProduction);
-  const advisoryMissing = health.filter((item) => !item.configured && !item.requiredForProduction);
+  const advisoryMissing = health.filter((item) => !item.configured && !item.requiredForProduction && hasVisibleOptionalIssue(item));
   const status: AuditStatus = requiredMissing.length ? "blocked" : "ready";
-  const advisories = advisoryMissing.map((item) => `Optional ${item.key} secret(s) are non-blocking for shipped workflows: ${item.missing.join(", ")}.`);
+  const advisories = advisoryMissing.map((item) => `Optional ${item.key} secret(s) need attention before enabling that optional provider: ${item.missing.join(", ")}.`);
   const nextActions = requiredMissing.map((item) => `Set ${item.key} runtime secret(s): ${item.missing.join(", ")}.`);
 
   return {
@@ -59,19 +59,27 @@ function buildSecretsAudit(root: string, runtimeEnv: RuntimeEnv, loadedFiles: st
     summary:
       status === "ready"
         ? advisories.length
-          ? "Required production secrets are configured; optional unused provider advisories are visible and non-blocking."
+          ? "Required production secrets are configured; optional provider setup has non-blocking notes."
           : "All production integration secret groups are configured."
         : "Required production secrets need attention before live production handoff.",
     integrations: health.map((item) => ({
       key: item.key,
-      configured: item.configured,
+      configured: isOperationallyConfigured(item),
       requiredForProduction: item.requiredForProduction,
-      missing: item.missing,
+      missing: isOperationallyConfigured(item) ? [] : item.missing,
     })),
     keys,
     advisories,
     nextActions,
   };
+}
+
+function hasVisibleOptionalIssue(item: { key: string; missing: string[] }): boolean {
+  return item.missing.some((missing) => !isUnusedRedisPlaceholderIssue(item.key, missing));
+}
+
+function isOperationallyConfigured(item: { key: string; configured: boolean; missing: string[] }): boolean {
+  return item.configured || item.missing.length > 0 && item.missing.every((missing) => isUnusedRedisPlaceholderIssue(item.key, missing));
 }
 
 function loadTrackedLocalEnv(root: string, runtimeEnv: RuntimeEnv): string[] {

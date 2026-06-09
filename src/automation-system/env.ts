@@ -76,6 +76,10 @@ export function getIntegrationHealth(env: RuntimeEnv = process.env): Integration
   });
 }
 
+export function isUnusedRedisPlaceholderIssue(key: string, message: string): boolean {
+  return key === "redis" && message.includes("REDIS_URL contains a placeholder credential");
+}
+
 function getAnyOfRuntimeEnvIssue(env: RuntimeEnv, keys: readonly string[] | undefined): string[] {
   if (!keys?.length) return [];
   return keys.some((key) => getEnv(env, key)) ? [] : [`one of ${keys.join(", ")}`];

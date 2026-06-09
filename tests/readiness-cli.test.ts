@@ -30,12 +30,12 @@ test("Jarvis readiness CLI reports blockers without leaking secrets", () => {
   };
   assert.equal(body.status, "blocked");
   assert.ok(body.blockers.some((blocker) => blocker.key === "postgres"));
-  assert.ok(body.blockers.some((blocker) => blocker.key === "redis"));
-  assert.ok(body.fixGuide.some((step) => step.id === "redis-real-password" && step.envKeys.includes("REDIS_URL")));
-  assert.ok(body.attentionQueue.some((item) => item.key === "redis" && item.validationCommand.includes("doctor")));
+  assert.equal(body.blockers.some((blocker) => blocker.key === "redis"), false);
+  assert.equal(body.fixGuide.some((step) => step.id === "redis-real-password"), false);
+  assert.equal(body.attentionQueue.some((item) => item.key === "redis"), false);
 });
 
-test("Jarvis readiness CLI exits zero with attention when only unused Redis is invalid", () => {
+test("Jarvis readiness CLI exits ready when only unused Redis is invalid", () => {
   const result = spawnSync("node", ["scripts/jarvis_readiness.ts", "--json", "--no-env-file"], {
     cwd: process.cwd(),
     encoding: "utf-8",
@@ -65,9 +65,9 @@ test("Jarvis readiness CLI exits zero with attention when only unused Redis is i
     blockers: Array<{ key: string; severity: string }>;
     attentionQueue: Array<{ key: string; severity: string }>;
   };
-  assert.equal(body.status, "attention");
-  assert.ok(body.blockers.some((blocker) => blocker.key === "redis" && blocker.severity === "warning"));
-  assert.ok(body.attentionQueue.some((item) => item.key === "redis" && item.severity === "warning"));
+  assert.equal(body.status, "ready");
+  assert.equal(body.blockers.some((blocker) => blocker.key === "redis"), false);
+  assert.equal(body.attentionQueue.some((item) => item.key === "redis"), false);
 });
 
 test("Jarvis readiness CLI help is available without env", () => {

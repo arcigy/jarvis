@@ -60,7 +60,7 @@ test("Jarvis secrets audit reports local setup without leaking secret values", (
   assert.equal(body.integrations.find((item) => item.key === "remoteMcp")?.configured, true);
   assert.equal(body.integrations.find((item) => item.key === "remoteMcp")?.requiredForProduction, false);
   assert.equal(body.keys.find((item) => item.key === "REDIS_URL")?.state, "placeholder");
-  assert.ok(body.advisories.some((item) => item.includes("Optional redis") && item.includes("non-blocking")));
+  assert.equal(body.advisories.some((item) => item.includes("Optional redis")), false);
   assert.deepEqual(body.nextActions, []);
   assert.match(body.keys.find((item) => item.key === "GEMINI_API_KEY")?.fingerprint ?? "", /^sha256:[0-9a-f]{12}$/);
 });

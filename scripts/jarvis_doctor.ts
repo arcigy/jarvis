@@ -6,7 +6,7 @@ import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { redactSensitiveText } from "../src/automation-system/ai-safety.ts";
-import { getIntegrationHealth, loadLocalEnv } from "../src/automation-system/env.ts";
+import { getIntegrationHealth, isUnusedRedisPlaceholderIssue, loadLocalEnv } from "../src/automation-system/env.ts";
 import { runIntegrationDiagnostics } from "../src/automation-system/diagnostics.ts";
 import { listJarvisMcpTools } from "../src/automation-system/mcp-tools.ts";
 
@@ -135,9 +135,11 @@ function checkMcpToolRegistry(): DoctorCheck {
 
 function checkRuntimeEnv(): DoctorCheck {
   const health = getIntegrationHealth();
-  const missing = health.filter((item) => !item.configured).map((item) => ({ key: item.key, missing: item.missing, requiredForProduction: item.requiredForProduction }));
+  const missing = health
+    .filter((item) => !isOperationallyConfigured(item))
+    .map((item) => ({ key: item.key, missing: item.missing, requiredForProduction: item.requiredForProduction }));
   const blockingMissing = missing.filter((item) => item.requiredForProduction);
-  const advisoryMissing = missing.filter((item) => !item.requiredForProduction);
+  const advisoryMissing = missing.filter((item) => !item.requiredForProduction && hasVisibleOptionalRuntimeIssue(item));
   const status: CheckStatus = blockingMissing.length ? (strictEnv ? "failed" : "warning") : advisoryMissing.length ? "warning" : "ready";
   return {
     key: "runtimeEnv",
@@ -148,7 +150,7 @@ function checkRuntimeEnv(): DoctorCheck {
         ? `${health.length - advisoryMissing.length}/${health.length} production integration group(s) are configured; ${advisoryMissing.length} non-blocking advisory remains.`
         : `${health.length} integration group(s) have runtime env configured.`,
     details: {
-      configured: health.filter((item) => item.configured).map((item) => item.key),
+      configured: health.filter(isOperationallyConfigured).map((item) => item.key),
       missing,
       advisoryMissing,
     },
@@ -158,27 +160,42 @@ function checkRuntimeEnv(): DoctorCheck {
 async function checkLiveIntegrationDiagnostics(): Promise<DoctorCheck> {
   const dbPath = safeGeneratedPath(`doctor-live-diagnostics-${Date.now()}-${process.pid}.db`);
   const diagnostics = await runIntegrationDiagnostics({ live: true, dbPath });
-  const notReady = diagnostics.checks.filter((check) => check.status !== "ready");
+  const visibleChecks = diagnostics.checks.filter((check) => !isCoveredOptionalDiagnosticIssue(check, diagnostics.checks));
+  const notReady = visibleChecks.filter((check) => check.status !== "ready");
   const advisoryKeys = ["redis", "serper", "remoteMcp"];
   const blockingNotReady = notReady.filter((check) => !advisoryKeys.includes(check.key));
   const advisoryNotReady = notReady.filter((check) => advisoryKeys.includes(check.key));
+  const readyChecks = visibleChecks.filter((check) => check.status === "ready");
   return {
     key: "liveIntegrationDiagnostics",
     status: blockingNotReady.length ? "failed" : "ready",
     message: blockingNotReady.length
       ? `${blockingNotReady.length} live integration check(s) are not ready.`
       : advisoryNotReady.length
-        ? `${diagnostics.checks.length - advisoryNotReady.length}/${diagnostics.checks.length} live integration check(s) passed; optional providers have non-blocking advisories.`
-        : `${diagnostics.checks.length} live integration check(s) passed.`,
+        ? `${readyChecks.length}/${visibleChecks.length} live integration check(s) passed; optional providers have non-blocking advisories.`
+        : `${visibleChecks.length} live integration check(s) passed.`,
     details: {
       live: diagnostics.live,
       checkedAt: diagnostics.checkedAt,
       dbPath,
       notReady,
       advisoryNotReady,
-      ready: diagnostics.checks.filter((check) => check.status === "ready").map((check) => check.key),
+      ready: readyChecks.map((check) => check.key),
     },
   };
+}
+
+function isCoveredOptionalDiagnosticIssue(check: { key: string; status: string; message: string }, checks: Array<{ key: string; status: string }>): boolean {
+  if (isUnusedRedisPlaceholderIssue(check.key, check.message)) return true;
+  return check.key === "serper" && checks.some((item) => item.key === "googleMaps" && item.status === "ready");
+}
+
+function hasVisibleOptionalRuntimeIssue(item: { key: string; missing: string[] }): boolean {
+  return item.missing.some((missing) => !isUnusedRedisPlaceholderIssue(item.key, missing));
+}
+
+function isOperationallyConfigured(item: { key: string; configured: boolean; missing: string[] }): boolean {
+  return item.configured || item.missing.length > 0 && item.missing.every((missing) => isUnusedRedisPlaceholderIssue(item.key, missing));
 }
 
 function checkLocalDbSmoke(): DoctorCheck {

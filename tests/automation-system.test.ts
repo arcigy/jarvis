@@ -97,11 +97,11 @@ test("production readiness report returns blockers and next actions without secr
 
   assert.equal(report.status, "blocked");
   assert.equal(report.mcp.toolCount, listJarvisMcpTools().length);
-  assert.ok(report.blockers.some((blocker) => blocker.key === "redis" && blocker.severity === "warning"));
-  assert.ok(report.nextActions.some((action) => action.includes("REDIS_URL")));
-  assert.ok(report.fixGuide.some((step) => step.id === "redis-real-password" && step.envKeys.includes("REDIS_URL")));
+  assert.equal(report.blockers.some((blocker) => blocker.key === "redis"), false);
+  assert.equal(report.nextActions.some((action) => action.includes("REDIS_URL")), false);
+  assert.equal(report.fixGuide.some((step) => step.id === "redis-real-password"), false);
   assert.ok(report.fixGuide.every((step) => step.validationCommand.includes("doctor")));
-  assert.ok(report.attentionQueue.some((item) => item.key === "redis" && item.source === "configuration"));
+  assert.equal(report.attentionQueue.some((item) => item.key === "redis"), false);
   assert.ok(report.attentionQueue.every((item) => item.validationCommand.includes("doctor")));
   assert.ok(report.launchChecklist.some((item) => item.id === "required-integrations" && item.status === "blocked"));
   assert.ok(report.launchChecklist.some((item) => item.id === "approval-locks" && item.status === "ready"));
@@ -1116,7 +1116,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
   assert.ok(report.checks.some((check) => check.key === "secret-redaction" && check.status === "ready"));
 });
 
-test("production readiness treats unused Redis as non-blocking advisory", async () => {
+test("production readiness treats unused Redis as optional disabled provider", async () => {
   const report = await buildProductionReadinessReport(
     { live: false },
     {
@@ -1137,11 +1137,11 @@ test("production readiness treats unused Redis as non-blocking advisory", async 
     }
   );
 
-  assert.equal(report.status, "attention");
-  assert.ok(report.blockers.some((blocker) => blocker.key === "redis" && blocker.severity === "warning"));
-  assert.ok(report.attentionQueue.some((item) => item.key === "redis" && item.severity === "warning"));
-  assert.ok(report.launchChecklist.some((item) => item.id === "optional-advisories" && item.status === "attention"));
-  assert.match(report.summary, /non-blocking warning/);
+  assert.equal(report.status, "ready");
+  assert.equal(report.blockers.some((blocker) => blocker.key === "redis"), false);
+  assert.equal(report.attentionQueue.some((item) => item.key === "redis"), false);
+  assert.ok(report.launchChecklist.some((item) => item.id === "optional-advisories" && item.status === "ready"));
+  assert.match(report.summary, /Production gates ready/);
 });
 
 test("production verification evidence marks stale ready artifacts as attention", () => {
@@ -1184,11 +1184,11 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   );
 
   assert.equal(pack.readiness?.status, "blocked");
-  assert.ok(pack.readiness?.attentionQueue.some((item) => item.key === "redis"));
+  assert.equal(pack.readiness?.attentionQueue.some((item) => item.key === "redis"), false);
   assert.ok(pack.readiness?.launchChecklist.some((item) => item.id === "mcp-registry" && item.status === "ready"));
   assert.ok(pack.readiness?.launchEvidence.proofGates.some((gate) => gate.id === "live-diagnostics" && gate.validationCommand.includes("doctor")));
   assert.equal(pack.readiness?.launchEvidence.remoteHandoff.tunnelCommand, "npm run web:tunnel:secure");
-  assert.ok(pack.readiness?.fixGuide.some((step) => step.id === "redis-real-password"));
+  assert.equal(pack.readiness?.fixGuide.some((step) => step.id === "redis-real-password"), false);
   assert.equal(pack.actionManifestUrl, "https://jarvis.example/.well-known/ai-plugin.json");
   assert.equal(pack.openApiSchemaUrl, "https://jarvis.example/api/openapi.json");
   assert.equal(pack.productionVerificationEvidenceUrl, "https://jarvis.example/api/production-verification-evidence");
@@ -2282,7 +2282,7 @@ test("integration diagnostics redact Google Sheets metadata transport errors", a
   assert.match(googleSheets?.message ?? "", /postgresql:\/\/postgres:\[redacted\]@example\.com/);
 });
 
-test("production readiness treats Serper exhaustion as advisory when other lead provider works", async () => {
+test("production readiness treats Serper exhaustion as covered when Google Places works", async () => {
   const fetchImpl = async (url: string | URL | Request) => {
     const target = String(url);
     if (target.includes("generativelanguage.googleapis.com")) {
@@ -2335,11 +2335,11 @@ test("production readiness treats Serper exhaustion as advisory when other lead 
       fetchImpl as typeof fetch
     );
 
-    assert.equal(report.status, "attention");
-    assert.equal(report.blockers.find((blocker) => blocker.key === "serper")?.severity, "warning");
-    assert.equal(report.attentionQueue.find((item) => item.key === "serper")?.source, "live-diagnostic");
-    assert.ok(report.launchChecklist.some((item) => item.id === "live-diagnostics" && item.status === "attention"));
-    assert.match(report.summary, /non-blocking warning/);
+    assert.equal(report.status, "ready");
+    assert.equal(report.blockers.some((blocker) => blocker.key === "serper"), false);
+    assert.equal(report.attentionQueue.some((item) => item.key === "serper"), false);
+    assert.ok(report.launchChecklist.some((item) => item.id === "live-diagnostics" && item.status === "ready" && item.proof.includes("9/9")));
+    assert.match(report.summary, /Production gates ready/);
     assert.equal(JSON.stringify(report).includes("spent-serper"), false);
   } finally {
     await postgres.close();
