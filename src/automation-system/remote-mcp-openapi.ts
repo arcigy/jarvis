@@ -167,7 +167,7 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
   if (toolName === "arcigy.prepare_positive_outreach_reply") {
     return {
       leadEmail: "lead@example.com",
-      companyName: "Demo Company",
+      companyName: "Modelova Firma",
       positiveSignal: "Lead asked for pricing and a short discovery call.",
       language: "sk",
       tone: "executive",
@@ -177,14 +177,14 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
     return {
       approval: { approved: true },
       intake: {
-        client: { businessName: "Demo Klient s. r. o.", email: "client@example.com" },
-        project: { name: "Demo webova aplikacia", includedModules: ["Klientsky portal", "Reporting"] },
+        client: { businessName: "Modelovy Klient s. r. o.", email: "client@example.com" },
+        project: { name: "Modelova webova aplikacia", includedModules: ["Klientsky portal", "Reporting"] },
         pricing: { implementationFeeEur: 2000, monthlyFeeEur: 200 },
       },
     };
   }
   if (toolName === "arcigy.send_approved_outreach_reply") return { preparedEventId: "prepared_reply_id", approval: { approved: true } };
   if (toolName === "arcigy.update_client_need_status") return { needSignalId: "client_need_signal_id", status: "resolved", approval: { approved: true } };
-  if (toolName === "arcigy.append_leads_to_google_sheet") return { rows: [["Demo Company", "https://example.com", "lead@example.com"]], approval: { approved: true } };
+  if (toolName === "arcigy.append_leads_to_google_sheet") return { rows: [["Modelova Firma", "https://example.com", "lead@example.com"]], approval: { approved: true } };
   return {};
 }

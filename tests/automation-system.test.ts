@@ -148,6 +148,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.equal(contractGenerate.post["x-arcigy-requiresApproval"], true);
   assert.equal(contractGenerate.post.requestBody.content["application/json"].examples.quickStart.value.approval.approved, true);
   assert.equal(JSON.stringify(document).includes("<JARVIS_WEB_TOKEN>"), true);
+  assert.equal(/Demo Company|Demo Klient|Demo webova/i.test(JSON.stringify(document)), false);
   assert.equal(/AIza|GOCSPX|1\/\/|postgresql:\/\/|redis:\/\//.test(JSON.stringify(document)), false);
 });
 
