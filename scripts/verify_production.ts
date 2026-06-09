@@ -21,6 +21,7 @@ try {
 async function main() {
   runNpm("typecheck", ["run", "typecheck"]);
   runNpm("tests", ["test"]);
+  runNpm("local-memory-smoke", ["run", "local:memory:smoke"]);
   await ensureWebBridge();
   runNpm("doctor-live", ["run", "doctor", "--", "--live-integrations"]);
   runNpm("remote-mcp-smoke", ["run", "remote:mcp:smoke", "--", "--url", webUrl, "--json"]);

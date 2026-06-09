@@ -141,6 +141,12 @@ Run explicit live read-only probes only when you want to test configured provide
 npm run doctor -- --live-integrations
 ```
 
+Run the local memory smoke when you want proof that email identity, client need alerts, audit events, and redacted local snapshots work end-to-end:
+
+```powershell
+npm run local:memory:smoke
+```
+
 Doctor removes its own generated smoke artifacts after a successful run. Use `npm run doctor -- --keep-doctor-artifacts` when debugging generated outputs.
 
 Run the browser-ready Jarvis bridge:

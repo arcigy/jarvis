@@ -10,6 +10,7 @@
     "mcp": "node src/automation-system/mcp-server.ts",
     "doctor": "node scripts/jarvis_doctor.ts",
     "readiness": "node scripts/jarvis_readiness.ts",
+    "local:memory:smoke": "node scripts/local_memory_smoke.ts",
     "remote:mcp:smoke": "node scripts/remote_mcp_smoke.ts",
     "ui:smoke": "electron scripts/jarvis_ui_smoke.cjs",
     "verify:production": "node scripts/verify_production.ts",

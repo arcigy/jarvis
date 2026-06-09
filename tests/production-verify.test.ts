@@ -9,6 +9,8 @@ test("production verifier wires every live release gate", () => {
   assert.equal(packageJson.scripts["verify:production"], "node scripts/verify_production.ts");
   assert.match(script, /runNpm\("typecheck", \["run", "typecheck"\]\)/);
   assert.match(script, /runNpm\("tests", \["test"\]\)/);
+  assert.equal(packageJson.scripts["local:memory:smoke"], "node scripts/local_memory_smoke.ts");
+  assert.match(script, /runNpm\("local-memory-smoke", \["run", "local:memory:smoke"\]\)/);
   assert.match(script, /process\.env\.npm_execpath/);
   assert.match(script, /ensureWebBridge/);
   assert.match(script, /doctor", "--", "--live-integrations"/);
