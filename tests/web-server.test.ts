@@ -563,6 +563,8 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(smokeBody.checks.some((check) => check.key === "pack-limits" && check.status === "ready"));
     assert.ok(smokeBody.checks.some((check) => check.key === "pack-contract-quick-start" && check.status === "ready"));
     assert.ok(smokeBody.checks.some((check) => check.key === "pack-contract-draft-quick-start" && check.status === "ready"));
+    assert.ok(smokeBody.checks.some((check) => check.key === "pack-voice-quick-start" && check.status === "ready"));
+    assert.ok(smokeBody.checks.some((check) => check.key === "voice-tool-call" && check.status === "ready"));
     assert.ok(smokeBody.checks.some((check) => check.key === "pack-production-evidence-quick-start" && check.status === "ready"));
     assert.ok(smokeBody.checks.some((check) => check.key === "production-evidence-tool-call" && check.status === "ready"));
 

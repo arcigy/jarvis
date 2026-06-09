@@ -209,6 +209,19 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
 
   const health = await postJson(fetchImpl, `${baseUrl}/api/mcp/arcigy.get_system_health`, { format: "json" }, input.bearerToken);
   checks.push(check(health.ok && Array.isArray(health.body?.result?.integrations), "read-only-tool-call", "Read-only MCP tool call returned integration health."));
+  const voice = await postJson(
+    fetchImpl,
+    `${baseUrl}/api/mcp/arcigy.jarvis_voice_event`,
+    { text: "Jarvis integracie", session: { state: "idle", wakeWord: "jarvis" } },
+    input.bearerToken
+  );
+  checks.push(
+    check(
+      voice.ok && hasSafeVoiceWakeResult(voice.body?.result),
+      "voice-tool-call",
+      "Read-only Jarvis voice MCP call handled a wake command and returned secret-safe speech instructions."
+    )
+  );
   const productionEvidence = await postJson(fetchImpl, `${baseUrl}/api/mcp/arcigy.get_production_verification_evidence`, {}, input.bearerToken);
   checks.push(
     check(
@@ -237,7 +250,7 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
     baseUrl,
     summary:
       status === "ready"
-        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, action manifest, OpenAPI action schema, CORS preflight, external auth gate, auth throttle policy, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, voice quick-start, client memory quick-start, audit quick-start, production evidence quick-start, production evidence tool call, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
+        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, action manifest, OpenAPI action schema, CORS preflight, external auth gate, auth throttle policy, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, voice quick-start, voice tool call, client memory quick-start, audit quick-start, production evidence quick-start, production evidence tool call, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((item) => item.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -634,6 +647,12 @@ function hasProductionEvidenceQuickStart(value: unknown, baseUrl: string): boole
     | { approvalRequired?: unknown; method?: unknown; url?: unknown; body?: unknown }
     | undefined;
   return call?.approvalRequired === false && call.method === "POST" && call.url === `${baseUrl}/api/mcp/arcigy.get_production_verification_evidence` && isEmptyRecord(call.body);
+}
+
+function hasSafeVoiceWakeResult(value: unknown): boolean {
+  if (!value || typeof value !== "object") return false;
+  const result = value as { session?: { state?: unknown }; shouldStopRecording?: unknown; speakText?: unknown };
+  return result.session?.state === "idle" && result.shouldStopRecording === true && typeof result.speakText === "string" && /integr/i.test(result.speakText);
 }
 
 function hasSafeProductionEvidenceResult(value: unknown): boolean {
