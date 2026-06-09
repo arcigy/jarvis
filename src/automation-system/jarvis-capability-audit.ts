@@ -92,6 +92,20 @@ const capabilityDefinitions: CapabilityDefinition[] = [
     evidence: ["ui-smoke", "ui-smoke-narrow", "voice-tool-call", "pack-voice-quick-start"],
   },
   {
+    id: "proactive-digest",
+    title: "Proactive Jarvis attention digest",
+    tools: [
+      "arcigy.get_operator_briefing",
+      "arcigy.sync_gmail_recent_messages",
+      "arcigy.get_client_need_alerts",
+      "arcigy.get_approval_queue",
+      "arcigy.get_production_readiness",
+    ],
+    approvalRequired: [],
+    evidence: ["local-memory-smoke", "doctor-live", "ui-smoke"],
+    envKeys: ["gmail"],
+  },
+  {
     id: "remote-mcp",
     title: "Remote MCP handoff for Claude, ChatGPT, Grok, and HTTP agents",
     tools: [

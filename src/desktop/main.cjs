@@ -694,6 +694,19 @@ const coreWebWorkflowSurfaces = [
     proof: "Wake-word command handling, operator briefing, and production evidence voice path are registered.",
   },
   {
+    id: "proactive-digest-workflow",
+    title: "Proactive Jarvis attention digest workflow",
+    tools: [
+      "arcigy.get_operator_briefing",
+      "arcigy.sync_gmail_recent_messages",
+      "arcigy.get_client_need_alerts",
+      "arcigy.get_approval_queue",
+      "arcigy.get_production_readiness",
+    ],
+    approvalRequired: [],
+    proof: "Operator briefing, Gmail sync, client alerts, approval queue, and readiness are registered for proactive digest checks.",
+  },
+  {
     id: "remote-agent-workflow",
     title: "Remote agent workflow",
     tools: [
@@ -1117,6 +1130,20 @@ function jarvisCapabilityDefinitions() {
       tools: ["arcigy.jarvis_voice_event", "arcigy.get_operator_briefing", "arcigy.get_production_verification_evidence"],
       approvalRequired: [],
       evidence: ["ui-smoke", "ui-smoke-narrow", "voice-tool-call", "pack-voice-quick-start"],
+    },
+    {
+      id: "proactive-digest",
+      title: "Proactive Jarvis attention digest",
+      tools: [
+        "arcigy.get_operator_briefing",
+        "arcigy.sync_gmail_recent_messages",
+        "arcigy.get_client_need_alerts",
+        "arcigy.get_approval_queue",
+        "arcigy.get_production_readiness",
+      ],
+      approvalRequired: [],
+      evidence: ["local-memory-smoke", "doctor-live", "ui-smoke"],
+      envKeys: ["gmail"],
     },
     {
       id: "remote-mcp",

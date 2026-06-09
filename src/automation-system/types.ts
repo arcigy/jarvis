@@ -2,6 +2,7 @@ export type AutomationKey =
   | "contract_document_generator"
   | "cold_outreach_activity_brief"
   | "local_client_lead_identity"
+  | "proactive_attention_digest"
   | "jarvis_voice_desktop_listener";
 
 export type AutomationChannel = "mcp" | "dashboard" | "voice" | "scheduled";

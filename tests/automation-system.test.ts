@@ -32,6 +32,7 @@ import { resolveJarvisIntentFromTranscript } from "../src/automation-system/jarv
 import { buildProductionReadinessReport } from "../src/automation-system/production-readiness.ts";
 import { buildOperatorBriefing } from "../src/automation-system/operator-briefing.ts";
 import { buildJarvisCapabilityAudit } from "../src/automation-system/jarvis-capability-audit.ts";
+import { jarvisAutomations } from "../src/automation-system/jarvis-automations.ts";
 import { buildRemoteMcpOpenApiDocument } from "../src/automation-system/remote-mcp-openapi.ts";
 import { buildRemoteMcpConnectionPack } from "../src/automation-system/remote-mcp-pack.ts";
 import { runRemoteMcpSmoke } from "../src/automation-system/remote-mcp-smoke.ts";
@@ -89,6 +90,25 @@ test("MCP tools expose the requested automation surface", () => {
   }
 });
 
+test("Jarvis automation catalog is production-facing and UTF-8 clean", () => {
+  assert.deepEqual(jarvisAutomations.map((item) => item.key), [
+    "contract_document_generator",
+    "cold_outreach_activity_brief",
+    "local_client_lead_identity",
+    "proactive_attention_digest",
+    "jarvis_voice_desktop_listener",
+  ]);
+  const proactive = jarvisAutomations.find((item) => item.key === "proactive_attention_digest");
+  assert.ok(proactive);
+  assert.equal(proactive.enabledByDefault, true);
+  assert.ok(proactive.channels.includes("scheduled"));
+  assert.match(proactive.description, /Gmail sync/);
+  assert.match(proactive.description, /approval queue/);
+  for (const automation of jarvisAutomations) {
+    assert.doesNotMatch(`${automation.name} ${automation.description}`, /[\u0102\u00c4\u0139]/);
+  }
+});
+
 test("Jarvis capability audit maps the full requested production surface to evidence", async () => {
   const env = {
     GEMINI_API_KEY: "gemini-key",
@@ -142,6 +162,7 @@ test("Jarvis capability audit maps the full requested production surface to evid
   assert.equal(audit.toolCount, listJarvisMcpTools().length);
   assert.equal(audit.productionEvidence.requiredRemoteMcpSmokeGates, 37);
   assert.ok(audit.capabilities.some((item) => item.id === "remote-mcp" && item.status === "ready" && item.tools.includes("arcigy.get_jarvis_capability_audit")));
+  assert.ok(audit.capabilities.some((item) => item.id === "proactive-digest" && item.status === "ready" && item.tools.includes("arcigy.sync_gmail_recent_messages")));
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.append_leads_to_google_sheet")));
   assert.doesNotMatch(JSON.stringify(audit), /AIza|GOCSPX|1\/\/|postgresql:\/\/|redis:\/\//);
 });
@@ -168,6 +189,7 @@ test("production readiness report returns blockers and next actions without secr
   assert.ok(report.launchChecklist.some((item) => item.id === "outreach-workflow" && item.status === "ready"));
   assert.ok(report.launchChecklist.some((item) => item.id === "client-memory-workflow" && item.status === "ready"));
   assert.ok(report.launchChecklist.some((item) => item.id === "voice-workflow" && item.status === "ready"));
+  assert.ok(report.launchChecklist.some((item) => item.id === "proactive-digest-workflow" && item.status === "ready"));
   assert.ok(report.launchChecklist.some((item) => item.id === "remote-agent-workflow" && item.status === "ready"));
   assert.equal(report.launchEvidence.mode, "production-launch-evidence");
   assert.equal(report.launchEvidence.decision, "blocked");
@@ -1236,7 +1258,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 8/8 skupin ready, 0 attention, 0 blocked. MCP: 36 toolov, 6 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 36 toolov, 6 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {

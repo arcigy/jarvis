@@ -279,14 +279,21 @@ async function run() {
     if (!/^[0-9]+$/.test(dom.capabilityAuditToolCountText) || Number(dom.capabilityAuditToolCountText) < 35) {
       fail(`Capability audit tool count is stale or not loaded: ${dom.capabilityAuditToolCountText}.`);
     }
-    if (dom.capabilityAuditCardCount !== 8) fail(`Capability audit card grid is incomplete: ${dom.capabilityAuditCardCount}/8 cards.`);
+    if (dom.capabilityAuditCardCount !== 9) fail(`Capability audit card grid is incomplete: ${dom.capabilityAuditCardCount}/9 cards.`);
     if (displayedToolCount !== preflight.mcpToolCount) fail(`MCP tool count mismatch: UI ${displayedToolCount}, preflight ${preflight.mcpToolCount}.`);
     if (displayedApprovalLockCount !== preflight.riskyToolsRequiringApproval.length) {
       fail(`Approval lock count mismatch: UI ${displayedApprovalLockCount}, preflight ${preflight.riskyToolsRequiringApproval.length}.`);
     }
     const workflowProofCards = Array.isArray(dom.workflowProofCards) ? dom.workflowProofCards : [];
-    if (workflowProofCards.length !== 5) fail(`Workflow proof matrix is incomplete: ${workflowProofCards.length}/5 cards.`);
-    for (const expected of ["Contract automation workflow", "Cold outreach workflow", "Client memory workflow", "Jarvis voice workflow", "Remote agent workflow"]) {
+    if (workflowProofCards.length !== 6) fail(`Workflow proof matrix is incomplete: ${workflowProofCards.length}/6 cards.`);
+    for (const expected of [
+      "Contract automation workflow",
+      "Cold outreach workflow",
+      "Client memory workflow",
+      "Jarvis voice workflow",
+      "Proactive Jarvis attention digest workflow",
+      "Remote agent workflow",
+    ]) {
       const card = workflowProofCards.find((item) => item.text.includes(expected));
       if (!card) fail(`Workflow proof matrix is missing ${expected}.`);
       if (card.state !== "ready" || card.width < 100 || card.height < 80) {
@@ -518,7 +525,7 @@ async function waitForCapabilityAudit(window) {
         cards: document.querySelectorAll("#capabilityAuditGrid .capabilityCard").length
       }))()
     `);
-    if (/ready|attention|blocked/i.test(lastState.status) && /^[0-9]+$/.test(lastState.tools) && Number(lastState.cards) === 8) {
+    if (/ready|attention|blocked/i.test(lastState.status) && /^[0-9]+$/.test(lastState.tools) && Number(lastState.cards) === 9) {
       stableReads += 1;
       if (stableReads >= 2) return;
     } else {

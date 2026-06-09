@@ -966,7 +966,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /outreach-workflow/);
   assert.match(main, /client-memory-workflow/);
   assert.match(main, /voice-workflow/);
+  assert.match(main, /proactive-digest-workflow/);
   assert.match(main, /remote-agent-workflow/);
+  assert.match(main, /Proactive Jarvis attention digest/);
   assert.match(main, /npm test && npm run doctor/);
   assert.match(main, /readOnlyOrDraftToolNames/);
   assert.match(main, /hasValidQuickStartUrls/);

@@ -118,7 +118,7 @@ Gmail sync defaults to `in:inbox newer_than:7d`; live operator briefing uses `in
 Serper is treated as an optional lead provider in readiness because Google Places keeps the shipped lead discovery workflow functional. If Google Places is live, exhausted Serper credits are reported only in the diagnostics detail and do not create a launch warning.
 
 Use `arcigy.get_production_readiness` or `POST /api/production-readiness` for a secret-safe status report. It returns blockers, next actions, and a `fixGuide` with env key names and validation commands, never the secret values.
-The launch checklist also proves the core Jarvis workflow surfaces independently: contract automation, cold outreach, client memory, voice commands, and remote agent handoff. If any required MCP tool or approval lock for those workflows is removed, readiness becomes blocked before handoff.
+The launch checklist also proves the core Jarvis workflow surfaces independently: contract automation, cold outreach, client memory, voice commands, proactive attention digest, and remote agent handoff. If any required MCP tool or approval lock for those workflows is removed, readiness becomes blocked before handoff.
 
 Run the secret-safe local setup audit before sharing any live MCP handoff. It loads `.env.local` when present, but only prints key names, configured/missing/placeholder state, value lengths, and one-way fingerprints:
 

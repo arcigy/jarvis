@@ -286,6 +286,19 @@ const coreWorkflowSurfaces: CoreWorkflowSurface[] = [
     proof: "Wake-word command handling, operator briefing, and production evidence voice path are registered.",
   },
   {
+    id: "proactive-digest-workflow",
+    title: "Proactive Jarvis attention digest workflow",
+    tools: [
+      "arcigy.get_operator_briefing",
+      "arcigy.sync_gmail_recent_messages",
+      "arcigy.get_client_need_alerts",
+      "arcigy.get_approval_queue",
+      "arcigy.get_production_readiness",
+    ],
+    approvalRequired: [],
+    proof: "Operator briefing, Gmail sync, client alerts, approval queue, and readiness are registered for proactive digest checks.",
+  },
+  {
     id: "remote-agent-workflow",
     title: "Remote agent workflow",
     tools: [
