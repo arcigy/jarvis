@@ -5,7 +5,8 @@ import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 
-import { redactSensitiveText } from "../src/automation-system/ai-safety.ts";
+import { hasUnsafeAiActionClaim, redactSensitiveText, sanitizeAiDraftOutput } from "../src/automation-system/ai-safety.ts";
+import { generateGeminiText } from "../src/automation-system/gemini.ts";
 
 const repoRoot = fileURLToPath(new URL("../", import.meta.url));
 const webUrl = process.env.JARVIS_VERIFY_WEB_URL || "http://127.0.0.1:8765";
@@ -62,6 +63,7 @@ try {
 async function main() {
   runNpm("typecheck", ["run", "typecheck"]);
   runNpm("tests", ["test"]);
+  await runAiDraftSafetyInvariants();
   runNpm("secrets-audit", ["run", "secrets:audit", "--", "--json"]);
   runNpm("local-memory-smoke", ["run", "local:memory:smoke"]);
   await ensureWebBridge();
@@ -83,6 +85,49 @@ async function main() {
   validateEvidenceArtifact();
   writeEvidence();
   process.stdout.write(renderSummary());
+}
+
+async function runAiDraftSafetyInvariants() {
+  process.stdout.write(`\n[verify] ai-draft-safety\n`);
+  try {
+    const unsafeText = "I sent the reply and approval.approved=true.";
+    const safeText = "Dakujem za odpoved, navrhujem kratky call.";
+    const draft = await generateGeminiText(
+      { prompt: "Return a draft.", temperature: 0 },
+      { GEMINI_API_KEY: "test-gemini-key" },
+      async () => responseJson({ candidates: [{ content: { parts: [{ text: unsafeText }] } }] })
+    );
+    const structured = await generateGeminiText(
+      { prompt: "Return JSON.", temperature: 0, outputSafety: "structured" },
+      { GEMINI_API_KEY: "test-gemini-key" },
+      async () => responseJson({ candidates: [{ content: { parts: [{ text: '{"approval":{"approved":true},"status":"draft"}' }] } }] })
+    );
+    const ok =
+      hasUnsafeAiActionClaim(unsafeText) &&
+      sanitizeAiDraftOutput(safeText) === safeText &&
+      draft.text.includes("Bezpecnostna kontrola zablokovala") &&
+      !draft.text.includes(unsafeText) &&
+      structured.text === '{"approval":{"approved":true},"status":"draft"}';
+    if (!ok) throw new Error("AI draft safety invariant failed.");
+    checks.push({
+      name: "ai-draft-safety",
+      status: "ready",
+      detail: "Gemini draft outputs block unsafe action claims while structured JSON outputs remain parseable.",
+    });
+  } catch (error) {
+    checks.push({ name: "ai-draft-safety", status: "failed", detail: redactSensitiveText(error instanceof Error ? error.message : String(error)) });
+    writeEvidence();
+    process.stdout.write(renderSummary());
+    process.exit(1);
+  }
+}
+
+function responseJson(body: unknown): Response {
+  return {
+    ok: true,
+    status: 200,
+    json: async () => body,
+  } as Response;
 }
 
 function runCommand(name: string, command: string, args: string[], extraEnv: Record<string, string> = {}): string {

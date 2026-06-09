@@ -1165,7 +1165,7 @@ function jarvisCapabilityDefinitions() {
       title: "Gemini AI drafting for replies and contract intake",
       tools: ["arcigy.generate_ai_reply", "arcigy.draft_contract_intake", "arcigy.prepare_positive_outreach_reply"],
       approvalRequired: [],
-      evidence: ["tests", "doctor-live"],
+      evidence: ["tests", "doctor-live", "ai-draft-safety"],
       envKeys: ["gemini"],
     },
     {
@@ -1188,7 +1188,7 @@ function jarvisCapabilityDefinitions() {
         "arcigy.export_local_memory_snapshot",
         "arcigy.append_leads_to_google_sheet",
       ],
-      evidence: ["approval-gate", "approval-shape-gate", "secret-redaction", "secret-scan"],
+      evidence: ["approval-gate", "approval-shape-gate", "secret-redaction", "secret-scan", "ai-draft-safety"],
     },
   ];
 }

@@ -12,6 +12,12 @@ test("production verifier wires every live release gate", () => {
   assert.equal(packageJson.scripts["secrets:bootstrap"], "node scripts/jarvis_env_bootstrap.ts");
   assert.match(script, /runNpm\("typecheck", \["run", "typecheck"\]\)/);
   assert.match(script, /runNpm\("tests", \["test"\]\)/);
+  assert.match(script, /runAiDraftSafetyInvariants/);
+  assert.match(script, /\[verify\] ai-draft-safety/);
+  assert.match(script, /Gemini draft outputs block unsafe action claims/);
+  assert.match(script, /outputSafety: "structured"/);
+  assert.match(script, /sanitizeAiDraftOutput/);
+  assert.match(script, /hasUnsafeAiActionClaim/);
   assert.match(script, /runNpm\("secrets-audit", \["run", "secrets:audit", "--", "--json"\]\)/);
   assert.equal(packageJson.scripts["local:memory:smoke"], "node scripts/local_memory_smoke.ts");
   assert.match(script, /runNpm\("local-memory-smoke", \["run", "local:memory:smoke"\]\)/);
