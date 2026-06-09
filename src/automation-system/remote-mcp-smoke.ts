@@ -615,6 +615,7 @@ function hasHandoffProof(value: unknown, baseUrl: string): boolean {
       "approval-shape-gate",
       "secret-redaction",
       "dirty=false",
+      "freshness.fresh=true",
     ].every((key) => remoteSmokeExpected.includes(key)) &&
     agentFirstSteps.some((step) => typeof step === "string" && step.includes("arcigy.get_operator_briefing")) &&
     agentFirstSteps.some((step) => typeof step === "string" && step.includes("status=ready"))
@@ -707,13 +708,27 @@ function hasSafeVoiceWakeResult(value: unknown): boolean {
 
 function hasSafeProductionEvidenceResult(value: unknown): boolean {
   if (!value || typeof value !== "object") return false;
-  const evidence = value as { mode?: unknown; status?: unknown; generatedAt?: unknown; summary?: unknown; checks?: unknown; release?: unknown };
+  const evidence = value as { mode?: unknown; status?: unknown; generatedAt?: unknown; summary?: unknown; checks?: unknown; release?: unknown; freshness?: unknown };
   if (evidence.mode !== "arcigy-jarvis-production-verification") return false;
   if (typeof evidence.status !== "string" || !["ready", "attention", "missing", "failed"].includes(evidence.status)) return false;
   if (!(typeof evidence.generatedAt === "string" || evidence.generatedAt === null)) return false;
   if (typeof evidence.summary !== "string" || !evidence.summary.trim()) return false;
   if (!Array.isArray(evidence.checks)) return false;
-  return evidence.status !== "ready" || hasSafeReleaseProof(evidence.release);
+  return evidence.status === "ready" && hasSafeReleaseProof(evidence.release) && hasFreshProductionEvidence(evidence.freshness);
+}
+
+function hasFreshProductionEvidence(value: unknown): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const freshness = value as { fresh?: unknown; ageHours?: unknown; maxAgeHours?: unknown; checkedAt?: unknown; detail?: unknown };
+  return (
+    freshness.fresh === true &&
+    typeof freshness.ageHours === "number" &&
+    freshness.ageHours >= 0 &&
+    freshness.maxAgeHours === 24 &&
+    typeof freshness.checkedAt === "string" &&
+    typeof freshness.detail === "string" &&
+    freshness.detail.length > 0
+  );
 }
 
 function hasSafeReleaseProof(value: unknown): boolean {

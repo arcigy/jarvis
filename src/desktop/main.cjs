@@ -11,6 +11,7 @@ let tunnelProcess = null;
 const repoRoot = path.resolve(__dirname, "..", "..");
 const defaultDbPath = path.join(repoRoot, "data", "jarvis-local.db");
 const productionVerificationEvidencePath = path.join(repoRoot, "generated", "production-verification", "latest.json");
+const productionEvidenceMaxAgeHours = 24;
 const defaultGmailSyncQuery = "in:inbox newer_than:7d";
 const defaultGmailBriefingQuery = "in:inbox newer_than:2d";
 const googleOAuthTokenUrls = ["https://oauth2.googleapis.com/token", "https://www.googleapis.com/oauth2/v4/token"];
@@ -556,7 +557,7 @@ function buildReadinessLaunchEvidence(status, launchChecklist, nextActions) {
       requiredBeforeExternalAgent: [
         "Run npm run web:tunnel:secure or use the browser Start tunnel button with a strong JARVIS_WEB_TOKEN.",
         "Fetch /.well-known/ai-plugin.json, /api/openapi.json, /.well-known/arcigy-jarvis.json, and /api/remote-mcp-pack?includeReadiness=true&live=true through the external URL.",
-        "Run /api/remote-mcp-smoke and require status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-agent-setup-profiles, pack-voice-quick-start, voice-tool-call, pack-production-evidence-quick-start, production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction ready; production evidence must also be status=ready with release proof and dirty=false before any remote agent uses write-capable tools.",
+        "Run /api/remote-mcp-smoke and require status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-agent-setup-profiles, pack-voice-quick-start, voice-tool-call, pack-production-evidence-quick-start, production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction ready; production evidence must also be status=ready with release proof, dirty=false, and freshness.fresh=true within 24h before any remote agent uses write-capable tools.",
       ],
       smokeCommand: "npm run remote:mcp:smoke -- --url <external-url>",
       tunnelCommand: "npm run web:tunnel:secure",
@@ -796,6 +797,7 @@ function getProductionVerificationEvidence() {
       mode: "arcigy-jarvis-production-verification",
       status: "missing",
       generatedAt: null,
+      freshness: buildEvidenceFreshness(null),
       evidencePath: productionVerificationEvidencePath,
       summary: "Run npm run verify:production to create the latest secret-safe verification evidence artifact.",
       checks: [],
@@ -804,22 +806,28 @@ function getProductionVerificationEvidence() {
   try {
     const raw = redactSensitiveText(fs.readFileSync(productionVerificationEvidencePath, "utf-8"));
     const evidence = JSON.parse(raw);
+    const generatedAt = typeof evidence.generatedAt === "string" ? evidence.generatedAt : null;
+    const freshness = buildEvidenceFreshness(generatedAt);
+    const storedStatus = typeof evidence.status === "string" ? evidence.status : "attention";
+    const status = storedStatus === "ready" && !freshness.fresh ? "attention" : storedStatus;
     return {
       mode: evidence.mode === "arcigy-jarvis-production-verification" ? evidence.mode : "arcigy-jarvis-production-verification",
-      status: typeof evidence.status === "string" ? evidence.status : "attention",
-      generatedAt: typeof evidence.generatedAt === "string" ? evidence.generatedAt : null,
+      status,
+      generatedAt,
       webUrl: typeof evidence.webUrl === "string" ? evidence.webUrl : undefined,
       release: isPlainObject(evidence.release) ? evidence.release : undefined,
+      freshness,
       secretPolicy: typeof evidence.secretPolicy === "string" ? evidence.secretPolicy : "Secret-safe verification evidence.",
       evidencePath: productionVerificationEvidencePath,
       checks: Array.isArray(evidence.checks) ? evidence.checks : [],
-      summary: summarizeProductionVerificationEvidence(evidence),
+      summary: summarizeProductionVerificationEvidence(evidence, status, freshness),
     };
   } catch (error) {
     return {
       mode: "arcigy-jarvis-production-verification",
       status: "attention",
       generatedAt: null,
+      freshness: buildEvidenceFreshness(null),
       evidencePath: productionVerificationEvidencePath,
       summary: `Production verification evidence exists but could not be parsed: ${redactSensitiveText(error instanceof Error ? error.message : String(error))}`,
       checks: [],
@@ -827,12 +835,47 @@ function getProductionVerificationEvidence() {
   }
 }
 
-function summarizeProductionVerificationEvidence(evidence) {
+function summarizeProductionVerificationEvidence(evidence, status, freshness) {
   const checks = Array.isArray(evidence.checks) ? evidence.checks : [];
   const ready = checks.filter((check) => check && typeof check === "object" && check.status === "ready").length;
   const failed = checks.filter((check) => check && typeof check === "object" && check.status === "failed").length;
   const release = isPlainObject(evidence.release) && typeof evidence.release.shortCommit === "string" ? ` Commit ${evidence.release.shortCommit}.` : "";
-  return `Production verification ${evidence.status === "ready" ? "ready" : "needs attention"}: ${ready} ready, ${failed} failed.${release}`;
+  const freshnessText = freshness.fresh ? ` Fresh evidence (${freshness.ageHours}h old).` : ` ${freshness.detail}`;
+  return `Production verification ${status === "ready" ? "ready" : "needs attention"}: ${ready} ready, ${failed} failed.${release}${freshnessText}`;
+}
+
+function buildEvidenceFreshness(generatedAt) {
+  const checkedAt = new Date().toISOString();
+  if (!generatedAt) {
+    return {
+      fresh: false,
+      ageHours: null,
+      maxAgeHours: productionEvidenceMaxAgeHours,
+      checkedAt,
+      detail: "Production evidence timestamp is missing.",
+    };
+  }
+  const parsed = Date.parse(generatedAt);
+  if (!Number.isFinite(parsed)) {
+    return {
+      fresh: false,
+      ageHours: null,
+      maxAgeHours: productionEvidenceMaxAgeHours,
+      checkedAt,
+      detail: "Production evidence timestamp is invalid.",
+    };
+  }
+  const ageHours = Math.max(0, Math.round(((Date.now() - parsed) / 3600000) * 10) / 10);
+  const fresh = ageHours <= productionEvidenceMaxAgeHours;
+  return {
+    fresh,
+    ageHours,
+    maxAgeHours: productionEvidenceMaxAgeHours,
+    checkedAt,
+    detail: fresh
+      ? `Production evidence is fresh: ${ageHours}h old, max ${productionEvidenceMaxAgeHours}h.`
+      : `Production evidence is stale: ${ageHours}h old, max ${productionEvidenceMaxAgeHours}h. Rerun npm run verify:production.`,
+  };
 }
 
 function isPlainObject(value) {
@@ -921,7 +964,7 @@ async function getRemoteMcpPack(payload = {}) {
       "Fetch actionManifestUrl when the remote agent supports ai-plugin/action manifests.",
       "Import openApiSchemaUrl when the remote agent supports ChatGPT custom actions, Grok actions, or OpenAPI-based HTTP tool setup.",
       "Fetch productionVerificationEvidenceUrl or call arcigy.get_production_verification_evidence to inspect the latest verified production proof.",
-      "Run the smokeTestUrl before handoff and require ready checks for action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-agent-setup-profiles, pack-voice-quick-start, voice-tool-call, pack-production-evidence-quick-start, production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction. Production evidence must be status=ready with release proof and dirty=false.",
+      "Run the smokeTestUrl before handoff and require ready checks for action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-agent-setup-profiles, pack-voice-quick-start, voice-tool-call, pack-production-evidence-quick-start, production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction. Production evidence must be status=ready with release proof, dirty=false, and freshness.fresh=true within 24h.",
       "Call MCP tools with POST JSON to mcpToolCallPattern.",
       "Use the bearer auth header placeholder; the real token must be supplied by the operator and is never returned by this pack.",
       "Use tunnel.statusUrl to inspect public tunnel URLs from the redacted secure-tunnel log. Browser-launched tunnel start requires a strong JARVIS_WEB_TOKEN.",
@@ -1011,7 +1054,7 @@ function buildRemoteMcpAgentCompatibility() {
       "Import openApiSchemaUrl if the agent supports OpenAPI or custom actions.",
       "Fetch productionVerificationEvidenceUrl or call arcigy.get_production_verification_evidence and cite its status.",
       "Fetch handoff.connectionPackUrl and confirm tokenValueReturned=false plus repo-only limits.",
-      "Run smokeTestUrl and require status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-agent-setup-profiles, pack-voice-quick-start, voice-tool-call, pack-production-evidence-quick-start, production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction ready. Production evidence must include release proof and dirty=false.",
+      "Run smokeTestUrl and require status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-agent-setup-profiles, pack-voice-quick-start, voice-tool-call, pack-production-evidence-quick-start, production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction ready. Production evidence must include release proof, dirty=false, and freshness.fresh=true within 24h.",
       "Inspect tunnel.statusUrl after any tunnel start and never ask for the real bearer token.",
     ],
     safetyRules: [
@@ -1040,7 +1083,7 @@ function buildRemoteMcpHandoffRunbook(baseUrl) {
       "Fetch actionManifestUrl if the agent supports ai-plugin/action manifests.",
       "Fetch openApiSchemaUrl if the agent supports OpenAPI/custom actions.",
       "Fetch productionVerificationEvidenceUrl or call arcigy.get_production_verification_evidence and cite its status.",
-      "Run smokeTestUrl and require status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-agent-setup-profiles, pack-voice-quick-start, voice-tool-call, pack-production-evidence-quick-start, production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction ready before using MCP tools. Production evidence must include release proof and dirty=false.",
+      "Run smokeTestUrl and require status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-agent-setup-profiles, pack-voice-quick-start, voice-tool-call, pack-production-evidence-quick-start, production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction ready before using MCP tools. Production evidence must include release proof, dirty=false, and freshness.fresh=true within 24h.",
       "Fetch tunnel.statusUrl if the operator needs the current public tunnel URLs; token values must remain redacted.",
       "Call arcigy.get_operator_briefing before proposing work.",
       "Use read-only or draft tools first; use dryRun: true before Gmail sync writes.",
@@ -1080,7 +1123,7 @@ function buildRemoteMcpHandoffRunbook(baseUrl) {
       {
         key: "remote-smoke",
         url: `${baseUrl}/api/remote-mcp-smoke`,
-        expected: 'status=ready, including action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-agent-setup-profiles, pack-voice-quick-start, voice-tool-call, pack-production-evidence-quick-start, production-evidence-tool-call, secret-redaction, approval-gate, approval-shape-gate for top-level {"approved":true} payload rejection, and production evidence release proof with dirty=false.',
+        expected: 'status=ready, including action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-agent-setup-profiles, pack-voice-quick-start, voice-tool-call, pack-production-evidence-quick-start, production-evidence-tool-call, secret-redaction, approval-gate, approval-shape-gate for top-level {"approved":true} payload rejection, and production evidence release proof with dirty=false and freshness.fresh=true within 24h.',
       },
     ],
   };
@@ -1825,6 +1868,7 @@ function hasHandoffProof(value, baseUrl) {
       "approval-shape-gate",
       "secret-redaction",
       "dirty=false",
+      "freshness.fresh=true",
     ].every((key) => remoteSmokeExpected.includes(key)) &&
     agentFirstSteps.some((step) => typeof step === "string" && step.includes("arcigy.get_operator_briefing")) &&
     agentFirstSteps.some((step) => typeof step === "string" && step.includes("status=ready"))
@@ -1902,7 +1946,20 @@ function hasSafeProductionEvidenceResult(value) {
   if (!(typeof value.generatedAt === "string" || value.generatedAt === null)) return false;
   if (typeof value.summary !== "string" || !value.summary.trim()) return false;
   if (!Array.isArray(value.checks)) return false;
-  return value.status !== "ready" || hasSafeReleaseProof(value.release);
+  return value.status === "ready" && hasSafeReleaseProof(value.release) && hasFreshProductionEvidence(value.freshness);
+}
+
+function hasFreshProductionEvidence(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  return (
+    value.fresh === true &&
+    typeof value.ageHours === "number" &&
+    value.ageHours >= 0 &&
+    value.maxAgeHours === productionEvidenceMaxAgeHours &&
+    typeof value.checkedAt === "string" &&
+    typeof value.detail === "string" &&
+    value.detail.length > 0
+  );
 }
 
 function hasSafeReleaseProof(value) {

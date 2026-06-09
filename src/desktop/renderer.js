@@ -437,26 +437,30 @@ function renderLaunchQueue(report) {
 function renderProductionVerificationEvidence(evidence) {
   if (!elements.verificationEvidence) return;
   const status = evidence?.status ?? "missing";
+  const freshness = evidence?.freshness && typeof evidence.freshness === "object" ? evidence.freshness : null;
+  const fresh = freshness?.fresh === true;
   const checks = Array.isArray(evidence?.checks) ? evidence.checks : [];
   const ready = checks.filter((check) => check?.status === "ready").length;
   const failed = checks.filter((check) => check?.status === "failed").length;
   const generatedAt = evidence?.generatedAt ? new Date(evidence.generatedAt).toLocaleString() : "not generated";
-  elements.verificationEvidence.textContent = status === "ready" ? `${ready} gates ready` : `${status}: ${failed} failed`;
+  elements.verificationEvidence.textContent = status === "ready" && fresh ? `${ready} gates ready` : `${status}: ${failed} failed`;
   elements.verificationEvidence.title = `${evidence?.summary ?? "Run npm run verify:production."} ${generatedAt}`;
-  elements.verificationEvidence.closest("div")?.setAttribute("data-state", status === "ready" ? "ready" : "attention");
+  elements.verificationEvidence.closest("div")?.setAttribute("data-state", status === "ready" && fresh ? "ready" : "attention");
   renderReleaseProof(evidence, generatedAt);
 }
 
 function renderReleaseProof(evidence, generatedAt) {
   if (!elements.releaseProofGrid) return;
   const release = evidence?.release && typeof evidence.release === "object" ? evidence.release : {};
+  const freshness = evidence?.freshness && typeof evidence.freshness === "object" ? evidence.freshness : {};
   const gates = Array.isArray(release.requiredRemoteMcpSmokeGates) ? release.requiredRemoteMcpSmokeGates.length : 0;
   const dirty = typeof release.dirty === "boolean" ? (release.dirty ? "dirty" : "clean") : "unknown";
+  const fresh = freshness.fresh === true ? `fresh ${freshness.ageHours}h` : "stale or missing";
   const items = [
     ["Commit", release.shortCommit || "not verified"],
     ["Tree", dirty],
     ["MCP gates", gates ? String(gates) : "not verified"],
-    ["Generated", generatedAt],
+    ["Freshness", fresh],
   ];
   elements.releaseProofGrid.replaceChildren();
   for (const [label, value] of items) {
@@ -468,7 +472,9 @@ function renderReleaseProof(evidence, generatedAt) {
     row.append(key, val);
     elements.releaseProofGrid.appendChild(row);
   }
-  elements.releaseProofGrid.closest(".releaseProof")?.setAttribute("data-state", evidence?.status === "ready" && dirty === "clean" ? "ready" : "attention");
+  elements.releaseProofGrid
+    .closest(".releaseProof")
+    ?.setAttribute("data-state", evidence?.status === "ready" && dirty === "clean" && freshness.fresh === true ? "ready" : "attention");
 }
 
 function buildCommandTimeline(blockers, bridge, advisories = []) {

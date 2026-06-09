@@ -123,7 +123,15 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.equal(readiness.launchEvidence.remoteHandoff.tunnelCommand, "npm run web:tunnel:secure");
   assert.ok(readiness.launchEvidence.remoteHandoff.requiredBeforeExternalAgent.some((step) => step.includes("/.well-known/ai-plugin.json") && step.includes("/api/openapi.json")));
   assert.ok(readiness.launchEvidence.remoteHandoff.requiredBeforeExternalAgent.some((step) => step.includes("cors-preflight") && step.includes("secret-redaction")));
-  assert.ok(readiness.launchEvidence.remoteHandoff.requiredBeforeExternalAgent.some((step) => step.includes("production-evidence-tool-call") && step.includes("release proof") && step.includes("dirty=false")));
+  assert.ok(
+    readiness.launchEvidence.remoteHandoff.requiredBeforeExternalAgent.some(
+      (step) =>
+        step.includes("production-evidence-tool-call") &&
+        step.includes("release proof") &&
+        step.includes("dirty=false") &&
+        step.includes("freshness.fresh=true")
+    )
+  );
   assertToolError(
     await client.callTool({
       name: "arcigy.get_production_readiness",
@@ -212,7 +220,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("action-manifest")));
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("pack-production-evidence-quick-start")));
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("production-evidence-tool-call")));
-  assert.ok(pack.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("dirty=false")));
+  assert.ok(pack.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("dirty=false") && item.expected.includes("freshness.fresh=true")));
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("approval-shape-gate")));
   assert.ok(pack.handoff.agentFirstSteps.some((step) => step.includes("arcigy.get_operator_briefing")));
   assert.ok(pack.handoff.agentFirstSteps.some((step) => step.includes("secret-redaction")));

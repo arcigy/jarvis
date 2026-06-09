@@ -156,7 +156,7 @@ function buildLaunchEvidence(
       requiredBeforeExternalAgent: [
         "Run npm run web:tunnel:secure or use the browser Start tunnel button with a strong JARVIS_WEB_TOKEN.",
         "Fetch /.well-known/ai-plugin.json, /api/openapi.json, /.well-known/arcigy-jarvis.json, and /api/remote-mcp-pack?includeReadiness=true&live=true through the external URL.",
-        "Run /api/remote-mcp-smoke and require status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-agent-setup-profiles, pack-voice-quick-start, voice-tool-call, pack-production-evidence-quick-start, production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction ready; production evidence must also be status=ready with release proof and dirty=false before any remote agent uses write-capable tools.",
+        "Run /api/remote-mcp-smoke and require status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-agent-setup-profiles, pack-voice-quick-start, voice-tool-call, pack-production-evidence-quick-start, production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction ready; production evidence must also be status=ready with release proof, dirty=false, and freshness.fresh=true within 24h before any remote agent uses write-capable tools.",
       ],
       smokeCommand: "npm run remote:mcp:smoke -- --url <external-url>",
       tunnelCommand: "npm run web:tunnel:secure",

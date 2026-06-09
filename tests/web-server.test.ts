@@ -25,7 +25,7 @@ test("local web bridge serves UI and API health", async () => {
     JSON.stringify({
       mode: "arcigy-jarvis-production-verification",
       status: "ready",
-      generatedAt: "2026-06-09T06:37:47.066Z",
+      generatedAt: new Date().toISOString(),
       webUrl: "http://127.0.0.1:8765",
       release: {
         repository: "arcigy/jarvis",
@@ -34,6 +34,7 @@ test("local web bridge serves UI and API health", async () => {
         dirty: false,
         requiredRemoteMcpSmokeGates: ["secret-redaction", "pack-agent-setup-profiles"],
       },
+      freshnessPolicy: { maxAgeHours: 24, command: "npm run verify:production" },
       secretPolicy: `Secret-safe ${syntheticGoogleKey}`,
       checks: [
         { name: "typecheck", status: "ready", detail: "OK" },
@@ -395,6 +396,7 @@ test("local web bridge serves UI and API health", async () => {
           step.includes("production-evidence-tool-call") &&
           step.includes("release proof") &&
           step.includes("dirty=false") &&
+          step.includes("freshness.fresh=true") &&
           step.includes("secret-redaction")
       )
     );
@@ -406,6 +408,7 @@ test("local web bridge serves UI and API health", async () => {
     const verificationEvidenceBody = JSON.parse(verificationEvidenceText) as {
       status: string;
       summary: string;
+      freshness: { fresh: boolean; ageHours: number | null; maxAgeHours: number };
       release?: { repository?: string; shortCommit?: string; dirty?: boolean; requiredRemoteMcpSmokeGates?: string[] };
       checks: Array<{ name: string; status: string; detail: string }>;
     };
@@ -414,6 +417,9 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(verificationEvidenceBody.release?.repository, "arcigy/jarvis");
     assert.equal(verificationEvidenceBody.release?.shortCommit, "0123456789ab");
     assert.equal(verificationEvidenceBody.release?.dirty, false);
+    assert.equal(verificationEvidenceBody.freshness.fresh, true);
+    assert.equal(verificationEvidenceBody.freshness.maxAgeHours, 24);
+    assert.equal(typeof verificationEvidenceBody.freshness.ageHours, "number");
     assert.ok(verificationEvidenceBody.release?.requiredRemoteMcpSmokeGates?.includes("secret-redaction"));
     assert.ok(verificationEvidenceBody.release?.requiredRemoteMcpSmokeGates?.includes("pack-agent-setup-profiles"));
     assert.ok(verificationEvidenceBody.checks.some((check) => check.name === "secret-scan" && check.status === "ready"));
@@ -426,7 +432,11 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(mcpReadiness.result.launchChecklist.some((item: { id: string }) => item.id === "mcp-registry"));
     assert.ok(mcpReadiness.result.launchEvidence.proofGates.some((gate: { id: string }) => gate.id === "approval-locks"));
     assert.ok(mcpReadiness.result.launchEvidence.remoteHandoff.requiredBeforeExternalAgent.some((step: string) => step.includes("action-manifest") || step.includes("/.well-known/ai-plugin.json")));
-    assert.ok(mcpReadiness.result.launchEvidence.remoteHandoff.requiredBeforeExternalAgent.some((step: string) => step.includes("production-evidence-tool-call") && step.includes("dirty=false")));
+    assert.ok(
+      mcpReadiness.result.launchEvidence.remoteHandoff.requiredBeforeExternalAgent.some(
+        (step: string) => step.includes("production-evidence-tool-call") && step.includes("dirty=false") && step.includes("freshness.fresh=true")
+      )
+    );
 
     const mcpEvidence = await postJson(`${baseUrl}/api/mcp/arcigy.get_production_verification_evidence`, {});
     assert.equal(mcpEvidence.result.status, "ready");
@@ -532,7 +542,11 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("openapi-schema")));
     assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("pack-production-evidence-quick-start")));
     assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("production-evidence-tool-call")));
-    assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("dirty=false")));
+    assert.ok(
+      remotePackBody.handoff.requiredProof.some(
+        (item) => item.key === "remote-smoke" && item.expected.includes("dirty=false") && item.expected.includes("freshness.fresh=true")
+      )
+    );
     assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("approval-shape-gate")));
     assert.ok(remotePackBody.handoff.agentFirstSteps.some((step) => step.includes("secret-redaction")));
     assert.deepEqual(remotePackBody.agentCompatibility.supportedAgents.slice(0, 3), ["Claude", "ChatGPT", "Grok"]);

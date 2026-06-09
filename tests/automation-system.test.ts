@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createServer, type Socket } from "node:net";
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -34,6 +34,7 @@ import { buildOperatorBriefing } from "../src/automation-system/operator-briefin
 import { buildRemoteMcpOpenApiDocument } from "../src/automation-system/remote-mcp-openapi.ts";
 import { buildRemoteMcpConnectionPack } from "../src/automation-system/remote-mcp-pack.ts";
 import { runRemoteMcpSmoke } from "../src/automation-system/remote-mcp-smoke.ts";
+import { getProductionVerificationEvidence } from "../src/automation-system/production-verification-evidence.ts";
 
 test("MCP tools expose the requested automation surface", () => {
   const names = listJarvisMcpTools().map((tool) => tool.name);
@@ -121,6 +122,7 @@ test("production readiness report returns blockers and next actions without secr
         step.includes("production-evidence-tool-call") &&
         step.includes("release proof") &&
         step.includes("dirty=false") &&
+        step.includes("freshness.fresh=true") &&
         step.includes("secret-redaction")
     )
   );
@@ -887,7 +889,7 @@ test("remote MCP smoke requires the production evidence quick-start", async () =
             { key: "connection-pack" },
             { key: "secure-tunnel-status" },
             { key: "production-verification-evidence" },
-            { key: "remote-smoke", expected: "action-manifest openapi-schema cors-preflight external-auth-gate pack-auth-throttle-policy pack-limits pack-agent-setup-profiles pack-voice-quick-start voice-tool-call pack-production-evidence-quick-start production-evidence-tool-call approval-shape-gate secret-redaction dirty=false" },
+            { key: "remote-smoke", expected: "action-manifest openapi-schema cors-preflight external-auth-gate pack-auth-throttle-policy pack-limits pack-agent-setup-profiles pack-voice-quick-start voice-tool-call pack-production-evidence-quick-start production-evidence-tool-call approval-shape-gate secret-redaction dirty=false freshness.fresh=true" },
           ],
           agentFirstSteps: ["Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
         },
@@ -921,7 +923,7 @@ test("remote MCP smoke requires the production evidence quick-start", async () =
   assert.ok(report.checks.some((check) => check.key === "pack-audit-quick-start" && check.status === "ready"));
 });
 
-test("remote MCP smoke requires release proof for ready production evidence", async () => {
+test("remote MCP smoke requires fresh release proof for ready production evidence", async () => {
   const expectedNames = listJarvisMcpTools().map((tool) => tool.name);
   const tools = remoteSmokeManifestToolsFixture();
   const token = "smoke-token";
@@ -988,7 +990,7 @@ test("remote MCP smoke requires release proof for ready production evidence", as
             { key: "connection-pack" },
             { key: "secure-tunnel-status" },
             { key: "production-verification-evidence" },
-            { key: "remote-smoke", expected: "action-manifest openapi-schema cors-preflight external-auth-gate pack-auth-throttle-policy pack-limits pack-agent-setup-profiles pack-voice-quick-start voice-tool-call pack-production-evidence-quick-start production-evidence-tool-call approval-shape-gate secret-redaction dirty=false" },
+            { key: "remote-smoke", expected: "action-manifest openapi-schema cors-preflight external-auth-gate pack-auth-throttle-policy pack-limits pack-agent-setup-profiles pack-voice-quick-start voice-tool-call pack-production-evidence-quick-start production-evidence-tool-call approval-shape-gate secret-redaction dirty=false freshness.fresh=true" },
           ],
           agentFirstSteps: ["Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
         },
@@ -1008,8 +1010,22 @@ test("remote MCP smoke requires release proof for ready production evidence", as
         result: {
           mode: "arcigy-jarvis-production-verification",
           status: "ready",
-          generatedAt: "2026-06-09T10:00:00.000Z",
-          summary: "Production verification ready: 12 ready, 0 failed.",
+          generatedAt: "2000-01-01T00:00:00.000Z",
+          summary: "Production verification ready: 12 ready, 0 failed. Production evidence is stale.",
+          release: {
+            repository: "arcigy/jarvis",
+            branch: "main",
+            shortCommit: "0123456789ab",
+            dirty: false,
+            requiredRemoteMcpSmokeGates: ["secret-redaction", "pack-agent-setup-profiles"],
+          },
+          freshness: {
+            fresh: false,
+            ageHours: 1000,
+            maxAgeHours: 24,
+            checkedAt: "2026-06-09T10:00:00.000Z",
+            detail: "Production evidence is stale.",
+          },
           checks: [{ name: "secret-scan", status: "ready", detail: "OK" }],
         },
       });
@@ -1061,6 +1077,36 @@ test("production readiness treats unused Redis as non-blocking advisory", async 
   assert.ok(report.attentionQueue.some((item) => item.key === "redis" && item.severity === "warning"));
   assert.ok(report.launchChecklist.some((item) => item.id === "optional-advisories" && item.status === "attention"));
   assert.match(report.summary, /non-blocking warning/);
+});
+
+test("production verification evidence marks stale ready artifacts as attention", () => {
+  const repoRoot = mkdtempSync(join(tmpdir(), "jarvis-stale-evidence-"));
+  const evidenceDir = join(repoRoot, "generated", "production-verification");
+  mkdirSync(evidenceDir, { recursive: true });
+  writeFileSync(
+    join(evidenceDir, "latest.json"),
+    JSON.stringify({
+      mode: "arcigy-jarvis-production-verification",
+      status: "ready",
+      generatedAt: "2000-01-01T00:00:00.000Z",
+      release: {
+        repository: "arcigy/jarvis",
+        branch: "main",
+        shortCommit: "0123456789ab",
+        dirty: false,
+        requiredRemoteMcpSmokeGates: ["secret-redaction", "pack-agent-setup-profiles"],
+      },
+      checks: [{ name: "secret-scan", status: "ready", detail: "OK" }],
+    }),
+    "utf-8"
+  );
+
+  const evidence = getProductionVerificationEvidence(repoRoot);
+
+  assert.equal(evidence.status, "attention");
+  assert.equal(evidence.freshness.fresh, false);
+  assert.equal(evidence.freshness.maxAgeHours, 24);
+  assert.match(evidence.summary, /stale/i);
 });
 
 test("remote MCP connection pack includes secret-safe readiness attention queue", async () => {
@@ -1116,9 +1162,25 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
     )
   );
   assert.ok(pack.agentInstructions.some((step) => step.includes("arcigy.get_production_verification_evidence")));
-  assert.ok(pack.agentInstructions.some((step) => step.includes("pack-production-evidence-quick-start") && step.includes("production-evidence-tool-call") && step.includes("dirty=false")));
+  assert.ok(
+    pack.agentInstructions.some(
+      (step) =>
+        step.includes("pack-production-evidence-quick-start") &&
+        step.includes("production-evidence-tool-call") &&
+        step.includes("dirty=false") &&
+        step.includes("freshness.fresh=true")
+    )
+  );
   assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("production-evidence-tool-call") && step.includes("release proof")));
-  assert.ok(pack.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("production-evidence-tool-call") && item.expected.includes("dirty=false")));
+  assert.ok(
+    pack.handoff.requiredProof.some(
+      (item) =>
+        item.key === "remote-smoke" &&
+        item.expected.includes("production-evidence-tool-call") &&
+        item.expected.includes("dirty=false") &&
+        item.expected.includes("freshness.fresh=true")
+    )
+  );
   assert.equal(JSON.stringify(pack).includes("PASSWORD"), false);
 });
 

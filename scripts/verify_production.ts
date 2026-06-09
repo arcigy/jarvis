@@ -10,6 +10,7 @@ import { redactSensitiveText } from "../src/automation-system/ai-safety.ts";
 const repoRoot = fileURLToPath(new URL("../", import.meta.url));
 const webUrl = process.env.JARVIS_VERIFY_WEB_URL || "http://127.0.0.1:8765";
 const evidencePath = join(repoRoot, "generated", "production-verification", "latest.json");
+const productionEvidenceMaxAgeHours = 24;
 const checks: Array<{ name: string; status: "ready" | "failed"; detail: string }> = [];
 const requiredRemoteMcpSmokeGates = [
   "action-manifest",
@@ -41,7 +42,9 @@ async function main() {
   runNpm("secrets-audit", ["run", "secrets:audit", "--", "--json"]);
   runNpm("local-memory-smoke", ["run", "local:memory:smoke"]);
   await ensureWebBridge();
+  writeEvidence();
   runNpm("doctor-live", ["run", "doctor", "--", "--live-integrations"]);
+  writeEvidence();
   const remoteMcpSmokeOutput = runNpm("remote-mcp-smoke", ["run", "remote:mcp:smoke", "--", "--url", webUrl, "--json"]);
   requireRemoteMcpSmokeGates(remoteMcpSmokeOutput);
   runNpm("ui-smoke", ["run", "ui:smoke"], {
@@ -213,6 +216,10 @@ function writeEvidence() {
     generatedAt: new Date().toISOString(),
     webUrl,
     release,
+    freshnessPolicy: {
+      maxAgeHours: productionEvidenceMaxAgeHours,
+      command: "npm run verify:production",
+    },
     secretPolicy: "Secret-safe: command output is streamed through redactSensitiveText and this artifact stores only redacted check details.",
     evidencePath,
     checks: checks.map((check) => ({
@@ -239,6 +246,7 @@ function validateEvidenceArtifact() {
       mode?: unknown;
       status?: unknown;
       generatedAt?: unknown;
+      freshnessPolicy?: { maxAgeHours?: unknown; command?: unknown };
       release?: { repository?: unknown; branch?: unknown; shortCommit?: unknown; dirty?: unknown; requiredRemoteMcpSmokeGates?: unknown };
       checks?: Array<{ name?: unknown; status?: unknown; detail?: unknown }>;
     };
@@ -251,6 +259,8 @@ function validateEvidenceArtifact() {
       evidence.mode !== "arcigy-jarvis-production-verification" ||
       evidence.status !== "ready" ||
       typeof evidence.generatedAt !== "string" ||
+      evidence.freshnessPolicy?.maxAgeHours !== productionEvidenceMaxAgeHours ||
+      evidence.freshnessPolicy?.command !== "npm run verify:production" ||
       !release ||
       release.repository !== "arcigy/jarvis" ||
       typeof release.branch !== "string" ||
