@@ -195,7 +195,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /if \(state\.lastRemoteMcpSmoke && !matchingSmoke\) state\.lastRemoteMcpSmoke = null/);
   assert.match(renderer, /buildRemoteAgentPrompt\(pack, matchingSmoke\)/);
   assert.match(renderer, /summarizeRemoteProofGates/);
-  assert.match(renderer, /ready: 4\/4 safety gates/);
+  assert.match(renderer, /requiredRemoteSmokeGates/);
+  assert.match(renderer, /production-evidence-tool-call/);
+  assert.match(renderer, /ready: \$\{requiredRemoteSmokeGates\.length\}\/\$\{requiredRemoteSmokeGates\.length\} safety gates/);
   assert.match(renderer, /blocked: \$\{missing\.join\(", "\)\}/);
   assert.match(renderer, /blocked: smoke status \$\{report\.status \?\? "unknown"\}/);
   assert.match(renderer, /checking safety gates/);

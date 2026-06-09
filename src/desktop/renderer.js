@@ -26,6 +26,20 @@ const state = {
   lastSecureTunnelStatus: null,
 };
 
+const requiredRemoteSmokeGates = [
+  "action-manifest",
+  "openapi-schema",
+  "cors-preflight",
+  "external-auth-gate",
+  "pack-auth-throttle-policy",
+  "pack-limits",
+  "pack-production-evidence-quick-start",
+  "production-evidence-tool-call",
+  "approval-gate",
+  "approval-shape-gate",
+  "secret-redaction",
+];
+
 const elements = {
   navButtons: [...document.querySelectorAll("nav button[data-target]")],
   cortexNodes: [...document.querySelectorAll(".cortexNode[data-target]")],
@@ -1192,12 +1206,11 @@ function renderRemoteMcpSmoke(report) {
 }
 
 function summarizeRemoteProofGates(report) {
-  const required = ["pack-limits", "approval-gate", "approval-shape-gate", "secret-redaction"];
   const checks = new Map((report.checks ?? []).map((check) => [check.key, check.status]));
-  const missing = required.filter((key) => checks.get(key) !== "ready");
+  const missing = requiredRemoteSmokeGates.filter((key) => checks.get(key) !== "ready");
   if (missing.length) return { ready: false, text: `blocked: ${missing.join(", ")}` };
   if (report.status !== "ready") return { ready: false, text: `blocked: smoke status ${report.status ?? "unknown"}` };
-  return { ready: true, text: "ready: 4/4 safety gates" };
+  return { ready: true, text: `ready: ${requiredRemoteSmokeGates.length}/${requiredRemoteSmokeGates.length} safety gates` };
 }
 
 async function copyRemotePack() {

@@ -179,7 +179,7 @@ async function run() {
     if (!/^[0-9]+\/[0-9]+$/.test(dom.readyIntegrationsText)) fail(`Ready integration count is not loaded: ${dom.readyIntegrationsText}.`);
     if (!/^[0-9]+$/.test(dom.mcpToolCountText) || Number(dom.mcpToolCountText) < 28) fail(`MCP tool count is not loaded: ${dom.mcpToolCountText}.`);
     if (!/^[0-9]+$/.test(dom.approvalLockCountText) || Number(dom.approvalLockCountText) < 3) fail(`Approval lock count is not loaded: ${dom.approvalLockCountText}.`);
-    if (!/smoke not run|ready: 4\/4 safety gates|blocked:/i.test(dom.handoffProofGatesText)) fail(`Remote proof gates are not rendered: ${dom.handoffProofGatesText}.`);
+    if (!/smoke not run|ready: 11\/11 safety gates|blocked:/i.test(dom.handoffProofGatesText)) fail(`Remote proof gates are not rendered: ${dom.handoffProofGatesText}.`);
     assertBox("sidebar", dom.sidebar, { width: isNarrowViewport ? 300 : 180, height: 60 });
     assertBox("navigation", dom.nav, { width: isNarrowViewport ? 300 : 150, height: 40 });
     assertBox("header", dom.header, { width: isNarrowViewport ? 300 : 400, height: 40 });
