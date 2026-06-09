@@ -590,9 +590,11 @@ test("local web bridge serves UI and API health", async () => {
       )
     );
     assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("approval-shape-gate")));
+    assert.ok(remotePackBody.handoff.agentFirstSteps.some((step) => step.includes("arcigy.get_jarvis_capability_audit") && step.includes("Jarvis capability audit")));
     assert.ok(remotePackBody.handoff.agentFirstSteps.some((step) => step.includes("secret-redaction")));
     assert.deepEqual(remotePackBody.agentCompatibility.supportedAgents.slice(0, 3), ["Claude", "ChatGPT", "Grok"]);
     assert.ok(remotePackBody.agentCompatibility.requiredBeforeWork.some((step) => step.includes("repo-only limits")));
+    assert.ok(remotePackBody.agentCompatibility.requiredBeforeWork.some((step) => step.includes("arcigy.get_jarvis_capability_audit") && step.includes("MCP counts")));
     assert.ok(remotePackBody.agentCompatibility.requiredBeforeWork.some((step) => step.includes("pack-limits")));
     assert.ok(remotePackBody.agentCompatibility.requiredBeforeWork.some((step) => step.includes("cors-preflight") && step.includes("external-auth-gate") && step.includes("pack-auth-throttle-policy") && step.includes("action-manifest")));
     assert.ok(remotePackBody.agentCompatibility.safetyRules.some((rule) => rule.includes("family-friendly")));
@@ -610,8 +612,10 @@ test("local web bridge serves UI and API health", async () => {
     assert.match(remotePackBody.agentLaunchBundle.shareWithAgent.openApiSchemaUrl, /\/api\/openapi\.json$/);
     assert.match(remotePackBody.agentLaunchBundle.shareWithAgent.smokeTestUrl, /\/api\/remote-mcp-smoke$/);
     assert.match(remotePackBody.agentLaunchBundle.firstPrompts.Grok, /api\/mcp\/\{toolName\}/);
+    assert.match(remotePackBody.agentLaunchBundle.firstPrompts.Grok, /arcigy\.get_jarvis_capability_audit/);
     assert.match(remotePackBody.agentLaunchBundle.firstPrompts.ChatGPT, /custom action schema/);
     assert.equal(remotePackBody.agentLaunchBundle.proofPolicy.freshnessMaxAgeHours, 24);
+    assert.ok(remotePackBody.agentLaunchBundle.proofPolicy.beforeAnyWork.some((step) => step.includes("arcigy.get_jarvis_capability_audit") && step.includes("coverage")));
     assert.ok(remotePackBody.agentLaunchBundle.proofPolicy.beforeWrites.some((step) => step.includes("approval.approved=true")));
     assert.ok(remotePackBody.agentLaunchBundle.safetyRails.some((rail) => rail.includes("OAuth refresh tokens")));
     assert.ok(remotePackBody.quickStartCalls.every((call) => call.method === "POST" && call.url.endsWith(`/api/mcp/${call.tool}`)));

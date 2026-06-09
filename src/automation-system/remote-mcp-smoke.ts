@@ -696,6 +696,7 @@ function hasHandoffProof(value: unknown, baseUrl: string): boolean {
       "dirty=false",
       "freshness.fresh=true",
     ].every((key) => remoteSmokeExpected.includes(key)) &&
+    agentFirstSteps.some((step) => typeof step === "string" && step.includes("arcigy.get_jarvis_capability_audit")) &&
     agentFirstSteps.some((step) => typeof step === "string" && step.includes("arcigy.get_operator_briefing")) &&
     agentFirstSteps.some((step) => typeof step === "string" && step.includes("status=ready"))
   );
@@ -709,6 +710,7 @@ function hasAgentCompatibility(value: unknown): boolean {
   const safetyRules = Array.isArray(compatibility.safetyRules) ? compatibility.safetyRules : [];
   return (
     ["Claude", "ChatGPT", "Grok"].every((agent) => agents.includes(agent)) &&
+    requiredBeforeWork.some((step) => typeof step === "string" && step.includes("arcigy.get_jarvis_capability_audit")) &&
     requiredBeforeWork.some((step) => typeof step === "string" && step.includes("status=ready")) &&
     safetyRules.some((rule) => typeof rule === "string" && rule.includes("approvalRequired")) &&
     safetyRules.some((rule) => typeof rule === "string" && rule.includes("family-friendly"))
@@ -792,9 +794,12 @@ function hasAgentLaunchBundle(value: unknown, baseUrl: string): boolean {
     controls.tunnelStatusUrl === `${baseUrl}/api/secure-tunnel-status` &&
     controls.startTunnelUrl === `${baseUrl}/api/start-secure-tunnel` &&
     controls.stopTunnelUrl === `${baseUrl}/api/stop-secure-tunnel` &&
-    ["Claude", "ChatGPT", "Grok", "Generic HTTP agent"].every((agent) => typeof prompts[agent] === "string" && String(prompts[agent]).includes("arcigy.get_operator_briefing")) &&
+    ["Claude", "ChatGPT", "Grok", "Generic HTTP agent"].every(
+      (agent) => typeof prompts[agent] === "string" && String(prompts[agent]).includes("arcigy.get_operator_briefing") && String(prompts[agent]).includes("arcigy.get_jarvis_capability_audit")
+    ) &&
     bundle.proofPolicy?.freshnessMaxAgeHours === 24 &&
     beforeAnyWork.some((step) => typeof step === "string" && step.includes("tokenValueReturned=false")) &&
+    beforeAnyWork.some((step) => typeof step === "string" && step.includes("arcigy.get_jarvis_capability_audit")) &&
     beforeAnyWork.some((step) => typeof step === "string" && step.includes("status=ready")) &&
     beforeWrites.some((step) => typeof step === "string" && step.includes("freshness.fresh=true")) &&
     beforeWrites.some((step) => typeof step === "string" && step.includes("approval.approved=true")) &&

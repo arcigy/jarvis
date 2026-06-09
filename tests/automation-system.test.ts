@@ -1365,9 +1365,11 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.deepEqual(pack.agentCompatibility.supportedAgents.slice(0, 3), ["Claude", "ChatGPT", "Grok"]);
   assert.ok(pack.agentInstructions.some((step) => step.includes("Nacitaj actionManifestUrl, ked remote agent podporuje")));
   assert.ok(pack.agentInstructions.some((step) => step.includes("najnovsi overeny production proof")));
+  assert.ok(pack.agentInstructions.some((step) => step.includes("arcigy.get_jarvis_capability_audit") && step.includes("coverage")));
   assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("openApiSchemaUrl")));
   assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("Nacitaj actionManifestUrl, ak agent podporuje")));
   assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("a cituj status")));
+  assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("arcigy.get_jarvis_capability_audit") && step.includes("MCP counts")));
   assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("productionVerificationEvidenceUrl")));
   assert.equal(pack.agentCompatibility.protocol, "HTTP JSON MCP bridge");
   assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("status=ready")));
@@ -1390,6 +1392,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.equal(pack.tunnel.browserStartRequiresStrongToken, true);
   assert.ok(pack.handoff.operatorChecklist.some((step) => step.includes("Spusti npm run web:tunnel:secure")));
   assert.ok(pack.handoff.operatorChecklist.some((step) => step.includes("Spustit tunel")));
+  assert.ok(pack.handoff.agentFirstSteps.some((step) => step.includes("arcigy.get_jarvis_capability_audit") && step.includes("Jarvis capability audit")));
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "action-manifest" && item.url.endsWith("/.well-known/ai-plugin.json")));
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "secure-tunnel-status"));
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "production-verification-evidence" && item.url.endsWith("/api/production-verification-evidence")));
@@ -1408,6 +1411,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   );
   assert.match(pack.agentPromptTemplates.grok, /xAI-compatible agents/);
   assert.match(pack.agentPromptTemplates.grok, /remote smoke/);
+  assert.match(pack.agentPromptTemplates.grok, /arcigy\.get_jarvis_capability_audit/);
   assert.match(pack.agentPromptTemplates.grok, /operator nepotvrdi presny payload/);
   assert.match(pack.agentPromptTemplates.chatgpt, /POST https:\/\/jarvis\.example\/api\/mcp\/\{toolName\}/);
   assert.match(pack.agentPromptTemplates.claude, /external HTTP MCP bridge/);
@@ -1421,8 +1425,10 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.equal(pack.agentLaunchBundle.shareWithAgent.connectionPackUrl, "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true");
   assert.equal(pack.agentLaunchBundle.operatorControls.secureTunnelCommand, "npm run web:tunnel:secure");
   assert.match(pack.agentLaunchBundle.firstPrompts.Grok, /POST https:\/\/jarvis\.example\/api\/mcp\/\{toolName\}/);
+  assert.match(pack.agentLaunchBundle.firstPrompts.Grok, /arcigy\.get_jarvis_capability_audit/);
   assert.match(pack.agentLaunchBundle.firstPrompts.ChatGPT, /custom action schema/);
   assert.ok(pack.agentLaunchBundle.proofPolicy.beforeAnyWork.some((step) => step.includes("Nacitaj productionVerificationEvidenceUrl")));
+  assert.ok(pack.agentLaunchBundle.proofPolicy.beforeAnyWork.some((step) => step.includes("arcigy.get_jarvis_capability_audit") && step.includes("evidence status")));
   assert.ok(pack.agentLaunchBundle.proofPolicy.beforeWrites.some((step) => step.includes("approval.approved=true")));
   assert.ok(pack.agentLaunchBundle.safetyRails.some((rail) => rail.includes("OAuth refresh tokens")));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_production_verification_evidence" && call.approvalRequired === false));
