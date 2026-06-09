@@ -147,6 +147,8 @@ Run the local memory smoke when you want proof that email identity, client need 
 npm run local:memory:smoke
 ```
 
+Full production verification writes a secret-safe machine-readable evidence file to `generated\production-verification\latest.json`.
+
 Doctor removes its own generated smoke artifacts after a successful run. Use `npm run doctor -- --keep-doctor-artifacts` when debugging generated outputs.
 
 Run the browser-ready Jarvis bridge:

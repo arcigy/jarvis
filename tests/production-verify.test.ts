@@ -17,6 +17,10 @@ test("production verifier wires every live release gate", () => {
   assert.match(script, /remote:mcp:smoke/);
   assert.match(script, /ui:smoke/);
   assert.match(script, /runSecretScan/);
+  assert.match(script, /writeEvidence/);
+  assert.match(script, /generated", "production-verification", "latest\.json"/);
+  assert.match(script, /arcigy-jarvis-production-verification/);
+  assert.match(script, /Secret-safe: command output is streamed through redactSensitiveText/);
   assert.match(script, /git", \["ls-files", "-z"\]/);
   assert.match(script, /JARVIS_VERIFY_WEB_URL/);
   assert.match(script, /redactSensitiveText/);
@@ -24,6 +28,7 @@ test("production verifier wires every live release gate", () => {
   assert.match(script, /process\.stderr\.write\(redactSensitiveText\(result\.stderr\)\)/);
   assert.match(script, /redactSensitiveText\(String\(chunk\)\)/);
   assert.match(script, /redactSensitiveText\(check\.detail\)/);
+  assert.match(script, /redactSensitiveText\(JSON\.stringify\(payload, null, 2\)\)/);
   assert.match(script, /Arcigy Jarvis production verification/);
   assert.doesNotMatch(script, /API_SECRET_KEY=dummy/);
 });

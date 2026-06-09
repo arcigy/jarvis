@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
@@ -9,6 +9,7 @@ import { redactSensitiveText } from "../src/automation-system/ai-safety.ts";
 
 const repoRoot = fileURLToPath(new URL("../", import.meta.url));
 const webUrl = process.env.JARVIS_VERIFY_WEB_URL || "http://127.0.0.1:8765";
+const evidencePath = join(repoRoot, "generated", "production-verification", "latest.json");
 const checks: Array<{ name: string; status: "ready" | "failed"; detail: string }> = [];
 let webChild: ChildProcess | null = null;
 
@@ -34,6 +35,7 @@ async function main() {
     JARVIS_UI_SMOKE_OUT: "generated/jarvis-ui-smoke-narrow.png",
   });
   runSecretScan();
+  writeEvidence();
   process.stdout.write(renderSummary());
 }
 
@@ -49,6 +51,7 @@ function runCommand(name: string, command: string, args: string[], extraEnv: Rec
   if (result.stderr) process.stderr.write(redactSensitiveText(result.stderr));
   if (result.status !== 0) {
     checks.push({ name, status: "failed", detail: result.error ? redactSensitiveText(result.error.message) : `Exited with status ${result.status}.` });
+    writeEvidence();
     process.stdout.write(renderSummary());
     process.exit(result.status ?? 1);
   }
@@ -92,6 +95,7 @@ async function ensureWebBridge() {
     await delay(400);
   }
   checks.push({ name: "web-bridge", status: "failed", detail: `Timed out waiting for ${webUrl}.` });
+  writeEvidence();
   process.stdout.write(renderSummary());
   process.exit(1);
 }
@@ -110,6 +114,7 @@ function runSecretScan() {
   const tracked = spawnSync("git", ["ls-files", "-z"], { cwd: repoRoot, encoding: "utf-8" });
   if (tracked.status !== 0) {
     checks.push({ name: "secret-scan", status: "failed", detail: "git ls-files failed." });
+    writeEvidence();
     process.exit(1);
   }
   const patterns = [
@@ -129,10 +134,30 @@ function runSecretScan() {
   }
   if (hits.length) {
     checks.push({ name: "secret-scan", status: "failed", detail: `Potential secret in tracked file(s): ${hits.join(", ")}` });
+    writeEvidence();
     process.stdout.write(renderSummary());
     process.exit(1);
   }
   checks.push({ name: "secret-scan", status: "ready", detail: "No tracked secret patterns found." });
+}
+
+function writeEvidence() {
+  const failed = checks.filter((check) => check.status === "failed").length;
+  const payload = {
+    mode: "arcigy-jarvis-production-verification",
+    status: failed ? "failed" : "ready",
+    generatedAt: new Date().toISOString(),
+    webUrl,
+    secretPolicy: "Secret-safe: command output is streamed through redactSensitiveText and this artifact stores only redacted check details.",
+    evidencePath,
+    checks: checks.map((check) => ({
+      name: check.name,
+      status: check.status,
+      detail: redactSensitiveText(check.detail),
+    })),
+  };
+  mkdirSync(join(repoRoot, "generated", "production-verification"), { recursive: true });
+  writeFileSync(evidencePath, `${redactSensitiveText(JSON.stringify(payload, null, 2))}\n`, "utf-8");
 }
 
 function shouldSkipSecretScan(file: string): boolean {
