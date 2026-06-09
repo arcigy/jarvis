@@ -33,6 +33,8 @@ const requiredRemoteSmokeGates = [
   "external-auth-gate",
   "pack-auth-throttle-policy",
   "pack-limits",
+  "pack-voice-quick-start",
+  "voice-tool-call",
   "pack-production-evidence-quick-start",
   "production-evidence-tool-call",
   "approval-gate",

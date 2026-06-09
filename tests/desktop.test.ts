@@ -373,7 +373,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /buildReadinessLaunchEvidence/);
   assert.match(main, /production-launch-evidence/);
   assert.match(main, /\.well-known\/ai-plugin\.json, \/api\/openapi\.json/);
-  assert.match(main, /cors-preflight, external-auth-gate, pack-auth-throttle-policy, approval-gate, approval-shape-gate, and secret-redaction/);
+  assert.match(main, /cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-voice-quick-start, voice-tool-call, approval-gate, approval-shape-gate, and secret-redaction/);
   assert.match(renderer, /renderOperatorBriefing/);
   assert.match(renderer, /function renderOperatorBriefingCards/);
   assert.match(renderer, /elements\.briefingGrid\.replaceChildren\(\)/);

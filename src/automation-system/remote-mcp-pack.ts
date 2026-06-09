@@ -200,7 +200,7 @@ export async function buildRemoteMcpConnectionPack(
       "Fetch actionManifestUrl when the remote agent supports ai-plugin/action manifests.",
       "Import openApiSchemaUrl when the remote agent supports ChatGPT custom actions, Grok actions, or OpenAPI-based HTTP tool setup.",
       "Fetch productionVerificationEvidenceUrl or call arcigy.get_production_verification_evidence to inspect the latest verified production proof.",
-      "Run the smokeTestUrl before handoff and require ready checks for action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, approval-gate, approval-shape-gate, and secret-redaction.",
+      "Run the smokeTestUrl before handoff and require ready checks for action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-voice-quick-start, voice-tool-call, approval-gate, approval-shape-gate, and secret-redaction.",
       "Call MCP tools with POST JSON to mcpToolCallPattern.",
       "Use the bearer auth header placeholder; the real token must be supplied by the operator and is never returned by this pack.",
       "Use tunnel.statusUrl to inspect public tunnel URLs from the redacted secure-tunnel log. Browser-launched tunnel start requires a strong JARVIS_WEB_TOKEN.",
@@ -236,7 +236,7 @@ function buildAgentCompatibility(): RemoteMcpConnectionPack["agentCompatibility"
       "Import openApiSchemaUrl if the agent supports OpenAPI or custom actions.",
       "Fetch productionVerificationEvidenceUrl or call arcigy.get_production_verification_evidence and cite its status.",
       "Fetch handoff.connectionPackUrl and confirm tokenValueReturned=false plus repo-only limits.",
-      "Run smokeTestUrl and require status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, approval-gate, approval-shape-gate, and secret-redaction ready.",
+      "Run smokeTestUrl and require status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-voice-quick-start, voice-tool-call, approval-gate, approval-shape-gate, and secret-redaction ready.",
       "Inspect tunnel.statusUrl after any tunnel start and never ask for the real bearer token.",
     ],
     safetyRules: [
@@ -265,7 +265,7 @@ function buildHandoffRunbook(baseUrl: string): RemoteMcpConnectionPack["handoff"
       "Fetch actionManifestUrl if the agent supports ai-plugin/action manifests.",
       "Fetch openApiSchemaUrl if the agent supports OpenAPI/custom actions.",
       "Fetch productionVerificationEvidenceUrl or call arcigy.get_production_verification_evidence and cite its status.",
-      "Run smokeTestUrl and require status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, approval-gate, approval-shape-gate, and secret-redaction ready before using MCP tools.",
+      "Run smokeTestUrl and require status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-voice-quick-start, voice-tool-call, approval-gate, approval-shape-gate, and secret-redaction ready before using MCP tools.",
       "Fetch tunnel.statusUrl if the operator needs the current public tunnel URLs; token values must remain redacted.",
       "Call arcigy.get_operator_briefing before proposing work.",
       "Use read-only or draft tools first; use dryRun: true before Gmail sync writes.",
@@ -305,7 +305,7 @@ function buildHandoffRunbook(baseUrl: string): RemoteMcpConnectionPack["handoff"
       {
         key: "remote-smoke",
         url: `${baseUrl}/api/remote-mcp-smoke`,
-        expected: 'status=ready, including action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, secret-redaction, approval-gate, and approval-shape-gate for top-level {"approved":true} payload rejection.',
+        expected: 'status=ready, including action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-voice-quick-start, voice-tool-call, secret-redaction, approval-gate, and approval-shape-gate for top-level {"approved":true} payload rejection.',
       },
     ],
   };

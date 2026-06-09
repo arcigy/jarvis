@@ -11,6 +11,21 @@ const repoRoot = fileURLToPath(new URL("../", import.meta.url));
 const webUrl = process.env.JARVIS_VERIFY_WEB_URL || "http://127.0.0.1:8765";
 const evidencePath = join(repoRoot, "generated", "production-verification", "latest.json");
 const checks: Array<{ name: string; status: "ready" | "failed"; detail: string }> = [];
+const requiredRemoteMcpSmokeGates = [
+  "action-manifest",
+  "openapi-schema",
+  "cors-preflight",
+  "external-auth-gate",
+  "pack-auth-throttle-policy",
+  "pack-limits",
+  "pack-voice-quick-start",
+  "voice-tool-call",
+  "pack-production-evidence-quick-start",
+  "production-evidence-tool-call",
+  "approval-gate",
+  "approval-shape-gate",
+  "secret-redaction",
+];
 let webChild: ChildProcess | null = null;
 
 try {
@@ -26,7 +41,8 @@ async function main() {
   runNpm("local-memory-smoke", ["run", "local:memory:smoke"]);
   await ensureWebBridge();
   runNpm("doctor-live", ["run", "doctor", "--", "--live-integrations"]);
-  runNpm("remote-mcp-smoke", ["run", "remote:mcp:smoke", "--", "--url", webUrl, "--json"]);
+  const remoteMcpSmokeOutput = runNpm("remote-mcp-smoke", ["run", "remote:mcp:smoke", "--", "--url", webUrl, "--json"]);
+  requireRemoteMcpSmokeGates(remoteMcpSmokeOutput);
   runNpm("ui-smoke", ["run", "ui:smoke"], {
     JARVIS_UI_SMOKE_URL: `${webUrl}/index.html`,
     JARVIS_UI_SMOKE_OUT: "generated/jarvis-ui-smoke.png",
@@ -42,7 +58,7 @@ async function main() {
   process.stdout.write(renderSummary());
 }
 
-function runCommand(name: string, command: string, args: string[], extraEnv: Record<string, string> = {}) {
+function runCommand(name: string, command: string, args: string[], extraEnv: Record<string, string> = {}): string {
   process.stdout.write(`\n[verify] ${name}\n`);
   const result = spawnSync(command, args, {
     cwd: repoRoot,
@@ -59,15 +75,58 @@ function runCommand(name: string, command: string, args: string[], extraEnv: Rec
     process.exit(result.status ?? 1);
   }
   checks.push({ name, status: "ready", detail: "OK" });
+  return result.stdout;
 }
 
-function runNpm(name: string, args: string[], extraEnv: Record<string, string> = {}) {
+function runNpm(name: string, args: string[], extraEnv: Record<string, string> = {}): string {
   const npmExecPath = process.env.npm_execpath;
   if (npmExecPath) {
-    runCommand(name, process.execPath, [npmExecPath, ...args], extraEnv);
-    return;
+    return runCommand(name, process.execPath, [npmExecPath, ...args], extraEnv);
   }
-  runCommand(name, process.platform === "win32" ? "npm.cmd" : "npm", args, extraEnv);
+  return runCommand(name, process.platform === "win32" ? "npm.cmd" : "npm", args, extraEnv);
+}
+
+function requireRemoteMcpSmokeGates(output: string) {
+  process.stdout.write(`\n[verify] remote-mcp-smoke-required-gates\n`);
+  try {
+    const report = parseRemoteMcpSmokeJson(output) as {
+      status?: unknown;
+      checks?: Array<{ key?: unknown; status?: unknown }>;
+    };
+    const readyChecks = new Set((Array.isArray(report.checks) ? report.checks : []).filter((check) => check.status === "ready").map((check) => String(check.key ?? "")));
+    const missing = requiredRemoteMcpSmokeGates.filter((key) => !readyChecks.has(key));
+    if (report.status !== "ready" || missing.length > 0) {
+      checks.push({
+        name: "remote-mcp-smoke-required-gates",
+        status: "failed",
+        detail: missing.length ? `Remote MCP smoke is missing required ready gate(s): ${missing.join(", ")}.` : "Remote MCP smoke report is not ready.",
+      });
+      writeEvidence();
+      process.stdout.write(renderSummary());
+      process.exit(1);
+    }
+    checks.push({
+      name: "remote-mcp-smoke-required-gates",
+      status: "ready",
+      detail: `Remote MCP smoke required gates are ready: ${requiredRemoteMcpSmokeGates.join(", ")}.`,
+    });
+  } catch (error) {
+    checks.push({
+      name: "remote-mcp-smoke-required-gates",
+      status: "failed",
+      detail: redactSensitiveText(error instanceof Error ? error.message : String(error)),
+    });
+    writeEvidence();
+    process.stdout.write(renderSummary());
+    process.exit(1);
+  }
+}
+
+function parseRemoteMcpSmokeJson(output: string): unknown {
+  const start = output.indexOf("{");
+  const end = output.lastIndexOf("}");
+  if (start < 0 || end <= start) throw new Error("Remote MCP smoke JSON report was not found in command output.");
+  return JSON.parse(output.slice(start, end + 1));
 }
 
 async function ensureWebBridge() {

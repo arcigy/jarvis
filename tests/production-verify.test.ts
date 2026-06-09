@@ -19,6 +19,11 @@ test("production verifier wires every live release gate", () => {
   assert.match(script, /ensureWebBridge/);
   assert.match(script, /doctor", "--", "--live-integrations"/);
   assert.match(script, /remote:mcp:smoke/);
+  assert.match(script, /requiredRemoteMcpSmokeGates/);
+  assert.match(script, /remote-mcp-smoke-required-gates/);
+  assert.match(script, /parseRemoteMcpSmokeJson/);
+  assert.match(script, /pack-voice-quick-start/);
+  assert.match(script, /voice-tool-call/);
   assert.match(script, /ui:smoke/);
   assert.match(script, /runSecretScan/);
   assert.match(script, /writeEvidence/);

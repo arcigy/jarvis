@@ -858,7 +858,7 @@ test("remote MCP smoke requires the production evidence quick-start", async () =
             { key: "connection-pack" },
             { key: "secure-tunnel-status" },
             { key: "production-verification-evidence" },
-            { key: "remote-smoke", expected: "action-manifest openapi-schema cors-preflight external-auth-gate pack-auth-throttle-policy approval-shape-gate secret-redaction" },
+            { key: "remote-smoke", expected: "action-manifest openapi-schema cors-preflight external-auth-gate pack-auth-throttle-policy pack-voice-quick-start voice-tool-call approval-shape-gate secret-redaction" },
           ],
           agentFirstSteps: ["Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
         },
