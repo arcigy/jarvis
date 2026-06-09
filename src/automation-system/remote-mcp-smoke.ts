@@ -600,7 +600,22 @@ function hasHandoffProof(value: unknown, baseUrl: string): boolean {
     proofKeys.has("secure-tunnel-status") &&
     proofKeys.has("production-verification-evidence") &&
     proofKeys.has("remote-smoke") &&
-    ["action-manifest", "openapi-schema", "cors-preflight", "external-auth-gate", "pack-auth-throttle-policy", "pack-agent-setup-profiles", "pack-voice-quick-start", "voice-tool-call", "approval-shape-gate", "secret-redaction"].every((key) => remoteSmokeExpected.includes(key)) &&
+    [
+      "action-manifest",
+      "openapi-schema",
+      "cors-preflight",
+      "external-auth-gate",
+      "pack-auth-throttle-policy",
+      "pack-limits",
+      "pack-agent-setup-profiles",
+      "pack-voice-quick-start",
+      "voice-tool-call",
+      "pack-production-evidence-quick-start",
+      "production-evidence-tool-call",
+      "approval-shape-gate",
+      "secret-redaction",
+      "dirty=false",
+    ].every((key) => remoteSmokeExpected.includes(key)) &&
     agentFirstSteps.some((step) => typeof step === "string" && step.includes("arcigy.get_operator_briefing")) &&
     agentFirstSteps.some((step) => typeof step === "string" && step.includes("status=ready"))
   );

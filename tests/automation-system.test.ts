@@ -109,7 +109,21 @@ test("production readiness report returns blockers and next actions without secr
   assert.ok(report.launchEvidence.proofGates.some((gate) => gate.id === "approval-locks" && gate.validationCommand === "npm test"));
   assert.match(report.launchEvidence.remoteHandoff.smokeCommand, /remote:mcp:smoke/);
   assert.ok(report.launchEvidence.remoteHandoff.requiredBeforeExternalAgent.some((step) => step.includes("/.well-known/ai-plugin.json") && step.includes("/api/openapi.json")));
-  assert.ok(report.launchEvidence.remoteHandoff.requiredBeforeExternalAgent.some((step) => step.includes("cors-preflight") && step.includes("external-auth-gate") && step.includes("pack-auth-throttle-policy") && step.includes("secret-redaction")));
+  assert.ok(
+    report.launchEvidence.remoteHandoff.requiredBeforeExternalAgent.some(
+      (step) =>
+        step.includes("cors-preflight") &&
+        step.includes("external-auth-gate") &&
+        step.includes("pack-auth-throttle-policy") &&
+        step.includes("pack-limits") &&
+        step.includes("pack-agent-setup-profiles") &&
+        step.includes("pack-production-evidence-quick-start") &&
+        step.includes("production-evidence-tool-call") &&
+        step.includes("release proof") &&
+        step.includes("dirty=false") &&
+        step.includes("secret-redaction")
+    )
+  );
   assert.equal(JSON.stringify(report).includes("PASSWORD"), false);
 });
 
@@ -873,7 +887,7 @@ test("remote MCP smoke requires the production evidence quick-start", async () =
             { key: "connection-pack" },
             { key: "secure-tunnel-status" },
             { key: "production-verification-evidence" },
-            { key: "remote-smoke", expected: "action-manifest openapi-schema cors-preflight external-auth-gate pack-auth-throttle-policy pack-agent-setup-profiles pack-voice-quick-start voice-tool-call approval-shape-gate secret-redaction" },
+            { key: "remote-smoke", expected: "action-manifest openapi-schema cors-preflight external-auth-gate pack-auth-throttle-policy pack-limits pack-agent-setup-profiles pack-voice-quick-start voice-tool-call pack-production-evidence-quick-start production-evidence-tool-call approval-shape-gate secret-redaction dirty=false" },
           ],
           agentFirstSteps: ["Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
         },
@@ -974,7 +988,7 @@ test("remote MCP smoke requires release proof for ready production evidence", as
             { key: "connection-pack" },
             { key: "secure-tunnel-status" },
             { key: "production-verification-evidence" },
-            { key: "remote-smoke", expected: "action-manifest openapi-schema cors-preflight external-auth-gate pack-auth-throttle-policy pack-agent-setup-profiles pack-voice-quick-start voice-tool-call approval-shape-gate secret-redaction" },
+            { key: "remote-smoke", expected: "action-manifest openapi-schema cors-preflight external-auth-gate pack-auth-throttle-policy pack-limits pack-agent-setup-profiles pack-voice-quick-start voice-tool-call pack-production-evidence-quick-start production-evidence-tool-call approval-shape-gate secret-redaction dirty=false" },
           ],
           agentFirstSteps: ["Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
         },
@@ -1102,6 +1116,9 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
     )
   );
   assert.ok(pack.agentInstructions.some((step) => step.includes("arcigy.get_production_verification_evidence")));
+  assert.ok(pack.agentInstructions.some((step) => step.includes("pack-production-evidence-quick-start") && step.includes("production-evidence-tool-call") && step.includes("dirty=false")));
+  assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("production-evidence-tool-call") && step.includes("release proof")));
+  assert.ok(pack.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("production-evidence-tool-call") && item.expected.includes("dirty=false")));
   assert.equal(JSON.stringify(pack).includes("PASSWORD"), false);
 });
 

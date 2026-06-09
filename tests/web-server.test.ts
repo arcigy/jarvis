@@ -386,7 +386,18 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(readinessBody.launchEvidence.proofGates.some((gate) => gate.id === "mcp-registry" && gate.validationCommand === "npm test"));
     assert.equal(readinessBody.launchEvidence.remoteHandoff.tunnelCommand, "npm run web:tunnel:secure");
     assert.ok(readinessBody.launchEvidence.remoteHandoff.requiredBeforeExternalAgent.some((step) => step.includes("/.well-known/ai-plugin.json") && step.includes("/api/openapi.json")));
-    assert.ok(readinessBody.launchEvidence.remoteHandoff.requiredBeforeExternalAgent.some((step) => step.includes("cors-preflight") && step.includes("external-auth-gate") && step.includes("secret-redaction")));
+    assert.ok(
+      readinessBody.launchEvidence.remoteHandoff.requiredBeforeExternalAgent.some(
+        (step) =>
+          step.includes("cors-preflight") &&
+          step.includes("external-auth-gate") &&
+          step.includes("pack-production-evidence-quick-start") &&
+          step.includes("production-evidence-tool-call") &&
+          step.includes("release proof") &&
+          step.includes("dirty=false") &&
+          step.includes("secret-redaction")
+      )
+    );
 
     const verificationEvidence = await fetch(`${baseUrl}/api/production-verification-evidence`);
     assert.equal(verificationEvidence.status, 200);
@@ -415,6 +426,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(mcpReadiness.result.launchChecklist.some((item: { id: string }) => item.id === "mcp-registry"));
     assert.ok(mcpReadiness.result.launchEvidence.proofGates.some((gate: { id: string }) => gate.id === "approval-locks"));
     assert.ok(mcpReadiness.result.launchEvidence.remoteHandoff.requiredBeforeExternalAgent.some((step: string) => step.includes("action-manifest") || step.includes("/.well-known/ai-plugin.json")));
+    assert.ok(mcpReadiness.result.launchEvidence.remoteHandoff.requiredBeforeExternalAgent.some((step: string) => step.includes("production-evidence-tool-call") && step.includes("dirty=false")));
 
     const mcpEvidence = await postJson(`${baseUrl}/api/mcp/arcigy.get_production_verification_evidence`, {});
     assert.equal(mcpEvidence.result.status, "ready");
@@ -518,6 +530,9 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("external-auth-gate")));
     assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("pack-auth-throttle-policy")));
     assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("openapi-schema")));
+    assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("pack-production-evidence-quick-start")));
+    assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("production-evidence-tool-call")));
+    assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("dirty=false")));
     assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("approval-shape-gate")));
     assert.ok(remotePackBody.handoff.agentFirstSteps.some((step) => step.includes("secret-redaction")));
     assert.deepEqual(remotePackBody.agentCompatibility.supportedAgents.slice(0, 3), ["Claude", "ChatGPT", "Grok"]);
