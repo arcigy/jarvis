@@ -158,6 +158,17 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
     handoff: { connectionPackUrl: string; requiredProof: Array<{ key: string; url: string; expected: string }>; agentFirstSteps: string[] };
     agentCompatibility: { supportedAgents: string[]; safetyRules: string[]; requiredBeforeWork: string[] };
     agentPromptTemplates: { claude: string; chatgpt: string; grok: string; generic: string };
+    agentSetupProfiles: Array<{
+      agent: string;
+      setupMode: string;
+      importUrl: string;
+      fallbackUrl: string;
+      firstTool: string;
+      firstToolUrl: string;
+      writePolicy: string;
+      localWritePolicy: string;
+      requiredProofGates: string[];
+    }>;
     tunnel: { secureCommand: string; statusUrl: string; startUrl: string; stopUrl: string; browserStartRequiresStrongToken: boolean };
   };
   assert.equal(pack.manifestUrl, "https://jarvis.example.ngrok-free.app/.well-known/arcigy-jarvis.json");
@@ -208,6 +219,10 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(pack.agentCompatibility.safetyRules.some((rule) => rule.includes("family-friendly")));
   assert.match(pack.agentPromptTemplates.grok, /Grok or xAI-compatible agents/);
   assert.match(pack.agentPromptTemplates.generic, /POST JSON/);
+  assert.ok(pack.agentSetupProfiles.some((profile) => profile.agent === "ChatGPT" && profile.setupMode === "openapi-custom-action" && profile.importUrl === "https://jarvis.example.ngrok-free.app/api/openapi.json"));
+  assert.ok(pack.agentSetupProfiles.some((profile) => profile.agent === "Grok" && profile.fallbackUrl === "https://jarvis.example.ngrok-free.app/api/mcp/{toolName}"));
+  assert.ok(pack.agentSetupProfiles.every((profile) => profile.firstTool === "arcigy.get_operator_briefing" && profile.writePolicy === "approval.approved-required" && profile.localWritePolicy === "dry-run-first"));
+  assert.ok(pack.agentSetupProfiles.every((profile) => profile.requiredProofGates.includes("pack-agent-setup-profiles") && profile.requiredProofGates.includes("secret-redaction")));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_outreach_brief" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_outreach_brief" && !("campaignId" in call.body)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.sync_gmail_recent_messages" && call.body.dryRun === true));
