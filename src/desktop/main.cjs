@@ -1056,6 +1056,14 @@ function buildRemoteMcpQuickStartCalls(baseUrl) {
       approvalRequired: false,
     },
     {
+      label: "Test Jarvis voice wake command",
+      tool: "arcigy.jarvis_voice_event",
+      method: "POST",
+      url: toolUrl("arcigy.jarvis_voice_event"),
+      body: { text: "Jarvis integracie", session: { state: "idle", wakeWord: "jarvis" } },
+      approvalRequired: false,
+    },
+    {
       label: "Get Jarvis operator briefing",
       tool: "arcigy.get_operator_briefing",
       method: "POST",
@@ -1379,6 +1387,13 @@ async function runRemoteMcpSmoke(payload = {}) {
   );
   checks.push(
     smokeCheck(
+      hasVoiceQuickStart(pack.body?.quickStartCalls),
+      "pack-voice-quick-start",
+      "Connection pack includes a read-only Jarvis voice wake command quick-start call."
+    )
+  );
+  checks.push(
+    smokeCheck(
       hasHandoffProof(pack.body?.handoff, baseUrl),
       "pack-handoff-proof",
       "Connection pack includes remote handoff proof URLs and first-step instructions."
@@ -1414,6 +1429,14 @@ async function runRemoteMcpSmoke(payload = {}) {
   );
   const health = await fetchJson(`${baseUrl}/api/mcp/arcigy.get_system_health`, token, { format: "json" });
   checks.push(smokeCheck(health.ok && Array.isArray(health.body?.result?.integrations), "read-only-tool-call", "Read-only MCP tool call returned integration health."));
+  const voice = await fetchJson(`${baseUrl}/api/mcp/arcigy.jarvis_voice_event`, token, { text: "Jarvis integracie", session: { state: "idle", wakeWord: "jarvis" } });
+  checks.push(
+    smokeCheck(
+      voice.ok && hasSafeVoiceWakeResult(voice.body?.result),
+      "voice-tool-call",
+      "Read-only Jarvis voice MCP call handled a wake command and returned secret-safe speech instructions."
+    )
+  );
   const productionEvidence = await fetchJson(`${baseUrl}/api/mcp/arcigy.get_production_verification_evidence`, token, {});
   checks.push(
     smokeCheck(
@@ -1426,7 +1449,7 @@ async function runRemoteMcpSmoke(payload = {}) {
   checks.push(smokeCheck(approvalGate.ok, "approval-gate", "All approval-required write tools rejected unapproved calls."));
   const topLevelApprovalGate = await checkApprovalGates(baseUrl, token, true);
   checks.push(smokeCheck(topLevelApprovalGate.ok, "approval-shape-gate", 'All approval-required write tools rejected top-level {"approved":true}.'));
-  const leakedSecret = hasSensitiveLeak({ manifest: manifest.body, actionManifest: actionManifest.body, openApi: openApi.body, pack: pack.body, tunnelStatus: tunnelStatus.body, health: health.body, productionEvidence: productionEvidence.body, approvalGate: approvalGate.bodies, topLevelApprovalGate: topLevelApprovalGate.bodies }, token);
+  const leakedSecret = hasSensitiveLeak({ manifest: manifest.body, actionManifest: actionManifest.body, openApi: openApi.body, pack: pack.body, tunnelStatus: tunnelStatus.body, health: health.body, voice: voice.body, productionEvidence: productionEvidence.body, approvalGate: approvalGate.bodies, topLevelApprovalGate: topLevelApprovalGate.bodies }, token);
   checks.push(smokeCheck(!leakedSecret, "secret-redaction", "Smoke responses did not echo bearer tokens, API keys, OAuth tokens, or database URLs."));
   const status = checks.every((check) => check.status === "ready") ? "ready" : "blocked";
   return {
@@ -1436,7 +1459,7 @@ async function runRemoteMcpSmoke(payload = {}) {
     baseUrl,
     summary:
       status === "ready"
-      ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, action manifest, OpenAPI action schema, CORS preflight, external auth gate, auth throttle policy, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, client memory quick-start, audit quick-start, production evidence quick-start, production evidence tool call, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
+      ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, action manifest, OpenAPI action schema, CORS preflight, external auth gate, auth throttle policy, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, voice quick-start, voice tool call, client memory quick-start, audit quick-start, production evidence quick-start, production evidence tool call, agent compatibility, handoff proof, read-only call, approval gates, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((check) => check.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -1690,6 +1713,19 @@ function hasDraftContractIntakeQuickStart(value) {
   );
 }
 
+function hasVoiceQuickStart(value) {
+  if (!Array.isArray(value)) return false;
+  const call = value.find((item) => item?.tool === "arcigy.jarvis_voice_event");
+  return (
+    call?.approvalRequired === false &&
+    typeof call?.body?.text === "string" &&
+    /\bjarvis\b/i.test(call.body.text) &&
+    call.body.session?.state === "idle" &&
+    call.body.session?.wakeWord === "jarvis" &&
+    !("approval" in (call.body ?? {}))
+  );
+}
+
 function hasHandoffProof(value, baseUrl) {
   if (!value || typeof value !== "object") return false;
   if (value.connectionPackUrl !== `${baseUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`) return false;
@@ -1759,6 +1795,11 @@ function hasSafeProductionEvidenceResult(value) {
   if (!(typeof value.generatedAt === "string" || value.generatedAt === null)) return false;
   if (typeof value.summary !== "string" || !value.summary.trim()) return false;
   return Array.isArray(value.checks);
+}
+
+function hasSafeVoiceWakeResult(value) {
+  if (!value || typeof value !== "object") return false;
+  return value.session?.state === "idle" && value.shouldStopRecording === true && typeof value.speakText === "string" && /integr/i.test(value.speakText);
 }
 
 function isEmptyRecord(value) {

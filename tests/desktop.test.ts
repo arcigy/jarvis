@@ -580,6 +580,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /sameStringArray/);
   assert.match(main, /pack-contract-quick-start/);
   assert.match(main, /pack-contract-draft-quick-start/);
+  assert.match(main, /Test Jarvis voice wake command/);
+  assert.match(main, /pack-voice-quick-start/);
+  assert.match(main, /voice-tool-call/);
   assert.match(main, /pack-handoff-proof/);
   assert.match(main, /pack-client-memory-quick-start/);
   assert.match(main, /pack-audit-quick-start/);
@@ -591,6 +594,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /Draft contract intake JSON without writing files/);
   assert.match(main, /hasUsableContractQuickStart/);
   assert.match(main, /hasDraftContractIntakeQuickStart/);
+  assert.match(main, /hasVoiceQuickStart/);
+  assert.match(main, /hasSafeVoiceWakeResult/);
   assert.match(main, /hasHandoffProof/);
   assert.match(main, /hasClientMemoryQuickStarts/);
   assert.match(main, /hasAuditQuickStart/);
