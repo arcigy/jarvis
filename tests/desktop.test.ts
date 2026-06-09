@@ -79,6 +79,13 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /id="missionGmail"/);
   assert.match(html, /id="missionRemote"/);
   assert.match(html, /id="missionContracts"/);
+  assert.match(html, /id="missionControl"/);
+  assert.match(html, /Mission verdict/);
+  assert.match(html, /id="missionControlScore"/);
+  assert.match(html, /id="missionControlProof"/);
+  assert.match(html, /id="missionControlRemote"/);
+  assert.match(html, /id="missionControlApprovals"/);
+  assert.match(html, /id="missionControlNext"/);
   assert.match(html, /Voice command center pre zmluvy/);
   assert.match(html, /<span>Hlas<\/span>/);
   assert.match(html, /pripraveny/);
@@ -770,6 +777,10 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /clientAlertGmailSyncPollMs: 300000/);
   assert.match(renderer, /maybeSyncGmailForClientAlerts/);
   assert.match(renderer, /Gmail auto-sync skontroloval/);
+  assert.match(renderer, /function updateMissionControl/);
+  assert.match(renderer, /missionControlScore/);
+  assert.match(renderer, /requiredRemoteSmokeGates\.length/);
+  assert.match(renderer, /Drz proof fresh a schvaluj zapisy len explicitne/);
   assert.match(renderer, /Client alert watch pauznuty/);
   assert.match(renderer, /Pauznut watch/);
   assert.match(renderer, /Obnovit watch/);
@@ -786,6 +797,11 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /announceNew/);
   assert.match(styles, /\.missionRail/);
   assert.match(styles, /\.missionSignal\[data-state="ready"\]/);
+  assert.match(styles, /\.missionControl/);
+  assert.match(styles, /\.missionControl\[data-state="ready"\]/);
+  assert.match(styles, /\.missionControlGauge/);
+  assert.match(styles, /\.gaugeValue/);
+  assert.match(styles, /\.missionControlStrip/);
   assert.match(styles, /@keyframes tacticalScope/);
   assert.match(styles, /@keyframes statusBreath/);
   assert.match(styles, /\.deckVisual::after/);
@@ -807,6 +823,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(styles, /\.radarNode\[data-state="attention"\]/);
   assert.match(styles, /@keyframes radarSweep/);
   assert.match(styles, /@keyframes radarPanelSweep/);
+  assert.match(styles, /\.missionControl,\s+\.missionControlStrip,/s);
   assert.match(styles, /\.launchQueue,\s+\.capabilityAuditHead,\s+\.capabilityAuditStats,\s+\.capabilityAuditGrid,\s+\.workflowProofGrid,\s+\.operationsRadar,\s+\.cortexMap/s);
   assert.match(styles, /\.diagnosticsGrid/);
   assert.match(styles, /\.diagnosticCard\[data-state="ready"\]/);
@@ -836,6 +853,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.equal(packageJson.scripts["ui:smoke"], "electron scripts/jarvis_ui_smoke.cjs");
   assert.equal(packageJson.scripts["verify:production"], "node scripts/verify_production.ts");
   assert.match(uiSmoke, /capturePage/);
+  assert.match(uiSmoke, /missionControlScoreText/);
+  assert.match(uiSmoke, /Mission control score/);
   assert.match(uiSmoke, /assertScreenshotPixels/);
   assert.match(uiSmoke, /image\.toBitmap\(\)/);
   assert.match(uiSmoke, /color buckets/);

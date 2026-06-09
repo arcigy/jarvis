@@ -83,6 +83,16 @@ const elements = {
   missionGmail: document.querySelector("#missionGmail"),
   missionRemote: document.querySelector("#missionRemote"),
   missionContracts: document.querySelector("#missionContracts"),
+  missionControl: document.querySelector("#missionControl"),
+  missionControlVerdict: document.querySelector("#missionControlVerdict"),
+  missionControlSummary: document.querySelector("#missionControlSummary"),
+  missionControlGaugeValue: document.querySelector("#missionControlGaugeValue"),
+  missionControlScore: document.querySelector("#missionControlScore"),
+  missionControlScoreText: document.querySelector("#missionControlScoreText"),
+  missionControlProof: document.querySelector("#missionControlProof"),
+  missionControlRemote: document.querySelector("#missionControlRemote"),
+  missionControlApprovals: document.querySelector("#missionControlApprovals"),
+  missionControlNext: document.querySelector("#missionControlNext"),
   cortexVoice: document.querySelector("#cortexVoice"),
   cortexOutreach: document.querySelector("#cortexOutreach"),
   cortexMemory: document.querySelector("#cortexMemory"),
@@ -487,6 +497,7 @@ function renderCommandDeck(health, bridge = null) {
   elements.commandTimeline.textContent = buildCommandTimeline(blockers, bridge, advisories);
   renderMissionSignals(health, bridge);
   updateOperationsRadar();
+  updateMissionControl();
 }
 
 function renderLaunchQueue(report) {
@@ -513,6 +524,7 @@ function renderLaunchQueue(report) {
   }
   renderWorkflowProofMatrix(launchChecklist);
   updateOperationsRadar();
+  updateMissionControl();
 }
 
 function renderWorkflowProofMatrix(launchChecklist) {
@@ -564,6 +576,7 @@ function renderProductionVerificationEvidence(evidence) {
   renderReleaseProof(evidence, generatedAt);
   updateOperationsRadar();
   updateRemoteMissionStatus();
+  updateMissionControl();
 }
 
 function renderCapabilityAudit(audit) {
@@ -605,6 +618,7 @@ function renderCapabilityAudit(audit) {
     card.append(label, title, proof, meta);
     elements.capabilityAuditGrid.appendChild(card);
   }
+  updateMissionControl();
 }
 
 function renderCapabilityAuditText(audit) {
@@ -689,6 +703,7 @@ function updateOperationsRadar() {
   const radarReady = proofReady && checksReady && !clientAlerts;
   elements.operationsRadar.setAttribute("data-state", radarReady ? "ready" : "attention");
   elements.radarSweepLabel.textContent = radarReady ? "Jarvis takticky radar je stabilny" : "Jarvis takticky radar sleduje attention";
+  updateMissionControl();
 }
 
 function updateRemoteMissionStatus() {
@@ -725,6 +740,70 @@ function updateRemoteMissionStatus() {
   );
   setRemoteMissionNode(elements.remoteMissionAgents, agentReady ? "Claude / ChatGPT / Grok ready" : "agent profiles cakaju", agentReady);
   elements.remoteMissionStatus.setAttribute("data-state", packReady && smokeReady && evidenceReady && agentReady ? "ready" : "attention");
+  updateMissionControl();
+}
+
+function updateMissionControl() {
+  if (!elements.missionControl) return;
+  const integrations = state.lastSystemHealth?.integrations ?? [];
+  const requiredIntegrations = integrations.filter((item) => item.requiredForProduction !== false);
+  const readyRequired = requiredIntegrations.filter((item) => item.configured).length;
+  const readinessReady = state.lastReadinessReport?.status === "ready";
+  const evidence = state.lastProductionEvidence ?? {};
+  const release = evidence.release && typeof evidence.release === "object" ? evidence.release : {};
+  const freshness = evidence.freshness && typeof evidence.freshness === "object" ? evidence.freshness : {};
+  const evidenceGates = Array.isArray(release.requiredRemoteMcpSmokeGates) ? release.requiredRemoteMcpSmokeGates.length : 0;
+  const evidenceReady = evidence.status === "ready" && release.dirty === false && freshness.fresh === true && evidenceGates === requiredRemoteSmokeGates.length;
+  const pack = state.lastRemoteMcpPack;
+  const smokeProof = state.lastRemoteMcpSmoke ? summarizeRemoteProofGates(state.lastRemoteMcpSmoke) : null;
+  const remoteReady = Boolean(pack?.agentLaunchBundle && pack?.tools?.count) && (smokeProof?.ready === true || evidenceReady);
+  const approvalLocks = state.lastReadinessReport?.mcp?.approvalRequired ?? state.lastBridgePreflight?.riskyToolsRequiringApproval ?? [];
+  const openClientAlerts = state.lastClientNeedAlerts.length;
+  const approvalReady = approvalLocks.length > 0;
+  const watchReady = state.clientAlertWatchEnabled && openClientAlerts === 0;
+  const checks = [
+    integrations.length ? readyRequired === requiredIntegrations.length : false,
+    readinessReady,
+    evidenceReady,
+    remoteReady,
+    approvalReady,
+    watchReady,
+  ];
+  const readyCount = checks.filter(Boolean).length;
+  const score = Math.round((readyCount / checks.length) * 100);
+  const stateName = score >= 84 && !openClientAlerts ? "ready" : score >= 50 ? "attention" : "checking";
+  const nextAction =
+    openClientAlerts > 0
+      ? "Skontroluj klientsku poziadavku pred dalsim handoffom."
+      : !evidenceReady
+        ? "Spusti production verification pre fresh proof."
+        : !remoteReady
+          ? "Nacitaj MCP pack a spusti remote smoke."
+          : !readinessReady
+            ? "Otvor readiness report a vyries attention queue."
+            : "Drz proof fresh a schvaluj zapisy len explicitne.";
+  const verdict =
+    stateName === "ready"
+      ? "Jarvis je pripraveny na riadenu produkcnu prevadzku"
+      : stateName === "attention"
+        ? "Jarvis je funkcny, ale sleduje attention"
+        : "Jarvis zbiera produkcne signaly";
+  elements.missionControl.setAttribute("data-state", stateName);
+  elements.missionControlVerdict.textContent = verdict;
+  elements.missionControlSummary.textContent = `${readyCount}/${checks.length} hlavnych vrstiev ready. Klient watch: ${openClientAlerts ? `${openClientAlerts} otvorene` : "cisty"}.`;
+  elements.missionControlScore.textContent = `${score}%`;
+  elements.missionControlScoreText.textContent = `${readyCount}/${checks.length} vrstiev`;
+  elements.missionControlGaugeValue.style.strokeDashoffset = String(302 - (302 * score) / 100);
+  setMissionControlItem(elements.missionControlProof, evidenceReady ? `fresh ${freshness.ageHours ?? 0}h, ${evidenceGates} gates` : "evidence caka", evidenceReady);
+  setMissionControlItem(elements.missionControlRemote, remoteReady ? `${pack?.tools?.count ?? 0} toolov, smoke covered` : "MCP pack/smoke caka", remoteReady);
+  setMissionControlItem(elements.missionControlApprovals, approvalReady ? `${approvalLocks.length} approval locks aktivnych` : "approval policy caka", approvalReady);
+  setMissionControlItem(elements.missionControlNext, nextAction, stateName === "ready");
+}
+
+function setMissionControlItem(node, text, ready) {
+  if (!node) return;
+  node.textContent = text;
+  node.closest("div")?.setAttribute("data-state", ready ? "ready" : "attention");
 }
 
 function setRemoteMissionNode(node, text, ready) {
@@ -2917,3 +2996,4 @@ startWebBridgeWatch();
 startOperatorBriefingWatch();
 startClientNeedWatch();
 setMode("idle");
+updateMissionControl();

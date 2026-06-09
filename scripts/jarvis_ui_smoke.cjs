@@ -211,6 +211,7 @@ async function run() {
           nav: box("nav"),
           header: box("header"),
           rail: box("#missionRail"),
+          missionControl: box("#missionControl"),
           cortex: box("#cortexMap"),
           deck: box("#commandDeck"),
           capabilityAuditPanel: box("#capabilityAuditPanel"),
@@ -220,6 +221,12 @@ async function run() {
           responsePanel: box("#jarvisPanel + .panel"),
           missionReadiness: box("#missionReadiness"),
           missionRemote: box("#missionRemote"),
+          missionControlVerdictText: document.querySelector("#missionControlVerdict")?.textContent.trim() || "",
+          missionControlScoreText: document.querySelector("#missionControlScore")?.textContent.trim() || "",
+          missionControlProofText: document.querySelector("#missionControlProof")?.textContent.trim() || "",
+          missionControlRemoteText: document.querySelector("#missionControlRemote")?.textContent.trim() || "",
+          missionControlApprovalsText: document.querySelector("#missionControlApprovals")?.textContent.trim() || "",
+          missionControlNextText: document.querySelector("#missionControlNext")?.textContent.trim() || "",
           readyIntegrationsText: document.querySelector("#readyIntegrations")?.textContent.trim() || "",
           mcpToolCountText: document.querySelector("#mcpToolCount")?.textContent.trim() || "",
           approvalLockCountText: document.querySelector("#approvalLockCount")?.textContent.trim() || "",
@@ -262,6 +269,13 @@ async function run() {
     if (!dom.coreImageComplete || dom.coreImageNaturalWidth < 100) fail("Command core image did not load.");
     if (dom.visibleMissionSignals !== 5) fail(`Expected 5 mission signals, found ${dom.visibleMissionSignals}.`);
     if (dom.visibleCortexNodes !== 5) fail(`Expected 5 cortex nodes, found ${dom.visibleCortexNodes}.`);
+    if (!/Jarvis/i.test(dom.missionControlVerdictText)) fail(`Mission control verdict is not rendered: ${dom.missionControlVerdictText}.`);
+    if (!/^[0-9]{1,3}%$/.test(dom.missionControlScoreText)) fail(`Mission control score is not loaded: ${dom.missionControlScoreText}.`);
+    if (Number(dom.missionControlScoreText.replace("%", "")) < 50) fail(`Mission control score is unexpectedly low after startup: ${dom.missionControlScoreText}.`);
+    if (!/fresh|evidence/i.test(dom.missionControlProofText)) fail(`Mission control proof is not rendered: ${dom.missionControlProofText}.`);
+    if (!/MCP|toolov|smoke/i.test(dom.missionControlRemoteText)) fail(`Mission control remote state is not rendered: ${dom.missionControlRemoteText}.`);
+    if (!/approval|lock/i.test(dom.missionControlApprovalsText)) fail(`Mission control approval state is not rendered: ${dom.missionControlApprovalsText}.`);
+    if (!/proof|smoke|readiness|schvaluj|klientsku/i.test(dom.missionControlNextText)) fail(`Mission control next action is not actionable: ${dom.missionControlNextText}.`);
     if (/undefined|null|\[object Object\]/i.test(dom.bodyText)) fail("UI contains raw undefined/null/object text.");
     if (dom.scrollWidth > dom.clientWidth + 2) fail(`UI has horizontal overflow: ${dom.scrollWidth}px > ${dom.clientWidth}px.`);
     for (const control of [...dom.criticalWorkflowControls, ...dom.criticalFormControls]) {
@@ -330,6 +344,7 @@ async function run() {
     assertBox("header", dom.header, { width: isNarrowViewport ? 300 : 400, height: 40 });
     if (isNarrowViewport) {
       assertVisibleStart("mission rail", dom.rail, { width: 300, height: 50 });
+      assertSize("mission control", dom.missionControl, { width: 300, height: 110 });
       assertSize("cortex map", dom.cortex, { width: 300, height: 80 });
       assertSize("command deck", dom.deck, { width: 300, height: 90 });
       assertSize("capability audit", dom.capabilityAuditPanel, { width: 300, height: 90 });
@@ -339,6 +354,7 @@ async function run() {
       assertSize("Jarvis response panel", dom.responsePanel, { width: 260, height: 90 });
     } else {
       assertBox("mission rail", dom.rail, { width: 600, height: 50 });
+      assertBox("mission control", dom.missionControl, { width: 600, height: 100 });
       assertBox("cortex map", dom.cortex, { width: 600, height: 80 });
       assertBox("command deck", dom.deck, { width: 600, height: 90 });
       assertSize("capability audit", dom.capabilityAuditPanel, { width: 600, height: 90 });

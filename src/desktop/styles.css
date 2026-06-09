@@ -263,6 +263,187 @@ h2 {
   line-height: 1.15;
 }
 
+.missionControl {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(230px, 1.2fr) 98px minmax(340px, 2fr);
+  gap: 8px;
+  min-height: 88px;
+  margin-bottom: 10px;
+  border: 1px solid #26302f;
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, rgb(67 217 196 / 8%) 1px, transparent 1px),
+    linear-gradient(0deg, rgb(240 184 79 / 5%) 1px, transparent 1px),
+    linear-gradient(135deg, rgb(11 20 21 / 96%), rgb(7 12 13 / 96%));
+  background-size: 28px 28px, 28px 28px, auto;
+  padding: 8px;
+  overflow: hidden;
+}
+
+.missionControl::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgb(67 217 196 / 12%), transparent);
+  transform: translateX(-110%);
+  animation: signalSweep 7.5s ease-in-out infinite;
+}
+
+.missionControl::after {
+  content: "";
+  position: absolute;
+  inset: auto 8px 8px;
+  height: 2px;
+  border-radius: 999px;
+  background: #56615f;
+}
+
+.missionControl[data-state="ready"] {
+  border-color: rgb(67 217 196 / 56%);
+}
+
+.missionControl[data-state="ready"]::after {
+  background: #43d9c4;
+  box-shadow: 0 0 20px rgb(67 217 196 / 62%);
+}
+
+.missionControl[data-state="attention"] {
+  border-color: rgb(240 184 79 / 58%);
+}
+
+.missionControl[data-state="attention"]::after {
+  background: #f0b84f;
+  box-shadow: 0 0 20px rgb(240 184 79 / 44%);
+}
+
+.missionControlVerdict,
+.missionControlGauge,
+.missionControlStrip {
+  position: relative;
+  z-index: 1;
+}
+
+.missionControlVerdict {
+  display: grid;
+  align-content: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.missionControl span,
+.missionControlVerdict span,
+.missionControlStrip span {
+  color: #91a19d;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.missionControlVerdict strong {
+  color: #eef4f2;
+  font-size: 17px;
+  line-height: 1.18;
+  overflow-wrap: anywhere;
+}
+
+.missionControlVerdict p {
+  color: #a9b8b4;
+  font-size: 12px;
+  line-height: 1.32;
+}
+
+.missionControlGauge {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  min-height: 70px;
+}
+
+.missionControlGauge svg {
+  position: absolute;
+  width: 74px;
+  height: 74px;
+  transform: rotate(-90deg);
+}
+
+.gaugeTrack,
+.gaugeValue {
+  fill: none;
+  stroke-width: 8;
+}
+
+.gaugeTrack {
+  stroke: rgb(145 161 157 / 20%);
+}
+
+.gaugeValue {
+  stroke: #43d9c4;
+  stroke-linecap: round;
+  stroke-dasharray: 302;
+  stroke-dashoffset: 302;
+  filter: drop-shadow(0 0 8px rgb(67 217 196 / 56%));
+  transition: stroke-dashoffset 360ms ease;
+}
+
+.missionControl[data-state="attention"] .gaugeValue {
+  stroke: #f0b84f;
+  filter: drop-shadow(0 0 8px rgb(240 184 79 / 48%));
+}
+
+.missionControlGauge strong {
+  position: relative;
+  color: #eef4f2;
+  font-size: 19px;
+  line-height: 1;
+}
+
+.missionControlGauge span {
+  position: relative;
+  margin-top: 24px;
+  color: #91a19d;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.missionControlStrip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.missionControlStrip > div {
+  min-height: 70px;
+  border: 1px solid #203331;
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgb(67 217 196 / 10%), transparent 52%),
+    rgb(8 14 15 / 88%);
+  padding: 9px;
+  overflow: hidden;
+}
+
+.missionControlStrip > div[data-state="ready"] {
+  border-color: rgb(67 217 196 / 45%);
+}
+
+.missionControlStrip > div[data-state="attention"] {
+  border-color: rgb(240 184 79 / 52%);
+}
+
+.missionControlStrip strong {
+  display: block;
+  margin-top: 8px;
+  color: #eef4f2;
+  font-size: 12px;
+  line-height: 1.26;
+  overflow-wrap: anywhere;
+}
+
+.missionControlStrip > div[data-state="attention"] strong {
+  color: #ffd893;
+}
+
 .statusGrid {
   display: grid;
   grid-template-columns: repeat(6, minmax(96px, 1fr));
@@ -2141,6 +2322,8 @@ ul {
 
   .statusGrid,
   .missionRail,
+  .missionControl,
+  .missionControlStrip,
   .commandDeck,
   .briefingGrid,
   .launchQueue,

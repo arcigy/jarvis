@@ -86,7 +86,40 @@
         </div>
       </section>
 
-      <section class="statusGrid" id="healthGrid" aria-label="Integration status"></section>
+      <section class="missionControl" id="missionControl" aria-label="Jarvis mission control" data-state="checking">
+        <div class="missionControlVerdict">
+          <span>Mission verdict</span>
+          <strong id="missionControlVerdict">Inicializujem Jarvis core</strong>
+          <p id="missionControlSummary">Spajam production evidence, live readiness, MCP handoff, schvalenia a klientsky watch.</p>
+        </div>
+        <div class="missionControlGauge" aria-label="Production readiness score">
+          <svg viewBox="0 0 120 120" role="img" aria-labelledby="missionControlScoreLabel">
+            <title id="missionControlScoreLabel">Jarvis readiness score</title>
+            <circle class="gaugeTrack" cx="60" cy="60" r="48"></circle>
+            <circle class="gaugeValue" id="missionControlGaugeValue" cx="60" cy="60" r="48"></circle>
+          </svg>
+          <strong id="missionControlScore">0%</strong>
+          <span id="missionControlScoreText">cakam na data</span>
+        </div>
+        <div class="missionControlStrip">
+          <div data-state="checking">
+            <span>Proof</span>
+            <strong id="missionControlProof">evidence caka</strong>
+          </div>
+          <div data-state="checking">
+            <span>Remote agent</span>
+            <strong id="missionControlRemote">MCP pack caka</strong>
+          </div>
+          <div data-state="checking">
+            <span>Approval queue</span>
+            <strong id="missionControlApprovals">kontrola</strong>
+          </div>
+          <div data-state="checking">
+            <span>Next safe action</span>
+            <strong id="missionControlNext">Nacitavam dalsi krok</strong>
+          </div>
+        </div>
+      </section>
 
       <section class="commandDeck" id="commandDeck" aria-label="Production command deck">
         <div class="deckVisual" aria-hidden="true">
@@ -561,6 +594,8 @@
           <div class="response" id="contractResult">Pripravene generovat lokalne DOCX subory.</div>
         </article>
       </section>
+
+      <section class="statusGrid" id="healthGrid" aria-label="Integration status"></section>
 
       <section class="workflowProofGrid" id="workflowProofGrid" aria-label="Core Jarvis workflow proof">
         <div class="workflowProofCard" data-state="checking">
