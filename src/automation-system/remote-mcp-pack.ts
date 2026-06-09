@@ -340,6 +340,14 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Test Jarvis voice wake command",
+      tool: "arcigy.jarvis_voice_event",
+      method: "POST",
+      url: toolUrl("arcigy.jarvis_voice_event"),
+      body: { text: "Jarvis integracie", session: { state: "idle", wakeWord: "jarvis" } },
+      approvalRequired: false,
+    },
+    {
       label: "List operator approval queue",
       tool: "arcigy.get_approval_queue",
       method: "POST",

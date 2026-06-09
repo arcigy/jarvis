@@ -511,6 +511,15 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(remotePackBody.tools.localStateWrite.includes("arcigy.prepare_positive_outreach_reply"));
     assert.equal(remotePackBody.tools.readOnlyOrDraft.includes("arcigy.ingest_client_message"), false);
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.run_remote_mcp_smoke" && call.approvalRequired === false));
+    assert.ok(
+      remotePackBody.quickStartCalls.some(
+        (call) =>
+          call.tool === "arcigy.jarvis_voice_event" &&
+          call.approvalRequired === false &&
+          call.body.text === "Jarvis integracie" &&
+          (call.body.session as { state?: string; wakeWord?: string } | undefined)?.wakeWord === "jarvis"
+      )
+    );
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_outreach_brief" && !("campaignId" in call.body)));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.prepare_positive_outreach_reply" && call.body.leadEmail === "lead@example.com"));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.send_approved_outreach_reply" && call.approvalRequired === true));
