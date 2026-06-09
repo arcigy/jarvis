@@ -1299,6 +1299,15 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
         item.expected.includes("freshness.fresh=true")
     )
   );
+  assert.ok(
+    pack.quickStartCalls.some(
+      (call) =>
+        call.tool === "arcigy.generate_ai_reply" &&
+        typeof call.body.message === "string" &&
+        call.body.message.includes("onboarding automatizacie") &&
+        !call.body.message.includes("Client message here")
+    )
+  );
   assert.equal(JSON.stringify(pack).includes("PASSWORD"), false);
 });
 

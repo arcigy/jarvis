@@ -1351,7 +1351,12 @@ function buildRemoteMcpQuickStartCalls(baseUrl) {
       tool: "arcigy.generate_ai_reply",
       method: "POST",
       url: toolUrl("arcigy.generate_ai_reply"),
-      body: { message: "Client message here", context: "Arcigy Jarvis remote handoff.", language: "sk", tone: "executive" },
+      body: {
+        message: "Potrebujem kratke zhrnutie dalsieho kroku pre klienta po poziadavke na upravu onboarding automatizacie.",
+        context: "Arcigy Jarvis remote handoff.",
+        language: "sk",
+        tone: "executive",
+      },
       approvalRequired: false,
     },
     {

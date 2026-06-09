@@ -805,6 +805,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /cleanVoiceQuery/);
   assert.match(main, /ipcMain\.handle\("jarvis:systemHealth"/);
   assert.match(main, /ipcMain\.handle\("jarvis:generateAiReply"/);
+  assert.doesNotMatch(main, /Client message here/);
+  assert.match(main, /onboarding automatizacie/);
   assert.match(main, /ipcMain\.handle\("jarvis:syncGmailRecentMessages"/);
   assert.match(main, /ipcMain\.handle\("jarvis:getSmartleadCampaignStatus"/);
   assert.match(main, /ipcMain\.handle\("jarvis:getSmartleadOutreachBrief"/);
