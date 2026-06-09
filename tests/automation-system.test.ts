@@ -925,6 +925,49 @@ test("remote MCP smoke requires the Jarvis voice quick-start", async () => {
   assert.ok(report.checks.some((check) => check.key === "pack-voice-quick-start" && check.status === "blocked"));
 });
 
+test("remote MCP smoke requires the Jarvis capability audit voice quick-start", async () => {
+  const tools = remoteSmokeManifestToolsFixture();
+  const fetchImpl = async (target: string | URL) => {
+    const url = String(target);
+    if (url.endsWith("/.well-known/arcigy-jarvis.json")) {
+      return responseJson({
+        tools,
+        auth: { header: "Authorization: Bearer <JARVIS_WEB_TOKEN>" },
+        toolPolicy: {
+          localStateWrite: ["arcigy.sync_gmail_recent_messages"],
+          readOnlyOrDraft: ["arcigy.generate_ai_reply"],
+        },
+      });
+    }
+    if (url.includes("/api/remote-mcp-pack")) {
+      return responseJson({
+        auth: { tokenValueReturned: false },
+        limits: remoteSmokePackLimitsFixture(),
+        agentCompatibility: remoteAgentCompatibilityFixture(),
+        agentSetupProfiles: remoteAgentSetupProfilesFixture(),
+        handoff: {
+          connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
+          requiredProof: [{ key: "manifest" }, { key: "connection-pack" }, { key: "remote-smoke" }],
+          agentFirstSteps: ["Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
+        },
+        tools: {
+          localStateWrite: ["arcigy.sync_gmail_recent_messages"],
+          readOnlyOrDraft: ["arcigy.generate_ai_reply"],
+        },
+        quickStartCalls: remoteSmokeQuickStartFixture().filter((call) => call.body.text !== "Jarvis capability audit"),
+      });
+    }
+    if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
+    if (url.endsWith("/api/mcp/arcigy.generate_contract_documents")) return responseJson({ error: "approval required" }, 409);
+    return responseJson({ error: "unexpected URL" }, 404);
+  };
+
+  const report = await runRemoteMcpSmoke({ baseUrl: "https://jarvis.example", fetchImpl: fetchImpl as typeof fetch });
+
+  assert.equal(report.status, "blocked");
+  assert.ok(report.checks.some((check) => check.key === "pack-voice-quick-start" && check.status === "blocked"));
+});
+
 test("remote MCP smoke requires the audit trail quick-start", async () => {
   const expectedNames = listJarvisMcpTools().map((tool) => tool.name);
   const tools = remoteSmokeManifestToolsFixture();
@@ -1388,6 +1431,15 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.quickStartCalls.some((call) => call.label === "Ziskat najnovsiu production verification evidence"));
   assert.ok(pack.quickStartCalls.some((call) => call.label === "Spytat sa Jarvisa na production evidence"));
   assert.ok(pack.quickStartCalls.some((call) => call.label === "Spytat sa Jarvisa na full launch proof"));
+  assert.ok(
+    pack.quickStartCalls.some(
+      (call) =>
+        call.tool === "arcigy.jarvis_voice_event" &&
+        call.approvalRequired === false &&
+        call.body.text === "Jarvis capability audit" &&
+        (call.body.session as { state?: string; wakeWord?: string } | undefined)?.state === "idle"
+    )
+  );
   assert.ok(
     pack.quickStartCalls.some(
       (call) =>

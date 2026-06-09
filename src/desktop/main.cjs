@@ -2307,14 +2307,15 @@ function hasDraftContractIntakeQuickStart(value) {
 
 function hasVoiceQuickStart(value) {
   if (!Array.isArray(value)) return false;
-  const call = value.find((item) => item?.tool === "arcigy.jarvis_voice_event");
+  const call = value.find((item) => item?.tool === "arcigy.jarvis_voice_event" && item?.body?.text === "Jarvis capability audit");
   return (
     call?.approvalRequired === false &&
-    typeof call?.body?.text === "string" &&
-    /\bjarvis\b/i.test(call.body.text) &&
+    call?.method === "POST" &&
     call.body.session?.state === "idle" &&
     call.body.session?.wakeWord === "jarvis" &&
-    !("approval" in (call.body ?? {}))
+    !("approval" in (call.body ?? {})) &&
+    !("dbPath" in (call.body ?? {})) &&
+    !("live" in (call.body ?? {}))
   );
 }
 

@@ -645,15 +645,17 @@ function hasVoiceQuickStart(value: unknown): boolean {
   if (!Array.isArray(value)) return false;
   const call = value.find((item) => {
     if (!item || typeof item !== "object") return false;
-    return (item as { tool?: unknown }).tool === "arcigy.jarvis_voice_event";
-  }) as { approvalRequired?: unknown; body?: { text?: unknown; session?: { state?: unknown; wakeWord?: unknown }; approval?: unknown } } | undefined;
+    const candidate = item as { tool?: unknown; body?: { text?: unknown } };
+    return candidate.tool === "arcigy.jarvis_voice_event" && candidate.body?.text === "Jarvis capability audit";
+  }) as { approvalRequired?: unknown; method?: unknown; body?: { text?: unknown; session?: { state?: unknown; wakeWord?: unknown }; approval?: unknown; dbPath?: unknown; live?: unknown } } | undefined;
   return (
     call?.approvalRequired === false &&
-    typeof call.body?.text === "string" &&
-    /\bjarvis\b/i.test(call.body.text) &&
-    call.body.session?.state === "idle" &&
+    call.method === "POST" &&
+    call.body?.session?.state === "idle" &&
     call.body.session.wakeWord === "jarvis" &&
-    !("approval" in (call.body ?? {}))
+    !("approval" in (call.body ?? {})) &&
+    !("dbPath" in (call.body ?? {})) &&
+    !("live" in (call.body ?? {}))
   );
 }
 
