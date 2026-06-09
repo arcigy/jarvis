@@ -71,6 +71,13 @@ export type RemoteMcpConnectionPack = {
     url: string;
     body: Record<string, unknown>;
     approvalRequired: boolean;
+    exactMcpCall: {
+      tool: string;
+      method: "POST";
+      url: string;
+      body: Record<string, unknown>;
+      approvalRequired: boolean;
+    };
   }>;
   approval: {
     requiredPayload: { approval: { approved: true } };
@@ -489,7 +496,7 @@ function buildHandoffRunbook(baseUrl: string): RemoteMcpConnectionPack["handoff"
 function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickStartCalls"] {
   const toolUrl = (name: string) => `${baseUrl}/api/mcp/${name}`;
   const contractIntake = buildQuickStartContractIntake();
-  return [
+  return withExactMcpCalls([
     {
       label: "Spustit remote MCP smoke proof",
       tool: "arcigy.run_remote_mcp_smoke",
@@ -671,7 +678,22 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       body: { approval: { approved: true }, intake: contractIntake },
       approvalRequired: true,
     },
-  ];
+  ]);
+}
+
+function withExactMcpCalls(
+  calls: Array<Omit<RemoteMcpConnectionPack["quickStartCalls"][number], "exactMcpCall">>
+): RemoteMcpConnectionPack["quickStartCalls"] {
+  return calls.map((call) => ({
+    ...call,
+    exactMcpCall: {
+      tool: call.tool,
+      method: call.method,
+      url: call.url,
+      body: call.body,
+      approvalRequired: call.approvalRequired,
+    },
+  }));
 }
 
 function buildQuickStartContractIntake(): Record<string, unknown> {

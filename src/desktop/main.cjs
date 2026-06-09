@@ -1352,7 +1352,7 @@ const localStateWriteTools = new Set([
 function buildRemoteMcpQuickStartCalls(baseUrl) {
   const toolUrl = (name) => `${baseUrl}/api/mcp/${name}`;
   const contractIntake = buildQuickStartContractIntake();
-  return [
+  return withExactRemoteMcpCalls([
     {
       label: "Spustit remote MCP smoke proof",
       tool: "arcigy.run_remote_mcp_smoke",
@@ -1534,7 +1534,20 @@ function buildRemoteMcpQuickStartCalls(baseUrl) {
       body: { approval: { approved: true }, intake: contractIntake },
       approvalRequired: true,
     },
-  ];
+  ]);
+}
+
+function withExactRemoteMcpCalls(calls) {
+  return calls.map((call) => ({
+    ...call,
+    exactMcpCall: {
+      tool: call.tool,
+      method: call.method,
+      url: call.url,
+      body: call.body,
+      approvalRequired: call.approvalRequired,
+    },
+  }));
 }
 
 function buildQuickStartContractIntake() {

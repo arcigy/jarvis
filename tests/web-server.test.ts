@@ -511,7 +511,14 @@ test("local web bridge serves UI and API health", async () => {
       auth: { header: string; tokenStrong: boolean; tokenValueReturned: boolean };
       limits: { maxJsonBytes: number; pathPolicy: string; writesRequireExplicitToolCall: boolean; authFailureThrottle: { enabled: boolean; limit: number; windowMs: number; scope: string } };
       tools: { count: number; approvalRequired: string[]; readOnlyOrDraft: string[]; localStateWrite: string[] };
-      quickStartCalls: Array<{ tool: string; method: string; url: string; approvalRequired: boolean; body: Record<string, unknown> }>;
+      quickStartCalls: Array<{
+        tool: string;
+        method: string;
+        url: string;
+        approvalRequired: boolean;
+        body: Record<string, unknown>;
+        exactMcpCall: { tool: string; method: string; url: string; approvalRequired: boolean; body: Record<string, unknown> };
+      }>;
       handoff: { connectionPackUrl: string; requiredProof: Array<{ key: string; url: string; expected: string }>; agentFirstSteps: string[] };
       agentCompatibility: { supportedAgents: string[]; safetyRules: string[]; requiredBeforeWork: string[] };
       agentPromptTemplates: { claude: string; chatgpt: string; grok: string; generic: string };
@@ -590,6 +597,9 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(remotePackBody.agentLaunchBundle.safetyRails.some((rail) => rail.includes("OAuth refresh tokens")));
     assert.ok(remotePackBody.quickStartCalls.every((call) => call.method === "POST" && call.url.endsWith(`/api/mcp/${call.tool}`)));
     assert.ok(remotePackBody.quickStartCalls.every((call) => call.approvalRequired === remotePackBody.tools.approvalRequired.includes(call.tool)));
+    assert.ok(remotePackBody.quickStartCalls.every((call) => call.exactMcpCall.tool === call.tool && call.exactMcpCall.url === call.url));
+    assert.ok(remotePackBody.quickStartCalls.every((call) => call.exactMcpCall.method === call.method && call.exactMcpCall.approvalRequired === call.approvalRequired));
+    assert.ok(remotePackBody.quickStartCalls.every((call) => JSON.stringify(call.exactMcpCall.body) === JSON.stringify(call.body)));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_production_verification_evidence" && call.approvalRequired === false));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.identify_email" && typeof call.body.email === "string"));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_client_need_alerts" && call.body.status === "new"));

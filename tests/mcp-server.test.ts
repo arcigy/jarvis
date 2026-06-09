@@ -171,7 +171,14 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
     auth: { header: string; tokenValueReturned: boolean };
     limits: { maxJsonBytes: number; pathPolicy: string; writesRequireExplicitToolCall: boolean; authFailureThrottle: { enabled: boolean; limit: number; windowMs: number; scope: string } };
     tools: { count: number; approvalRequired: string[]; readOnlyOrDraft: string[]; localStateWrite: string[] };
-    quickStartCalls: Array<{ tool: string; method: string; url: string; approvalRequired: boolean; body: Record<string, unknown> }>;
+    quickStartCalls: Array<{
+      tool: string;
+      method: string;
+      url: string;
+      approvalRequired: boolean;
+      body: Record<string, unknown>;
+      exactMcpCall: { tool: string; method: string; url: string; approvalRequired: boolean; body: Record<string, unknown> };
+    }>;
     handoff: { connectionPackUrl: string; requiredProof: Array<{ key: string; url: string; expected: string }>; agentFirstSteps: string[] };
     agentCompatibility: { supportedAgents: string[]; safetyRules: string[]; requiredBeforeWork: string[] };
     agentPromptTemplates: { claude: string; chatgpt: string; grok: string; generic: string };
@@ -212,6 +219,9 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_production_verification_evidence" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.every((call) => call.method === "POST" && call.url === `https://jarvis.example.ngrok-free.app/api/mcp/${call.tool}`));
   assert.ok(pack.quickStartCalls.every((call) => call.approvalRequired === pack.tools.approvalRequired.includes(call.tool)));
+  assert.ok(pack.quickStartCalls.every((call) => call.exactMcpCall.tool === call.tool && call.exactMcpCall.url === call.url));
+  assert.ok(pack.quickStartCalls.every((call) => call.exactMcpCall.method === call.method && call.exactMcpCall.approvalRequired === call.approvalRequired));
+  assert.ok(pack.quickStartCalls.every((call) => call.exactMcpCall.body === call.body));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.identify_email" && call.approvalRequired === false && typeof call.body.email === "string"));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_client_need_alerts" && call.approvalRequired === false && call.body.status === "new"));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_audit_events" && call.approvalRequired === false && call.body.limit === 20));
