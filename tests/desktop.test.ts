@@ -496,7 +496,10 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(uiSmoke, /visibleCortexNodes/);
   assert.match(uiSmoke, /Command core image did not load/);
   assert.match(uiSmoke, /handoffProofGatesText/);
+  assert.match(uiSmoke, /proofReadyMatch/);
+  assert.match(uiSmoke, /Number\(proofReadyMatch\[1\]\) < 13/);
   assert.match(uiSmoke, /Remote proof gates are not rendered/);
+  assert.doesNotMatch(uiSmoke, /ready: 11\\\/11 safety gates/);
   assert.equal(existsSync("src/desktop/assets/jarvis-command-core.png"), true);
   assert.equal(visualAsset.subarray(0, 8).toString("hex"), "89504e470d0a1a0a");
   assert.equal(statSync("src/desktop/assets/jarvis-command-core.png").size > 200000, true);

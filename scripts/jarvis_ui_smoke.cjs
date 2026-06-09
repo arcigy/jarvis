@@ -184,7 +184,15 @@ async function run() {
     if (!/^[0-9]+\/[0-9]+$/.test(dom.readyIntegrationsText)) fail(`Ready integration count is not loaded: ${dom.readyIntegrationsText}.`);
     if (!/^[0-9]+$/.test(dom.mcpToolCountText) || Number(dom.mcpToolCountText) < 28) fail(`MCP tool count is not loaded: ${dom.mcpToolCountText}.`);
     if (!/^[0-9]+$/.test(dom.approvalLockCountText) || Number(dom.approvalLockCountText) < 3) fail(`Approval lock count is not loaded: ${dom.approvalLockCountText}.`);
-    if (!/smoke not run|ready: 11\/11 safety gates|blocked:/i.test(dom.handoffProofGatesText)) fail(`Remote proof gates are not rendered: ${dom.handoffProofGatesText}.`);
+    const proofGateText = String(dom.handoffProofGatesText ?? "");
+    const proofReadyMatch = proofGateText.match(/^ready:\s*(\d+)\/(\d+)\s+safety gates$/i);
+    if (/smoke not run|blocked:/i.test(proofGateText)) {
+      // Initial and blocked states are valid render states for the first smoke pass.
+    } else if (!proofReadyMatch) {
+      fail(`Remote proof gates are not rendered: ${proofGateText}.`);
+    } else if (proofReadyMatch[1] !== proofReadyMatch[2] || Number(proofReadyMatch[1]) < 13) {
+      fail(`Remote proof gates are stale or incomplete: ${proofGateText}.`);
+    }
     if (!/^idle$|^listening$|^awake$|^processing$/i.test(dom.voiceModeText)) fail(`Voice mode is not rendered: ${dom.voiceModeText}.`);
     if (!/microphone ready|text fallback/i.test(dom.voiceInputText)) fail(`Voice input capability is not rendered: ${dom.voiceInputText}.`);
     if (!/speech ready|screen only/i.test(dom.voiceOutputText)) fail(`Voice output capability is not rendered: ${dom.voiceOutputText}.`);
