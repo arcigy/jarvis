@@ -1556,6 +1556,13 @@ test("operator briefing combines readiness, outreach, client needs, and approval
       },
     ],
     preparedReplyCount: 1,
+    preparedReplyHighlights: [
+      {
+        leadEmail: "lead@example.com",
+        companyName: "LeadCo",
+        positiveSignal: "chce demo a termin callu",
+      },
+    ],
     nextActions: ["Replace REDIS_URL."],
   });
 
@@ -1572,6 +1579,8 @@ test("operator briefing combines readiness, outreach, client needs, and approval
   assert.match(briefing.speechText, /Klientske poziadavky: 2/);
   assert.match(briefing.sections.clientNeeds, /Demo Client: potrebuje upravit onboarding automatizaciu/);
   assert.match(briefing.speechText, /Pripravene odpovede: 1/);
+  assert.match(briefing.sections.preparedReplies, /LeadCo: chce demo a termin callu/);
+  assert.match(briefing.sections.preparedReplies, /Poslem ich az po tvojom schvaleni/);
   assert.equal(briefing.sections.nextAction, "Najblizsi krok: Replace REDIS_URL.");
 });
 

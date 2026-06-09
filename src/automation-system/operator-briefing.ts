@@ -25,6 +25,13 @@ export type OperatorBriefingInput = {
     } | null;
   }>;
   preparedReplyCount: number;
+  preparedReplyHighlights?: Array<{
+    leadEmail?: string | null;
+    leadName?: string | null;
+    companyName?: string | null;
+    positiveSignal?: string | null;
+    subject?: string | null;
+  }>;
   nextActions: string[];
 };
 
@@ -48,6 +55,7 @@ export function buildOperatorBriefing(input: OperatorBriefingInput): OperatorBri
   const nextAction = input.nextActions[0] ?? "Ziadny urgentny krok.";
   const readinessAttention = summarizeReadinessAttention(input.readinessAttentionQueue ?? []);
   const clientNeeds = summarizeClientNeeds(input.openClientNeedCount, input.clientNeedHighlights ?? []);
+  const preparedReplies = summarizePreparedReplies(input.preparedReplyCount, input.preparedReplyHighlights ?? []);
   const sections = {
     readiness: `Readiness: ${input.readinessStatus}. ${input.readinessSummary}`,
     readinessAttention,
@@ -56,10 +64,7 @@ export function buildOperatorBriefing(input: OperatorBriefingInput): OperatorBri
     coldOutreach: `Cold outreach: ${input.coldOutreachSummary}`,
     liveSync: input.liveSyncSummary ? `Live sync: ${input.liveSyncSummary}` : undefined,
     clientNeeds,
-    preparedReplies:
-      input.preparedReplyCount > 0
-        ? `Pripravene odpovede: ${input.preparedReplyCount} caka na schvalenie.`
-        : "Pripravene odpovede: nic necaka na schvalenie.",
+    preparedReplies,
     nextAction: `Najblizsi krok: ${nextAction}`,
   };
   const speechText = [
@@ -104,4 +109,19 @@ function summarizeClientNeeds(count: number, highlights: NonNullable<OperatorBri
     .filter(Boolean);
   if (!topItems.length) return `Klientske poziadavky: ${count} otvorenych.`;
   return `Klientske poziadavky: ${count} otvorenych. Najnovsie: ${topItems.join("; ")}.`;
+}
+
+function summarizePreparedReplies(count: number, highlights: NonNullable<OperatorBriefingInput["preparedReplyHighlights"]>): string {
+  if (count <= 0) return "Pripravene odpovede: nic necaka na schvalenie.";
+  const topItems = highlights
+    .slice(0, 3)
+    .map((item) => {
+      const name = item.leadName || item.companyName || item.leadEmail || "neznamy lead";
+      const signal = item.positiveSignal || item.subject || "pozitivna odpoved";
+      return `${name}: ${signal}`;
+    })
+    .filter(Boolean);
+  const base = `Pripravene odpovede: ${count} caka na schvalenie.`;
+  const guard = "Poslem ich az po tvojom schvaleni.";
+  return topItems.length ? `${base} Najnovsie: ${topItems.join("; ")}. ${guard}` : `${base} ${guard}`;
 }

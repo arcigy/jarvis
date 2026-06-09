@@ -1337,6 +1337,7 @@ async function getOperatorBriefing(payload: Record<string, unknown>) {
     openClientNeedCount: Number(clientNeeds.count ?? 0),
     clientNeedHighlights: Array.isArray(clientNeeds.alerts) ? clientNeeds.alerts : [],
     preparedReplyCount,
+    preparedReplyHighlights: Array.isArray(preparedReplies.replies) ? preparedReplies.replies : [],
     nextActions: readiness.nextActions,
   });
 }

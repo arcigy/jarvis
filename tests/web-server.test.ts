@@ -234,6 +234,19 @@ test("local web bridge serves UI and API health", async () => {
     });
     assert.equal(approvedPreparedReply.result.status, "approved");
 
+    const pendingBriefingReply = await postJson(`${baseUrl}/api/mcp/arcigy.add_cold_outreach_event`, {
+      dbPath: mcpDbPath,
+      leadEmail: "briefing-lead@example.com",
+      eventType: "prepared_reply",
+      occurredAt: "2026-06-07T11:00:00Z",
+      data: {
+        subject: "Re: demo",
+        replyText: "Dakujem, navrhujem kratky call.",
+        positiveSignal: "chce demo a termin callu",
+      },
+    });
+    assert.equal(pendingBriefingReply.result.leadEmail, "briefing-lead@example.com");
+
     const voiceTool = await postJson(`${baseUrl}/api/mcp/arcigy.jarvis_voice_event`, {
       text: "Jarvis",
       session: { state: "idle", wakeWord: "jarvis" },
@@ -352,10 +365,12 @@ test("local web bridge serves UI and API health", async () => {
       body: JSON.stringify({ dbPath: mcpDbPath, since: "2026-06-01T00:00:00Z", until: "2026-06-08T00:00:00Z", periodLabel: "poslednych 7 dni" }),
     });
     assert.equal(operatorBriefing.status, 200);
-    const operatorBriefingBody = (await operatorBriefing.json()) as { speechText: string; sections: { productionEvidence?: string } };
+    const operatorBriefingBody = (await operatorBriefing.json()) as { speechText: string; sections: { productionEvidence?: string; preparedReplies?: string } };
     assert.match(operatorBriefingBody.speechText, /Jarvis briefing/);
     assert.match(operatorBriefingBody.speechText, /Production evidence:/);
     assert.match(operatorBriefingBody.sections.productionEvidence ?? "", /Production verification/);
+    assert.match(operatorBriefingBody.sections.preparedReplies ?? "", /briefing-lead@example\.com/);
+    assert.match(operatorBriefingBody.sections.preparedReplies ?? "", /Poslem ich az po tvojom schvaleni/);
 
     const mcpOperatorBriefing = await postJson(`${baseUrl}/api/mcp/arcigy.get_operator_briefing`, {
       dbPath: mcpDbPath,
@@ -365,6 +380,8 @@ test("local web bridge serves UI and API health", async () => {
     });
     assert.match(mcpOperatorBriefing.result.speechText, /Jarvis briefing/);
     assert.match(mcpOperatorBriefing.result.speechText, /Production evidence:/);
+    assert.match(mcpOperatorBriefing.result.sections.preparedReplies, /briefing-lead@example\.com/);
+    assert.match(mcpOperatorBriefing.result.sections.preparedReplies, /Poslem ich az po tvojom schvaleni/);
 
     const readiness = await fetch(`${baseUrl}/api/production-readiness`, {
       method: "POST",
