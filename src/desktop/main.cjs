@@ -1362,7 +1362,7 @@ function buildRemoteMcpQuickStartCalls(baseUrl) {
       body: {
         leadEmail: "lead@example.com",
         positiveSignal: "Lead odpovedal pozitivne a chce kratky call.",
-        context: "Remote handoff demo. This stores a local prepared_reply draft only.",
+        context: "Remote handoff approval draft. This stores a local prepared_reply draft only.",
         language: "sk",
         tone: "executive",
       },
@@ -1416,7 +1416,7 @@ function buildRemoteMcpQuickStartCalls(baseUrl) {
 function buildQuickStartContractIntake() {
   return {
     client: {
-      businessName: "Demo Klient s. r. o.",
+      businessName: "Modelovy Klient s. r. o.",
       registeredAddress: "Hlavna 1, 811 01 Bratislava",
       companyId: "12345678",
       taxId: "SK1234567890",
@@ -1430,7 +1430,7 @@ function buildQuickStartContractIntake() {
       arcigyAuthorizedContact: "Branislav Laubert, Co-Founder & CEO, branislav@arcigy.group, +421 951 268 376",
     },
     project: {
-      name: "Demo automatizacna aplikacia",
+      name: "Modelova automatizacna aplikacia",
       goal: "Automatizovat prijem leadov, klientsku evidenciu a reportovanie.",
       includedUserAccounts: 2,
       feedbackRounds: 3,
@@ -1459,7 +1459,7 @@ function buildQuickStartContractIntake() {
       projectAppendixDate: "2026-06-08",
       plannedLaunchDate: "2026-07-15",
     },
-    specialTerms: ["Demo quick-start payload; operator must replace client data before real use."],
+    specialTerms: ["Safe quick-start payload; operator must replace client data before real use."],
     additionalAttachments: [],
   };
 }
