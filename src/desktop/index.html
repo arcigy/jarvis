@@ -16,14 +16,14 @@
         <div class="mark">A</div>
         <div>
           <strong>Arcigy Jarvis</strong>
-          <span>Production command center</span>
+          <span>Produkcne riadiace centrum</span>
         </div>
       </div>
       <nav>
         <button class="active" data-target="jarvisPanel">Jarvis</button>
         <button data-target="coldPanel">Cold outreach</button>
         <button data-target="clientPanel">Klienti & leads</button>
-        <button data-target="leadPanel">Lead discovery</button>
+        <button data-target="leadPanel">Leady</button>
         <button data-target="contractPanel">Zmluvy</button>
         <button data-target="operationsPanel">Integracie</button>
         <button data-target="mcpPanel">MCP</button>
@@ -39,7 +39,7 @@
           <strong id="radarRemoteProof">smoke caka</strong>
         </div>
         <div class="radarNode" data-state="checking">
-          <span>Live checks</span>
+          <span>Live kontroly</span>
           <strong id="radarLiveChecks">evidence caka</strong>
         </div>
         <div class="radarNode" data-state="checking">
@@ -47,7 +47,7 @@
           <strong id="radarApprovals">kontrola</strong>
         </div>
         <div class="radarNode" data-state="checking">
-          <span>Client watch</span>
+          <span>Klient watch</span>
           <strong id="radarClientAlerts">startujem</strong>
         </div>
         <div class="radarSweepLabel" id="radarSweepLabel">Jarvis takticky radar sa zahrieva</div>
@@ -60,7 +60,7 @@
           <h1>Arcigy Jarvis</h1>
           <p>Voice command center pre zmluvy, outreach, klientsku pamat, Gemini drafty a MCP operacie.</p>
         </div>
-        <div class="status" id="statusBadge">Idle</div>
+        <div class="status" id="statusBadge">Pripraveny</div>
       </header>
 
       <section class="missionRail" id="missionRail" aria-label="Live mission signals">
@@ -69,8 +69,8 @@
           <strong id="missionReadiness">kontrola</strong>
         </div>
         <div class="missionSignal" data-state="ready">
-          <span>Voice</span>
-          <strong id="missionVoice">idle</strong>
+          <span>Hlas</span>
+          <strong id="missionVoice">pripraveny</strong>
         </div>
         <div class="missionSignal" data-state="checking">
           <span>Gmail watch</span>
@@ -102,7 +102,7 @@
           <strong id="readyIntegrations">--</strong>
         </div>
         <div class="deckMetric">
-          <span>MCP tools</span>
+          <span>MCP tooly</span>
           <strong id="mcpToolCount">--</strong>
         </div>
         <div class="deckMetric">
@@ -145,8 +145,8 @@
 
       <section class="cortexMap" id="cortexMap" aria-label="Jarvis operational cortex">
         <div class="cortexNode" data-target="jarvisPanel" data-state="ready" role="button" tabindex="0">
-          <span>Voice</span>
-          <strong id="cortexVoice">standing by</strong>
+          <span>Hlas</span>
+          <strong id="cortexVoice">pripraveny</strong>
           <i></i>
         </div>
         <div class="cortexNode" data-target="coldPanel" data-state="checking" role="button" tabindex="0">
@@ -155,12 +155,12 @@
           <i></i>
         </div>
         <div class="cortexNode" data-target="clientPanel" data-state="checking" role="button" tabindex="0">
-          <span>Memory</span>
-          <strong id="cortexMemory">watching</strong>
+          <span>Pamat</span>
+          <strong id="cortexMemory">sleduje</strong>
           <i></i>
         </div>
         <div class="cortexNode" data-target="contractPanel" data-state="checking" role="button" tabindex="0">
-          <span>Contracts</span>
+          <span>Zmluvy</span>
           <strong id="cortexContracts">kontrola</strong>
           <i></i>
         </div>
@@ -175,61 +175,61 @@
         <article class="panel listener" id="jarvisPanel">
           <div class="panelHead">
             <div>
-              <h2>Voice listener</h2>
-              <p>Say "Jarvis" after enabling microphone listening.</p>
+              <h2>Hlasovy listener</h2>
+              <p>Po zapnuti mikrofonu povedz "Jarvis".</p>
             </div>
-            <button id="listenButton">Enable</button>
+            <button id="listenButton">Zapnut</button>
           </div>
           <dl class="voiceRuntime" id="voiceRuntime">
-            <div><dt>Mode</dt><dd id="voiceMode">idle</dd></div>
-            <div><dt>Input</dt><dd id="voiceInput">kontrola</dd></div>
-            <div><dt>Output</dt><dd id="voiceOutput">kontrola</dd></div>
-            <div><dt>Event</dt><dd id="voiceLastEvent">standby</dd></div>
+            <div><dt>Rezim</dt><dd id="voiceMode">pripraveny</dd></div>
+            <div><dt>Vstup</dt><dd id="voiceInput">kontrola</dd></div>
+            <div><dt>Vystup</dt><dd id="voiceOutput">kontrola</dd></div>
+            <div><dt>Udalost</dt><dd id="voiceLastEvent">standby</dd></div>
           </dl>
           <div class="orb" id="orb"></div>
           <label>
-            Transcript
+            Prepis
             <textarea id="transcript" spellcheck="false" placeholder="Jarvis, co sa dialo v cold outreach dnes?"></textarea>
           </label>
           <div class="actions">
-            <button id="simulateWake">Simulate wake</button>
-            <button id="submitTranscript">Send transcript</button>
+            <button id="simulateWake">Simulovat Jarvis</button>
+            <button id="submitTranscript">Odoslat prepis</button>
           </div>
         </article>
 
         <article class="panel">
-          <h2>Jarvis response</h2>
+          <h2>Jarvis odpoved</h2>
           <div class="response" id="response">Cakam na wake word.</div>
         </article>
 
         <article class="panel" id="coldPanel">
-          <h2>Cold outreach live brief</h2>
+          <h2>Cold outreach brief</h2>
           <dl>
-            <div><dt>Source</dt><dd>Smartlead live</dd></div>
-            <div><dt>Period</dt><dd>7d</dd></div>
-            <div><dt>Mode</dt><dd>Live + SQLite fallback</dd></div>
-            <div><dt>Approval</dt><dd>Manual send lock</dd></div>
+            <div><dt>Zdroj</dt><dd>Smartlead live</dd></div>
+            <div><dt>Obdobie</dt><dd>7d</dd></div>
+            <div><dt>Rezim</dt><dd>Live + SQLite fallback</dd></div>
+            <div><dt>Schvalenie</dt><dd>Manualny send lock</dd></div>
           </dl>
           <div class="buttonGroup">
-            <button id="coldBrief">Ask Jarvis</button>
-            <button id="approvalQueue">Approval queue</button>
-            <button id="preparedReplies">Prepared replies</button>
-            <button id="preparePositiveReply">Prepare positive</button>
-            <button id="approvePreparedReply">Approve first</button>
-            <button id="sendApprovedReply">Send approved</button>
+            <button id="coldBrief">Spytat Jarvisa</button>
+            <button id="approvalQueue">Schvalenia</button>
+            <button id="preparedReplies">Pripravene odpovede</button>
+            <button id="preparePositiveReply">Pripravit pozitivnu</button>
+            <button id="approvePreparedReply">Schvalit prvu</button>
+            <button id="sendApprovedReply">Odoslat schvalenu</button>
           </div>
           <div class="splitControls">
             <label>
-              Lead email
+              Email leadu
               <input id="positiveLeadEmail" spellcheck="false" placeholder="lead@example.com" />
             </label>
             <label>
-              Subject
+              Predmet
               <input id="positiveReplySubject" spellcheck="false" placeholder="Re: Arcigy" />
             </label>
           </div>
           <label>
-            Positive signal
+            Pozitivny signal
             <textarea id="positiveSignal" spellcheck="false" placeholder="Lead chce cenu, termin callu alebo viac detailov."></textarea>
           </label>
           <div class="response compact" id="preparedReplyResult">Ziadne pripravene odpovede este nie su nacitane.</div>
@@ -238,7 +238,7 @@
         <article class="panel operationsPanel" id="operationsPanel">
           <div class="panelHead">
             <div>
-              <h2>Operations sync</h2>
+              <h2>Sync operacii</h2>
               <p>Taha najnovsie Gmail signaly do lokalnej pamate a kontroluje Smartlead kampane.</p>
             </div>
             <div class="buttonGroup">
@@ -323,7 +323,7 @@
             </div>
           </div>
           <label>
-            Search query
+            Vyhladavaci dotaz
             <textarea id="leadQuery" spellcheck="false" placeholder="automation agency Bratislava"></textarea>
           </label>
           <div class="response compact leadResult" id="leadResult">Pripravene na read-only lead discovery.</div>
@@ -347,7 +347,7 @@
         <article class="panel" id="mcpPanel">
           <div class="panelHead">
             <div>
-              <h2>MCP tools</h2>
+              <h2>MCP tooly</h2>
               <p>Skontroluje lokalny web bridge pred vystavenim MCP toolov cez tunel.</p>
             </div>
             <button id="checkWebBridge">Preflight</button>
@@ -374,7 +374,7 @@
           <div class="handoffPanel" aria-label="Remote agent handoff">
             <div class="handoffHead">
               <div>
-                <span>Remote agent pack</span>
+                <span>Pack pre remote agenta</span>
                 <strong id="handoffStatus">caka</strong>
               </div>
               <div class="buttonGroup">

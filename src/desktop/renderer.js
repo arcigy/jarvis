@@ -325,20 +325,28 @@ function requiredInputValue(element, message) {
 
 function setMode(mode) {
   state.mode = mode;
-  elements.statusBadge.textContent = mode === "idle" ? "Idle" : mode === "awake" ? "Awake" : "Listening";
+  elements.statusBadge.textContent = mode === "idle" ? "Pripraveny" : mode === "awake" ? "Aktivny" : "Pocuva";
   elements.orb.dataset.mode = mode;
-  setMissionSignal(elements.missionVoice, mode === "idle" ? "idle" : mode, mode === "idle" ? "ready" : "attention");
-  setCortexSignal(elements.cortexVoice, mode === "idle" ? "standing by" : mode, mode === "idle" ? "ready" : "attention");
+  setMissionSignal(elements.missionVoice, mode === "idle" ? "pripraveny" : voiceModeLabel(mode), mode === "idle" ? "ready" : "attention");
+  setCortexSignal(elements.cortexVoice, mode === "idle" ? "pripraveny" : voiceModeLabel(mode), mode === "idle" ? "ready" : "attention");
   updateVoiceRuntimeStatus();
+}
+
+function voiceModeLabel(mode) {
+  if (mode === "idle") return "pripraveny";
+  if (mode === "awake") return "aktivny";
+  if (mode === "processing") return "spracuvam";
+  if (mode === "listening") return "pocuva";
+  return String(mode ?? "neznamy");
 }
 
 function updateVoiceRuntimeStatus(eventText) {
   const inputReady = Boolean(SpeechRecognition);
   const runtimeState = state.listening || state.mode === "awake" || state.mode === "processing" ? "attention" : "ready";
   elements.voiceRuntime.dataset.state = runtimeState;
-  elements.voiceMode.textContent = state.listening ? "listening" : state.mode;
-  elements.voiceInput.textContent = inputReady ? "microphone ready" : "text fallback";
-  elements.voiceOutput.textContent = speechOutputAvailable ? "speech ready" : "screen only";
+  elements.voiceMode.textContent = state.listening ? "pocuva" : voiceModeLabel(state.mode);
+  elements.voiceInput.textContent = inputReady ? "mikrofon ready" : "text fallback";
+  elements.voiceOutput.textContent = speechOutputAvailable ? "hlas ready" : "iba obrazovka";
   if (eventText) elements.voiceLastEvent.textContent = redactSensitiveText(eventText).replace(/\s+/g, " ").trim().slice(0, 96);
 }
 
@@ -462,12 +470,12 @@ function renderLaunchQueue(report) {
   const status = report.status ?? "unknown";
   const attentionQueue = report.attentionQueue ?? [];
   const launchChecklist = report.launchChecklist ?? [];
-  const nextAction = report.nextActions?.[0] ?? "No action needed. Keep running production verification before changes.";
+  const nextAction = report.nextActions?.[0] ?? "Netreba akciu. Pred zmenami dalej spustaj production verification.";
   const attention = attentionQueue[0];
   elements.launchQueue?.setAttribute("data-state", status === "ready" ? "ready" : "attention");
   elements.launchStatus.textContent = status;
   elements.launchNextAction.textContent = nextAction;
-  elements.launchAttention.textContent = attention ? `${attention.severity}: ${attention.title}` : "clear";
+  elements.launchAttention.textContent = attention ? `${attention.severity}: ${attention.title}` : "ciste";
   elements.launchChecklist.replaceChildren();
   for (const item of launchChecklist.slice(0, 3)) {
     const node = document.createElement("li");
@@ -491,7 +499,7 @@ function renderProductionVerificationEvidence(evidence) {
   const checks = Array.isArray(evidence?.checks) ? evidence.checks : [];
   const ready = checks.filter((check) => check?.status === "ready").length;
   const failed = checks.filter((check) => check?.status === "failed").length;
-  const generatedAt = evidence?.generatedAt ? new Date(evidence.generatedAt).toLocaleString() : "not generated";
+  const generatedAt = evidence?.generatedAt ? new Date(evidence.generatedAt).toLocaleString() : "negenerovane";
   elements.verificationEvidence.textContent = status === "ready" && fresh ? `${ready} gates ready` : `${status}: ${failed} failed`;
   elements.verificationEvidence.title = `${evidence?.summary ?? "Run npm run verify:production."} ${generatedAt}`;
   elements.verificationEvidence.closest("div")?.setAttribute("data-state", status === "ready" && fresh ? "ready" : "attention");
@@ -507,9 +515,9 @@ function renderReleaseProof(evidence, generatedAt) {
   const dirty = typeof release.dirty === "boolean" ? (release.dirty ? "dirty" : "clean") : "unknown";
   const fresh = freshness.fresh === true ? `fresh ${freshness.ageHours}h` : "stale or missing";
   const items = [
-    ["Commit", release.shortCommit || "not verified"],
+    ["Commit", release.shortCommit || "neoverene"],
     ["Tree", dirty],
-    ["MCP gates", gates ? String(gates) : "not verified"],
+    ["MCP gates", gates ? String(gates) : "neoverene"],
     ["Freshness", fresh],
   ];
   elements.releaseProofGrid.replaceChildren();
@@ -569,13 +577,13 @@ function buildCommandTimeline(blockers, bridge, advisories = []) {
   const bridgeState = bridge ? (bridge.readyForTunnel ? "MCP bridge je pripraveny na tunel." : "MCP bridge potrebuje attention.") : "MCP bridge preflight nie je nacitany.";
   if (!blockers.length) {
     const advisoryText = advisories.length ? ` Non-blocking advisory: ${advisories.map((item) => item.key).join(", ")}.` : "";
-    return `All required integration gates are ready.${advisoryText} ${bridgeState}`;
+    return `Vsetky povinne integracne gates su ready.${advisoryText} ${bridgeState}`;
   }
   const blockerText = blockers
     .map((item) => `${item.key}: ${(item.missing ?? []).join(", ")}`)
     .slice(0, 3)
     .join(" | ");
-  return `${blockers.length} integration gate(s) need attention. ${blockerText}. ${bridgeState}`;
+  return `${blockers.length} integration gate potrebuje attention. ${blockerText}. ${bridgeState}`;
 }
 
 function setMissionSignal(node, text, stateName) {
@@ -599,13 +607,13 @@ function renderMissionSignals(health, bridge = null) {
   const smartlead = integrations.find((item) => item.key === "smartlead");
   const readinessText = requiredBlockers.length ? `${requiredBlockers.length} blocker` : advisories.length ? `${advisories.length} advisory` : "ready";
   setMissionSignal(elements.missionReadiness, readinessText, requiredBlockers.length || advisories.length ? "attention" : "ready");
-  setMissionSignal(elements.missionGmail, gmail?.configured ? (state.clientAlertWatchEnabled ? "watching" : "paused") : "needs auth", gmail?.configured ? "ready" : "attention");
-  setMissionSignal(elements.missionRemote, bridge ? (bridge.readyForTunnel ? "ready" : "locked") : "checking", bridge ? (bridge.readyForTunnel ? "ready" : "attention") : "checking");
-  setMissionSignal(elements.missionContracts, gemini?.configured ? "Gemini ready" : "needs Gemini", gemini?.configured ? "ready" : "attention");
-  setCortexSignal(elements.cortexOutreach, smartlead?.configured ? "Smartlead ready" : "needs key", smartlead?.configured ? "ready" : "attention");
-  setCortexSignal(elements.cortexMemory, gmail?.configured ? (state.clientAlertWatchEnabled ? "Gmail watch" : "watch pauznuty") : "needs Gmail", gmail?.configured && state.clientAlertWatchEnabled ? "ready" : "attention");
-  setCortexSignal(elements.cortexContracts, gemini?.configured ? "Gemini intake" : "needs Gemini", gemini?.configured ? "ready" : "attention");
-  setCortexSignal(elements.cortexRemote, bridge ? (bridge.readyForTunnel ? "tunnel ready" : "auth locked") : "checking", bridge ? (bridge.readyForTunnel ? "ready" : "attention") : "checking");
+  setMissionSignal(elements.missionGmail, gmail?.configured ? (state.clientAlertWatchEnabled ? "watch aktivny" : "pauznuty") : "chyba auth", gmail?.configured ? "ready" : "attention");
+  setMissionSignal(elements.missionRemote, bridge ? (bridge.readyForTunnel ? "ready" : "zamknute") : "kontrola", bridge ? (bridge.readyForTunnel ? "ready" : "attention") : "checking");
+  setMissionSignal(elements.missionContracts, gemini?.configured ? "Gemini ready" : "chyba Gemini", gemini?.configured ? "ready" : "attention");
+  setCortexSignal(elements.cortexOutreach, smartlead?.configured ? "Smartlead ready" : "chyba key", smartlead?.configured ? "ready" : "attention");
+  setCortexSignal(elements.cortexMemory, gmail?.configured ? (state.clientAlertWatchEnabled ? "Gmail watch" : "watch pauznuty") : "chyba Gmail", gmail?.configured && state.clientAlertWatchEnabled ? "ready" : "attention");
+  setCortexSignal(elements.cortexContracts, gemini?.configured ? "Gemini intake" : "chyba Gemini", gemini?.configured ? "ready" : "attention");
+  setCortexSignal(elements.cortexRemote, bridge ? (bridge.readyForTunnel ? "tunel ready" : "auth zamok") : "kontrola", bridge ? (bridge.readyForTunnel ? "ready" : "attention") : "checking");
 }
 
 function renderReadinessReport(report) {
@@ -622,24 +630,24 @@ function renderReadinessReport(report) {
     `Schvalovacie zamky: ${(report.mcp?.approvalRequired ?? []).length}`,
     "",
     launchChecklist.length ? "Launch checklist:" : "Launch checklist: nie je nacitany",
-    ...launchChecklist.map((item) => [`- [${item.status}] ${item.title}`, `  Proof: ${item.proof}`, `  Next: ${item.nextAction}`].join("\n")),
+    ...launchChecklist.map((item) => [`- [${item.status}] ${item.title}`, `  Proof: ${item.proof}`, `  Dalsi krok: ${item.nextAction}`].join("\n")),
     "",
     launchEvidence ? `Launch evidence: ${launchEvidence.decision}` : "Launch evidence: nie je nacitana",
-    ...proofGates.map((gate) => [`- [${gate.status}] ${gate.title}`, `  Proof: ${gate.proof}`, `  Validate: ${gate.validationCommand}`].join("\n")),
+    ...proofGates.map((gate) => [`- [${gate.status}] ${gate.title}`, `  Proof: ${gate.proof}`, `  Validacia: ${gate.validationCommand}`].join("\n")),
     launchEvidence?.remoteHandoff
       ? [
           `Remote handoff: ${launchEvidence.remoteHandoff.tunnelCommand}`,
           `Smoke: ${launchEvidence.remoteHandoff.smokeCommand}`,
-          `Next: ${launchEvidence.operatorNextAction}`,
+          `Dalsi krok: ${launchEvidence.operatorNextAction}`,
         ].join("\n")
       : null,
     "",
-    blockers.length ? "Blockers:" : "Blockers: none",
+    blockers.length ? "Blockers:" : "Blockers: ziadne",
     ...blockers.map((blocker) => `- ${blocker.key}: ${blocker.message}`),
     "",
-    attentionQueue.length ? "Attention queue:" : "Attention queue: clear",
+    attentionQueue.length ? "Attention queue:" : "Attention queue: cista",
     ...attentionQueue.map((item) =>
-      [`- [${item.severity}] ${item.title}`, `  Source: ${item.source}`, `  Next: ${item.nextAction}`, `  Validate: ${item.validationCommand}`].join("\n")
+      [`- [${item.severity}] ${item.title}`, `  Zdroj: ${item.source}`, `  Dalsi krok: ${item.nextAction}`, `  Validacia: ${item.validationCommand}`].join("\n")
     ),
     "",
     "Dalsie kroky:",
@@ -647,7 +655,7 @@ function renderReadinessReport(report) {
     "",
     "Fix guide:",
     ...(report.fixGuide ?? []).map((step) =>
-      [`- ${step.title}`, `  Env: ${(step.envKeys ?? []).join(", ") || "none"}`, `  Validate: ${step.validationCommand}`, `  ${step.detail}`].join("\n")
+      [`- ${step.title}`, `  Env: ${(step.envKeys ?? []).join(", ") || "none"}`, `  Validacia: ${step.validationCommand}`, `  ${step.detail}`].join("\n")
     ),
   ].join("\n");
 }
@@ -827,39 +835,39 @@ function renderFullLaunchProof({ health, bridge, readiness, evidence, smoke }) {
       : "Jarvis full launch proof is ready.";
   return [
     headline,
-    `Integrations: ${productionSafeIntegrations}/${integrations.length || "--"} production-safe.`,
-    `Bridge: ${bridge?.readyForTunnel ? "ready for tunnel" : "needs token or preflight attention"}.`,
+    `Integracie: ${productionSafeIntegrations}/${integrations.length || "--"} production-safe.`,
+    `Bridge: ${bridge?.readyForTunnel ? "ready na tunel" : "potrebuje token alebo preflight attention"}.`,
     `Readiness: ${readiness?.status ?? "unknown"}; ${blocking.length} blocking, ${advisories.length} advisory.`,
     `Production evidence: ${evidence?.status ?? "missing"}, tree ${release.dirty === false ? "clean" : "not clean"}, freshness ${
       freshness.fresh === true ? `fresh ${freshness.ageHours}h` : "stale or missing"
     }.`,
-    `Remote MCP smoke: ${smokeGates ? smokeGates.text : smoke?.status ?? "not verified"}; required gates ${gates}/${requiredRemoteSmokeGates.length}.`,
+    `Remote MCP smoke: ${smokeGates ? smokeGates.text : smoke?.status ?? "neoverene"}; required gates ${gates}/${requiredRemoteSmokeGates.length}.`,
     blocking[0]?.nextAction
-      ? `Next: ${blocking[0].nextAction}`
+      ? `Dalsi krok: ${blocking[0].nextAction}`
       : advisories[0]?.nextAction
         ? `Advisory: ${advisories[0].nextAction}`
-        : "Next: keep proof fresh before remote agent handoff.",
+        : "Dalsi krok: drz proof cerstvy pred remote agent handoff.",
   ].join("\n");
 }
 
 function renderLeadDiscovery(result) {
   const leads = result.leads ?? [];
-  const sources = (result.sources ?? []).join(", ") || "none";
+  const sources = (result.sources ?? []).join(", ") || "ziadne";
   const providerLines = (result.providerStatus ?? []).map((provider) => `${provider.source}: ${provider.status}${provider.message ? ` - ${provider.message}` : ""}`);
   if (!leads.length) {
-    return [`No leads found. Sources checked: ${sources}.`, ...providerLines].join("\n");
+    return [`Ziadne leady nenajdene. Overene zdroje: ${sources}.`, ...providerLines].join("\n");
   }
   return [
-    `Found ${leads.length} leads. Sources: ${sources}.`,
+    `Najdene leady: ${leads.length}. Zdroje: ${sources}.`,
     ...providerLines,
     "",
     ...leads.map((lead, index) =>
       [
         `${index + 1}. ${lead.name}`,
-        lead.website ? `   Website: ${lead.website}` : null,
+        lead.website ? `   Web: ${lead.website}` : null,
         lead.phone ? `   Phone: ${lead.phone}` : null,
-        lead.address ? `   Address: ${lead.address}` : null,
-        lead.source ? `   Source: ${lead.source}` : null,
+        lead.address ? `   Adresa: ${lead.address}` : null,
+        lead.source ? `   Zdroj: ${lead.source}` : null,
       ]
         .filter(Boolean)
         .join("\n")
@@ -1182,7 +1190,7 @@ async function refreshClientNeedAlerts({ announceNew = false, loadingText = null
     : `Client alert watch pauznuty. Otvorene poziadavky: ${result.count ?? alerts.length}. ${state.lastClientAlertGmailSyncSummary}`;
   setCortexSignal(
     elements.cortexMemory,
-    Number(result.count ?? alerts.length) > 0 ? `${result.count ?? alerts.length} open need(s)` : "watch clear",
+    Number(result.count ?? alerts.length) > 0 ? `${result.count ?? alerts.length} otvorene poziadavky` : "watch cisty",
     Number(result.count ?? alerts.length) > 0 ? "attention" : state.clientAlertWatchEnabled ? "ready" : "attention"
   );
 
@@ -1219,7 +1227,7 @@ async function maybeSyncGmailForClientAlerts({ force = false } = {}) {
 function startClientNeedWatch() {
   state.clientAlertWatchEnabled = true;
   elements.toggleClientNeedWatch.textContent = "Pauznut watch";
-  setMissionSignal(elements.missionGmail, "watching", "ready");
+  setMissionSignal(elements.missionGmail, "watch aktivny", "ready");
   setCortexSignal(elements.cortexMemory, "Gmail watch", "ready");
   if (state.clientAlertPollTimer) window.clearInterval(state.clientAlertPollTimer);
   void refreshClientNeedAlerts({ announceNew: false }).catch((error) => {
@@ -1239,7 +1247,7 @@ function stopClientNeedWatch() {
   state.clientAlertPollTimer = null;
   elements.toggleClientNeedWatch.textContent = "Obnovit watch";
   elements.clientAlertWatchStatus.textContent = "Client alert watch pauznuty.";
-  setMissionSignal(elements.missionGmail, "paused", "attention");
+  setMissionSignal(elements.missionGmail, "pauznuty", "attention");
   setCortexSignal(elements.cortexMemory, "watch pauznuty", "attention");
 }
 
@@ -1293,17 +1301,17 @@ function renderWebBridgePreflight(result) {
 function renderBridgeCockpit(result) {
   state.lastBridgePreflight = result;
   const warnings = result.warnings ?? [];
-  elements.bridgeTunnelState.textContent = result.readyForTunnel ? "ready" : "locked";
-  elements.bridgeAuthState.textContent = result.tokenConfigured ? "token set" : "needs token";
-  elements.bridgeManifestState.textContent = result.manifestUrl ? "online" : "missing";
-  elements.bridgeToolState.textContent = result.mcpToolCount ? `${result.mcpToolCount} tools` : "offline";
+  elements.bridgeTunnelState.textContent = result.readyForTunnel ? "ready" : "zamknute";
+  elements.bridgeAuthState.textContent = result.tokenConfigured ? "token ready" : "chyba token";
+  elements.bridgeManifestState.textContent = result.manifestUrl ? "online" : "chyba";
+  elements.bridgeToolState.textContent = result.mcpToolCount ? `${result.mcpToolCount} toolov` : "offline";
   elements.bridgeTunnelState.dataset.state = result.readyForTunnel ? "ready" : "attention";
   elements.bridgeAuthState.dataset.state = result.tokenConfigured ? "ready" : "attention";
   elements.bridgeManifestState.dataset.state = result.manifestUrl ? "ready" : "attention";
   elements.bridgeToolState.dataset.state = result.mcpToolCount ? "ready" : "attention";
   if (warnings.length) elements.bridgeTunnelState.dataset.state = "attention";
-  setMissionSignal(elements.missionRemote, result.readyForTunnel ? "ready" : "locked", result.readyForTunnel ? "ready" : "attention");
-  setCortexSignal(elements.cortexRemote, result.readyForTunnel ? "tunnel ready" : "auth locked", result.readyForTunnel ? "ready" : "attention");
+  setMissionSignal(elements.missionRemote, result.readyForTunnel ? "ready" : "zamknute", result.readyForTunnel ? "ready" : "attention");
+  setCortexSignal(elements.cortexRemote, result.readyForTunnel ? "tunel ready" : "auth zamok", result.readyForTunnel ? "ready" : "attention");
   updateOperationsRadar();
 }
 
@@ -1549,8 +1557,8 @@ function renderRemoteMcpSmoke(report) {
   state.lastRemoteMcpSmoke = report;
   updateOperationsRadar();
   elements.remoteSmokeResult.dataset.state = report.status === "ready" ? "ready" : "attention";
-  setMissionSignal(elements.missionRemote, report.status === "ready" ? "smoke ready" : "smoke blocked", report.status === "ready" ? "ready" : "attention");
-  setCortexSignal(elements.cortexRemote, report.status === "ready" ? "smoke ready" : "smoke blocked", report.status === "ready" ? "ready" : "attention");
+  setMissionSignal(elements.missionRemote, report.status === "ready" ? "smoke ready" : "smoke blokovany", report.status === "ready" ? "ready" : "attention");
+  setCortexSignal(elements.cortexRemote, report.status === "ready" ? "smoke ready" : "smoke blokovany", report.status === "ready" ? "ready" : "attention");
   const proof = summarizeRemoteProofGates(report);
   elements.handoffProofGates.textContent = proof.text;
   elements.handoffProofGates.dataset.state = proof.ready ? "ready" : "attention";

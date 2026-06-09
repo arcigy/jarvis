@@ -288,10 +288,10 @@ async function run() {
     for (const expected of ["Claude", "ChatGPT", "Grok", "openapi-custom-action", "openapi-or-http-json", "external-http-mcp"]) {
       if (!agentSetupText.includes(expected)) fail(`Agent setup profiles are not rendered: missing ${expected}.`);
     }
-    if (!/^idle$|^listening$|^awake$|^processing$/i.test(dom.voiceModeText)) fail(`Voice mode is not rendered: ${dom.voiceModeText}.`);
-    if (!/microphone ready|text fallback/i.test(dom.voiceInputText)) fail(`Voice input capability is not rendered: ${dom.voiceInputText}.`);
-    if (!/speech ready|screen only/i.test(dom.voiceOutputText)) fail(`Voice output capability is not rendered: ${dom.voiceOutputText}.`);
-    if (!/standby|microphone|fallback|disabled|heard/i.test(dom.voiceLastEventText)) fail(`Voice event status is not rendered: ${dom.voiceLastEventText}.`);
+    if (!/^pripraveny$|^pocuva$|^aktivny$|^spracuvam$/i.test(dom.voiceModeText)) fail(`Voice mode is not rendered: ${dom.voiceModeText}.`);
+    if (!/mikrofon ready|text fallback/i.test(dom.voiceInputText)) fail(`Voice input capability is not rendered: ${dom.voiceInputText}.`);
+    if (!/hlas ready|iba obrazovka/i.test(dom.voiceOutputText)) fail(`Voice output capability is not rendered: ${dom.voiceOutputText}.`);
+    if (!/standby|mikrofon|fallback|disabled|heard|pocuva/i.test(dom.voiceLastEventText)) fail(`Voice event status is not rendered: ${dom.voiceLastEventText}.`);
     assertBox("sidebar", dom.sidebar, { width: isNarrowViewport ? 300 : 180, height: 60 });
     assertBox("navigation", dom.nav, { width: isNarrowViewport ? 300 : 150, height: 40 });
     assertBox("header", dom.header, { width: isNarrowViewport ? 300 : 400, height: 40 });
