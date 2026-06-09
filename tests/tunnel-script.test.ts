@@ -20,6 +20,12 @@ test("web tunnel script orchestrates protected Jarvis MCP exposure", () => {
   assert.match(script, /\/api\/remote-mcp-smoke/);
   assert.match(script, /verifyExternalConnectionPack/);
   assert.match(script, /hasGuardedConnectionPackLimits/);
+  assert.match(script, /hasAgentSetupProfiles/);
+  assert.match(script, /agentSetupProfiles/);
+  assert.match(script, /structured Claude, ChatGPT, Grok, and generic HTTP agent setup profiles/);
+  assert.match(script, /profile\?\.firstTool === "arcigy\.get_operator_briefing"/);
+  assert.match(script, /profile\?\.writePolicy === "approval\.approved-required"/);
+  assert.match(script, /profile\?\.localWritePolicy === "dry-run-first"/);
   assert.match(script, /pathPolicy === "repo-only"/);
   assert.match(script, /writesRequireExplicitToolCall === true/);
   assert.match(script, /bounded JSON/);
@@ -29,6 +35,7 @@ test("web tunnel script orchestrates protected Jarvis MCP exposure", () => {
   assert.match(script, /verifyRemoteMcpSmoke/);
   assert.match(script, /hasReadySmokeCheck/);
   assert.match(script, /pack-voice-quick-start/);
+  assert.match(script, /pack-agent-setup-profiles/);
   assert.match(script, /voice-tool-call/);
   assert.match(script, /pack-production-evidence-quick-start/);
   assert.match(script, /renderTunnelReadySummary/);
@@ -37,7 +44,8 @@ test("web tunnel script orchestrates protected Jarvis MCP exposure", () => {
   assert.match(script, /arcigy\.get_operator_briefing/);
   assert.match(script, /dryRun=true/);
   assert.match(script, /tokenValueReturned=false with repo-only limits/);
-  assert.match(script, /remote smoke status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-voice-quick-start, voice-tool-call, pack-production-evidence-quick-start, production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction/);
+  assert.match(script, /connection pack tokenValueReturned=false with repo-only limits and agentSetupProfiles for Claude\/ChatGPT\/Grok/);
+  assert.match(script, /remote smoke status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-agent-setup-profiles, pack-voice-quick-start, voice-tool-call, pack-production-evidence-quick-start, production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction/);
   assert.match(script, /Authorization: Bearer <JARVIS_WEB_TOKEN>/);
   assert.match(script, /--no-start-web/);
   assert.match(script, /--generate-token/);

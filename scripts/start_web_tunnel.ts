@@ -43,6 +43,16 @@ type RemoteConnectionPack = {
     approvalRequired?: string[];
     localStateWrite?: string[];
   };
+  agentSetupProfiles?: Array<{
+    agent?: string;
+    setupMode?: string;
+    importUrl?: string;
+    fallbackUrl?: string;
+    firstTool?: string;
+    writePolicy?: string;
+    localWritePolicy?: string;
+    requiredProofGates?: string[];
+  }>;
   handoff?: {
     connectionPackUrl?: string;
     requiredProof?: Array<{ key?: string }>;
@@ -281,6 +291,9 @@ async function verifyExternalConnectionPack(publicUrl: string, token: string | n
   if (!hasGuardedConnectionPackLimits(body.limits)) {
     exitWithMessage("Tunnel opened, but the external Jarvis connection pack is missing guarded limits: repo-only paths, bounded JSON, and explicit write tool calls.");
   }
+  if (!hasAgentSetupProfiles(body.agentSetupProfiles, publicUrl)) {
+    exitWithMessage("Tunnel opened, but the external Jarvis connection pack is missing structured Claude, ChatGPT, Grok, and generic HTTP agent setup profiles.");
+  }
   return body;
 }
 
@@ -292,6 +305,30 @@ function hasGuardedConnectionPackLimits(value: RemoteConnectionPack["limits"]): 
     value.pathPolicy === "repo-only" &&
     value.writesRequireExplicitToolCall === true
   );
+}
+
+function hasAgentSetupProfiles(value: RemoteConnectionPack["agentSetupProfiles"], publicUrl: string): boolean {
+  if (!Array.isArray(value)) return false;
+  const profiles = new Map(value.map((profile) => [profile.agent, profile]));
+  const expected = [
+    ["Claude", "external-http-mcp", `${publicUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`],
+    ["ChatGPT", "openapi-custom-action", `${publicUrl}/api/openapi.json`],
+    ["Grok", "openapi-or-http-json", `${publicUrl}/api/openapi.json`],
+    ["Generic HTTP agent", "openapi-or-http-json", `${publicUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`],
+  ];
+  return expected.every(([agent, setupMode, importUrl]) => {
+    const profile = profiles.get(agent);
+    const gates = Array.isArray(profile?.requiredProofGates) ? profile.requiredProofGates : [];
+    return (
+      profile?.setupMode === setupMode &&
+      profile?.importUrl === importUrl &&
+      profile?.firstTool === "arcigy.get_operator_briefing" &&
+      profile?.writePolicy === "approval.approved-required" &&
+      profile?.localWritePolicy === "dry-run-first" &&
+      gates.includes("pack-agent-setup-profiles") &&
+      gates.includes("secret-redaction")
+    );
+  });
 }
 
 async function verifyRemoteMcpSmoke(publicUrl: string, token: string | null): Promise<RemoteMcpSmoke | null> {
@@ -316,6 +353,7 @@ async function verifyRemoteMcpSmoke(publicUrl: string, token: string | null): Pr
     "external-auth-gate",
     "pack-auth-throttle-policy",
     "pack-limits",
+    "pack-agent-setup-profiles",
     "pack-voice-quick-start",
     "voice-tool-call",
     "pack-production-evidence-quick-start",
@@ -371,7 +409,7 @@ function renderTunnelReadySummary(input: {
     `- Connection pack: ${connectionPackUrl}`,
     `- Smoke test: ${smokeUrl}`,
     `- MCP tool call pattern: ${mcpToolPattern}`,
-    "- Required proof before work: action manifest HTTP 200, OpenAPI schema HTTP 200, manifest HTTP 200, connection pack tokenValueReturned=false with repo-only limits, remote smoke status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-voice-quick-start, voice-tool-call, pack-production-evidence-quick-start, production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction.",
+    "- Required proof before work: action manifest HTTP 200, OpenAPI schema HTTP 200, manifest HTTP 200, connection pack tokenValueReturned=false with repo-only limits and agentSetupProfiles for Claude/ChatGPT/Grok, remote smoke status=ready with action-manifest, openapi-schema, cors-preflight, external-auth-gate, pack-auth-throttle-policy, pack-limits, pack-agent-setup-profiles, pack-voice-quick-start, voice-tool-call, pack-production-evidence-quick-start, production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction.",
     "- First MCP call: POST arcigy.get_operator_briefing with {\"periodLabel\":\"poslednych 7 dni\",\"live\":true}.",
     "- Approval rule: never call approval-required tools without your explicit confirmation of the exact payload.",
     "- Local write rule: preview Gmail with dryRun=true before syncing messages into local memory.",
