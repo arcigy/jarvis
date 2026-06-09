@@ -649,6 +649,7 @@ function renderOperatorBriefing(briefing) {
     sections.readiness,
     sections.readinessAttention,
     sections.productionEvidence,
+    sections.providerFallback,
     sections.coldOutreach,
     sections.liveSync,
     sections.clientNeeds,
@@ -665,6 +666,7 @@ function renderOperatorBriefingCards(briefing) {
   const cards = [
     { key: "readiness", label: "Readiness", value: readiness, state: readinessCardState(readiness) },
     { key: "productionEvidence", label: "Evidence", value: sections.productionEvidence, state: evidenceCardState(sections.productionEvidence) },
+    { key: "providerFallback", label: "Fallbacks", value: sections.providerFallback, state: textHasAttention(sections.providerFallback) ? "attention" : "ready" },
     { key: "coldOutreach", label: "Outreach", value: sections.coldOutreach, state: textHasAttention(sections.coldOutreach) ? "attention" : "ready" },
     { key: "clientNeeds", label: "Client needs", value: sections.clientNeeds, state: textHasAttention(sections.clientNeeds) ? "attention" : "ready" },
     { key: "preparedReplies", label: "Approvals", value: sections.preparedReplies, state: textHasAttention(sections.preparedReplies) ? "attention" : "ready" },

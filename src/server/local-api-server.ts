@@ -1293,6 +1293,7 @@ async function getOperatorBriefing(payload: Record<string, unknown>) {
     readinessSummary: readiness.summary,
     readinessAttentionQueue: readiness.attentionQueue,
     productionEvidenceSummary: productionEvidence.summary,
+    providerFallbackSummary: summarizeProviderFallbackForBriefing(readiness.diagnostics?.checks),
     coldOutreachSummary,
     liveSyncSummary,
     openClientNeedCount: Number(clientNeeds.count ?? 0),
@@ -1300,6 +1301,22 @@ async function getOperatorBriefing(payload: Record<string, unknown>) {
     preparedReplyCount,
     nextActions: readiness.nextActions,
   });
+}
+
+function summarizeProviderFallbackForBriefing(checks: Array<{ key?: string; status?: string }> | undefined): string | null {
+  if (!checks?.length) return null;
+  const byKey = new Map(checks.map((check) => [check.key, check.status]));
+  const requiredKeys = ["gemini", "gmail", "smartlead", "postgres", "googleSheets", "googleMaps", "remoteMcp", "sqlite"];
+  const readyRequired = requiredKeys.filter((key) => byKey.get(key) === "ready").length;
+  const leadFallback =
+    byKey.get("serper") === "ready"
+      ? "Serper and Google Places are available."
+      : byKey.get("googleMaps") === "ready"
+        ? "Google Places fallback is active; Serper is optional."
+        : "Lead discovery providers need attention.";
+  const redis =
+    byKey.get("redis") === "ready" ? "Redis is live." : "Redis is optional for shipped workflows because local state uses SQLite.";
+  return `${readyRequired}/${requiredKeys.length} required providers ready. ${leadFallback} ${redis}`;
 }
 
 async function maybeSyncGmailForOperatorBriefing(payload: Record<string, unknown>, dbPath: string): Promise<string | null> {

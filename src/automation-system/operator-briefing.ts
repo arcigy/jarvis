@@ -9,6 +9,7 @@ export type OperatorBriefingInput = {
     nextAction: string;
   }>;
   productionEvidenceSummary?: string | null;
+  providerFallbackSummary?: string | null;
   coldOutreachSummary: string;
   liveSyncSummary?: string | null;
   openClientNeedCount: number;
@@ -34,6 +35,7 @@ export type OperatorBriefing = {
     readiness: string;
     readinessAttention?: string;
     productionEvidence?: string;
+    providerFallback?: string;
     coldOutreach: string;
     liveSync?: string;
     clientNeeds: string;
@@ -50,6 +52,7 @@ export function buildOperatorBriefing(input: OperatorBriefingInput): OperatorBri
     readiness: `Readiness: ${input.readinessStatus}. ${input.readinessSummary}`,
     readinessAttention,
     productionEvidence: input.productionEvidenceSummary ? `Production evidence: ${input.productionEvidenceSummary}` : undefined,
+    providerFallback: input.providerFallbackSummary ? `Provider fallback: ${input.providerFallbackSummary}` : undefined,
     coldOutreach: `Cold outreach: ${input.coldOutreachSummary}`,
     liveSync: input.liveSyncSummary ? `Live sync: ${input.liveSyncSummary}` : undefined,
     clientNeeds,
@@ -64,6 +67,7 @@ export function buildOperatorBriefing(input: OperatorBriefingInput): OperatorBri
     sections.readiness,
     sections.readinessAttention,
     sections.productionEvidence,
+    sections.providerFallback,
     sections.coldOutreach,
     sections.liveSync,
     sections.clientNeeds,

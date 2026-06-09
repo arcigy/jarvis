@@ -2790,6 +2790,7 @@ async function getOperatorBriefing(payload = {}) {
     readinessSummary: readiness.summary,
     readinessAttentionQueue: readiness.attentionQueue || [],
     productionEvidenceSummary: productionEvidence.summary,
+    providerFallbackSummary: summarizeProviderFallbackForBriefing(readiness.diagnostics?.checks),
     coldOutreachSummary,
     liveSyncSummary,
     openClientNeedCount: Number(clientNeeds.count || 0),
@@ -2797,6 +2798,22 @@ async function getOperatorBriefing(payload = {}) {
     preparedReplyCount,
     nextActions: readiness.nextActions || [],
   });
+}
+
+function summarizeProviderFallbackForBriefing(checks) {
+  if (!Array.isArray(checks) || !checks.length) return null;
+  const byKey = new Map(checks.map((check) => [check.key, check.status]));
+  const requiredKeys = ["gemini", "gmail", "smartlead", "postgres", "googleSheets", "googleMaps", "remoteMcp", "sqlite"];
+  const readyRequired = requiredKeys.filter((key) => byKey.get(key) === "ready").length;
+  const leadFallback =
+    byKey.get("serper") === "ready"
+      ? "Serper and Google Places are available."
+      : byKey.get("googleMaps") === "ready"
+        ? "Google Places fallback is active; Serper is optional."
+        : "Lead discovery providers need attention.";
+  const redis =
+    byKey.get("redis") === "ready" ? "Redis is live." : "Redis is optional for shipped workflows because local state uses SQLite.";
+  return `${readyRequired}/${requiredKeys.length} required providers ready. ${leadFallback} ${redis}`;
 }
 
 async function getOperatorColdOutreachSummary(live, periodLabel, localSummary, approvals = {}) {
@@ -2839,6 +2856,7 @@ function buildOperatorBriefing(input) {
     readiness: `Readiness: ${input.readinessStatus}. ${input.readinessSummary}`,
     readinessAttention,
     productionEvidence: input.productionEvidenceSummary ? `Production evidence: ${input.productionEvidenceSummary}` : undefined,
+    providerFallback: input.providerFallbackSummary ? `Provider fallback: ${input.providerFallbackSummary}` : undefined,
     coldOutreach: `Cold outreach: ${input.coldOutreachSummary}`,
     liveSync: input.liveSyncSummary ? `Live sync: ${input.liveSyncSummary}` : undefined,
     clientNeeds,
@@ -2853,6 +2871,7 @@ function buildOperatorBriefing(input) {
     sections.readiness,
     sections.readinessAttention,
     sections.productionEvidence,
+    sections.providerFallback,
     sections.coldOutreach,
     sections.liveSync,
     sections.clientNeeds,

@@ -416,6 +416,11 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /sections\.liveSync/);
   assert.match(renderer, /sections\.readinessAttention/);
   assert.match(renderer, /sections\.productionEvidence/);
+  assert.match(renderer, /sections\.providerFallback/);
+  assert.match(renderer, /label: "Fallbacks"/);
+  assert.match(main, /function summarizeProviderFallbackForBriefing/);
+  assert.match(main, /Google Places fallback is active; Serper is optional/);
+  assert.match(main, /Redis is optional for shipped workflows because local state uses SQLite/);
   assert.match(renderer, /function evidenceCardState/);
   assert.match(renderer, /label: "Evidence"/);
   assert.match(renderer, /refreshOperatorBriefing/);
