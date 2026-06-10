@@ -1435,7 +1435,7 @@ async function getRemoteMcpPack(payload = {}) {
       "Call MCP tools with POST JSON to mcpToolCallPattern.",
       "Use the bearer auth header placeholder; the real token must be supplied by the operator and is never returned by this pack.",
       "Use tunnel.statusUrl to inspect public tunnel URLs from the redacted secure-tunnel log. Browser-launched tunnel start requires a strong JARVIS_WEB_TOKEN.",
-      "Treat generate_contract_documents, approve_prepared_outreach_reply, send_approved_outreach_reply, update_client_need_status, and append_leads_to_google_sheet as approval-gated actions.",
+      "Treat generate_contract_documents, approve_prepared_outreach_reply, send_approved_outreach_reply, update_client_need_status, create_smartlead_campaign, configure_smartlead_campaign, add_leads_to_smartlead_campaign, and append_leads_to_google_sheet as approval-gated actions.",
       "Treat localStateWrite tools as local memory writes. Prefer dryRun: true for sync_gmail_recent_messages before ingesting messages.",
       "Use get_operator_briefing for a Jarvis-style daily status before making recommendations.",
     ],
@@ -2234,6 +2234,8 @@ async function checkApprovalGates(baseUrl, token, topLevelApproved) {
     ["arcigy.export_local_memory_snapshot", { outputPath: "generated/local-memory/smoke.json" }],
     ["arcigy.append_leads_to_google_sheet", { rows: [["Smoke", "https://example.com"]] }],
     ["arcigy.add_leads_to_smartlead_campaign", { campaignId: "123", leads: [{ email: "smoke@example.com" }] }],
+    ["arcigy.create_smartlead_campaign", { name: "SMOKE CAMPAIGN" }],
+    ["arcigy.configure_smartlead_campaign", { campaignId: "123", schedule: { max_new_leads_per_day: 1 } }],
   ];
   const bodies = [];
   for (const [tool, payload] of payloads) {
@@ -2393,6 +2395,8 @@ function hasSafeOpenApiExample(toolName, value) {
   if (toolName === "arcigy.generate_contract_documents") return value.approval?.approved === true && typeof value.intake === "object";
   if (toolName === "arcigy.append_leads_to_google_sheet") return value.approval?.approved === true && Array.isArray(value.rows);
   if (toolName === "arcigy.add_leads_to_smartlead_campaign") return value.approval?.approved === true && Array.isArray(value.leads);
+  if (toolName === "arcigy.create_smartlead_campaign") return value.approval?.approved === true && typeof value.name === "string";
+  if (toolName === "arcigy.configure_smartlead_campaign") return value.approval?.approved === true && typeof value.campaignId !== "undefined";
   return true;
 }
 
@@ -2885,6 +2889,10 @@ function listWebMcpTools() {
     { name: "arcigy.sync_gmail_recent_messages", requiresApproval: false },
     { name: "arcigy.get_smartlead_campaign_status", requiresApproval: false },
     { name: "arcigy.get_smartlead_outreach_brief", requiresApproval: false },
+    { name: "arcigy.get_smartlead_campaign_leads", requiresApproval: false },
+    { name: "arcigy.get_smartlead_message_history", requiresApproval: false },
+    { name: "arcigy.create_smartlead_campaign", requiresApproval: true },
+    { name: "arcigy.configure_smartlead_campaign", requiresApproval: true },
     { name: "arcigy.search_serper", requiresApproval: false },
     { name: "arcigy.search_google_places", requiresApproval: false },
     { name: "arcigy.discover_leads", requiresApproval: false },

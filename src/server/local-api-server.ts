@@ -36,7 +36,15 @@ import { buildRemoteMcpOpenApiDocument } from "../automation-system/remote-mcp-o
 import { buildRemoteMcpConnectionPack } from "../automation-system/remote-mcp-pack.ts";
 import { runRemoteMcpSmoke } from "../automation-system/remote-mcp-smoke.ts";
 import { createJarvisMcpServer } from "../automation-system/mcp-server.ts";
-import { addLeadsToSmartleadCampaign, getSmartleadCampaignStatus, getSmartleadOutreachBrief } from "../automation-system/smartlead.ts";
+import {
+  addLeadsToSmartleadCampaign,
+  configureSmartleadCampaign,
+  createSmartleadCampaign,
+  getSmartleadCampaignLeads,
+  getSmartleadCampaignStatus,
+  getSmartleadMessageHistory,
+  getSmartleadOutreachBrief,
+} from "../automation-system/smartlead.ts";
 
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
 const desktopRoot = join(repoRoot, "src", "desktop");
@@ -1137,6 +1145,55 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
   }
   if (name === "arcigy.get_smartlead_outreach_brief") {
     writeJson(response, 200, { result: await getSmartleadOutreachBrief(toSmartleadOutreachBriefInput(payload)) });
+    return;
+  }
+  if (name === "arcigy.get_smartlead_campaign_leads") {
+    writeJson(response, 200, {
+      result: await getSmartleadCampaignLeads({
+        campaignId: (payload.campaignId ?? "") as string | number,
+        offset: typeof payload.offset === "number" ? payload.offset : undefined,
+        limit: typeof payload.limit === "number" ? payload.limit : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.get_smartlead_message_history") {
+    writeJson(response, 200, {
+      result: await getSmartleadMessageHistory({
+        campaignId: (payload.campaignId ?? "") as string | number,
+        email: String(payload.email ?? ""),
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.create_smartlead_campaign") {
+    const result = await createSmartleadCampaign({
+      name: String(payload.name ?? ""),
+      clientId: (payload.clientId ?? null) as string | number | null,
+      sequences: payload.sequences as Parameters<typeof createSmartleadCampaign>[0]["sequences"],
+      emailAccountIds: payload.emailAccountIds as Parameters<typeof createSmartleadCampaign>[0]["emailAccountIds"],
+      schedule: payload.schedule as Parameters<typeof createSmartleadCampaign>[0]["schedule"],
+      settings: payload.settings as Parameters<typeof createSmartleadCampaign>[0]["settings"],
+      webhook: payload.webhook as Parameters<typeof createSmartleadCampaign>[0]["webhook"],
+      leads: payload.leads as Parameters<typeof createSmartleadCampaign>[0]["leads"],
+    });
+    const responseBody = { result };
+    addAuditEvent("arcigy.create_smartlead_campaign", "submitted", payload, responseBody, true);
+    writeJson(response, 200, responseBody);
+    return;
+  }
+  if (name === "arcigy.configure_smartlead_campaign") {
+    const result = await configureSmartleadCampaign({
+      campaignId: (payload.campaignId ?? "") as string | number,
+      sequences: payload.sequences as Parameters<typeof configureSmartleadCampaign>[0]["sequences"],
+      emailAccountIds: payload.emailAccountIds as Parameters<typeof configureSmartleadCampaign>[0]["emailAccountIds"],
+      schedule: payload.schedule as Parameters<typeof configureSmartleadCampaign>[0]["schedule"],
+      settings: payload.settings as Parameters<typeof configureSmartleadCampaign>[0]["settings"],
+      webhook: payload.webhook as Parameters<typeof configureSmartleadCampaign>[0]["webhook"],
+    });
+    const responseBody = { result };
+    addAuditEvent("arcigy.configure_smartlead_campaign", "submitted", payload, responseBody, true);
+    writeJson(response, 200, responseBody);
     return;
   }
   if (name === "arcigy.discover_leads") {

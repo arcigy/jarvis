@@ -52,6 +52,26 @@ export type SmartleadLead = {
   custom_fields?: Record<string, string | number | boolean>;
 };
 
+export type SmartleadSequence = {
+  seq_number: number;
+  seq_delay_details: { delay_in_days: number };
+  seq_variants: Array<{
+    variant_label: string;
+    subject: string;
+    email_body: string;
+  }>;
+};
+
+export type SmartleadSchedule = {
+  timezone?: string;
+  start_hour?: string;
+  end_hour?: string;
+  days_of_the_week?: number[];
+  max_new_leads_per_day?: number;
+  min_time_btw_emails?: number;
+  schedule_start_time?: string | null;
+};
+
 export type SmartleadAddLeadsInput = {
   campaignId: string | number;
   leads: SmartleadLead[];
@@ -66,6 +86,52 @@ export type SmartleadAddLeadsResult = {
   submitted: number;
   batches: number;
   responses: unknown[];
+};
+
+export type SmartleadCampaignConfigureInput = {
+  campaignId: string | number;
+  sequences?: SmartleadSequence[];
+  emailAccountIds?: Array<string | number>;
+  schedule?: SmartleadSchedule;
+  settings?: {
+    trackOpen?: boolean;
+    stopOnReply?: boolean;
+    followUpPercentage?: number;
+  };
+  webhook?: {
+    url: string;
+    name?: string;
+    eventTypes?: string[];
+  };
+};
+
+export type SmartleadCampaignCreateInput = Omit<SmartleadCampaignConfigureInput, "campaignId"> & {
+  name: string;
+  clientId?: string | number | null;
+  leads?: SmartleadLead[];
+};
+
+export type SmartleadCampaignWriteResult = {
+  campaignId: string;
+  steps: Array<{ step: string; status: "skipped" | "submitted"; response?: unknown }>;
+};
+
+export type SmartleadCampaignLeadsResult = {
+  campaignId: string;
+  offset: number;
+  limit: number;
+  leads: unknown;
+};
+
+export type SmartleadMessageHistoryResult = {
+  campaignId: string;
+  email: string;
+  messages: unknown;
+  latestSentEmail?: {
+    email_stats_id?: string;
+    reply_message_id?: string;
+    reply_email_time?: string;
+  };
 };
 
 export async function getSmartleadCampaignStatus(
@@ -88,6 +154,142 @@ export async function getSmartleadCampaignStatus(
     campaignId: input.campaignId,
     statistics,
   };
+}
+
+export async function getSmartleadCampaignLeads(
+  input: { campaignId: string | number; offset?: number; limit?: number },
+  env: RuntimeEnv = process.env,
+  fetchImpl: FetchLike = fetch
+): Promise<SmartleadCampaignLeadsResult> {
+  const apiKey = requireEnv(env, "SMARTLEAD_API_KEY");
+  const campaignId = requireCampaignId(input.campaignId);
+  const offset = nonNegativeInteger(input.offset, 0, 100_000);
+  const limit = nonNegativeInteger(input.limit, 100, 500);
+  const leads = await smartleadFetch<unknown>(
+    `/campaigns/${encodeURIComponent(campaignId)}/leads?offset=${offset}&limit=${limit}`,
+    apiKey,
+    fetchImpl
+  );
+  return { campaignId, offset, limit, leads };
+}
+
+export async function getSmartleadMessageHistory(
+  input: { campaignId: string | number; email: string },
+  env: RuntimeEnv = process.env,
+  fetchImpl: FetchLike = fetch
+): Promise<SmartleadMessageHistoryResult> {
+  const apiKey = requireEnv(env, "SMARTLEAD_API_KEY");
+  const campaignId = requireCampaignId(input.campaignId);
+  const email = input.email.trim().toLowerCase();
+  if (!email || !email.includes("@")) throw new Error("Lead email is required.");
+  const messages = await smartleadFetch<unknown>(
+    `/campaigns/${encodeURIComponent(campaignId)}/leads/message-history?email=${encodeURIComponent(email)}`,
+    apiKey,
+    fetchImpl
+  );
+  return { campaignId, email, messages, latestSentEmail: latestSentEmailForReply(messages) };
+}
+
+export async function createSmartleadCampaign(
+  input: SmartleadCampaignCreateInput,
+  env: RuntimeEnv = process.env,
+  fetchImpl: FetchLike = fetch
+): Promise<SmartleadCampaignWriteResult> {
+  const apiKey = requireEnv(env, "SMARTLEAD_API_KEY");
+  const name = input.name.trim();
+  if (!name) throw new Error("Smartlead campaign name is required.");
+  const createResponse = await smartleadFetch<{ id?: string | number; campaign_id?: string | number }>(
+    "/campaigns/create",
+    apiKey,
+    fetchImpl,
+    { method: "POST", body: { name, client_id: input.clientId ?? null } }
+  );
+  const campaignId = String(createResponse.id ?? createResponse.campaign_id ?? "").trim();
+  if (!campaignId) throw new Error("Smartlead did not return a campaign id.");
+  const configured = await configureSmartleadCampaign({ ...input, campaignId }, env, fetchImpl);
+  const steps: SmartleadCampaignWriteResult["steps"] = [{ step: "create_campaign", status: "submitted", response: createResponse }, ...configured.steps];
+  if (input.leads?.length) {
+    steps.push({ step: "upload_leads", status: "submitted", response: await addLeadsToSmartleadCampaign({ campaignId, leads: input.leads }, env, fetchImpl) });
+  } else {
+    steps.push({ step: "upload_leads", status: "skipped" });
+  }
+  return { campaignId, steps };
+}
+
+export async function configureSmartleadCampaign(
+  input: SmartleadCampaignConfigureInput,
+  env: RuntimeEnv = process.env,
+  fetchImpl: FetchLike = fetch
+): Promise<SmartleadCampaignWriteResult> {
+  const apiKey = requireEnv(env, "SMARTLEAD_API_KEY");
+  const campaignId = requireCampaignId(input.campaignId);
+  const steps: SmartleadCampaignWriteResult["steps"] = [];
+  if (input.sequences?.length) {
+    steps.push({
+      step: "sequences",
+      status: "submitted",
+      response: await smartleadFetch(`/campaigns/${encodeURIComponent(campaignId)}/sequences`, apiKey, fetchImpl, {
+        method: "POST",
+        body: { sequences: input.sequences.map(normalizeSmartleadSequence) },
+      }),
+    });
+  } else {
+    steps.push({ step: "sequences", status: "skipped" });
+  }
+  if (input.emailAccountIds?.length) {
+    steps.push({
+      step: "email_accounts",
+      status: "submitted",
+      response: await smartleadFetch(`/campaigns/${encodeURIComponent(campaignId)}/email-accounts`, apiKey, fetchImpl, {
+        method: "POST",
+        body: { email_account_ids: input.emailAccountIds },
+      }),
+    });
+  } else {
+    steps.push({ step: "email_accounts", status: "skipped" });
+  }
+  if (input.schedule) {
+    steps.push({
+      step: "schedule",
+      status: "submitted",
+      response: await smartleadFetch(`/campaigns/${encodeURIComponent(campaignId)}/schedule`, apiKey, fetchImpl, {
+        method: "POST",
+        body: normalizeSmartleadSchedule(input.schedule),
+      }),
+    });
+  } else {
+    steps.push({ step: "schedule", status: "skipped" });
+  }
+  if (input.settings) {
+    steps.push({
+      step: "settings",
+      status: "submitted",
+      response: await smartleadFetch(`/campaigns/${encodeURIComponent(campaignId)}/settings`, apiKey, fetchImpl, {
+        method: "PATCH",
+        body: normalizeSmartleadSettings(input.settings),
+      }),
+    });
+  } else {
+    steps.push({ step: "settings", status: "skipped" });
+  }
+  if (input.webhook?.url) {
+    steps.push({
+      step: "webhook",
+      status: "submitted",
+      response: await smartleadFetch(`/campaigns/${encodeURIComponent(campaignId)}/webhooks`, apiKey, fetchImpl, {
+        method: "POST",
+        body: {
+          id: null,
+          name: input.webhook.name || "Jarvis Automation Webhook",
+          webhook_url: input.webhook.url,
+          event_types: input.webhook.eventTypes ?? ["EMAIL_REPLY", "LEAD_CATEGORY_UPDATED"],
+        },
+      }),
+    });
+  } else {
+    steps.push({ step: "webhook", status: "skipped" });
+  }
+  return { campaignId, steps };
 }
 
 export async function getSmartleadOutreachBrief(
@@ -321,6 +523,64 @@ function normalizeSmartleadLead(lead: SmartleadLead): SmartleadLead {
 function cleanOptional(value: string | undefined): string | undefined {
   const clean = value?.trim();
   return clean || undefined;
+}
+
+function requireCampaignId(value: string | number): string {
+  const campaignId = String(value ?? "").trim();
+  if (!campaignId) throw new Error("Smartlead campaignId is required.");
+  return campaignId;
+}
+
+function normalizeSmartleadSequence(sequence: SmartleadSequence): SmartleadSequence {
+  if (!sequence.seq_number || sequence.seq_number < 1) throw new Error("Smartlead sequence seq_number is required.");
+  if (!sequence.seq_variants?.length) throw new Error("Smartlead sequence requires at least one variant.");
+  return {
+    seq_number: Math.floor(sequence.seq_number),
+    seq_delay_details: { delay_in_days: Math.max(0, Math.floor(sequence.seq_delay_details?.delay_in_days ?? 0)) },
+    seq_variants: sequence.seq_variants.map((variant) => ({
+      variant_label: variant.variant_label?.trim() || "A",
+      subject: variant.subject?.trim() || "",
+      email_body: variant.email_body?.trim() || "",
+    })),
+  };
+}
+
+function normalizeSmartleadSchedule(schedule: SmartleadSchedule): Required<SmartleadSchedule> {
+  return {
+    timezone: schedule.timezone || "Europe/Bratislava",
+    start_hour: schedule.start_hour || "08:00",
+    end_hour: schedule.end_hour || "18:00",
+    days_of_the_week: schedule.days_of_the_week?.length ? schedule.days_of_the_week : [1, 2, 3, 4, 5],
+    max_new_leads_per_day: nonNegativeInteger(schedule.max_new_leads_per_day, 25, 500),
+    min_time_btw_emails: nonNegativeInteger(schedule.min_time_btw_emails, 10, 240),
+    schedule_start_time: schedule.schedule_start_time ?? null,
+  };
+}
+
+function normalizeSmartleadSettings(settings: NonNullable<SmartleadCampaignConfigureInput["settings"]>): Record<string, unknown> {
+  return {
+    track_settings: settings.trackOpen === false ? ["DONT_TRACK_EMAIL_OPEN"] : [],
+    stop_lead_settings: settings.stopOnReply === false ? "NEVER_STOP" : "REPLY_TO_AN_EMAIL",
+    follow_up_percentage: nonNegativeInteger(settings.followUpPercentage, 100, 100),
+  };
+}
+
+function nonNegativeInteger(value: number | undefined, fallback: number, max: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  return Math.max(0, Math.min(Math.floor(value), max));
+}
+
+function latestSentEmailForReply(messages: unknown): SmartleadMessageHistoryResult["latestSentEmail"] {
+  const list = Array.isArray(messages) ? messages : Array.isArray((messages as { data?: unknown[] } | null)?.data) ? (messages as { data: unknown[] }).data : [];
+  const sent = [...list].reverse().find((item) => item && typeof item === "object" && String((item as { type?: unknown }).type ?? "").toUpperCase() === "EMAIL_SENT") as
+    | { stats_id?: unknown; message_id?: unknown; send_time?: unknown }
+    | undefined;
+  if (!sent) return undefined;
+  return {
+    email_stats_id: typeof sent.stats_id === "string" ? sent.stats_id : undefined,
+    reply_message_id: typeof sent.message_id === "string" ? sent.message_id : undefined,
+    reply_email_time: typeof sent.send_time === "string" ? sent.send_time : undefined,
+  };
 }
 
 function cleanWebsite(value: string | undefined): string | undefined {

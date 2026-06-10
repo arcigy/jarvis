@@ -36,6 +36,10 @@ export type JarvisMcpToolName =
   | "arcigy.sync_gmail_recent_messages"
   | "arcigy.get_smartlead_campaign_status"
   | "arcigy.get_smartlead_outreach_brief"
+  | "arcigy.get_smartlead_campaign_leads"
+  | "arcigy.get_smartlead_message_history"
+  | "arcigy.create_smartlead_campaign"
+  | "arcigy.configure_smartlead_campaign"
   | "arcigy.search_serper"
   | "arcigy.search_google_places"
   | "arcigy.discover_leads"
@@ -249,6 +253,26 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
       name: "arcigy.get_smartlead_outreach_brief",
       description: "Normalizuje Smartlead statistiky kampane do hotoveho Jarvis cold outreach briefu.",
       requiresApproval: false,
+    },
+    {
+      name: "arcigy.get_smartlead_campaign_leads",
+      description: "Read-only nacita leadov v Smartlead kampani s offset/limit pre audit alebo kontrolu importu.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.get_smartlead_message_history",
+      description: "Read-only nacita Smartlead message history pre lead email a pripravi metadata posledneho odoslaneho emailu pre reply flow.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.create_smartlead_campaign",
+      description: "Vytvori Smartlead kampan a volitelne nastavi sekvencie, email ucty, schedule, settings, webhook a leady po explicitnom schvaleni.",
+      requiresApproval: true,
+    },
+    {
+      name: "arcigy.configure_smartlead_campaign",
+      description: "Nastavi existujucu Smartlead kampan: sekvencie, email ucty, schedule, settings alebo webhook po explicitnom schvaleni.",
+      requiresApproval: true,
     },
     {
       name: "arcigy.search_serper",

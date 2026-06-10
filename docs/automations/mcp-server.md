@@ -95,6 +95,10 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.sync_gmail_recent_messages`: fetches Gmail messages and ingests client requests into SQLite.
 - `arcigy.get_smartlead_campaign_status`: reads Smartlead campaigns or campaign statistics.
 - `arcigy.get_smartlead_outreach_brief`: normalizes one Smartlead campaign, or aggregates recent campaign statistics when `campaignId` is omitted, into one Jarvis cold outreach briefing.
+- `arcigy.get_smartlead_campaign_leads`: read-only fetch of campaign leads with offset/limit for audit and import checks.
+- `arcigy.get_smartlead_message_history`: read-only fetch of one lead's Smartlead message history plus latest sent-email reply metadata.
+- `arcigy.create_smartlead_campaign`: approval-gated Smartlead campaign creation with optional sequences, email accounts, schedule, settings, webhook, and leads.
+- `arcigy.configure_smartlead_campaign`: approval-gated configuration of an existing Smartlead campaign.
 - `arcigy.search_serper`: read-only Serper web search for lead discovery.
 - `arcigy.search_google_places`: read-only Google Places Text Search for company discovery.
 - `arcigy.discover_leads`: combines Serper and Google Places into normalized lead candidates.

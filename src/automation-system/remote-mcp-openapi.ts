@@ -219,6 +219,22 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
   if (toolName === "arcigy.generate_ai_reply") return { message: "Potrebujem upravit onboarding automatizaciu do piatku.", language: "sk", tone: "executive" };
   if (toolName === "arcigy.sync_gmail_recent_messages") return { dryRun: true, maxResults: 5 };
   if (toolName === "arcigy.get_smartlead_outreach_brief") return { periodLabel: "poslednych 7 dni" };
+  if (toolName === "arcigy.get_smartlead_campaign_leads") return { campaignId: "123456", offset: 0, limit: 100 };
+  if (toolName === "arcigy.get_smartlead_message_history") return { campaignId: "123456", email: "lead@example.com" };
+  if (toolName === "arcigy.create_smartlead_campaign") {
+    return {
+      name: "MODEL CAMPAIGN",
+      sequences: [{ seq_number: 1, seq_delay_details: { delay_in_days: 0 }, seq_variants: [{ variant_label: "A", subject: "Otazka k {{company_name}}", email_body: "<p>{{personalized_intro}}</p><p>%signature%</p>" }] }],
+      approval: { approved: true },
+    };
+  }
+  if (toolName === "arcigy.configure_smartlead_campaign") {
+    return {
+      campaignId: "123456",
+      schedule: { timezone: "Europe/Bratislava", start_hour: "08:00", end_hour: "18:00", days_of_the_week: [1, 2, 3, 4, 5], max_new_leads_per_day: 25, min_time_btw_emails: 10 },
+      approval: { approved: true },
+    };
+  }
   if (toolName === "arcigy.discover_leads") return { query: "automation agency Bratislava", maxResults: 5 };
   if (toolName === "arcigy.scrape_website_contacts") return { url: "https://example.com", includePriorityPages: true, maxPages: 4 };
   if (toolName === "arcigy.enrich_slovak_company_register") return { companyName: "Modelova Firma s.r.o." };

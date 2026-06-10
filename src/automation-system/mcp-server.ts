@@ -37,7 +37,15 @@ import { buildProductionReadinessReport } from "./production-readiness.ts";
 import { getProductionVerificationEvidence } from "./production-verification-evidence.ts";
 import { buildRemoteMcpConnectionPack } from "./remote-mcp-pack.ts";
 import { runRemoteMcpSmoke } from "./remote-mcp-smoke.ts";
-import { addLeadsToSmartleadCampaign, getSmartleadCampaignStatus, getSmartleadOutreachBrief } from "./smartlead.ts";
+import {
+  addLeadsToSmartleadCampaign,
+  configureSmartleadCampaign,
+  createSmartleadCampaign,
+  getSmartleadCampaignLeads,
+  getSmartleadCampaignStatus,
+  getSmartleadMessageHistory,
+  getSmartleadOutreachBrief,
+} from "./smartlead.ts";
 import type { ClientNeedSignal, LocalPerson } from "./types.ts";
 
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
@@ -999,6 +1007,140 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(await getSmartleadOutreachBrief(input))
+  );
+
+  server.registerTool(
+    "arcigy.get_smartlead_campaign_leads",
+    {
+      title: "Smartlead campaign leads",
+      description: "Fetch leads from a Smartlead campaign with offset and limit.",
+      inputSchema: {
+        campaignId: z.union([z.string(), z.number()]),
+        offset: z.number().int().min(0).default(0),
+        limit: z.number().int().min(1).max(500).default(100),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (input) => jsonResult(await getSmartleadCampaignLeads(input))
+  );
+
+  server.registerTool(
+    "arcigy.get_smartlead_message_history",
+    {
+      title: "Smartlead message history",
+      description: "Fetch Smartlead message history for a campaign lead and return latest sent-email reply metadata.",
+      inputSchema: {
+        campaignId: z.union([z.string(), z.number()]),
+        email: z.string().email(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (input) => jsonResult(await getSmartleadMessageHistory(input))
+  );
+
+  const smartleadSequenceSchema = z.object({
+    seq_number: z.number().int().min(1),
+    seq_delay_details: z.object({ delay_in_days: z.number().int().min(0) }),
+    seq_variants: z.array(
+      z.object({
+        variant_label: z.string().min(1),
+        subject: z.string(),
+        email_body: z.string().min(1),
+      })
+    ).min(1),
+  });
+  const smartleadScheduleSchema = z.object({
+    timezone: z.string().optional(),
+    start_hour: z.string().optional(),
+    end_hour: z.string().optional(),
+    days_of_the_week: z.array(z.number().int().min(0).max(6)).optional(),
+    max_new_leads_per_day: z.number().int().min(0).max(500).optional(),
+    min_time_btw_emails: z.number().int().min(0).max(240).optional(),
+    schedule_start_time: z.string().nullable().optional(),
+  });
+  const smartleadSettingsSchema = z.object({
+    trackOpen: z.boolean().optional(),
+    stopOnReply: z.boolean().optional(),
+    followUpPercentage: z.number().int().min(0).max(100).optional(),
+  });
+  const smartleadWebhookSchema = z.object({
+    url: z.string().url(),
+    name: z.string().optional(),
+    eventTypes: z.array(z.string()).optional(),
+  });
+  const smartleadUploadLeadSchema = z.object({
+    email: z.string().min(1),
+    first_name: z.string().optional(),
+    last_name: z.string().optional(),
+    company_name: z.string().optional(),
+    website: z.string().optional(),
+    custom_fields: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
+  });
+
+  server.registerTool(
+    "arcigy.create_smartlead_campaign",
+    {
+      title: "Create Smartlead campaign",
+      description: "Create and optionally configure a Smartlead campaign. This is an explicit external write action.",
+      inputSchema: {
+        name: z.string().min(1),
+        clientId: z.union([z.string(), z.number(), z.null()]).optional(),
+        sequences: z.array(smartleadSequenceSchema).optional(),
+        emailAccountIds: z.array(z.union([z.string(), z.number()])).optional(),
+        schedule: smartleadScheduleSchema.optional(),
+        settings: smartleadSettingsSchema.optional(),
+        webhook: smartleadWebhookSchema.optional(),
+        leads: z.array(smartleadUploadLeadSchema).optional(),
+        approval: approvalSchema,
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (input) => {
+      requireExplicitApproval("arcigy.create_smartlead_campaign", input);
+      return jsonResult(await createSmartleadCampaign(input));
+    }
+  );
+
+  server.registerTool(
+    "arcigy.configure_smartlead_campaign",
+    {
+      title: "Configure Smartlead campaign",
+      description: "Configure sequences, email accounts, schedule, settings, or webhook for an existing Smartlead campaign. This is an explicit external write action.",
+      inputSchema: {
+        campaignId: z.union([z.string(), z.number()]),
+        sequences: z.array(smartleadSequenceSchema).optional(),
+        emailAccountIds: z.array(z.union([z.string(), z.number()])).optional(),
+        schedule: smartleadScheduleSchema.optional(),
+        settings: smartleadSettingsSchema.optional(),
+        webhook: smartleadWebhookSchema.optional(),
+        approval: approvalSchema,
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (input) => {
+      requireExplicitApproval("arcigy.configure_smartlead_campaign", input);
+      return jsonResult(await configureSmartleadCampaign(input));
+    }
   );
 
   server.registerTool(

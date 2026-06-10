@@ -31,7 +31,16 @@ import {
   listJarvisMcpTools,
   localStateWriteToolNames,
 } from "../src/automation-system/mcp-tools.ts";
-import { addLeadsToSmartleadCampaign, buildSmartleadOutreachBrief, getSmartleadCampaignStatus, getSmartleadOutreachBrief } from "../src/automation-system/smartlead.ts";
+import {
+  addLeadsToSmartleadCampaign,
+  buildSmartleadOutreachBrief,
+  configureSmartleadCampaign,
+  createSmartleadCampaign,
+  getSmartleadCampaignLeads,
+  getSmartleadCampaignStatus,
+  getSmartleadMessageHistory,
+  getSmartleadOutreachBrief,
+} from "../src/automation-system/smartlead.ts";
 import {
   containsWakeWord,
   createJarvisVoiceSession,
@@ -87,6 +96,10 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.sync_gmail_recent_messages",
     "arcigy.get_smartlead_campaign_status",
     "arcigy.get_smartlead_outreach_brief",
+    "arcigy.get_smartlead_campaign_leads",
+    "arcigy.get_smartlead_message_history",
+    "arcigy.create_smartlead_campaign",
+    "arcigy.configure_smartlead_campaign",
     "arcigy.search_serper",
     "arcigy.search_google_places",
     "arcigy.discover_leads",
@@ -348,7 +361,9 @@ test("remote MCP smoke checks every response for bearer token leaks", async () =
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet") ||
-      url.endsWith("/api/mcp/arcigy.add_leads_to_smartlead_campaign")
+      url.endsWith("/api/mcp/arcigy.add_leads_to_smartlead_campaign") ||
+      url.endsWith("/api/mcp/arcigy.create_smartlead_campaign") ||
+      url.endsWith("/api/mcp/arcigy.configure_smartlead_campaign")
     ) {
       return responseJson({ error: `token leaked ${token}` }, 409);
     }
@@ -2620,6 +2635,78 @@ test("Smartlead lead upload posts approved lead_list batches without leaking API
   assert.equal(calls[0].body.lead_list[0].email, "lead1@example.com");
   assert.equal(calls[0].body.settings.ignore_global_block_list, false);
   assert.equal(JSON.stringify(result).includes("smartlead-secret"), false);
+});
+
+test("Smartlead campaign read helpers fetch leads and message history", async () => {
+  const calls: string[] = [];
+  const fetchImpl = async (url: string | URL | Request) => {
+    const target = String(url);
+    calls.push(target);
+    if (target.includes("/leads/message-history")) {
+      return responseJson([
+        { type: "EMAIL_OPEN", stats_id: "open" },
+        { type: "EMAIL_SENT", stats_id: "stats-1", message_id: "msg-1", send_time: "2026-06-10T10:00:00.000Z" },
+      ]);
+    }
+    if (target.includes("/leads?")) return responseJson({ data: [{ email: "lead@example.com" }] });
+    throw new Error(`Unexpected Smartlead URL: ${target}`);
+  };
+
+  const leads = await getSmartleadCampaignLeads({ campaignId: "123", offset: 10, limit: 50 }, { SMARTLEAD_API_KEY: "smartlead-secret" }, fetchImpl as typeof fetch);
+  const history = await getSmartleadMessageHistory({ campaignId: "123", email: "lead@example.com" }, { SMARTLEAD_API_KEY: "smartlead-secret" }, fetchImpl as typeof fetch);
+
+  assert.equal(leads.offset, 10);
+  assert.equal(leads.limit, 50);
+  assert.ok(calls[0].includes("offset=10&limit=50&api_key=smartlead-secret"));
+  assert.equal(history.latestSentEmail?.email_stats_id, "stats-1");
+  assert.equal(history.latestSentEmail?.reply_message_id, "msg-1");
+  assert.equal(JSON.stringify(history).includes("smartlead-secret"), false);
+});
+
+test("Smartlead campaign create and configure submit campaign setup without leaking API key", async () => {
+  const calls: Array<{ url: string; method?: string; body: any }> = [];
+  const fetchImpl = async (url: string | URL | Request, init?: RequestInit) => {
+    const target = String(url);
+    const body = init?.body ? JSON.parse(String(init.body)) : {};
+    calls.push({ url: target, method: init?.method, body });
+    if (target.includes("/campaigns/create")) return responseJson({ id: 777 });
+    if (target.includes("/campaigns/777/leads")) return responseJson({ imported: body.lead_list?.length ?? 0 });
+    if (target.includes("/campaigns/777/")) return responseJson({ ok: true });
+    if (target.includes("/campaigns/888/")) return responseJson({ ok: true });
+    throw new Error(`Unexpected Smartlead URL: ${target}`);
+  };
+  const sequence = {
+    seq_number: 1,
+    seq_delay_details: { delay_in_days: 0 },
+    seq_variants: [{ variant_label: "A", subject: "Otazka", email_body: "<p>{{personalized_intro}}</p>" }],
+  };
+
+  const created = await createSmartleadCampaign(
+    {
+      name: "MODEL CAMPAIGN",
+      sequences: [sequence],
+      emailAccountIds: [1, "2"],
+      schedule: { max_new_leads_per_day: 30 },
+      settings: { trackOpen: false, stopOnReply: true },
+      webhook: { url: "https://jarvis.example/webhook" },
+      leads: [{ email: "lead@example.com", company_name: "Lead Co" }],
+    },
+    { SMARTLEAD_API_KEY: "smartlead-secret" },
+    fetchImpl as typeof fetch
+  );
+  const configured = await configureSmartleadCampaign(
+    { campaignId: "888", schedule: { timezone: "Europe/Bratislava", max_new_leads_per_day: 5 } },
+    { SMARTLEAD_API_KEY: "smartlead-secret" },
+    fetchImpl as typeof fetch
+  );
+
+  assert.equal(created.campaignId, "777");
+  assert.ok(created.steps.some((step) => step.step === "upload_leads" && step.status === "submitted"));
+  assert.ok(calls.some((call) => call.url === "https://server.smartlead.ai/api/v1/campaigns/777/sequences?api_key=smartlead-secret"));
+  assert.ok(calls.some((call) => call.url === "https://server.smartlead.ai/api/v1/campaigns/777/email-accounts?api_key=smartlead-secret"));
+  assert.ok(calls.some((call) => call.body.track_settings?.includes("DONT_TRACK_EMAIL_OPEN")));
+  assert.equal(configured.campaignId, "888");
+  assert.equal(JSON.stringify(created).includes("smartlead-secret"), false);
 });
 
 test("lead quality scoring and dedupe prepare imports safely", () => {
