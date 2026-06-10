@@ -20,6 +20,7 @@ import { buildLeadgenDailyReport, buildLeadgenEveningSummary, buildLeadgenOpsDig
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "./lead-discovery.ts";
 import {
   buildBatchNicheDiscoveryPlan,
+  buildLeadgenExecutionQueuePreview,
   buildNicheLeadgenPlan,
   buildLeadgenGapReport,
   buildLeadgenCampaignPipelinePreview,
@@ -1863,6 +1864,14 @@ export function createJarvisMcpServer(): McpServer {
     smartleadCampaignId: z.union([z.string(), z.number(), z.null()]).optional(),
   });
 
+  const executionQueueNicheSchema = batchNicheSchema.extend({
+    status: z.string().optional(),
+    tier: z.number().int().min(1).max(99).optional(),
+    priority: z.number().int().min(1).max(99).optional(),
+    currentRegionIndex: z.number().int().min(0).optional(),
+    todaySent: z.number().int().min(0).optional(),
+  });
+
   server.registerTool(
     "arcigy.build_batch_niche_discovery_plan",
     {
@@ -1889,6 +1898,34 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildBatchNicheDiscoveryPlan(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_leadgen_execution_queue_preview",
+    {
+      title: "Build leadgen execution queue preview",
+      description: "Prioritize daily leadgen work across niches, regions, quotas, discovery, enrichment, and Smartlead handoff without executing writes.",
+      inputSchema: {
+        niches: z.array(executionQueueNicheSchema).min(1).max(100),
+        date: z.string().optional(),
+        defaultRegions: z.array(z.string()).optional(),
+        maxQueue: z.number().int().min(1).max(30).default(8),
+        dailyLimit: z.number().int().min(1).max(250).optional(),
+        targetCount: z.number().int().min(1).max(500).optional(),
+        batchSize: z.number().int().min(1).max(100).optional(),
+        offer: z.string().optional(),
+        painPoint: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        includeSmartleadSetup: z.boolean().default(false),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildLeadgenExecutionQueuePreview(input))
   );
 
   server.registerTool(

@@ -19,6 +19,7 @@ import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerpe
 import { buildLeadgenDailyReport, buildLeadgenEveningSummary, buildLeadgenOpsDigest, buildLeadgenSlackReportPreview, selectNextNiche } from "../automation-system/leadgen-report.ts";
 import {
   buildBatchNicheDiscoveryPlan,
+  buildLeadgenExecutionQueuePreview,
   buildNicheLeadgenPlan,
   buildLeadgenGapReport,
   buildLeadgenCampaignPipelinePreview,
@@ -1493,6 +1494,24 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         defaultRegions: Array.isArray(payload.defaultRegions) ? payload.defaultRegions.map(String) : undefined,
         maxNiches: typeof payload.maxNiches === "number" ? payload.maxNiches : undefined,
         maxRegionsPerNiche: typeof payload.maxRegionsPerNiche === "number" ? payload.maxRegionsPerNiche : undefined,
+        dailyLimit: typeof payload.dailyLimit === "number" ? payload.dailyLimit : undefined,
+        targetCount: typeof payload.targetCount === "number" ? payload.targetCount : undefined,
+        batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
+        offer: optionalString(payload.offer),
+        painPoint: optionalString(payload.painPoint),
+        language: payload.language === "en" ? "en" : "sk",
+        includeSmartleadSetup: payload.includeSmartleadSetup === true,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_leadgen_execution_queue_preview") {
+    writeJson(response, 200, {
+      result: buildLeadgenExecutionQueuePreview({
+        niches: (payload.niches ?? []) as Parameters<typeof buildLeadgenExecutionQueuePreview>[0]["niches"],
+        date: optionalString(payload.date),
+        defaultRegions: Array.isArray(payload.defaultRegions) ? payload.defaultRegions.map(String) : undefined,
+        maxQueue: typeof payload.maxQueue === "number" ? payload.maxQueue : undefined,
         dailyLimit: typeof payload.dailyLimit === "number" ? payload.dailyLimit : undefined,
         targetCount: typeof payload.targetCount === "number" ? payload.targetCount : undefined,
         batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,

@@ -371,6 +371,21 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       language: "sk",
     };
   }
+  if (toolName === "arcigy.build_leadgen_execution_queue_preview") {
+    return {
+      date: "2026-06-10",
+      niches: [
+        { id: "niche-1", slug: "autoservisy", name: "Autoservisy", status: "active", priority: 1, keywords: ["autoservis"], regions: ["Bratislava", "Trnava"], currentRegionIndex: 0, dailyTarget: 30, todaySent: 8, campaignId: "123456" },
+        { id: "niche-2", slug: "kuchyne", name: "Kuchynske studia", status: "active", priority: 2, keywords: ["kuchynske studio"], regions: ["Kosice"], dailyTarget: 20, todaySent: 0 },
+      ],
+      maxQueue: 5,
+      batchSize: 50,
+      offer: "AI asistent na odpovede a follow-up",
+      painPoint: "manualne spracovanie dopytov",
+      language: "sk",
+      includeSmartleadSetup: true,
+    };
+  }
   if (toolName === "arcigy.draft_smartlead_campaign_sequence") return { niche: "autoservisy", painPoint: "manualne riesenie dopytov", offer: "AI asistent na odpovede a follow-up", language: "sk" };
   if (toolName === "arcigy.preview_smartlead_email_rendering") {
     return {

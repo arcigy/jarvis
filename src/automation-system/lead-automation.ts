@@ -564,6 +564,34 @@ export type BatchNicheDiscoveryPlan = {
   warnings: string[];
 };
 
+export type LeadgenExecutionQueuePreview = {
+  mode: "leadgen-execution-queue-preview";
+  summary: string;
+  date: string;
+  totals: {
+    niches: number;
+    queued: number;
+    skipped: number;
+    discoveryCalls: number;
+    readOnlyCalls: number;
+    approvalCalls: number;
+    estimatedDailyLimit: number;
+    estimatedDiscoveryCount: number;
+  };
+  queue: Array<{
+    order: number;
+    niche: { id?: string; slug: string; name: string; region?: string; campaignId?: string | number | null };
+    priority: number;
+    status: "ready" | "attention" | "blocked";
+    reason: string;
+    target: { remainingToday: number; discoveryCount: number; dailyLimit: number; batchSize: number };
+    phases: Array<{ order: number; tool: string; purpose: string; writes: boolean; approvalRequired: boolean }>;
+    runbook: DailyLeadgenRunbook;
+  }>;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+  warnings: string[];
+};
+
 const genericEmailPrefixes = new Set(["info", "kontakt", "contact", "office", "admin", "sales", "hello", "support", "recepcia"]);
 
 const nicheTemplates: Record<string, Omit<NicheLeadgenPlan, "niche" | "region" | "notes">> = {
@@ -2642,6 +2670,178 @@ export function buildBatchNicheDiscoveryPlan(input: {
     summary: `Batch niche discovery plan: ${plans.length} runbookov pre ${selectedNiches.length} niche, odhad denny limit ${estimatedDailyLimit}. Ziadny scraping ani upload neprebehol.`,
     totals: { niches: selectedNiches.length, regions: plans.length, runbooks: plans.length, discoveryCalls: plans.length, estimatedDailyLimit },
     plans,
+    nextToolCalls,
+    warnings,
+  };
+}
+
+export function buildLeadgenExecutionQueuePreview(input: {
+  niches: Array<{
+    id?: string;
+    slug?: string;
+    name: string;
+    status?: string;
+    tier?: number;
+    priority?: number;
+    keywords?: string[];
+    regions?: string[];
+    currentRegionIndex?: number;
+    dailyTarget?: number;
+    todaySent?: number;
+    campaignId?: string | number | null;
+    smartleadCampaignId?: string | number | null;
+  }>;
+  date?: string;
+  defaultRegions?: string[];
+  maxQueue?: number;
+  dailyLimit?: number;
+  targetCount?: number;
+  batchSize?: number;
+  offer?: string;
+  painPoint?: string;
+  language?: "sk" | "en";
+  includeSmartleadSetup?: boolean;
+}): LeadgenExecutionQueuePreview {
+  const maxQueue = Math.min(Math.max(Math.trunc(input.maxQueue ?? 8), 1), 30);
+  const defaultRegions = input.defaultRegions?.length ? input.defaultRegions : ["Slovensko"];
+  const warnings: string[] = [];
+  const candidates = input.niches
+    .map((source, index) => {
+      const slug = source.slug?.trim() || slugify(source.name);
+      const blocked = !source.name.trim() || !slug;
+      const status = (source.status ?? "active").toLowerCase();
+      const regions = source.regions?.length ? source.regions : defaultRegions;
+      const regionIndex = Math.min(Math.max(Math.trunc(source.currentRegionIndex ?? 0), 0), Math.max(regions.length - 1, 0));
+      const dailyLimit = Math.min(Math.max(Math.trunc(input.dailyLimit ?? source.dailyTarget ?? 30), 1), 250);
+      const todaySent = Math.max(Math.trunc(source.todaySent ?? 0), 0);
+      const remainingToday = Math.max(dailyLimit - todaySent, 0);
+      const priority = Math.min(Math.max(Math.trunc(source.priority ?? source.tier ?? 5), 1), 99);
+      return { source, index, slug, blocked, status, regions, regionIndex, dailyLimit, todaySent, remainingToday, priority };
+    })
+    .filter((item) => {
+      if (item.blocked) {
+        warnings.push(`Skipped niche with missing name/slug at index ${item.index}.`);
+        return false;
+      }
+      if (["paused", "archived", "done", "disabled"].includes(item.status)) return false;
+      if (item.remainingToday <= 0) return false;
+      return true;
+    })
+    .sort((a, b) => a.priority - b.priority || b.remainingToday - a.remainingToday || a.index - b.index)
+    .slice(0, maxQueue);
+
+  const queue: LeadgenExecutionQueuePreview["queue"] = candidates.map((item, index) => {
+    const region = item.regions[item.regionIndex] ?? defaultRegions[0] ?? "Slovensko";
+    const campaignId = item.source.campaignId ?? item.source.smartleadCampaignId ?? null;
+    const runbook = buildDailyLeadgenRunbook({
+      niche: {
+        id: item.source.id,
+        slug: item.slug,
+        name: item.source.name,
+        keywords: item.source.keywords,
+        region,
+        campaignId,
+      },
+      targetCount: input.targetCount ?? Math.ceil(item.remainingToday * 1.5),
+      dailyLimit: item.dailyLimit,
+      batchSize: input.batchSize,
+      offer: input.offer,
+      painPoint: input.painPoint,
+      language: input.language,
+      includeSmartleadSetup: input.includeSmartleadSetup || !campaignId,
+    });
+    const status: LeadgenExecutionQueuePreview["queue"][number]["status"] = campaignId ? "ready" : "attention";
+    return {
+      order: index + 1,
+      niche: runbook.niche,
+      priority: item.priority,
+      status,
+      reason: status === "ready" ? `Remaining today ${item.remainingToday}; campaign is mapped.` : `Remaining today ${item.remainingToday}; campaign setup draft is needed.`,
+      target: {
+        remainingToday: item.remainingToday,
+        discoveryCount: runbook.target.discoveryCount,
+        dailyLimit: runbook.target.dailyLimit,
+        batchSize: runbook.target.batchSize,
+      },
+      phases: runbook.steps.map((step) => ({
+        order: step.order,
+        tool: step.tool,
+        purpose: step.purpose,
+        writes: step.writes,
+        approvalRequired: step.approvalRequired,
+      })),
+      runbook,
+    };
+  });
+
+  const nextToolCalls = dedupeNextToolCalls(queue.flatMap((item) => {
+    const primaryQuery = item.runbook.queryPlan.mapsQueries[0] ?? `${item.niche.name} ${item.niche.region ?? "Slovensko"}`.trim();
+    return [
+      {
+        tool: "arcigy.build_daily_leadgen_runbook",
+        payload: {
+          niche: item.niche,
+          targetCount: item.target.discoveryCount,
+          dailyLimit: item.target.dailyLimit,
+          batchSize: item.target.batchSize,
+          offer: input.offer,
+          painPoint: input.painPoint,
+          language: input.language ?? "sk",
+          includeSmartleadSetup: input.includeSmartleadSetup === true || !item.niche.campaignId,
+        },
+        reason: `Priprav detailny runbook pre queue slot ${item.order}: ${item.niche.name}.`,
+        approvalRequired: false,
+      },
+      {
+        tool: "arcigy.run_leadgen_research_pipeline",
+        payload: {
+          query: primaryQuery,
+          placesQuery: primaryQuery,
+          maxResults: Math.min(item.target.discoveryCount, 50),
+          scrapeWebsites: true,
+          draftIntros: true,
+          offer: input.offer,
+          language: input.language ?? "sk",
+        },
+        reason: `Spusti read-only discovery, scrape a AI intro pre ${item.niche.name}.`,
+        approvalRequired: false,
+      },
+      {
+        tool: "arcigy.build_smartlead_campaign_handoff_package_preview",
+        payload: {
+          niche: item.niche,
+          offer: input.offer,
+          painPoint: input.painPoint,
+          language: input.language ?? "sk",
+          batchSize: item.target.batchSize,
+          leads: [{ email: "lead@example.com", companyName: "Modelova Firma", website: "https://example.com", personalizedIntro: "Kratke AI intro." }],
+        },
+        reason: `Po enrichment kroku zloz launch/QA/capacity handoff pre ${item.niche.name}.`,
+        approvalRequired: false,
+      },
+    ];
+  })).slice(0, 90);
+
+  const readOnlyCalls = nextToolCalls.filter((call) => !call.approvalRequired).length;
+  const approvalCalls = nextToolCalls.filter((call) => call.approvalRequired).length;
+  const estimatedDailyLimit = queue.reduce((sum, item) => sum + item.target.dailyLimit, 0);
+  const estimatedDiscoveryCount = queue.reduce((sum, item) => sum + item.target.discoveryCount, 0);
+  const skipped = input.niches.length - queue.length;
+  return {
+    mode: "leadgen-execution-queue-preview",
+    date: input.date ?? new Date().toISOString().slice(0, 10),
+    summary: `Leadgen execution queue: ${queue.length}/${input.niches.length} niche pripravene, discovery ${estimatedDiscoveryCount}, denny limit ${estimatedDailyLimit}. Ziadny scraping ani upload neprebehol.`,
+    totals: {
+      niches: input.niches.length,
+      queued: queue.length,
+      skipped,
+      discoveryCalls: queue.length,
+      readOnlyCalls,
+      approvalCalls,
+      estimatedDailyLimit,
+      estimatedDiscoveryCount,
+    },
+    queue,
     nextToolCalls,
     warnings,
   };
