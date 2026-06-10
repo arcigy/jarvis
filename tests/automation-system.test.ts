@@ -26,6 +26,7 @@ import {
   buildLeadgenGapReport,
   buildLeadgenCampaignPipelinePreview,
   buildLeadSourceImportQueuePreview,
+  buildUrlIntelligenceQueuePreview,
   buildLeadRepairQueuePreview,
   buildNicheOpsDashboardPreview,
   buildColdOutreachCsvImportPreview,
@@ -149,6 +150,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.configure_smartlead_campaign",
     "arcigy.fetch_url_preview",
     "arcigy.batch_fetch_url_previews",
+    "arcigy.build_url_intelligence_queue_preview",
     "arcigy.search_serper",
     "arcigy.search_google_places",
     "arcigy.discover_leads",
@@ -1437,7 +1439,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 94 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 95 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -2934,6 +2936,31 @@ test("lead source import queue preview groups Google Maps leads before Smartlead
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_scrape_website_contacts" && !call.approvalRequired));
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.get_smartlead_campaign_leads" && !call.approvalRequired));
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.add_leads_to_smartlead_campaign" && call.approvalRequired));
+  assert.match(preview.summary, /Ziadny zapis ani upload/);
+});
+
+test("URL intelligence queue preview prepares fetch scrape intro and import steps", () => {
+  const preview = buildUrlIntelligenceQueuePreview({
+    urls: ["https://ready.sk", "needs-scrape.sk", "mailto:test@example.com"],
+    leads: [{ companyName: "Manual Lead", website: "https://manual.sk", email: "jan@manual.sk" }],
+    sourceName: "url-batch",
+    niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456" },
+    offer: "AI asistent na dopyty",
+    batchSize: 50,
+  });
+
+  assert.equal(preview.mode, "url-intelligence-queue-preview");
+  assert.equal(preview.totals.inputUrls, 3);
+  assert.equal(preview.totals.validUrls, 2);
+  assert.equal(preview.totals.invalidUrls, 1);
+  assert.equal(preview.totals.generatedLeads, 2);
+  assert.equal(preview.totals.totalLeads, 3);
+  assert.ok(preview.urlBatches.fetch.includes("https://ready.sk/"));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_fetch_url_previews" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_scrape_website_contacts" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_draft_lead_intros" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_lead_source_import_queue_preview" || call.tool === "arcigy.add_leads_to_smartlead_campaign"));
+  assert.equal(preview.importQueuePreview?.totals.groups, 1);
   assert.match(preview.summary, /Ziadny zapis ani upload/);
 });
 

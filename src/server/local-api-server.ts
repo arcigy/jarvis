@@ -24,6 +24,7 @@ import {
   buildLeadgenGapReport,
   buildLeadgenCampaignPipelinePreview,
   buildLeadSourceImportQueuePreview,
+  buildUrlIntelligenceQueuePreview,
   buildLeadRepairQueuePreview,
   buildNicheOpsDashboardPreview,
   batchScrapeWebsiteContacts,
@@ -1726,6 +1727,32 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         language: payload.language === "en" ? "en" : "sk",
         minScore: typeof payload.minScore === "number" ? payload.minScore : undefined,
         batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
+        maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_url_intelligence_queue_preview") {
+    writeJson(response, 200, {
+      result: buildUrlIntelligenceQueuePreview({
+        urls: Array.isArray(payload.urls) ? payload.urls.map(String) : undefined,
+        leads: Array.isArray(payload.leads) ? payload.leads as Parameters<typeof buildUrlIntelligenceQueuePreview>[0]["leads"] : undefined,
+        sourceName: optionalString(payload.sourceName),
+        niche: payload.niche as Parameters<typeof buildUrlIntelligenceQueuePreview>[0]["niche"],
+        niches: Array.isArray(payload.niches) ? payload.niches as Parameters<typeof buildUrlIntelligenceQueuePreview>[0]["niches"] : undefined,
+        includeFetchPreview: payload.includeFetchPreview !== false,
+        includeScrape: payload.includeScrape !== false,
+        includeIntroDrafts: payload.includeIntroDrafts !== false,
+        includeImportQueue: payload.includeImportQueue !== false,
+        includePriorityPages: payload.includePriorityPages !== false,
+        maxPages: typeof payload.maxPages === "number" ? payload.maxPages : undefined,
+        maxUrls: typeof payload.maxUrls === "number" ? payload.maxUrls : undefined,
+        offer: optionalString(payload.offer),
+        language: payload.language === "en" ? "en" : "sk",
+        minScore: typeof payload.minScore === "number" ? payload.minScore : undefined,
+        batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
+        blacklistDomains: Array.isArray(payload.blacklistDomains) ? payload.blacklistDomains.map(String) : undefined,
+        blacklistKeywords: Array.isArray(payload.blacklistKeywords) ? payload.blacklistKeywords.map(String) : undefined,
         maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
       }),
     });

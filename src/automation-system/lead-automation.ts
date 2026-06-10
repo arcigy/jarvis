@@ -370,6 +370,35 @@ export type LeadRepairQueuePreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type UrlIntelligenceQueuePreview = {
+  mode: "url-intelligence-queue-preview";
+  summary: string;
+  source: { name: string; type: "url_list" | "manual" | "mixed" };
+  totals: {
+    inputUrls: number;
+    validUrls: number;
+    invalidUrls: number;
+    inputLeads: number;
+    generatedLeads: number;
+    totalLeads: number;
+    fetchUrls: number;
+    scrapeUrls: number;
+    introsToDraft: number;
+    readyForSmartlead: number;
+    manualReview: number;
+  };
+  urlBatches: {
+    fetch: string[];
+    scrape: string[];
+    invalid: Array<{ value: string; error: string }>;
+  };
+  generatedLeads: LeadSourceImportQueueLead[];
+  repairPreview: LeadRepairQueuePreview;
+  importQueuePreview?: LeadSourceImportQueuePreview;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+  warnings: string[];
+};
+
 export type NicheOpsDashboardInput = {
   id?: string;
   slug: string;
@@ -2239,6 +2268,136 @@ export function buildLeadRepairQueuePreview(input: {
   };
 }
 
+export function buildUrlIntelligenceQueuePreview(input: {
+  urls?: string[];
+  leads?: LeadSourceImportQueueLead[];
+  sourceName?: string;
+  niche?: { id?: string; slug: string; name: string; campaignId?: string | number | null };
+  niches?: Array<{ id?: string; slug: string; name: string; campaignId?: string | number | null; aliases?: string[] }>;
+  includeFetchPreview?: boolean;
+  includeScrape?: boolean;
+  includeIntroDrafts?: boolean;
+  includeImportQueue?: boolean;
+  includePriorityPages?: boolean;
+  maxPages?: number;
+  maxUrls?: number;
+  offer?: string;
+  language?: "sk" | "en";
+  minScore?: number;
+  batchSize?: number;
+  blacklistDomains?: string[];
+  blacklistKeywords?: string[];
+  maxNextCalls?: number;
+}): UrlIntelligenceQueuePreview {
+  const maxUrls = Math.min(Math.max(Math.trunc(input.maxUrls ?? 100), 1), 300);
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 40), 1), 100);
+  const normalizedUrls: string[] = [];
+  const invalid: UrlIntelligenceQueuePreview["urlBatches"]["invalid"] = [];
+  for (const raw of (input.urls ?? []).slice(0, maxUrls)) {
+    try {
+      normalizedUrls.push(normalizeHttpUrl(raw));
+    } catch (error) {
+      invalid.push({ value: raw, error: error instanceof Error ? error.message : "Invalid URL" });
+    }
+  }
+  const uniqueUrls = unique(normalizedUrls).slice(0, maxUrls);
+  const generatedLeads: LeadSourceImportQueueLead[] = uniqueUrls.map((url) => {
+    const hostname = new URL(url).hostname.replace(/^www\./i, "");
+    return {
+      website: url,
+      companyName: titleFromHostname(hostname),
+      source: input.sourceName ?? "url-intelligence",
+      nicheSlug: input.niche?.slug,
+      nicheName: input.niche?.name,
+      campaignId: input.niche?.campaignId,
+      customFields: { source_url: url, source_type: "url_intelligence" },
+    };
+  });
+  const allLeads = [...(input.leads ?? []), ...generatedLeads].map((lead) => normalizeSourceQueueLead(lead, input.sourceName, "url-intelligence"));
+  const repairPreview = buildLeadRepairQueuePreview({
+    leads: allLeads as LeadRepairQueueLead[],
+    offer: input.offer,
+    language: input.language,
+    minScore: input.minScore,
+    maxNextCalls,
+  });
+  const importQueuePreview = input.includeImportQueue !== false && (input.niche || input.niches?.length)
+    ? buildLeadSourceImportQueuePreview({
+        sourceName: input.sourceName ?? "url-intelligence",
+        sourceType: "manual",
+        leads: allLeads,
+        niches: input.niches,
+        defaultNiche: input.niche,
+        blacklistDomains: input.blacklistDomains,
+        blacklistKeywords: input.blacklistKeywords,
+        offer: input.offer,
+        language: input.language,
+        minScore: input.minScore,
+        batchSize: input.batchSize,
+        maxNextCalls,
+      })
+    : undefined;
+  const nextToolCalls: UrlIntelligenceQueuePreview["nextToolCalls"] = [];
+  if (uniqueUrls.length && input.includeFetchPreview !== false) {
+    nextToolCalls.push({
+      tool: "arcigy.batch_fetch_url_previews",
+      payload: { urls: uniqueUrls, method: "GET", parseJson: false, maxBytes: 12000, maxUrls: uniqueUrls.length },
+      reason: "Rychlo nacitaj URL preview pred detailnym contact scrapingom.",
+      approvalRequired: false,
+    });
+  }
+  if (uniqueUrls.length && input.includeScrape !== false) {
+    nextToolCalls.push({
+      tool: "arcigy.batch_scrape_website_contacts",
+      payload: { urls: uniqueUrls, includePriorityPages: input.includePriorityPages !== false, maxPages: input.maxPages ?? 4, maxSites: uniqueUrls.length },
+      reason: "Najdi emaily, telefony a kontaktne podstranky z URL zoznamu.",
+      approvalRequired: false,
+    });
+  }
+  if (repairPreview.repairBatches.introsToDraft.length && input.includeIntroDrafts !== false) {
+    nextToolCalls.push({
+      tool: "arcigy.batch_draft_lead_intros",
+      payload: { leads: repairPreview.repairBatches.introsToDraft, offer: input.offer, language: input.language ?? "sk", maxLeads: repairPreview.repairBatches.introsToDraft.length },
+      reason: "Dopln AI intra pre leady pred manual review alebo Smartlead importom.",
+      approvalRequired: false,
+    });
+  }
+  nextToolCalls.push({
+    tool: "arcigy.build_lead_repair_queue_preview",
+    payload: { leads: allLeads, offer: input.offer, language: input.language ?? "sk", minScore: input.minScore, maxNextCalls },
+    reason: "Po fetchnuti/scrape znovu skontroluj, co chyba pred importom.",
+    approvalRequired: false,
+  });
+  if (importQueuePreview) nextToolCalls.push(...importQueuePreview.nextToolCalls);
+  const warnings: string[] = [];
+  if (!input.niche && !input.niches?.length) warnings.push("No niche mapping was provided; Smartlead import queue is not prepared.");
+  if (invalid.length) warnings.push(`${invalid.length} URL could not be normalized.`);
+  return {
+    mode: "url-intelligence-queue-preview",
+    source: { name: input.sourceName ?? "url-intelligence", type: input.urls?.length && input.leads?.length ? "mixed" : input.urls?.length ? "url_list" : "manual" },
+    summary: `URL intelligence queue: ${uniqueUrls.length} URL na fetch/scrape, ${allLeads.length} leadov, ${repairPreview.totals.needsIntro} intro draftov, ${importQueuePreview?.totals.readyForSmartlead ?? 0} ready do Smartlead. Ziadny zapis ani upload neprebehol.`,
+    totals: {
+      inputUrls: input.urls?.length ?? 0,
+      validUrls: uniqueUrls.length,
+      invalidUrls: invalid.length,
+      inputLeads: input.leads?.length ?? 0,
+      generatedLeads: generatedLeads.length,
+      totalLeads: allLeads.length,
+      fetchUrls: input.includeFetchPreview === false ? 0 : uniqueUrls.length,
+      scrapeUrls: input.includeScrape === false ? 0 : uniqueUrls.length,
+      introsToDraft: repairPreview.repairBatches.introsToDraft.length,
+      readyForSmartlead: importQueuePreview?.totals.readyForSmartlead ?? 0,
+      manualReview: importQueuePreview?.totals.manualReview ?? repairPreview.totals.manualReview,
+    },
+    urlBatches: { fetch: input.includeFetchPreview === false ? [] : uniqueUrls, scrape: input.includeScrape === false ? [] : uniqueUrls, invalid },
+    generatedLeads,
+    repairPreview,
+    importQueuePreview,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls).slice(0, maxNextCalls),
+    warnings,
+  };
+}
+
 export function buildNicheOpsDashboardPreview(input: {
   niches: NicheOpsDashboardInput[];
   offer?: string;
@@ -2872,10 +3031,20 @@ async function fetchHtmlPage(url: string, fetchImpl: FetchLike) {
 function normalizeHttpUrl(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) throw new Error("URL is required.");
+  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed) && !/^https?:\/\//i.test(trimmed)) throw new Error("Only http/https URLs are supported.");
   const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
   const url = new URL(withProtocol);
   if (!["http:", "https:"].includes(url.protocol)) throw new Error("Only http/https URLs are supported.");
   return url.toString();
+}
+
+function titleFromHostname(hostname: string): string {
+  const base = hostname.split(".").filter(Boolean)[0] ?? hostname;
+  return base
+    .split(/[-_]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ") || hostname;
 }
 
 function extractTag(html: string, tag: string): string {

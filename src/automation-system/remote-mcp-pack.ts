@@ -791,6 +791,23 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Build URL intelligence queue",
+      tool: "arcigy.build_url_intelligence_queue_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_url_intelligence_queue_preview"),
+      body: {
+        urls: ["https://ready.sk", "needs-scrape.sk"],
+        leads: [{ companyName: "Manual Lead", website: "https://manual.sk", email: "jan@manual.sk" }],
+        sourceName: "jarvis-url-batch",
+        niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456" },
+        offer: "AI asistent na odpovede a follow-up",
+        language: "sk",
+        maxUrls: 50,
+        batchSize: 50,
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Scrape website contacts without writing",
       tool: "arcigy.scrape_website_contacts",
       method: "POST",

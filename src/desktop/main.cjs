@@ -3031,6 +3031,7 @@ function listWebMcpTools() {
     { name: "arcigy.configure_smartlead_campaign", requiresApproval: true },
     { name: "arcigy.fetch_url_preview", requiresApproval: false },
     { name: "arcigy.batch_fetch_url_previews", requiresApproval: false },
+    { name: "arcigy.build_url_intelligence_queue_preview", requiresApproval: false },
     { name: "arcigy.search_serper", requiresApproval: false },
     { name: "arcigy.search_google_places", requiresApproval: false },
     { name: "arcigy.discover_leads", requiresApproval: false },

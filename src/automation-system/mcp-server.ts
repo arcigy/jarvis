@@ -25,6 +25,7 @@ import {
   buildLeadgenGapReport,
   buildLeadgenCampaignPipelinePreview,
   buildLeadSourceImportQueuePreview,
+  buildUrlIntelligenceQueuePreview,
   buildLeadRepairQueuePreview,
   buildNicheOpsDashboardPreview,
   batchScrapeWebsiteContacts,
@@ -2447,6 +2448,42 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildLeadSourceImportQueuePreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_url_intelligence_queue_preview",
+    {
+      title: "Build URL intelligence queue preview",
+      description: "Turn raw URLs and partial leads into fetch, contact scrape, AI intro, repair, and Smartlead import queue next steps without writes.",
+      inputSchema: {
+        urls: z.array(z.string()).optional(),
+        leads: z.array(leadSourceQueueLeadSchema).optional(),
+        sourceName: z.string().optional(),
+        niche: queueNicheSchema.omit({ aliases: true }).optional(),
+        niches: z.array(queueNicheSchema).optional(),
+        includeFetchPreview: z.boolean().default(true),
+        includeScrape: z.boolean().default(true),
+        includeIntroDrafts: z.boolean().default(true),
+        includeImportQueue: z.boolean().default(true),
+        includePriorityPages: z.boolean().default(true),
+        maxPages: z.number().int().min(1).max(10).default(4),
+        maxUrls: z.number().int().min(1).max(300).default(100),
+        offer: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        minScore: z.number().int().min(0).max(100).default(70),
+        batchSize: z.number().int().min(1).max(100).default(50),
+        blacklistDomains: z.array(z.string()).optional(),
+        blacklistKeywords: z.array(z.string()).optional(),
+        maxNextCalls: z.number().int().min(1).max(100).default(40),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildUrlIntelligenceQueuePreview(input))
   );
 
   server.registerTool(

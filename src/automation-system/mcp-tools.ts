@@ -56,6 +56,7 @@ export type JarvisMcpToolName =
   | "arcigy.configure_smartlead_campaign"
   | "arcigy.fetch_url_preview"
   | "arcigy.batch_fetch_url_previews"
+  | "arcigy.build_url_intelligence_queue_preview"
   | "arcigy.search_serper"
   | "arcigy.search_google_places"
   | "arcigy.discover_leads"
@@ -397,6 +398,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.batch_fetch_url_previews",
       description: "Bezpecne fetchne viac verejnych HTTP/HTTPS URL naraz a vrati redigovane per-URL preview bez zapisu.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_url_intelligence_queue_preview",
+      description: "Z raw URL a leadov pripravi fetch, scrape, AI intro, repair a Smartlead import queue bez spustenia zapisov.",
       requiresApproval: false,
     },
     {
