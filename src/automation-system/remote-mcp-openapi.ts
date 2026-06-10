@@ -361,6 +361,29 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       language: "sk",
     };
   }
+  if (toolName === "arcigy.preview_lead_enrichment_batch") {
+    return {
+      niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456" },
+      leads: [
+        {
+          companyName: "Modelova Firma",
+          website: "https://example.com",
+          scraped: { emails: ["jan.novak@example.com"], phones: ["+421 900 111 222"] },
+          register: { found: true, companyName: "Modelova Firma s.r.o.", ico: "12345678", executives: ["Jan Novak"] },
+          personalizedIntro: "Vsimol som si, ze riesite servis pre firemnych klientov.",
+        },
+      ],
+      minScore: 70,
+    };
+  }
+  if (toolName === "arcigy.build_daily_leadgen_runbook") {
+    return {
+      niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", keywords: ["autoservis", "pneuservis"], region: "Bratislava", campaignId: "123456" },
+      dailyLimit: 30,
+      targetCount: 60,
+      includeSmartleadSetup: false,
+    };
+  }
   if (toolName === "arcigy.parse_leads_csv") return { csvText: "company_name,email,website\nModelova Firma,lead@example.com,https://example.com" };
   if (toolName === "arcigy.filter_blacklisted_leads") return { leads: [{ email: "lead@example.com", website: "https://example.com" }], domains: ["competitor.sk"], keywords: ["franchise"] };
   if (toolName === "arcigy.build_manual_review_queue") return { minScore: 70, leads: [{ email: "lead@example.com", companyName: "Modelova Firma", website: "https://example.com", personalizedIntro: "Kratke AI intro." }] };

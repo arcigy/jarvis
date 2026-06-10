@@ -866,6 +866,36 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Preview enriched lead batch before Smartlead",
+      tool: "arcigy.preview_lead_enrichment_batch",
+      method: "POST",
+      url: toolUrl("arcigy.preview_lead_enrichment_batch"),
+      body: {
+        niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456" },
+        leads: [{
+          companyName: "Modelova Firma",
+          website: "https://example.com",
+          scraped: { emails: ["jan.novak@example.com"], phones: ["+421 900 111 222"] },
+          register: { found: true, companyName: "Modelova Firma s.r.o.", ico: "12345678", executives: ["Jan Novak"] },
+          personalizedIntro: "Vsimol som si, ze riesite servis pre firemnych klientov.",
+        }],
+        minScore: 70,
+      },
+      approvalRequired: false,
+    },
+    {
+      label: "Build exact daily leadgen runbook",
+      tool: "arcigy.build_daily_leadgen_runbook",
+      method: "POST",
+      url: toolUrl("arcigy.build_daily_leadgen_runbook"),
+      body: {
+        niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", keywords: ["autoservis", "pneuservis"], region: "Bratislava", campaignId: "123456" },
+        dailyLimit: 30,
+        targetCount: 60,
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Export lead review CSV after approval",
       tool: "arcigy.export_leads_csv",
       method: "POST",

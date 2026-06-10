@@ -19,6 +19,7 @@ import {
   buildManualReviewPickupPlan,
   buildManualReviewQueue,
   buildSmartleadInjectionPlan,
+  buildDailyLeadgenRunbook,
   dedupeLeadCandidates,
   draftNicheSmartleadCampaignSetup,
   draftLeadIntro,
@@ -26,6 +27,7 @@ import {
   enrichSlovakCompanyRegister,
   filterBlacklistedLeads,
   parseLeadsCsv,
+  previewLeadEnrichmentBatch,
   prepareSmartleadLeads,
   scoreLeadQuality,
   serializeLeadsCsv,
@@ -136,6 +138,8 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.preview_manual_review_pickup",
     "arcigy.build_smartlead_injection_plan",
     "arcigy.draft_niche_smartlead_campaign_setup",
+    "arcigy.preview_lead_enrichment_batch",
+    "arcigy.build_daily_leadgen_runbook",
     "arcigy.parse_leads_csv",
     "arcigy.filter_blacklisted_leads",
     "arcigy.build_manual_review_queue",
@@ -1393,7 +1397,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 70 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 72 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -2553,6 +2557,45 @@ test("manual review pickup builds Smartlead injection and campaign setup drafts"
   assert.equal(setup.campaignName, "autoservisy_SK");
   assert.equal(setup.createCampaignApprovalPayload.approval.approved, true);
   assert.ok(setup.webhook.eventTypes.includes("EMAIL_REPLY"));
+});
+
+test("lead enrichment preview and daily runbook prepare safe Smartlead next steps", () => {
+  const preview = previewLeadEnrichmentBatch({
+    niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456" },
+    leads: [
+      {
+        companyName: "Modelova Firma",
+        website: "https://example.sk",
+        scraped: { emails: ["info@example.sk", "jan.novak@example.sk"], phones: ["+421 900 111 222"] },
+        register: { found: true, companyName: "Modelova Firma s.r.o.", ico: "12345678", executives: ["Jan Novak"] },
+        personalizedIntro: "Kratke AI intro.",
+      },
+      {
+        companyName: "Dup Firma",
+        website: "https://example.sk/kontakt",
+        scraped: { emails: ["jan.novak@example.sk"] },
+      },
+    ],
+    minScore: 70,
+    batchSize: 1,
+  });
+  const runbook = buildDailyLeadgenRunbook({
+    niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", keywords: ["autoservis"], region: "Bratislava", campaignId: "123456" },
+    dailyLimit: 30,
+    targetCount: 60,
+  });
+
+  assert.equal(preview.mode, "lead-enrichment-batch-preview");
+  assert.equal(preview.totals.input, 2);
+  assert.equal(preview.totals.unique, 1);
+  assert.equal(preview.totals.readyForSmartlead, 1);
+  assert.equal(preview.leads[0].email, "jan.novak@example.sk");
+  assert.equal(preview.smartleadPlan?.addLeadsApprovalPayload?.campaignId, "123456");
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.add_leads_to_smartlead_campaign"));
+  assert.equal(runbook.mode, "daily-leadgen-runbook");
+  assert.equal(runbook.target.discoveryCount, 60);
+  assert.ok(runbook.steps.some((step) => step.tool === "arcigy.preview_lead_enrichment_batch" && step.writes === false));
+  assert.ok(runbook.steps.some((step) => step.tool === "arcigy.add_leads_to_smartlead_campaign" && step.approvalRequired));
 });
 
 test("niche rotation preview selects next active niche and wraps region index", () => {

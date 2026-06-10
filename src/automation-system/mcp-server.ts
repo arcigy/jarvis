@@ -28,7 +28,9 @@ import {
   draftSmartleadCampaignSequence,
   enrichSlovakCompanyRegister,
   filterBlacklistedLeads,
+  buildDailyLeadgenRunbook,
   parseLeadsCsv,
+  previewLeadEnrichmentBatch,
   prepareSmartleadLeads,
   runLeadgenResearchPipeline,
   scoreLeadQuality,
@@ -1691,6 +1693,32 @@ export function createJarvisMcpServer(): McpServer {
     verificationStatus: z.enum(["ok", "flagged", "failed"]).optional(),
     customFields: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
   }).passthrough();
+  const enrichmentLeadSchema = manualReviewPickupLeadSchema.extend({
+    scraped: z.object({
+      url: z.string().optional(),
+      finalUrl: z.string().optional(),
+      title: z.string().optional(),
+      description: z.string().optional(),
+      textPreview: z.string().optional(),
+      emails: z.array(z.string()).optional(),
+      phones: z.array(z.string()).optional(),
+      internalLinks: z.array(z.string()).optional(),
+    }).partial().optional(),
+    register: z.object({
+      found: z.boolean().optional(),
+      companyName: z.string().optional(),
+      ico: z.string().optional(),
+      address: z.string().optional(),
+      executives: z.array(z.string()).optional(),
+      sourceUrl: z.string().optional(),
+      source: z.enum(["orsr_ico", "orsr_name", "not_found"]).optional(),
+    }).partial().optional(),
+    preAi: z.object({
+      emails: z.array(z.string()).optional(),
+      phones: z.array(z.string()).optional(),
+      contextPreview: z.string().optional(),
+    }).optional(),
+  });
 
   server.registerTool(
     "arcigy.preview_manual_review_pickup",
@@ -1762,6 +1790,66 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(draftNicheSmartleadCampaignSetup(input))
+  );
+
+  server.registerTool(
+    "arcigy.preview_lead_enrichment_batch",
+    {
+      title: "Preview lead enrichment batch",
+      description: "Merge scraped/register/AI fields for a batch, dedupe, score, split review states, and optionally prepare a Smartlead injection plan without writes.",
+      inputSchema: {
+        leads: z.array(enrichmentLeadSchema).min(1),
+        niche: z.object({
+          id: z.string().optional(),
+          slug: z.string().min(1),
+          name: z.string().min(1),
+          campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+        }).optional(),
+        campaignTag: z.string().optional(),
+        defaultSource: z.string().optional(),
+        minScore: z.number().int().min(0).max(100).default(70),
+        batchSize: z.number().int().min(1).max(100).default(50),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(previewLeadEnrichmentBatch(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_daily_leadgen_runbook",
+    {
+      title: "Build daily leadgen runbook",
+      description: "Build an exact read-first daily leadgen runbook with MCP call payloads from discovery through enrichment and approved Smartlead upload.",
+      inputSchema: {
+        niche: z.object({
+          id: z.string().optional(),
+          slug: z.string().min(1),
+          name: z.string().min(1),
+          keywords: z.array(z.string()).optional(),
+          region: z.string().optional(),
+          campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+        }),
+        targetCount: z.number().int().min(1).max(500).optional(),
+        dailyLimit: z.number().int().min(1).max(250).optional(),
+        batchSize: z.number().int().min(1).max(100).optional(),
+        offer: z.string().optional(),
+        painPoint: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        includeSmartleadSetup: z.boolean().default(false),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildDailyLeadgenRunbook(input))
   );
 
   const leadCandidateSchema = z.object({

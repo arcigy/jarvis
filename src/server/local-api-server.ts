@@ -27,7 +27,9 @@ import {
   draftSmartleadCampaignSequence,
   enrichSlovakCompanyRegister,
   filterBlacklistedLeads,
+  buildDailyLeadgenRunbook,
   parseLeadsCsv,
+  previewLeadEnrichmentBatch,
   prepareSmartleadLeads,
   runLeadgenResearchPipeline,
   scoreLeadQuality,
@@ -1459,6 +1461,34 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         webhookUrl: optionalString(payload.webhookUrl),
         schedule: payload.schedule as Parameters<typeof draftNicheSmartleadCampaignSetup>[0]["schedule"],
         settings: payload.settings as Parameters<typeof draftNicheSmartleadCampaignSetup>[0]["settings"],
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.preview_lead_enrichment_batch") {
+    writeJson(response, 200, {
+      result: previewLeadEnrichmentBatch({
+        leads: (payload.leads ?? []) as Parameters<typeof previewLeadEnrichmentBatch>[0]["leads"],
+        niche: payload.niche as Parameters<typeof previewLeadEnrichmentBatch>[0]["niche"],
+        campaignTag: optionalString(payload.campaignTag),
+        defaultSource: optionalString(payload.defaultSource),
+        minScore: typeof payload.minScore === "number" ? payload.minScore : undefined,
+        batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_daily_leadgen_runbook") {
+    writeJson(response, 200, {
+      result: buildDailyLeadgenRunbook({
+        niche: (payload.niche ?? {}) as Parameters<typeof buildDailyLeadgenRunbook>[0]["niche"],
+        targetCount: typeof payload.targetCount === "number" ? payload.targetCount : undefined,
+        dailyLimit: typeof payload.dailyLimit === "number" ? payload.dailyLimit : undefined,
+        batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
+        offer: optionalString(payload.offer),
+        painPoint: optionalString(payload.painPoint),
+        language: payload.language === "en" ? "en" : "sk",
+        includeSmartleadSetup: payload.includeSmartleadSetup === true,
       }),
     });
     return;
