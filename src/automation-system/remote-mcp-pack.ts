@@ -940,6 +940,21 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Audit Smartlead import before upload",
+      tool: "arcigy.build_smartlead_import_audit_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_smartlead_import_audit_preview"),
+      body: {
+        campaignId: "123456",
+        leads: [
+          { email: "new@example.com", first_name: "Jan", company_name: "Nova Firma", website: "https://new.example", custom_fields: { personalized_intro: "Kratke AI intro." } },
+          { email: "existing@example.com", company_name: "Existujuca Firma" },
+        ],
+        existingSmartleadLeads: [{ email: "existing@example.com", id: "lead-1" }],
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Draft niche Smartlead campaign setup",
       tool: "arcigy.draft_niche_smartlead_campaign_setup",
       method: "POST",

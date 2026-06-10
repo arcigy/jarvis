@@ -165,6 +165,19 @@ export type SmartleadInjectionPlan = {
   summary: string;
 };
 
+export type SmartleadImportAuditPreview = {
+  mode: "smartlead-import-audit-preview";
+  summary: string;
+  totals: { input: number; normalized: number; newLeads: number; duplicateInInput: number; alreadyInSmartlead: number; skipped: number };
+  campaignId?: string | number;
+  newLeads: SmartleadLead[];
+  duplicateInInput: Array<{ lead: SmartleadLead; duplicateOf: string; reason: string }>;
+  alreadyInSmartlead: Array<{ lead: SmartleadLead; existingEmail: string; reason: string }>;
+  skipped: Array<{ email?: string; reason: string }>;
+  addLeadsApprovalPayload?: { campaignId: string | number; leads: SmartleadLead[]; settings: { ignore_global_block_list: false; ignore_unsubscribe_list: false }; approval: { approved: true } };
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type NicheSmartleadCampaignSetupDraft = {
   mode: "niche-smartlead-campaign-setup-draft";
   campaignName: string;
@@ -1127,6 +1140,80 @@ export function buildSmartleadInjectionPlan(input: {
   };
 }
 
+export function buildSmartleadImportAuditPreview(input: {
+  campaignId?: string | number | null;
+  leads: SmartleadLead[];
+  existingSmartleadLeads?: Array<Record<string, unknown>>;
+}): SmartleadImportAuditPreview {
+  const prepared = prepareSmartleadLeads({
+    leads: input.leads.map((lead) => ({
+      email: lead.email,
+      firstName: lead.first_name,
+      lastName: lead.last_name,
+      companyName: lead.company_name,
+      website: lead.website,
+      customFields: lead.custom_fields,
+    })),
+  });
+  const duplicateInInput = duplicateSmartleadInputLeads(input.leads);
+  const newLeads: SmartleadLead[] = [];
+  const existingEmails = new Set((input.existingSmartleadLeads ?? []).map(extractSmartleadEmail).filter((email): email is string => Boolean(email)));
+  const alreadyInSmartlead: SmartleadImportAuditPreview["alreadyInSmartlead"] = [];
+  for (const lead of prepared.leadList) {
+    const email = lead.email.trim().toLowerCase();
+    if (existingEmails.has(email)) {
+      alreadyInSmartlead.push({ lead, existingEmail: email, reason: "email already exists in Smartlead campaign lead list" });
+      continue;
+    }
+    newLeads.push(lead);
+  }
+  const campaignId = input.campaignId ?? undefined;
+  const addLeadsApprovalPayload = campaignId && newLeads.length
+    ? {
+        campaignId,
+        leads: newLeads,
+        settings: { ignore_global_block_list: false as const, ignore_unsubscribe_list: false as const },
+        approval: { approved: true as const },
+      }
+    : undefined;
+  const nextToolCalls: SmartleadImportAuditPreview["nextToolCalls"] = [];
+  if (campaignId) {
+    nextToolCalls.push({
+      tool: "arcigy.get_smartlead_campaign_leads",
+      payload: { campaignId, offset: 0, limit: 500 },
+      reason: "Pred dalsim importom nacitaj aktualnych leadov zo Smartlead kampane a zopakuj audit.",
+      approvalRequired: false,
+    });
+  }
+  if (addLeadsApprovalPayload) {
+    nextToolCalls.push({
+      tool: "arcigy.add_leads_to_smartlead_campaign",
+      payload: addLeadsApprovalPayload,
+      reason: "Importuj iba nove leady po explicitnom schvaleni operatora.",
+      approvalRequired: true,
+    });
+  }
+  return {
+    mode: "smartlead-import-audit-preview",
+    summary: `Smartlead import audit: ${newLeads.length} novych, ${alreadyInSmartlead.length} uz v Smartlead, ${duplicateInInput.length} duplicit v batchi, ${prepared.skipped.length} skipped. Ziadny upload neprebehol.`,
+    totals: {
+      input: input.leads.length,
+      normalized: prepared.leadList.length,
+      newLeads: newLeads.length,
+      duplicateInInput: duplicateInInput.length,
+      alreadyInSmartlead: alreadyInSmartlead.length,
+      skipped: prepared.skipped.length,
+    },
+    campaignId,
+    newLeads,
+    duplicateInInput,
+    alreadyInSmartlead,
+    skipped: prepared.skipped,
+    addLeadsApprovalPayload,
+    nextToolCalls,
+  };
+}
+
 export function draftNicheSmartleadCampaignSetup(input: {
   niche: { id?: string; slug: string; name: string };
   offer?: string;
@@ -2006,6 +2093,25 @@ function stringField(record: Record<string, unknown>, ...keys: string[]): string
     if (typeof value === "number" && Number.isFinite(value)) return String(value);
   }
   return undefined;
+}
+
+function extractSmartleadEmail(record: Record<string, unknown>): string | undefined {
+  return stringField(record, "email", "lead_email", "primary_email")?.toLowerCase();
+}
+
+function duplicateSmartleadInputLeads(leads: SmartleadLead[]): SmartleadImportAuditPreview["duplicateInInput"] {
+  const seen = new Set<string>();
+  const duplicates: SmartleadImportAuditPreview["duplicateInInput"] = [];
+  for (const lead of leads) {
+    const email = lead.email?.trim().toLowerCase();
+    if (!email) continue;
+    if (seen.has(email)) {
+      duplicates.push({ lead, duplicateOf: email, reason: "duplicate email in import batch" });
+      continue;
+    }
+    seen.add(email);
+  }
+  return duplicates;
 }
 
 function booleanField(record: Record<string, unknown>, ...keys: string[]): boolean | undefined {

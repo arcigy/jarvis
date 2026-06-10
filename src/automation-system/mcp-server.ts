@@ -30,6 +30,7 @@ import {
   buildSmartleadCampaignLaunchPreview,
   buildSmartleadCampaignQaPreview,
   buildSmartleadInjectionPlan,
+  buildSmartleadImportAuditPreview,
   buildColdOutreachCsvImportPreview,
   dedupeLeadCandidates,
   draftNicheSmartleadCampaignSetup,
@@ -2043,6 +2044,33 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildSmartleadInjectionPlan(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_smartlead_import_audit_preview",
+    {
+      title: "Build Smartlead import audit preview",
+      description: "Compare prepared Smartlead leads with existing campaign leads, separate new/duplicate/already-imported records, and prepare an approval payload without uploading.",
+      inputSchema: {
+        campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+        leads: z.array(z.object({
+          email: z.string().min(1),
+          first_name: z.string().optional(),
+          last_name: z.string().optional(),
+          company_name: z.string().optional(),
+          website: z.string().optional(),
+          custom_fields: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
+        })).min(1).max(500),
+        existingSmartleadLeads: z.array(z.record(z.string(), z.unknown())).optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildSmartleadImportAuditPreview(input))
   );
 
   server.registerTool(

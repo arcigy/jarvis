@@ -29,6 +29,7 @@ import {
   buildSmartleadCampaignLaunchPreview,
   buildSmartleadCampaignQaPreview,
   buildSmartleadInjectionPlan,
+  buildSmartleadImportAuditPreview,
   buildColdOutreachCsvImportPreview,
   dedupeLeadCandidates,
   draftNicheSmartleadCampaignSetup,
@@ -1538,6 +1539,16 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         niche: (payload.niche ?? {}) as Parameters<typeof buildSmartleadInjectionPlan>[0]["niche"],
         leads: (payload.leads ?? []) as Parameters<typeof buildSmartleadInjectionPlan>[0]["leads"],
         batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_smartlead_import_audit_preview") {
+    writeJson(response, 200, {
+      result: buildSmartleadImportAuditPreview({
+        campaignId: (payload.campaignId ?? null) as string | number | null,
+        leads: (payload.leads ?? []) as Parameters<typeof buildSmartleadImportAuditPreview>[0]["leads"],
+        existingSmartleadLeads: Array.isArray(payload.existingSmartleadLeads) ? payload.existingSmartleadLeads as Array<Record<string, unknown>> : undefined,
       }),
     });
     return;

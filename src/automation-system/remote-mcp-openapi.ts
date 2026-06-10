@@ -411,6 +411,16 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       leads: [{ email: "lead@example.com", decisionMakerName: "Jan Novak", companyName: "Modelova Firma", website: "https://example.com", personalizedIntro: "Kratke AI intro." }],
     };
   }
+  if (toolName === "arcigy.build_smartlead_import_audit_preview") {
+    return {
+      campaignId: "123456",
+      leads: [
+        { email: "new@example.com", first_name: "Jan", company_name: "Nova Firma", website: "https://new.example", custom_fields: { personalized_intro: "Kratke AI intro." } },
+        { email: "existing@example.com", company_name: "Existujuca Firma" },
+      ],
+      existingSmartleadLeads: [{ email: "existing@example.com", id: "lead-1" }],
+    };
+  }
   if (toolName === "arcigy.draft_niche_smartlead_campaign_setup") {
     return {
       niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy" },
