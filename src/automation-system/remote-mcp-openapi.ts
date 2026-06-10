@@ -279,6 +279,16 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
   if (toolName === "arcigy.preview_smartlead_lead_sync") return { campaignIds: ["123456"], limitPerCampaign: 100 };
   if (toolName === "arcigy.get_smartlead_message_history") return { campaignId: "123456", email: "lead@example.com" };
   if (toolName === "arcigy.classify_outreach_reply") return { replyBody: "Dobry den, poslite mi prosim ukazku.", useAi: false };
+  if (toolName === "arcigy.build_outreach_reply_triage_preview") {
+    return {
+      replies: [
+        { source: "smartlead", email: "lead@example.com", campaignId: "123456", replyBody: "Dobry den, poslite mi prosim ukazku.", senderEmail: "andrej@arcigy.group", leadName: "Jan Novak" },
+        { source: "gmail", email: "office@example.com", replyBody: "Nie dakujem, nemame zaujem.", senderEmail: "andrej@arcigy.group", threadId: "thread-123", messageId: "msg-123" },
+      ],
+      useAiClassification: false,
+      maxReplies: 20,
+    };
+  }
   if (toolName === "arcigy.preview_smartlead_ai_reply") {
     return {
       toEmail: "lead@example.com",

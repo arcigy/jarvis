@@ -52,7 +52,7 @@ import { buildProactiveAttentionDigest } from "../automation-system/proactive-at
 import { buildProductionCompletionScore, summarizeProductionCompletionScoreForVoice } from "../automation-system/production-completion-score.ts";
 import { buildProductionReadinessReport } from "../automation-system/production-readiness.ts";
 import { getProductionVerificationEvidence } from "../automation-system/production-verification-evidence.ts";
-import { classifyOutreachReply, previewGmailAiReply, previewSmartleadAiReply } from "../automation-system/reply-decision.ts";
+import { buildOutreachReplyTriagePreview, classifyOutreachReply, previewGmailAiReply, previewSmartleadAiReply } from "../automation-system/reply-decision.ts";
 import { buildRemoteMcpOpenApiDocument } from "../automation-system/remote-mcp-openapi.ts";
 import { buildRemoteMcpConnectionPack } from "../automation-system/remote-mcp-pack.ts";
 import { runRemoteMcpSmoke } from "../automation-system/remote-mcp-smoke.ts";
@@ -1292,6 +1292,17 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         history: Array.isArray(payload.history) ? payload.history as Parameters<typeof classifyOutreachReply>[0]["history"] : undefined,
         senderName: optionalString(payload.senderName),
         useAi: payload.useAi === true,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_outreach_reply_triage_preview") {
+    writeJson(response, 200, {
+      result: await buildOutreachReplyTriagePreview({
+        replies: Array.isArray(payload.replies) ? payload.replies as Parameters<typeof buildOutreachReplyTriagePreview>[0]["replies"] : [],
+        aiRepliesActive: typeof payload.aiRepliesActive === "boolean" ? payload.aiRepliesActive : undefined,
+        useAiClassification: payload.useAiClassification === true,
+        maxReplies: typeof payload.maxReplies === "number" ? payload.maxReplies : undefined,
       }),
     });
     return;

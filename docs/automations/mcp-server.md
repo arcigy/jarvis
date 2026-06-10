@@ -106,6 +106,7 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.preview_smartlead_lead_sync`: read-only Smartlead status sync preview that returns local update candidates without writing to the database.
 - `arcigy.get_smartlead_message_history`: read-only fetch of one lead's Smartlead message history plus latest sent-email reply metadata.
 - `arcigy.classify_outreach_reply`: classifies lead replies as `POSITIVE`, `NEGATIVE`, `ALREADY_SENT`, or `NEUTRAL` before any draft or send action.
+- `arcigy.build_outreach_reply_triage_preview`: read-only batch triage for Smartlead/Gmail replies with safe draft next-step payloads and no sending.
 - `arcigy.preview_smartlead_ai_reply`: previews the Smartlead AI reply webhook decision, including event/body guards, duplicate/human-in-loop checks, and safe next payloads.
 - `arcigy.preview_gmail_ai_reply`: previews Gmail AI reply decisions for known leads and cold outreach threads without sending.
 - `arcigy.draft_smartlead_thread_reply`: drafts a Smartlead thread reply from message history without sending.

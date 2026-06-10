@@ -74,7 +74,7 @@ import { buildOperatorBriefing } from "../src/automation-system/operator-briefin
 import { buildLeadgenDailyReport, buildLeadgenEveningSummary, buildLeadgenOpsDigest, buildLeadgenSlackReportPreview, selectNextNiche } from "../src/automation-system/leadgen-report.ts";
 import { draftPriceOfferIntake } from "../src/automation-system/price-offer.ts";
 import { buildProactiveAttentionDigest } from "../src/automation-system/proactive-attention-digest.ts";
-import { classifyOutreachReply, previewGmailAiReply, previewSmartleadAiReply } from "../src/automation-system/reply-decision.ts";
+import { buildOutreachReplyTriagePreview, classifyOutreachReply, previewGmailAiReply, previewSmartleadAiReply } from "../src/automation-system/reply-decision.ts";
 import { buildJarvisCapabilityAudit } from "../src/automation-system/jarvis-capability-audit.ts";
 import { buildProductionCompletionScore, summarizeProductionCompletionScoreForVoice } from "../src/automation-system/production-completion-score.ts";
 import { jarvisAutomations } from "../src/automation-system/jarvis-automations.ts";
@@ -131,6 +131,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.preview_smartlead_lead_sync",
     "arcigy.get_smartlead_message_history",
     "arcigy.classify_outreach_reply",
+    "arcigy.build_outreach_reply_triage_preview",
     "arcigy.preview_smartlead_ai_reply",
     "arcigy.preview_gmail_ai_reply",
     "arcigy.draft_smartlead_thread_reply",
@@ -1417,7 +1418,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 83 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 84 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -2842,6 +2843,41 @@ test("outreach reply decision previews Smartlead and Gmail sends without writing
   assert.match(gmail.reason, /NEGATIVE/);
   assert.equal(humanHandled.action, "skip");
   assert.match(humanHandled.reason, /Human-in-the-loop/);
+});
+
+test("outreach reply triage builds batch draft next steps without sending", async () => {
+  const triage = await buildOutreachReplyTriagePreview({
+    replies: [
+      {
+        source: "smartlead",
+        email: "lead@example.com",
+        campaignId: "123",
+        replyBody: "Dobry den, poslite mi prosim ukazku.",
+        senderEmail: "andrej@arcigy.group",
+        leadName: "Jan Novak",
+        companyName: "Modelova Firma",
+      },
+      {
+        source: "gmail",
+        email: "office@example.com",
+        replyBody: "Nie dakujem, nemame zaujem.",
+        senderEmail: "andrej@arcigy.group",
+        threadId: "thread-1",
+        messageId: "msg-1",
+      },
+    ],
+    useAiClassification: false,
+  });
+
+  assert.equal(triage.mode, "outreach-reply-triage-preview");
+  assert.equal(triage.totals.replies, 2);
+  assert.equal(triage.totals.positive, 1);
+  assert.equal(triage.totals.negative, 1);
+  assert.equal(triage.totals.draftCandidates, 1);
+  assert.equal(triage.nextToolCalls[0].tool, "arcigy.draft_smartlead_thread_reply");
+  assert.equal(triage.nextToolCalls[0].approvalRequired, false);
+  assert.equal((triage.nextToolCalls[0].payload as { email?: string }).email, "lead@example.com");
+  assert.match(triage.summary, /Nic nebolo odoslane/);
 });
 
 test("lead discovery helpers call Serper, Google Places, and Google Sheets", async () => {

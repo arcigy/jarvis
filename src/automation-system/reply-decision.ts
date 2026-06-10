@@ -56,6 +56,48 @@ export type GmailAiReplyPreview = {
   summary: string;
 };
 
+export type OutreachReplyTriageItemInput = {
+  source: "smartlead" | "gmail";
+  email: string;
+  replyBody: string;
+  campaignId?: string | number;
+  senderEmail?: string;
+  leadName?: string;
+  companyName?: string;
+  subject?: string;
+  threadId?: string;
+  messageId?: string;
+  history?: ReplyHistoryItem[];
+  alreadyHandled?: boolean;
+};
+
+export type OutreachReplyTriagePreview = {
+  mode: "outreach-reply-triage-preview";
+  summary: string;
+  totals: {
+    replies: number;
+    positive: number;
+    negative: number;
+    alreadySent: number;
+    neutral: number;
+    draftCandidates: number;
+    skipped: number;
+  };
+  items: Array<{
+    source: "smartlead" | "gmail";
+    email: string;
+    leadName?: string;
+    companyName?: string;
+    category: OutreachReplyCategory;
+    confidence: OutreachReplyClassification["confidence"];
+    recommendedAction: "draft_smartlead_reply" | "draft_gmail_reply" | "skip";
+    reason: string;
+    nextToolCall?: { tool: string; payload: Record<string, unknown>; approvalRequired: boolean };
+  }>;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; approvalRequired: boolean }>;
+  warnings: string[];
+};
+
 const allowedSmartleadEventTypes = new Set(["EMAIL_REPLY", "LEAD_CATEGORY_UPDATED"]);
 
 export async function classifyOutreachReply(
@@ -197,6 +239,78 @@ export async function previewGmailAiReply(
   };
 }
 
+export async function buildOutreachReplyTriagePreview(
+  input: {
+    replies: OutreachReplyTriageItemInput[];
+    aiRepliesActive?: boolean;
+    useAiClassification?: boolean;
+    maxReplies?: number;
+  },
+  env: RuntimeEnv = process.env,
+  fetchImpl: FetchLike = fetch
+): Promise<OutreachReplyTriagePreview> {
+  const maxReplies = Math.min(Math.max(Math.trunc(input.maxReplies ?? 50), 1), 100);
+  const replies = input.replies.slice(0, maxReplies);
+  const items: OutreachReplyTriagePreview["items"] = [];
+  const warnings: string[] = [];
+  for (const reply of replies) {
+    const body = reply.replyBody.trim();
+    if (!body) {
+      items.push(triageSkip(reply, classification("NEUTRAL", "high", ["empty reply body"]), "Empty reply body."));
+      continue;
+    }
+    if (input.aiRepliesActive === false || reply.alreadyHandled === true) {
+      const reason = input.aiRepliesActive === false ? "AI replies are paused." : "Reply already handled.";
+      items.push(triageSkip(reply, classification("NEUTRAL", "high", [reason]), reason));
+      continue;
+    }
+    const classificationResult = await classifyOutreachReply(
+      { replyBody: body, history: reply.history, senderName: reply.senderEmail, useAi: input.useAiClassification },
+      env,
+      fetchImpl
+    );
+    if (classificationResult.category !== "POSITIVE") {
+      items.push(triageSkip(reply, classificationResult, `Reply classified as ${classificationResult.category}.`));
+      continue;
+    }
+    const nextToolCall = buildPositiveReplyNextToolCall(reply, body);
+    if (!nextToolCall) {
+      warnings.push(`Positive reply for ${reply.email} is missing required ${reply.source} metadata for draft preparation.`);
+      items.push(triageSkip(reply, classificationResult, "Positive reply is missing required metadata for draft preparation."));
+      continue;
+    }
+    items.push({
+      source: reply.source,
+      email: reply.email,
+      leadName: reply.leadName,
+      companyName: reply.companyName,
+      category: classificationResult.category,
+      confidence: classificationResult.confidence,
+      recommendedAction: reply.source === "smartlead" ? "draft_smartlead_reply" : "draft_gmail_reply",
+      reason: "Positive reply detected; prepare a draft only, then wait for approval before sending.",
+      nextToolCall,
+    });
+  }
+  const totals = {
+    replies: items.length,
+    positive: items.filter((item) => item.category === "POSITIVE").length,
+    negative: items.filter((item) => item.category === "NEGATIVE").length,
+    alreadySent: items.filter((item) => item.category === "ALREADY_SENT").length,
+    neutral: items.filter((item) => item.category === "NEUTRAL").length,
+    draftCandidates: items.filter((item) => item.nextToolCall).length,
+    skipped: items.filter((item) => item.recommendedAction === "skip").length,
+  };
+  const nextToolCalls = items.flatMap((item) => item.nextToolCall ? [item.nextToolCall] : []);
+  return {
+    mode: "outreach-reply-triage-preview",
+    summary: `Outreach reply triage: ${totals.positive} pozitivnych, ${totals.negative} negativnych, ${totals.neutral} neutralnych, ${totals.alreadySent} uz vybavenych; ${totals.draftCandidates} draft kandidatov. Nic nebolo odoslane.`,
+    totals,
+    items,
+    nextToolCalls,
+    warnings,
+  };
+}
+
 function classifyOutreachReplyHeuristic(replyBody: string, history: ReplyHistoryItem[]): OutreachReplyClassification {
   const text = normalizeText(replyBody);
   const historyText = normalizeText(formatHistory(history, "Arcigy"));
@@ -293,6 +407,58 @@ function smartleadSkip(reason: string, classification?: OutreachReplyClassificat
 
 function gmailSkip(reason: string, classification?: OutreachReplyClassification): GmailAiReplyPreview {
   return { mode: "gmail-ai-reply-preview", action: "skip", reason, classification, summary: `Gmail AI reply skipped: ${reason}` };
+}
+
+function triageSkip(reply: OutreachReplyTriageItemInput, classificationResult: OutreachReplyClassification, reason: string): OutreachReplyTriagePreview["items"][number] {
+  return {
+    source: reply.source,
+    email: reply.email,
+    leadName: reply.leadName,
+    companyName: reply.companyName,
+    category: classificationResult.category,
+    confidence: classificationResult.confidence,
+    recommendedAction: "skip",
+    reason,
+  };
+}
+
+function buildPositiveReplyNextToolCall(reply: OutreachReplyTriageItemInput, body: string): OutreachReplyTriagePreview["nextToolCalls"][number] | null {
+  if (reply.source === "smartlead") {
+    if (reply.campaignId === undefined) return null;
+    return {
+      tool: "arcigy.draft_smartlead_thread_reply",
+      payload: {
+        campaignId: reply.campaignId,
+        email: reply.email,
+        leadName: reply.leadName,
+        companyName: reply.companyName,
+        positiveSignal: body,
+        latestLeadReply: body,
+        senderEmail: reply.senderEmail,
+        messageHistory: reply.history,
+        language: "sk",
+      },
+      approvalRequired: false,
+    };
+  }
+  if (!reply.senderEmail || !reply.threadId || !reply.messageId) return null;
+  return {
+    tool: "arcigy.preview_gmail_ai_reply",
+    payload: {
+      senderEmail: reply.senderEmail,
+      fromEmail: reply.email,
+      subject: reply.subject,
+      body,
+      threadId: reply.threadId,
+      messageId: reply.messageId,
+      leadName: reply.leadName,
+      history: reply.history,
+      leadKnown: true,
+      threadStartedByUs: true,
+      generateDraft: true,
+    },
+    approvalRequired: false,
+  };
 }
 
 function parseCategory(value: string): OutreachReplyCategory | null {

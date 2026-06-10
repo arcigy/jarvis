@@ -57,7 +57,7 @@ import { buildProactiveAttentionDigest } from "./proactive-attention-digest.ts";
 import { buildProductionCompletionScore, summarizeProductionCompletionScoreForVoice } from "./production-completion-score.ts";
 import { buildProductionReadinessReport } from "./production-readiness.ts";
 import { getProductionVerificationEvidence } from "./production-verification-evidence.ts";
-import { classifyOutreachReply, previewGmailAiReply, previewSmartleadAiReply } from "./reply-decision.ts";
+import { buildOutreachReplyTriagePreview, classifyOutreachReply, previewGmailAiReply, previewSmartleadAiReply } from "./reply-decision.ts";
 import { buildRemoteMcpConnectionPack } from "./remote-mcp-pack.ts";
 import { runRemoteMcpSmoke } from "./remote-mcp-smoke.ts";
 import {
@@ -1345,6 +1345,42 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(await classifyOutreachReply(input))
+  );
+
+  const outreachTriageItemSchema = z.object({
+    source: z.enum(["smartlead", "gmail"]),
+    email: z.string().email(),
+    replyBody: z.string().min(1),
+    campaignId: z.union([z.string(), z.number()]).optional(),
+    senderEmail: z.string().email().optional(),
+    leadName: z.string().optional(),
+    companyName: z.string().optional(),
+    subject: z.string().optional(),
+    threadId: z.string().optional(),
+    messageId: z.string().optional(),
+    history: z.array(replyHistoryItemSchema).optional(),
+    alreadyHandled: z.boolean().optional(),
+  });
+
+  server.registerTool(
+    "arcigy.build_outreach_reply_triage_preview",
+    {
+      title: "Build outreach reply triage preview",
+      description: "Batch triage Smartlead/Gmail replies into positive, negative, already-sent, and neutral groups with safe draft next-step payloads and no sending.",
+      inputSchema: {
+        replies: z.array(outreachTriageItemSchema).min(1).max(100),
+        aiRepliesActive: z.boolean().optional(),
+        useAiClassification: z.boolean().default(false),
+        maxReplies: z.number().int().min(1).max(100).default(50),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (input) => jsonResult(await buildOutreachReplyTriagePreview(input))
   );
 
   server.registerTool(

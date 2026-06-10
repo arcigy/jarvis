@@ -47,6 +47,7 @@ export type JarvisMcpToolName =
   | "arcigy.preview_smartlead_lead_sync"
   | "arcigy.get_smartlead_message_history"
   | "arcigy.classify_outreach_reply"
+  | "arcigy.build_outreach_reply_triage_preview"
   | "arcigy.preview_smartlead_ai_reply"
   | "arcigy.preview_gmail_ai_reply"
   | "arcigy.draft_smartlead_thread_reply"
@@ -341,6 +342,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.classify_outreach_reply",
       description: "Read-only klasifikuje odpoved leada na POSITIVE, NEGATIVE, ALREADY_SENT alebo NEUTRAL pred akymkolvek draftom.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_outreach_reply_triage_preview",
+      description: "Read-only roztriedi viac outreach odpovedi naraz a pripravi bezpecne draft next-step payloady bez odoslania.",
       requiresApproval: false,
     },
     {

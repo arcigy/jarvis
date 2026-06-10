@@ -267,6 +267,7 @@ const coreWorkflowSurfaces: CoreWorkflowSurface[] = [
       "arcigy.get_approval_queue",
       "arcigy.send_approved_outreach_reply",
       "arcigy.classify_outreach_reply",
+      "arcigy.build_outreach_reply_triage_preview",
       "arcigy.preview_smartlead_ai_reply",
       "arcigy.preview_gmail_ai_reply",
       "arcigy.draft_smartlead_thread_reply",

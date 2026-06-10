@@ -1072,6 +1072,21 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Batch triage outreach replies before drafts",
+      tool: "arcigy.build_outreach_reply_triage_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_outreach_reply_triage_preview"),
+      body: {
+        replies: [
+          { source: "smartlead", email: "lead@example.com", campaignId: "123456", replyBody: "Dobry den, poslite mi prosim ukazku.", senderEmail: "andrej@arcigy.group", leadName: "Jan Novak" },
+          { source: "gmail", email: "office@example.com", replyBody: "Nie dakujem, nemame zaujem.", senderEmail: "andrej@arcigy.group", threadId: "thread-123", messageId: "msg-123" },
+        ],
+        useAiClassification: false,
+        maxReplies: 20,
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Preview Smartlead AI reply webhook decision",
       tool: "arcigy.preview_smartlead_ai_reply",
       method: "POST",
