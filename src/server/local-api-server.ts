@@ -26,6 +26,7 @@ import {
   buildLeadgenAutopilotBatchPreview,
   buildRegionExpansionQueuePreview,
   buildLeadSourceImportQueuePreview,
+  buildLeadSourceBundlePreview,
   buildUrlIntelligenceQueuePreview,
   buildLeadRepairQueuePreview,
   buildNicheOpsDashboardPreview,
@@ -1826,6 +1827,28 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         language: payload.language === "en" ? "en" : "sk",
         minScore: typeof payload.minScore === "number" ? payload.minScore : undefined,
         batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
+        maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_lead_source_bundle_preview") {
+    writeJson(response, 200, {
+      result: buildLeadSourceBundlePreview({
+        bundleName: optionalString(payload.bundleName),
+        sources: Array.isArray(payload.sources) ? payload.sources as Parameters<typeof buildLeadSourceBundlePreview>[0]["sources"] : [],
+        niches: Array.isArray(payload.niches) ? payload.niches as Parameters<typeof buildLeadSourceBundlePreview>[0]["niches"] : undefined,
+        defaultNiche: payload.defaultNiche as Parameters<typeof buildLeadSourceBundlePreview>[0]["defaultNiche"],
+        blacklistDomains: Array.isArray(payload.blacklistDomains) ? payload.blacklistDomains.map(String) : undefined,
+        blacklistKeywords: Array.isArray(payload.blacklistKeywords) ? payload.blacklistKeywords.map(String) : undefined,
+        existingSmartleadLeadsByCampaign: payload.existingSmartleadLeadsByCampaign as Parameters<typeof buildLeadSourceBundlePreview>[0]["existingSmartleadLeadsByCampaign"],
+        campaignTag: optionalString(payload.campaignTag),
+        defaultSource: optionalString(payload.defaultSource),
+        offer: optionalString(payload.offer),
+        language: payload.language === "en" ? "en" : "sk",
+        minScore: typeof payload.minScore === "number" ? payload.minScore : undefined,
+        batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
+        auditIntros: payload.auditIntros !== false,
         maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
       }),
     });

@@ -362,6 +362,37 @@ export type LeadSourceImportQueuePreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type LeadSourceBundlePreview = {
+  mode: "lead-source-bundle-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  sources: Array<{
+    name: string;
+    type: "google_maps" | "csv" | "json" | "serper" | "manual" | "other";
+    totals: { directLeads: number; parsedCsv: number; parsedJson: number; skippedRows: number; warnings: number };
+    warnings: string[];
+  }>;
+  totals: {
+    sources: number;
+    inputLeads: number;
+    parsedCsv: number;
+    parsedJson: number;
+    skippedRows: number;
+    groups: number;
+    readyForSmartlead: number;
+    manualReview: number;
+    rejected: number;
+    websitesToScrape: number;
+    introsToDraft: number;
+    unassigned: number;
+    approvalCalls: number;
+    readOnlyCalls: number;
+  };
+  sourcePreview: LeadSourceImportQueuePreview;
+  autopilotPreview?: LeadgenAutopilotBatchPreview;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type LeadgenAutopilotBatchPreview = {
   mode: "leadgen-autopilot-batch-preview";
   summary: string;
@@ -2705,6 +2736,140 @@ export function buildLeadSourceImportQueuePreview(input: {
   };
 }
 
+export function buildLeadSourceBundlePreview(input: {
+  bundleName?: string;
+  sources: Array<{
+    sourceName?: string;
+    sourceType?: "google_maps" | "csv" | "json" | "serper" | "manual" | "other";
+    leads?: LeadSourceImportQueueLead[];
+    csvText?: string;
+    jsonText?: string;
+    delimiter?: "," | ";";
+    maxRows?: number;
+    defaultNiche?: { id?: string; slug: string; name: string; campaignId?: string | number | null };
+  }>;
+  niches?: Array<{ id?: string; slug: string; name: string; campaignId?: string | number | null; aliases?: string[] }>;
+  defaultNiche?: { id?: string; slug: string; name: string; campaignId?: string | number | null };
+  blacklistDomains?: string[];
+  blacklistKeywords?: string[];
+  existingSmartleadLeadsByCampaign?: Record<string, Array<Record<string, unknown>>>;
+  campaignTag?: string;
+  defaultSource?: string;
+  offer?: string;
+  language?: "sk" | "en";
+  minScore?: number;
+  batchSize?: number;
+  auditIntros?: boolean;
+  maxNextCalls?: number;
+}): LeadSourceBundlePreview {
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 80), 1), 150);
+  const sourceSummaries: LeadSourceBundlePreview["sources"] = [];
+  const mergedLeads: LeadSourceImportQueueLead[] = [];
+  let parsedCsv = 0;
+  let parsedJson = 0;
+  let skippedRows = 0;
+  for (const [index, source] of input.sources.slice(0, 20).entries()) {
+    const name = source.sourceName?.trim() || `${input.bundleName ?? "lead-source"}-${index + 1}`;
+    const warnings: string[] = [];
+    const csv = source.csvText
+      ? parseLeadsCsv({ csvText: source.csvText, delimiter: source.delimiter, maxRows: source.maxRows })
+      : { headers: [], leads: [] as LeadCsvRow[], skipped: [] };
+    const json = source.jsonText ? parseJsonLeadExport(source.jsonText) : { leads: [] as LeadSourceImportQueueLead[], warnings: [] as string[] };
+    warnings.push(...json.warnings);
+    const direct = source.leads ?? [];
+    const niche = source.defaultNiche ?? input.defaultNiche;
+    const sourceLeads = [...direct, ...csv.leads, ...json.leads].map((lead) => withSourceBundleDefaults(lead, name, source.sourceType, niche));
+    mergedLeads.push(...sourceLeads);
+    parsedCsv += csv.leads.length;
+    parsedJson += json.leads.length;
+    skippedRows += csv.skipped.length;
+    sourceSummaries.push({
+      name,
+      type: source.sourceType ?? (source.csvText ? "csv" : source.jsonText ? "json" : "manual"),
+      totals: {
+        directLeads: direct.length,
+        parsedCsv: csv.leads.length,
+        parsedJson: json.leads.length,
+        skippedRows: csv.skipped.length,
+        warnings: warnings.length,
+      },
+      warnings,
+    });
+  }
+
+  const sourcePreview = buildLeadSourceImportQueuePreview({
+    sourceName: input.bundleName ?? "lead-source-bundle",
+    sourceType: "manual",
+    leads: mergedLeads,
+    niches: input.niches,
+    defaultNiche: input.defaultNiche,
+    blacklistDomains: input.blacklistDomains,
+    blacklistKeywords: input.blacklistKeywords,
+    existingSmartleadLeadsByCampaign: input.existingSmartleadLeadsByCampaign,
+    campaignTag: input.campaignTag,
+    defaultSource: input.defaultSource ?? input.bundleName ?? "lead-source-bundle",
+    offer: input.offer,
+    language: input.language,
+    minScore: input.minScore,
+    batchSize: input.batchSize,
+    maxNextCalls,
+  });
+  const autopilotPreview = input.auditIntros === false
+    ? undefined
+    : buildLeadgenAutopilotBatchPreview({
+        sourceName: input.bundleName ?? "lead-source-bundle",
+        sourceType: "manual",
+        leads: mergedLeads,
+        niches: input.niches,
+        defaultNiche: input.defaultNiche,
+        blacklistDomains: input.blacklistDomains,
+        blacklistKeywords: input.blacklistKeywords,
+        existingSmartleadLeadsByCampaign: input.existingSmartleadLeadsByCampaign,
+        campaignTag: input.campaignTag,
+        defaultSource: input.defaultSource ?? input.bundleName ?? "lead-source-bundle",
+        offer: input.offer,
+        language: input.language,
+        minScore: input.minScore,
+        batchSize: input.batchSize,
+        auditIntros: true,
+        maxNextCalls,
+      });
+  const nextToolCalls = dedupeNextToolCalls(autopilotPreview?.nextToolCalls ?? sourcePreview.nextToolCalls).slice(0, maxNextCalls);
+  const approvalCalls = nextToolCalls.filter((call) => call.approvalRequired).length;
+  const totals = {
+    sources: sourceSummaries.length,
+    inputLeads: mergedLeads.length,
+    parsedCsv,
+    parsedJson,
+    skippedRows,
+    groups: sourcePreview.totals.groups,
+    readyForSmartlead: sourcePreview.totals.readyForSmartlead,
+    manualReview: sourcePreview.totals.manualReview,
+    rejected: sourcePreview.totals.rejected,
+    websitesToScrape: sourcePreview.totals.websitesToScrape,
+    introsToDraft: sourcePreview.totals.introsToDraft,
+    unassigned: sourcePreview.totals.unassigned,
+    approvalCalls,
+    readOnlyCalls: nextToolCalls.length - approvalCalls,
+  };
+  const status: LeadSourceBundlePreview["status"] =
+    totals.sources === 0 || totals.inputLeads === 0 || totals.groups === 0 || totals.unassigned > 0
+      ? "blocked"
+      : totals.readyForSmartlead > 0 && totals.websitesToScrape === 0 && totals.introsToDraft === 0
+        ? "ready"
+        : "attention";
+  return {
+    mode: "lead-source-bundle-preview",
+    status,
+    summary: `Lead source bundle: ${status}, ${totals.sources} zdrojov, ${totals.inputLeads} leadov, ${totals.groups} skupin, ${totals.readyForSmartlead} ready do Smartlead, ${totals.websitesToScrape} scrape, ${totals.introsToDraft} intro draft, ${approvalCalls} approval krokov. Ziadny zapis ani upload neprebehol.`,
+    sources: sourceSummaries,
+    totals,
+    sourcePreview,
+    autopilotPreview,
+    nextToolCalls,
+  };
+}
+
 export function buildLeadgenAutopilotBatchPreview(input: {
   sourceName?: string;
   sourceType?: "google_maps" | "csv" | "serper" | "manual" | "other";
@@ -4015,6 +4180,103 @@ function normalizePipelineLead(
       context_preview: contextPreview ? redactSensitiveText(contextPreview).slice(0, 1200) : undefined,
     },
   };
+}
+
+function withSourceBundleDefaults(
+  lead: LeadSourceImportQueueLead,
+  sourceName: string,
+  sourceType?: "google_maps" | "csv" | "json" | "serper" | "manual" | "other",
+  niche?: { id?: string; slug: string; name: string; campaignId?: string | number | null }
+): LeadSourceImportQueueLead {
+  return {
+    ...lead,
+    source: lead.source ?? sourceName,
+    nicheSlug: lead.nicheSlug ?? niche?.slug,
+    nicheName: lead.nicheName ?? niche?.name,
+    campaignId: lead.campaignId ?? lead.smartleadCampaignId ?? niche?.campaignId,
+    smartleadCampaignId: lead.smartleadCampaignId ?? niche?.campaignId,
+    customFields: {
+      ...lead.customFields,
+      source_name: sourceName,
+      source_type: sourceType,
+      niche_slug: lead.nicheSlug ?? niche?.slug,
+      niche_name: lead.nicheName ?? niche?.name,
+      smartlead_campaign_id: lead.smartleadCampaignId ?? lead.campaignId ?? niche?.campaignId ?? undefined,
+    },
+  };
+}
+
+function parseJsonLeadExport(jsonText: string): { leads: LeadSourceImportQueueLead[]; warnings: string[] } {
+  try {
+    const parsed = JSON.parse(jsonText) as unknown;
+    const rows = extractJsonLeadRows(parsed);
+    return {
+      leads: rows.map(mapJsonLeadRow).filter((lead) => lead.companyName || lead.website || lead.email),
+      warnings: rows.length ? [] : ["JSON parsed, but no lead rows were found."],
+    };
+  } catch (error) {
+    return { leads: [], warnings: [`JSON parse failed: ${redactSensitiveText(error instanceof Error ? error.message : String(error))}`] };
+  }
+}
+
+function extractJsonLeadRows(value: unknown): Array<Record<string, unknown>> {
+  if (Array.isArray(value)) return value.filter(isRecord);
+  if (!isRecord(value)) return [];
+  for (const key of ["leads", "results", "items", "data", "rows"]) {
+    const candidate = value[key];
+    if (Array.isArray(candidate)) return candidate.filter(isRecord);
+  }
+  return [value];
+}
+
+function mapJsonLeadRow(row: Record<string, unknown>): LeadSourceImportQueueLead {
+  const custom = primitiveCustomFields(row);
+  const website = stringField(row, "website", "web", "url", "domain", "google_domain", "finalUrl", "final_url");
+  const scraped = isRecord(row.scraped) ? row.scraped as Partial<ScrapedWebsiteContacts> : undefined;
+  const intro = isRecord(row.intro) ? row.intro as Partial<LeadIntroDraft> : undefined;
+  const email = stringField(row, "email", "primary_email", "mail") ?? selectBestEmail(Array.isArray(row.emails) ? row.emails.map(String) : scraped?.emails ?? []);
+  return {
+    email,
+    companyName: stringField(row, "companyName", "company_name", "official_company_name", "original_name", "name", "firma", "company", "title"),
+    firstName: stringField(row, "firstName", "first_name", "meno"),
+    lastName: stringField(row, "lastName", "last_name", "priezvisko", "decision_maker_last_name"),
+    website: website ? normalizeWebsiteValue(website) : undefined,
+    phone: stringField(row, "international_phone", "phone", "telefon", "tel") ?? (Array.isArray(row.phones) ? String(row.phones[0] ?? "") || undefined : scraped?.phones?.[0]),
+    source: stringField(row, "source", "niche", "campaign_tag", "matched_queries", "smartlead_campaigns"),
+    personalizedIntro: stringField(row, "personalizedIntro", "personalized_intro", "icebreaker", "icebreaker_sentence") ?? intro?.personalizedIntro,
+    nicheSlug: stringField(row, "nicheSlug", "niche_slug"),
+    nicheName: stringField(row, "nicheName", "niche_name"),
+    campaignId: stringField(row, "campaignId", "campaign_id"),
+    smartleadCampaignId: stringField(row, "smartleadCampaignId", "smartlead_campaign_id"),
+    placeId: stringField(row, "placeId", "place_id", "google_place_id"),
+    rating: numberField(row, "rating", "google_rating"),
+    reviewCount: numberField(row, "reviewCount", "review_count", "reviews", "google_review_count"),
+    scraped,
+    intro,
+    context: stringField(row, "context", "textPreview", "text_preview", "description"),
+    customFields: custom,
+  };
+}
+
+function primitiveCustomFields(row: Record<string, unknown>): Record<string, string | number | boolean | null | undefined> {
+  return Object.fromEntries(
+    Object.entries(row)
+      .filter(([, value]) => value === null || ["string", "number", "boolean"].includes(typeof value))
+      .map(([key, value]) => [slugify(key).replace(/-/g, "_"), value as string | number | boolean | null])
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function numberField(record: Record<string, unknown>, ...keys: string[]): number | undefined {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string" && value.trim() && Number.isFinite(Number(value))) return Number(value);
+  }
+  return undefined;
 }
 
 function normalizeSourceQueueLead(lead: LeadSourceImportQueueLead, sourceName?: string, defaultSource?: string): LeadSourceImportQueueLead {

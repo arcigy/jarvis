@@ -27,6 +27,7 @@ import {
   buildLeadgenAutopilotBatchPreview,
   buildRegionExpansionQueuePreview,
   buildLeadSourceImportQueuePreview,
+  buildLeadSourceBundlePreview,
   buildUrlIntelligenceQueuePreview,
   buildLeadRepairQueuePreview,
   buildNicheOpsDashboardPreview,
@@ -2648,6 +2649,47 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildLeadSourceImportQueuePreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_lead_source_bundle_preview",
+    {
+      title: "Build lead source bundle preview",
+      description: "Merge multiple CSV, JSON, and manual lead exports into one read-only leadgen runbook with scrape, AI intro, review, and Smartlead next steps.",
+      inputSchema: {
+        bundleName: z.string().optional(),
+        sources: z.array(z.object({
+          sourceName: z.string().optional(),
+          sourceType: z.enum(["google_maps", "csv", "json", "serper", "manual", "other"]).default("manual"),
+          leads: z.array(leadSourceQueueLeadSchema).optional(),
+          csvText: z.string().optional(),
+          jsonText: z.string().optional(),
+          delimiter: z.enum([",", ";"]).optional(),
+          maxRows: z.number().int().min(1).max(10_000).default(1000),
+          defaultNiche: queueNicheSchema.omit({ aliases: true }).optional(),
+        })).min(1).max(20),
+        niches: z.array(queueNicheSchema).optional(),
+        defaultNiche: queueNicheSchema.omit({ aliases: true }).optional(),
+        blacklistDomains: z.array(z.string()).optional(),
+        blacklistKeywords: z.array(z.string()).optional(),
+        existingSmartleadLeadsByCampaign: z.record(z.string(), z.array(z.record(z.string(), z.unknown()))).optional(),
+        campaignTag: z.string().optional(),
+        defaultSource: z.string().optional(),
+        offer: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        minScore: z.number().int().min(0).max(100).default(70),
+        batchSize: z.number().int().min(1).max(100).default(50),
+        auditIntros: z.boolean().default(true),
+        maxNextCalls: z.number().int().min(1).max(150).default(80),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildLeadSourceBundlePreview(input))
   );
 
   server.registerTool(

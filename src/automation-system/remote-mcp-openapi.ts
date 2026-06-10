@@ -362,6 +362,28 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       batchSize: 50,
     };
   }
+  if (toolName === "arcigy.build_lead_source_bundle_preview") {
+    return {
+      bundleName: "kuchyne-sk-import",
+      sources: [
+        {
+          sourceName: "kuchyne_sk_google_maps.csv",
+          sourceType: "csv",
+          csvText: "company,website,email,personalized_intro\nReady Studio,https://ready.sk,jan@ready.sk,Vsimol som si vase kuchynske realizacie.",
+          defaultNiche: { id: "niche-1", slug: "kuchyne", name: "Kuchynske studia", campaignId: "123456" },
+        },
+        {
+          sourceName: "kuchyne_enriched.json",
+          sourceType: "json",
+          jsonText: "{\"leads\":[{\"companyName\":\"Needs Scrape\",\"website\":\"https://needs-scrape.sk\"}]}",
+          defaultNiche: { id: "niche-1", slug: "kuchyne", name: "Kuchynske studia", campaignId: "123456" },
+        },
+      ],
+      offer: "AI asistent na odpovede a follow-up",
+      language: "sk",
+      minScore: 70,
+    };
+  }
   if (toolName === "arcigy.discover_leads") return { query: "automation agency Bratislava", maxResults: 5 };
   if (toolName === "arcigy.scrape_website_contacts") return { url: "https://example.com", includePriorityPages: true, maxPages: 4 };
   if (toolName === "arcigy.batch_scrape_website_contacts") return { urls: ["https://example.com", "https://example.org"], includePriorityPages: true, maxPages: 4, maxSites: 10 };

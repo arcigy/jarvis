@@ -29,6 +29,7 @@ import {
   buildLeadgenAutopilotBatchPreview,
   buildRegionExpansionQueuePreview,
   buildLeadSourceImportQueuePreview,
+  buildLeadSourceBundlePreview,
   buildUrlIntelligenceQueuePreview,
   buildLeadRepairQueuePreview,
   buildNicheOpsDashboardPreview,
@@ -189,6 +190,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.build_leadgen_gap_report",
     "arcigy.build_leadgen_campaign_pipeline_preview",
     "arcigy.build_lead_source_import_queue_preview",
+    "arcigy.build_lead_source_bundle_preview",
     "arcigy.build_leadgen_autopilot_batch_preview",
     "arcigy.build_lead_repair_queue_preview",
     "arcigy.build_niche_ops_dashboard_preview",
@@ -1455,7 +1457,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 103 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 104 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -3026,6 +3028,44 @@ test("lead source import queue preview groups Google Maps leads before Smartlead
   assert.equal(preview.groups[0].importAudit?.totals.newLeads, 1);
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_scrape_website_contacts" && !call.approvalRequired));
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.get_smartlead_campaign_leads" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.add_leads_to_smartlead_campaign" && call.approvalRequired));
+  assert.match(preview.summary, /Ziadny zapis ani upload/);
+});
+
+test("lead source bundle preview merges CSV and JSON exports into one runbook", () => {
+  const preview = buildLeadSourceBundlePreview({
+    bundleName: "kuchyne-sk-exporty",
+    sources: [
+      {
+        sourceName: "kuchyne_sk_google_maps_2026-04-27.csv",
+        sourceType: "csv",
+        csvText: "company,website,email,first_name,phone,personalized_intro\nReady Studio,https://ready.sk,jan@ready.sk,Jan,+421 900 111 222,Vsimol som si vase kuchynske realizacie.",
+        defaultNiche: { id: "niche-1", slug: "kuchyne", name: "Kuchynske studia", campaignId: "123456" },
+      },
+      {
+        sourceName: "kuchyne_sk_google_maps_enriched.json",
+        sourceType: "json",
+        jsonText: JSON.stringify({ leads: [{ companyName: "Needs Scrape", website: "needs-scrape.sk", nicheSlug: "kuchyne" }] }),
+        defaultNiche: { id: "niche-1", slug: "kuchyne", name: "Kuchynske studia", campaignId: "123456" },
+      },
+    ],
+    defaultNiche: { id: "niche-1", slug: "kuchyne", name: "Kuchynske studia", campaignId: "123456" },
+    offer: "AI automatizacie pre dopyty.",
+    minScore: 70,
+  });
+
+  assert.equal(preview.mode, "lead-source-bundle-preview");
+  assert.equal(preview.status, "attention");
+  assert.equal(preview.totals.sources, 2);
+  assert.equal(preview.totals.inputLeads, 2);
+  assert.equal(preview.totals.parsedCsv, 1);
+  assert.equal(preview.totals.parsedJson, 1);
+  assert.equal(preview.totals.groups, 1);
+  assert.equal(preview.totals.readyForSmartlead, 1);
+  assert.equal(preview.totals.websitesToScrape, 1);
+  assert.equal(preview.sourcePreview.groups[0].niche.campaignId, "123456");
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_scrape_website_contacts" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_draft_lead_intros" && !call.approvalRequired));
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.add_leads_to_smartlead_campaign" && call.approvalRequired));
   assert.match(preview.summary, /Ziadny zapis ani upload/);
 });
