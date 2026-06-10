@@ -44,10 +44,12 @@ import {
   addLeadsToSmartleadCampaign,
   configureSmartleadCampaign,
   createSmartleadCampaign,
+  draftSmartleadThreadReply,
   getSmartleadCampaignLeads,
   getSmartleadCampaignStatus,
   getSmartleadMessageHistory,
   getSmartleadOutreachBrief,
+  sendSmartleadThreadReply,
 } from "../automation-system/smartlead.ts";
 
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
@@ -1168,6 +1170,38 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         email: String(payload.email ?? ""),
       }),
     });
+    return;
+  }
+  if (name === "arcigy.draft_smartlead_thread_reply") {
+    writeJson(response, 200, {
+      result: await draftSmartleadThreadReply({
+        campaignId: (payload.campaignId ?? "") as string | number,
+        email: String(payload.email ?? ""),
+        leadName: optionalString(payload.leadName),
+        companyName: optionalString(payload.companyName),
+        positiveSignal: optionalString(payload.positiveSignal),
+        latestLeadReply: optionalString(payload.latestLeadReply),
+        context: optionalString(payload.context),
+        language: payload.language === "en" ? "en" : "sk",
+        senderName: optionalString(payload.senderName),
+        senderEmail: optionalString(payload.senderEmail),
+        messageHistory: payload.messageHistory,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.send_smartlead_thread_reply") {
+    const result = await sendSmartleadThreadReply({
+      campaignId: (payload.campaignId ?? "") as string | number,
+      email: optionalString(payload.email),
+      emailBody: String(payload.emailBody ?? ""),
+      emailStatsId: optionalString(payload.emailStatsId),
+      replyMessageId: optionalString(payload.replyMessageId),
+      replyEmailTime: optionalString(payload.replyEmailTime),
+    });
+    const responseBody = { result };
+    addAuditEvent("arcigy.send_smartlead_thread_reply", "submitted", payload, responseBody, true);
+    writeJson(response, 200, responseBody);
     return;
   }
   if (name === "arcigy.create_smartlead_campaign") {

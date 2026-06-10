@@ -47,10 +47,12 @@ import {
   addLeadsToSmartleadCampaign,
   configureSmartleadCampaign,
   createSmartleadCampaign,
+  draftSmartleadThreadReply,
   getSmartleadCampaignLeads,
   getSmartleadCampaignStatus,
   getSmartleadMessageHistory,
   getSmartleadOutreachBrief,
+  sendSmartleadThreadReply,
 } from "./smartlead.ts";
 import type { ClientNeedSignal, LocalPerson } from "./types.ts";
 
@@ -1052,6 +1054,61 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(await getSmartleadMessageHistory(input))
+  );
+
+  server.registerTool(
+    "arcigy.draft_smartlead_thread_reply",
+    {
+      title: "Draft Smartlead thread reply",
+      description: "Draft a Smartlead email-thread reply from message history without sending it.",
+      inputSchema: {
+        campaignId: z.union([z.string(), z.number()]),
+        email: z.string().email(),
+        leadName: z.string().optional(),
+        companyName: z.string().optional(),
+        positiveSignal: z.string().optional(),
+        latestLeadReply: z.string().optional(),
+        context: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        senderName: z.string().optional(),
+        senderEmail: z.string().email().optional(),
+        messageHistory: z.unknown().optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (input) => jsonResult(await draftSmartleadThreadReply(input))
+  );
+
+  server.registerTool(
+    "arcigy.send_smartlead_thread_reply",
+    {
+      title: "Send Smartlead thread reply",
+      description: "Send an approved reply into an existing Smartlead email thread. This is an explicit external write action.",
+      inputSchema: {
+        campaignId: z.union([z.string(), z.number()]),
+        email: z.string().email().optional(),
+        emailBody: z.string().min(1),
+        emailStatsId: z.string().optional(),
+        replyMessageId: z.string().optional(),
+        replyEmailTime: z.string().optional(),
+        approval: approvalSchema,
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (input) => {
+      requireExplicitApproval("arcigy.send_smartlead_thread_reply", input);
+      return jsonResult(await sendSmartleadThreadReply(input));
+    }
   );
 
   const smartleadSequenceSchema = z.object({

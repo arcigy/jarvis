@@ -38,6 +38,8 @@ export type JarvisMcpToolName =
   | "arcigy.get_smartlead_outreach_brief"
   | "arcigy.get_smartlead_campaign_leads"
   | "arcigy.get_smartlead_message_history"
+  | "arcigy.draft_smartlead_thread_reply"
+  | "arcigy.send_smartlead_thread_reply"
   | "arcigy.create_smartlead_campaign"
   | "arcigy.configure_smartlead_campaign"
   | "arcigy.search_serper"
@@ -268,6 +270,16 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
       name: "arcigy.get_smartlead_message_history",
       description: "Read-only nacita Smartlead message history pre lead email a pripravi metadata posledneho odoslaneho emailu pre reply flow.",
       requiresApproval: false,
+    },
+    {
+      name: "arcigy.draft_smartlead_thread_reply",
+      description: "Pouzije Gemini a Smartlead message history na draft odpovede vo vlakne bez odoslania.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.send_smartlead_thread_reply",
+      description: "Odosle schvalenu odpoved do existujuceho Smartlead email vlakna cez reply-email-thread.",
+      requiresApproval: true,
     },
     {
       name: "arcigy.create_smartlead_campaign",

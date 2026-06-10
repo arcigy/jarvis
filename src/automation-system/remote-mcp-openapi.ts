@@ -221,6 +221,24 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
   if (toolName === "arcigy.get_smartlead_outreach_brief") return { periodLabel: "poslednych 7 dni" };
   if (toolName === "arcigy.get_smartlead_campaign_leads") return { campaignId: "123456", offset: 0, limit: 100 };
   if (toolName === "arcigy.get_smartlead_message_history") return { campaignId: "123456", email: "lead@example.com" };
+  if (toolName === "arcigy.draft_smartlead_thread_reply") {
+    return {
+      campaignId: "123456",
+      email: "lead@example.com",
+      leadName: "Jan Novak",
+      positiveSignal: "Lead asked to see the showcase.",
+      latestLeadReply: "Dobry den, poslite mi prosim ukazku.",
+      language: "sk",
+    };
+  }
+  if (toolName === "arcigy.send_smartlead_thread_reply") {
+    return {
+      campaignId: "123456",
+      email: "lead@example.com",
+      emailBody: "Dobry den pan Novak,<br><br>posielam slubenu ukazku: <a href='https://www.arcigy.com/showcase'>https://www.arcigy.com/showcase</a>.",
+      approval: { approved: true },
+    };
+  }
   if (toolName === "arcigy.create_smartlead_campaign") {
     return {
       name: "MODEL CAMPAIGN",

@@ -1,5 +1,6 @@
 import { requireEnv, type RuntimeEnv } from "./env.ts";
-import type { FetchLike } from "./gemini.ts";
+import { safeAiPromptPart, safeUntrustedAiPromptPart } from "./ai-safety.ts";
+import { generateGeminiText, type FetchLike } from "./gemini.ts";
 
 const smartleadBaseUrl = "https://server.smartlead.ai/api/v1";
 
@@ -134,6 +135,58 @@ export type SmartleadMessageHistoryResult = {
   };
 };
 
+export type SmartleadThreadReplyDraftInput = {
+  campaignId: string | number;
+  email: string;
+  leadName?: string;
+  companyName?: string;
+  positiveSignal?: string;
+  latestLeadReply?: string;
+  context?: string;
+  language?: "sk" | "en";
+  senderName?: string;
+  senderEmail?: string;
+  messageHistory?: unknown;
+};
+
+export type SmartleadThreadReplyDraft = {
+  campaignId: string;
+  email: string;
+  emailBody: string;
+  model: string;
+  attempts: number;
+  latestSentEmail?: SmartleadMessageHistoryResult["latestSentEmail"];
+  approvalPayload: {
+    campaignId: string;
+    email: string;
+    emailBody: string;
+    approval: { approved: true };
+  };
+  summary: string;
+};
+
+export type SmartleadThreadReplySendInput = {
+  campaignId: string | number;
+  email?: string;
+  emailBody: string;
+  emailStatsId?: string;
+  replyMessageId?: string;
+  replyEmailTime?: string;
+};
+
+export type SmartleadThreadReplySendResult = {
+  campaignId: string;
+  email?: string;
+  submitted: true;
+  payload: {
+    email_stats_id: string;
+    email_body: string;
+    reply_message_id: string;
+    reply_email_time: string;
+  };
+  response: unknown;
+};
+
 export async function getSmartleadCampaignStatus(
   input: { campaignId?: string } = {},
   env: RuntimeEnv = process.env,
@@ -188,6 +241,94 @@ export async function getSmartleadMessageHistory(
     fetchImpl
   );
   return { campaignId, email, messages, latestSentEmail: latestSentEmailForReply(messages) };
+}
+
+export async function draftSmartleadThreadReply(
+  input: SmartleadThreadReplyDraftInput,
+  env: RuntimeEnv = process.env,
+  fetchImpl: FetchLike = fetch
+): Promise<SmartleadThreadReplyDraft> {
+  const campaignId = requireCampaignId(input.campaignId);
+  const email = input.email.trim().toLowerCase();
+  if (!email || !email.includes("@")) throw new Error("Lead email is required.");
+  const history = input.messageHistory === undefined ? await getSmartleadMessageHistory({ campaignId, email }, env, fetchImpl) : { campaignId, email, messages: input.messageHistory, latestSentEmail: latestSentEmailForReply(input.messageHistory) };
+  const senderName = input.senderName?.trim() || "Andrej";
+  const language = input.language ?? "sk";
+  const result = await generateGeminiText(
+    {
+      prompt: [
+        `You are ${safeAiPromptPart(senderName)}, a male professional sales assistant for Arcigy.`,
+        language === "sk" ? "Write the reply in Slovak." : "Write the reply in English.",
+        "Draft only the email body. Do not claim the message was sent.",
+        "Use a warm, formal tone, maximum 3 sentences, no subject and no signature.",
+        "If the lead is positive or asks for the showcase, include this link as HTML: <a href='https://www.arcigy.com/showcase'>https://www.arcigy.com/showcase</a>.",
+        input.senderEmail ? `Sender email: ${safeAiPromptPart(input.senderEmail)}.` : null,
+        input.leadName ? `Lead name: ${safeAiPromptPart(input.leadName)}.` : null,
+        input.companyName ? `Company: ${safeAiPromptPart(input.companyName)}.` : null,
+        input.positiveSignal ? safeUntrustedAiPromptPart("positive signal", input.positiveSignal) : null,
+        input.latestLeadReply ? safeUntrustedAiPromptPart("latest lead reply", input.latestLeadReply) : null,
+        input.context ? safeUntrustedAiPromptPart("operator context", input.context) : null,
+        safeUntrustedAiPromptPart("Smartlead message history", formatMessageHistoryForPrompt(history.messages)),
+      ].filter(Boolean).join("\n"),
+      temperature: 0.4,
+    },
+    env,
+    fetchImpl
+  );
+  const emailBody = result.text.trim();
+  return {
+    campaignId,
+    email,
+    emailBody,
+    model: result.model,
+    attempts: result.attempts,
+    latestSentEmail: history.latestSentEmail,
+    approvalPayload: {
+      campaignId,
+      email,
+      emailBody,
+      approval: { approved: true },
+    },
+    summary: `Jarvis pripravil Smartlead thread odpoved pre ${email}. Odosli ju az po schvaleni cez arcigy.send_smartlead_thread_reply.`,
+  };
+}
+
+export async function sendSmartleadThreadReply(
+  input: SmartleadThreadReplySendInput,
+  env: RuntimeEnv = process.env,
+  fetchImpl: FetchLike = fetch
+): Promise<SmartleadThreadReplySendResult> {
+  const apiKey = requireEnv(env, "SMARTLEAD_API_KEY");
+  const campaignId = requireCampaignId(input.campaignId);
+  const emailBody = input.emailBody.trim();
+  if (!emailBody) throw new Error("Smartlead reply emailBody is required.");
+  let emailStatsId = input.emailStatsId?.trim();
+  let replyMessageId = input.replyMessageId?.trim();
+  let replyEmailTime = input.replyEmailTime?.trim();
+  const email = input.email?.trim().toLowerCase();
+
+  if ((!emailStatsId || !replyMessageId || !replyEmailTime) && email) {
+    const history = await getSmartleadMessageHistory({ campaignId, email }, env, fetchImpl);
+    emailStatsId = emailStatsId || history.latestSentEmail?.email_stats_id;
+    replyMessageId = replyMessageId || history.latestSentEmail?.reply_message_id;
+    replyEmailTime = replyEmailTime || history.latestSentEmail?.reply_email_time;
+  }
+
+  if (!emailStatsId || !replyMessageId || !replyEmailTime) {
+    throw new Error("Smartlead reply requires emailStatsId, replyMessageId and replyEmailTime. Provide them or provide campaignId + email so Jarvis can fetch message history.");
+  }
+
+  const payload = {
+    email_stats_id: emailStatsId,
+    email_body: emailBody,
+    reply_message_id: replyMessageId,
+    reply_email_time: replyEmailTime,
+  };
+  const response = await smartleadFetch<unknown>(`/campaigns/${encodeURIComponent(campaignId)}/reply-email-thread`, apiKey, fetchImpl, {
+    method: "POST",
+    body: payload,
+  });
+  return { campaignId, email, submitted: true, payload, response };
 }
 
 export async function createSmartleadCampaign(
@@ -581,6 +722,35 @@ function latestSentEmailForReply(messages: unknown): SmartleadMessageHistoryResu
     reply_message_id: typeof sent.message_id === "string" ? sent.message_id : undefined,
     reply_email_time: typeof sent.send_time === "string" ? sent.send_time : undefined,
   };
+}
+
+function formatMessageHistoryForPrompt(messages: unknown): string {
+  const list = Array.isArray(messages)
+    ? messages
+    : Array.isArray((messages as { data?: unknown[] } | null)?.data)
+      ? (messages as { data: unknown[] }).data
+      : Array.isArray((messages as { history?: unknown[] } | null)?.history)
+        ? (messages as { history: unknown[] }).history
+        : Array.isArray((messages as { messages?: unknown[] } | null)?.messages)
+          ? (messages as { messages: unknown[] }).messages
+          : [];
+  if (!list.length) return "No message history was provided.";
+  return list
+    .slice(-12)
+    .map((item) => {
+      if (!item || typeof item !== "object") return "";
+      const record = item as Record<string, unknown>;
+      const type = String(record.type ?? record.event_type ?? "MESSAGE").toUpperCase();
+      const when = String(record.send_time ?? record.created_at ?? record.time ?? "");
+      const body = stripHtml(String(record.email_body ?? record.body ?? record.text ?? "")).slice(0, 2000);
+      return `[${type}${when ? ` ${when}` : ""}] ${body}`;
+    })
+    .filter(Boolean)
+    .join("\n---\n");
+}
+
+function stripHtml(value: string): string {
+  return value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 }
 
 function cleanWebsite(value: string | undefined): string | undefined {

@@ -40,10 +40,12 @@ import {
   buildSmartleadOutreachBrief,
   configureSmartleadCampaign,
   createSmartleadCampaign,
+  draftSmartleadThreadReply,
   getSmartleadCampaignLeads,
   getSmartleadCampaignStatus,
   getSmartleadMessageHistory,
   getSmartleadOutreachBrief,
+  sendSmartleadThreadReply,
 } from "../src/automation-system/smartlead.ts";
 import {
   containsWakeWord,
@@ -102,6 +104,8 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.get_smartlead_outreach_brief",
     "arcigy.get_smartlead_campaign_leads",
     "arcigy.get_smartlead_message_history",
+    "arcigy.draft_smartlead_thread_reply",
+    "arcigy.send_smartlead_thread_reply",
     "arcigy.create_smartlead_campaign",
     "arcigy.configure_smartlead_campaign",
     "arcigy.search_serper",
@@ -366,6 +370,7 @@ test("remote MCP smoke checks every response for bearer token leaks", async () =
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.export_leads_csv") ||
@@ -428,6 +433,7 @@ test("remote MCP smoke requires valid quick-start URLs", async () => {
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
@@ -485,6 +491,7 @@ test("remote MCP smoke requires quick-start approval policy parity", async () =>
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
@@ -542,6 +549,7 @@ test("remote MCP smoke requires exact MCP call parity in quick-starts", async ()
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
@@ -619,6 +627,7 @@ test("remote MCP smoke blocks generic secret patterns in response bodies", async
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
@@ -675,6 +684,7 @@ test("remote MCP smoke requires exact manifest and pack tool registries", async 
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
@@ -733,6 +743,7 @@ test("remote MCP smoke requires valid manifest tool metadata", async () => {
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
@@ -788,6 +799,7 @@ test("remote MCP smoke requires exact manifest and pack tool policies", async ()
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
@@ -844,6 +856,7 @@ test("remote MCP smoke requires guarded connection pack limits", async () => {
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
@@ -1117,6 +1130,7 @@ test("remote MCP smoke requires the audit trail quick-start", async () => {
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
@@ -1182,6 +1196,7 @@ test("remote MCP smoke requires the production evidence quick-start", async () =
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
@@ -1247,6 +1262,7 @@ test("remote MCP smoke requires the production evidence voice quick-start", asyn
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
@@ -1346,7 +1362,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 38 toolov, 6 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 58 toolov, 11 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -1378,6 +1394,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
+      url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
@@ -2670,6 +2687,80 @@ test("Smartlead campaign read helpers fetch leads and message history", async ()
   assert.equal(history.latestSentEmail?.email_stats_id, "stats-1");
   assert.equal(history.latestSentEmail?.reply_message_id, "msg-1");
   assert.equal(JSON.stringify(history).includes("smartlead-secret"), false);
+});
+
+test("Smartlead thread reply draft uses Gemini without sending", async () => {
+  const calls: string[] = [];
+  const fetchImpl = async (url: string | URL | Request) => {
+    const target = String(url);
+    calls.push(target);
+    assert.ok(target.includes("generativelanguage.googleapis.com"));
+    return responseJson({
+      candidates: [{ content: { parts: [{ text: "Dobry den pan Novak,<br><br>posielam slubenu ukazku: <a href='https://www.arcigy.com/showcase'>https://www.arcigy.com/showcase</a>." }] } }],
+    });
+  };
+
+  const draft = await draftSmartleadThreadReply(
+    {
+      campaignId: "123",
+      email: "Lead@Example.com",
+      leadName: "Jan Novak",
+      positiveSignal: "Lead wants the showcase.",
+      latestLeadReply: "Poslite ukazku.",
+      messageHistory: [
+        { type: "EMAIL_SENT", stats_id: "stats-1", message_id: "msg-1", send_time: "2026-06-10T10:00:00.000Z", email_body: "Chcete ukazku?" },
+        { type: "EMAIL_REPLY", email_body: "Poslite ukazku." },
+      ],
+    },
+    { GEMINI_API_KEY: "gemini-secret" },
+    fetchImpl as typeof fetch
+  );
+
+  assert.equal(calls.length, 1);
+  assert.equal(draft.email, "lead@example.com");
+  assert.match(draft.emailBody, /arcigy\.com\/showcase/);
+  assert.equal(draft.latestSentEmail?.email_stats_id, "stats-1");
+  assert.equal(draft.approvalPayload.approval.approved, true);
+  assert.equal(JSON.stringify(draft).includes("gemini-secret"), false);
+});
+
+test("Smartlead thread reply send fetches metadata and posts reply-email-thread without leaking API key", async () => {
+  const calls: Array<{ url: string; method?: string; body: any }> = [];
+  const fetchImpl = async (url: string | URL | Request, init?: RequestInit) => {
+    const target = String(url);
+    const body = init?.body ? JSON.parse(String(init.body)) : {};
+    calls.push({ url: target, method: init?.method, body });
+    if (target.includes("/leads/message-history")) {
+      return responseJson([
+        { type: "EMAIL_SENT", stats_id: "stats-1", message_id: "msg-1", send_time: "2026-06-10T10:00:00.000Z" },
+      ]);
+    }
+    if (target.includes("/reply-email-thread")) return responseJson({ ok: true, id: "reply-1" });
+    throw new Error(`Unexpected Smartlead URL: ${target}`);
+  };
+
+  const sent = await sendSmartleadThreadReply(
+    {
+      campaignId: "123",
+      email: "lead@example.com",
+      emailBody: "Dobry den,<br><br>posielam ukazku.",
+    },
+    { SMARTLEAD_API_KEY: "smartlead-secret" },
+    fetchImpl as typeof fetch
+  );
+
+  assert.equal(calls.length, 2);
+  assert.ok(calls[0].url.includes("/campaigns/123/leads/message-history?email=lead%40example.com&api_key=smartlead-secret"));
+  assert.equal(calls[1].url, "https://server.smartlead.ai/api/v1/campaigns/123/reply-email-thread?api_key=smartlead-secret");
+  assert.equal(calls[1].method, "POST");
+  assert.deepEqual(calls[1].body, {
+    email_stats_id: "stats-1",
+    email_body: "Dobry den,<br><br>posielam ukazku.",
+    reply_message_id: "msg-1",
+    reply_email_time: "2026-06-10T10:00:00.000Z",
+  });
+  assert.equal(sent.submitted, true);
+  assert.equal(JSON.stringify(sent).includes("smartlead-secret"), false);
 });
 
 test("Smartlead campaign create and configure submit campaign setup without leaking API key", async () => {
