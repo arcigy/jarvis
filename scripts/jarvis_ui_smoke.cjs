@@ -339,6 +339,18 @@ async function run() {
     if (!/mikrofon ready|text fallback/i.test(dom.voiceInputText)) fail(`Voice input capability is not rendered: ${dom.voiceInputText}.`);
     if (!/hlas ready|iba obrazovka/i.test(dom.voiceOutputText)) fail(`Voice output capability is not rendered: ${dom.voiceOutputText}.`);
     if (!/standby|mikrofon|fallback|vypnute|zachytene|pocuva|cakam/i.test(dom.voiceLastEventText)) fail(`Voice event status is not rendered: ${dom.voiceLastEventText}.`);
+    const voiceUi = await runJarvisTextVoiceFlow(window);
+    if (
+      !/cold outreach/i.test(voiceUi.responseText) ||
+      !/napisali\s+\d+\s+ludom/i.test(voiceUi.responseText) ||
+      !/\d+(?:\.\d+)?%\s+si email otvorilo/i.test(voiceUi.responseText) ||
+      !/(potvrdenie|schvalenie|Pripravene odpovede|nic necaka na schvalenie)/i.test(voiceUi.responseText)
+    ) {
+      fail(`Jarvis text voice flow did not render the cold outreach answer: ${voiceUi.responseText}.`);
+    }
+    if (!/Jarvis cold outreach status/i.test(voiceUi.transcriptText) || !/zachytene/i.test(voiceUi.voiceLastEventText)) {
+      fail(`Jarvis text voice flow did not record transcript state: ${voiceUi.transcriptText} / ${voiceUi.voiceLastEventText}.`);
+    }
     assertBox("sidebar", dom.sidebar, { width: isNarrowViewport ? 300 : 180, height: 60 });
     assertBox("navigation", dom.nav, { width: isNarrowViewport ? 300 : 150, height: 40 });
     assertBox("header", dom.header, { width: isNarrowViewport ? 300 : 400, height: 40 });
@@ -442,6 +454,46 @@ async function runRemoteSmokeFromUi(window) {
     await new Promise((resolveDone) => setTimeout(resolveDone, 250));
   }
   fail(`Remote MCP smoke UI flow did not settle: ${state.handoffProofGatesText || state.remoteSmokeResultText || "empty"}.`);
+  return state;
+}
+
+async function runJarvisTextVoiceFlow(window) {
+  const started = await executeRendererJson(window, `
+    (() => {
+      const transcript = document.getElementById("transcript");
+      const button = document.getElementById("submitTranscript");
+      if (!transcript || !button) return false;
+      transcript.value = "Jarvis cold outreach status";
+      transcript.dispatchEvent(new Event("input", { bubbles: true }));
+      window.setTimeout(() => button.click(), 0);
+      return true;
+    })()
+  `, 5000);
+  if (!started) {
+    fail("Jarvis text voice controls are missing.");
+    return { responseText: "", transcriptText: "", voiceLastEventText: "" };
+  }
+
+  const deadline = Date.now() + 10000;
+  let state = { responseText: "", transcriptText: "", voiceLastEventText: "" };
+  while (Date.now() < deadline) {
+    state = await executeRendererJson(window, `
+      (() => ({
+        responseText: document.querySelector("#response")?.textContent.trim() || "",
+        transcriptText: document.querySelector("#transcript")?.value.trim() || "",
+        voiceLastEventText: document.querySelector("#voiceLastEvent")?.textContent.trim() || ""
+      }))()
+    `, 5000);
+    if (
+      /cold outreach/i.test(state.responseText) &&
+      /napisali\s+\d+\s+ludom/i.test(state.responseText) &&
+      /\d+(?:\.\d+)?%\s+si email otvorilo/i.test(state.responseText) &&
+      /(potvrdenie|schvalenie|Pripravene odpovede|nic necaka na schvalenie)/i.test(state.responseText)
+    ) {
+      return state;
+    }
+    await new Promise((resolveDone) => setTimeout(resolveDone, 200));
+  }
   return state;
 }
 
