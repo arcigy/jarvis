@@ -399,6 +399,28 @@ export type UrlIntelligenceQueuePreview = {
   warnings: string[];
 };
 
+export type SuppressionListPreview = {
+  mode: "suppression-list-preview";
+  summary: string;
+  totals: {
+    inputLeads: number;
+    suppressedEmails: number;
+    suppressedDomains: number;
+    suppressedKeywords: number;
+    allowedLeads: number;
+    blockedLeads: number;
+    duplicateSignals: number;
+  };
+  suppression: {
+    emails: string[];
+    domains: string[];
+    keywords: string[];
+    reasons: Array<{ value: string; type: "email" | "domain" | "keyword"; reason: string }>;
+  };
+  filtered: ReturnType<typeof filterBlacklistedLeads>;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type NicheOpsDashboardInput = {
   id?: string;
   slug: string;
@@ -1027,6 +1049,103 @@ export function filterBlacklistedLeads(input: {
     allowed.push(lead);
   }
   return { allowed, blocked };
+}
+
+export function buildSuppressionListPreview(input: {
+  leads?: LeadCandidateInput[];
+  bouncedEmails?: string[];
+  unsubscribedEmails?: string[];
+  negativeReplyEmails?: string[];
+  manualSuppressionEmails?: string[];
+  manualSuppressionDomains?: string[];
+  manualSuppressionKeywords?: string[];
+  replySignals?: Array<{ email?: string; website?: string; companyName?: string; text?: string; category?: string; reason?: string }>;
+  suppressWholeDomainForBounces?: boolean;
+  suppressWholeDomainForUnsubscribes?: boolean;
+  sourceName?: string;
+  maxNextCalls?: number;
+}): SuppressionListPreview {
+  const reasons: SuppressionListPreview["suppression"]["reasons"] = [];
+  const emails = new Set<string>();
+  const domains = new Set<string>();
+  const keywords = new Set<string>();
+  const addEmail = (value: string | undefined, reason: string) => {
+    const email = value?.trim().toLowerCase();
+    if (!email || !email.includes("@")) return;
+    const before = emails.size;
+    emails.add(email);
+    if (emails.size !== before) reasons.push({ value: email, type: "email", reason });
+  };
+  const addDomain = (value: string | undefined, reason: string) => {
+    const domain = normalizeDomain(value ?? "");
+    if (!domain) return;
+    const before = domains.size;
+    domains.add(domain);
+    if (domains.size !== before) reasons.push({ value: domain, type: "domain", reason });
+  };
+  const addKeyword = (value: string | undefined, reason: string) => {
+    const keyword = value?.trim().toLowerCase();
+    if (!keyword) return;
+    const before = keywords.size;
+    keywords.add(keyword);
+    if (keywords.size !== before) reasons.push({ value: keyword, type: "keyword", reason });
+  };
+  for (const email of input.bouncedEmails ?? []) {
+    addEmail(email, "bounced email");
+    if (input.suppressWholeDomainForBounces) addDomain(email.split("@")[1], "bounce domain");
+  }
+  for (const email of input.unsubscribedEmails ?? []) {
+    addEmail(email, "unsubscribed email");
+    if (input.suppressWholeDomainForUnsubscribes) addDomain(email.split("@")[1], "unsubscribe domain");
+  }
+  for (const email of input.negativeReplyEmails ?? []) addEmail(email, "negative reply email");
+  for (const email of input.manualSuppressionEmails ?? []) addEmail(email, "manual suppression email");
+  for (const domain of input.manualSuppressionDomains ?? []) addDomain(domain, "manual suppression domain");
+  for (const keyword of input.manualSuppressionKeywords ?? []) addKeyword(keyword, "manual suppression keyword");
+  for (const signal of input.replySignals ?? []) {
+    const text = `${signal.category ?? ""} ${signal.reason ?? ""} ${signal.text ?? ""}`.toLowerCase();
+    if (/(unsubscribe|odhlasit|nepiste|stop|remove|nemam zaujem|nemame zaujem|not interested|no thanks)/i.test(text)) {
+      addEmail(signal.email, "negative or unsubscribe reply signal");
+      addDomain(signal.website ?? signal.email?.split("@")[1], "negative or unsubscribe reply signal");
+      if (signal.companyName) addKeyword(signal.companyName, "negative company reply signal");
+    }
+  }
+  const emailDomains = [...emails].map((email) => email.split("@")[1]).filter(Boolean);
+  const suppressionDomains = unique([...domains, ...emailDomains.map((domain) => normalizeDomain(domain))]).filter(Boolean);
+  const filtered = filterBlacklistedLeads({ leads: input.leads ?? [], domains: suppressionDomains, keywords: [...keywords] });
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 20), 1), 80);
+  const nextToolCalls: SuppressionListPreview["nextToolCalls"] = [];
+  if ((input.leads ?? []).length) {
+    nextToolCalls.push({
+      tool: "arcigy.filter_blacklisted_leads",
+      payload: { leads: input.leads, domains: suppressionDomains, keywords: [...keywords] },
+      reason: "Aplikuj suppression list na leady pred dalsim enrichmentom alebo Smartlead importom.",
+      approvalRequired: false,
+    });
+    nextToolCalls.push({
+      tool: "arcigy.build_lead_repair_queue_preview",
+      payload: { leads: filtered.allowed, maxNextCalls },
+      reason: "Po odfiltrovani suppression leadov skontroluj opravitelne gapy.",
+      approvalRequired: false,
+    });
+  }
+  const duplicateSignals = (input.bouncedEmails?.length ?? 0) + (input.unsubscribedEmails?.length ?? 0) + (input.negativeReplyEmails?.length ?? 0) + (input.manualSuppressionEmails?.length ?? 0) - emails.size;
+  return {
+    mode: "suppression-list-preview",
+    summary: `Suppression list preview: ${emails.size} emailov, ${suppressionDomains.length} domen, ${keywords.size} keywordov, ${filtered.blocked.length} leadov blokovanych. Ziadny zapis ani upload neprebehol.`,
+    totals: {
+      inputLeads: input.leads?.length ?? 0,
+      suppressedEmails: emails.size,
+      suppressedDomains: suppressionDomains.length,
+      suppressedKeywords: keywords.size,
+      allowedLeads: filtered.allowed.length,
+      blockedLeads: filtered.blocked.length,
+      duplicateSignals: Math.max(duplicateSignals, 0),
+    },
+    suppression: { emails: [...emails], domains: suppressionDomains, keywords: [...keywords], reasons },
+    filtered,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls).slice(0, maxNextCalls),
+  };
 }
 
 export function buildManualReviewQueue(input: { leads: LeadCandidateInput[]; minScore?: number }): {

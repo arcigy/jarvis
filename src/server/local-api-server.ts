@@ -27,6 +27,7 @@ import {
   buildUrlIntelligenceQueuePreview,
   buildLeadRepairQueuePreview,
   buildNicheOpsDashboardPreview,
+  buildSuppressionListPreview,
   batchScrapeWebsiteContacts,
   batchDraftLeadIntros,
   buildManualReviewPickupPlan,
@@ -1475,6 +1476,25 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
     writeJson(response, 200, {
       result: dedupeLeadCandidates({
         leads: (payload.leads ?? []) as Parameters<typeof dedupeLeadCandidates>[0]["leads"],
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_suppression_list_preview") {
+    writeJson(response, 200, {
+      result: buildSuppressionListPreview({
+        leads: Array.isArray(payload.leads) ? payload.leads as Parameters<typeof buildSuppressionListPreview>[0]["leads"] : undefined,
+        bouncedEmails: Array.isArray(payload.bouncedEmails) ? payload.bouncedEmails.map(String) : undefined,
+        unsubscribedEmails: Array.isArray(payload.unsubscribedEmails) ? payload.unsubscribedEmails.map(String) : undefined,
+        negativeReplyEmails: Array.isArray(payload.negativeReplyEmails) ? payload.negativeReplyEmails.map(String) : undefined,
+        manualSuppressionEmails: Array.isArray(payload.manualSuppressionEmails) ? payload.manualSuppressionEmails.map(String) : undefined,
+        manualSuppressionDomains: Array.isArray(payload.manualSuppressionDomains) ? payload.manualSuppressionDomains.map(String) : undefined,
+        manualSuppressionKeywords: Array.isArray(payload.manualSuppressionKeywords) ? payload.manualSuppressionKeywords.map(String) : undefined,
+        replySignals: Array.isArray(payload.replySignals) ? payload.replySignals as Parameters<typeof buildSuppressionListPreview>[0]["replySignals"] : undefined,
+        suppressWholeDomainForBounces: payload.suppressWholeDomainForBounces === true,
+        suppressWholeDomainForUnsubscribes: payload.suppressWholeDomainForUnsubscribes === true,
+        sourceName: optionalString(payload.sourceName),
+        maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
       }),
     });
     return;

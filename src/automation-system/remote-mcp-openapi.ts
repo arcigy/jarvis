@@ -370,6 +370,20 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
     return { minScore: 70, leads: [{ email: "majitel@example.sk", website: "https://example.sk", decisionMaker: "Jan Novak", registerVerified: true, personalizedIntro: "Kratke AI intro." }] };
   }
   if (toolName === "arcigy.dedupe_lead_candidates") return { leads: [{ email: "lead@example.com", companyName: "Modelova Firma" }, { email: "lead@example.com", companyName: "Duplicita" }] };
+  if (toolName === "arcigy.build_suppression_list_preview") {
+    return {
+      leads: [
+        { email: "bad@example.com", website: "https://example.com", companyName: "Bad Lead" },
+        { email: "good@ready.sk", website: "https://ready.sk", companyName: "Ready Lead" },
+      ],
+      bouncedEmails: ["bad@example.com"],
+      unsubscribedEmails: ["stop@unsubscribe.sk"],
+      manualSuppressionDomains: ["competitor.sk"],
+      manualSuppressionKeywords: ["franchise"],
+      replySignals: [{ email: "reply@blocked.sk", companyName: "Blocked Firma", text: "Nemame zaujem, prosim nepiste." }],
+      suppressWholeDomainForUnsubscribes: true,
+    };
+  }
   if (toolName === "arcigy.build_niche_leadgen_plan") return { niche: "autoservisy", region: "Bratislava" };
   if (toolName === "arcigy.build_batch_niche_discovery_plan") {
     return {

@@ -124,6 +124,7 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.enrich_slovak_company_register`: read-only ORSR lookup by ICO or company name for company, address, executives, and source URL.
 - `arcigy.score_lead_quality`: scores lead candidates 0-100 using email type, website, `.sk` domain, decision maker, register verification, AI intro, and validation status.
 - `arcigy.dedupe_lead_candidates`: deduplicates lead candidates by email, website, phone, or company name before import.
+- `arcigy.build_suppression_list_preview`: builds a read-only suppression/blacklist filter from bounces, unsubscribes, negative replies, and manual rules.
 - `arcigy.build_niche_leadgen_plan`: returns niche-specific Google Maps and Serper query plans with blacklist keywords.
 - `arcigy.build_batch_niche_discovery_plan`: plans read-only discovery, scraping, AI intros, runbooks, and Smartlead prep across multiple niches/regions without executing.
 - `arcigy.build_leadgen_execution_queue_preview`: prioritizes today's leadgen work across niches, regions, quotas, discovery, enrichment, and Smartlead handoff without executing.

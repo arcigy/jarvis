@@ -160,6 +160,7 @@ const capabilityDefinitions: CapabilityDefinition[] = [
       "arcigy.enrich_slovak_company_register",
       "arcigy.score_lead_quality",
       "arcigy.dedupe_lead_candidates",
+      "arcigy.build_suppression_list_preview",
       "arcigy.build_niche_leadgen_plan",
       "arcigy.build_batch_niche_discovery_plan",
       "arcigy.build_leadgen_execution_queue_preview",

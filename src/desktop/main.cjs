@@ -3040,6 +3040,7 @@ function listWebMcpTools() {
     { name: "arcigy.enrich_slovak_company_register", requiresApproval: false },
     { name: "arcigy.score_lead_quality", requiresApproval: false },
     { name: "arcigy.dedupe_lead_candidates", requiresApproval: false },
+    { name: "arcigy.build_suppression_list_preview", requiresApproval: false },
     { name: "arcigy.build_niche_leadgen_plan", requiresApproval: false },
     { name: "arcigy.build_batch_niche_discovery_plan", requiresApproval: false },
     { name: "arcigy.build_leadgen_execution_queue_preview", requiresApproval: false },

@@ -893,6 +893,25 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Build suppression list before import",
+      tool: "arcigy.build_suppression_list_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_suppression_list_preview"),
+      body: {
+        leads: [
+          { email: "bad@example.com", website: "https://example.com", companyName: "Bad Lead" },
+          { email: "good@ready.sk", website: "https://ready.sk", companyName: "Ready Lead" },
+        ],
+        bouncedEmails: ["bad@example.com"],
+        unsubscribedEmails: ["stop@unsubscribe.sk"],
+        manualSuppressionDomains: ["competitor.sk"],
+        manualSuppressionKeywords: ["franchise"],
+        replySignals: [{ email: "reply@blocked.sk", companyName: "Blocked Firma", text: "Nemame zaujem, prosim nepiste." }],
+        suppressWholeDomainForUnsubscribes: true,
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Draft a Smartlead sequence without writing",
       tool: "arcigy.draft_smartlead_campaign_sequence",
       method: "POST",

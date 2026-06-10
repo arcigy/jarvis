@@ -28,6 +28,7 @@ import {
   buildUrlIntelligenceQueuePreview,
   buildLeadRepairQueuePreview,
   buildNicheOpsDashboardPreview,
+  buildSuppressionListPreview,
   batchScrapeWebsiteContacts,
   batchDraftLeadIntros,
   buildManualReviewPickupPlan,
@@ -1833,6 +1834,54 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(dedupeLeadCandidates(input))
+  );
+
+  const suppressionLeadSchema = z.object({
+    email: z.string().optional(),
+    companyName: z.string().optional(),
+    firstName: z.string().optional(),
+    lastName: z.string().optional(),
+    website: z.string().optional(),
+    phone: z.string().optional(),
+    source: z.string().optional(),
+    personalizedIntro: z.string().optional(),
+    customFields: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
+  });
+
+  server.registerTool(
+    "arcigy.build_suppression_list_preview",
+    {
+      title: "Build suppression list preview",
+      description: "Build a read-only suppression/blacklist filter from bounces, unsubscribes, negative replies, and manual rules.",
+      inputSchema: {
+        leads: z.array(suppressionLeadSchema).optional(),
+        bouncedEmails: z.array(z.string()).optional(),
+        unsubscribedEmails: z.array(z.string()).optional(),
+        negativeReplyEmails: z.array(z.string()).optional(),
+        manualSuppressionEmails: z.array(z.string()).optional(),
+        manualSuppressionDomains: z.array(z.string()).optional(),
+        manualSuppressionKeywords: z.array(z.string()).optional(),
+        replySignals: z.array(z.object({
+          email: z.string().optional(),
+          website: z.string().optional(),
+          companyName: z.string().optional(),
+          text: z.string().optional(),
+          category: z.string().optional(),
+          reason: z.string().optional(),
+        })).optional(),
+        suppressWholeDomainForBounces: z.boolean().default(false),
+        suppressWholeDomainForUnsubscribes: z.boolean().default(false),
+        sourceName: z.string().optional(),
+        maxNextCalls: z.number().int().min(1).max(80).default(20),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildSuppressionListPreview(input))
   );
 
   server.registerTool(
