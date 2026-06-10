@@ -1571,8 +1571,11 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   );
   assert.ok(pack.agentInstructions.some((step) => step.includes("arcigy.get_production_verification_evidence")));
   assert.ok(pack.agentInstructions.some((step) => step.includes("arcigy.get_production_completion_score") && step.includes("completion percento")));
+  assert.ok(pack.agentInstructions.some((step) => step.includes("arcigy.get_production_completion_score quick-start coverage")));
   assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("arcigy.get_production_completion_score") && step.includes("completion percento")));
+  assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("arcigy.get_production_completion_score quick-start coverage")));
   assert.ok(pack.handoff.agentFirstSteps.some((step) => step.includes("arcigy.get_production_completion_score") && step.includes("completion percento")));
+  assert.ok(pack.handoff.agentFirstSteps.some((step) => step.includes("arcigy.get_production_completion_score quick-start coverage")));
   assert.ok(
     pack.agentInstructions.some(
       (step) =>
@@ -1592,6 +1595,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
         item.expected.includes("all 37 required remote MCP smoke gates") &&
         item.expected.includes("pack-client-memory-quick-start") &&
         item.expected.includes("production-evidence-tool-call") &&
+        item.expected.includes("arcigy.get_production_completion_score quick-start coverage") &&
         item.expected.includes("dirty=false") &&
         item.expected.includes("freshness.fresh=true")
     )

@@ -682,6 +682,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("openapi-schema")));
     assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("pack-production-evidence-quick-start")));
     assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("production-evidence-tool-call")));
+    assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("arcigy.get_production_completion_score quick-start coverage")));
     assert.ok(
       remotePackBody.handoff.requiredProof.some(
         (item) => item.key === "remote-smoke" && item.expected.includes("dirty=false") && item.expected.includes("freshness.fresh=true")
@@ -689,10 +690,12 @@ test("local web bridge serves UI and API health", async () => {
     );
     assert.ok(remotePackBody.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("approval-shape-gate")));
     assert.ok(remotePackBody.handoff.agentFirstSteps.some((step) => step.includes("arcigy.get_jarvis_capability_audit") && step.includes("arcigy.get_production_completion_score") && step.includes("completion percento")));
+    assert.ok(remotePackBody.handoff.agentFirstSteps.some((step) => step.includes("arcigy.get_production_completion_score quick-start coverage")));
     assert.ok(remotePackBody.handoff.agentFirstSteps.some((step) => step.includes("secret-redaction")));
     assert.deepEqual(remotePackBody.agentCompatibility.supportedAgents.slice(0, 3), ["Claude", "ChatGPT", "Grok"]);
     assert.ok(remotePackBody.agentCompatibility.requiredBeforeWork.some((step) => step.includes("repo-only limits")));
     assert.ok(remotePackBody.agentCompatibility.requiredBeforeWork.some((step) => step.includes("arcigy.get_jarvis_capability_audit") && step.includes("arcigy.get_production_completion_score") && step.includes("completion percento")));
+    assert.ok(remotePackBody.agentCompatibility.requiredBeforeWork.some((step) => step.includes("arcigy.get_production_completion_score quick-start coverage")));
     assert.ok(remotePackBody.agentCompatibility.requiredBeforeWork.some((step) => step.includes("pack-limits")));
     assert.ok(remotePackBody.agentCompatibility.requiredBeforeWork.some((step) => step.includes("cors-preflight") && step.includes("external-auth-gate") && step.includes("pack-auth-throttle-policy") && step.includes("action-manifest")));
     assert.ok(remotePackBody.agentCompatibility.safetyRules.some((rule) => rule.includes("family-friendly")));

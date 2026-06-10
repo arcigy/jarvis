@@ -299,12 +299,14 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("action-manifest")));
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("pack-production-evidence-quick-start")));
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("production-evidence-tool-call")));
+  assert.ok(pack.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("arcigy.get_production_completion_score quick-start coverage")));
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("dirty=false") && item.expected.includes("freshness.fresh=true")));
   assert.ok(pack.handoff.requiredProof.some((item) => item.key === "remote-smoke" && item.expected.includes("approval-shape-gate")));
   assert.ok(pack.handoff.agentFirstSteps.some((step) => step.includes("arcigy.get_operator_briefing")));
   assert.ok(pack.handoff.agentFirstSteps.some((step) => step.includes("secret-redaction")));
   assert.deepEqual(pack.agentCompatibility.supportedAgents.slice(0, 3), ["Claude", "ChatGPT", "Grok"]);
   assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("repo-only limits")));
+  assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("arcigy.get_production_completion_score quick-start coverage")));
   assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("pack-limits")));
   assert.ok(pack.agentCompatibility.requiredBeforeWork.some((step) => step.includes("cors-preflight") && step.includes("external-auth-gate") && step.includes("pack-auth-throttle-policy") && step.includes("openapi-schema")));
   assert.ok(pack.agentCompatibility.safetyRules.some((rule) => rule.includes("family-friendly")));

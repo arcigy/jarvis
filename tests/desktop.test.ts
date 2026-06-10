@@ -639,7 +639,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /pack-client-memory-quick-start/);
   assert.match(main, /pack-production-evidence-quick-start/);
   assert.match(main, /production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction/);
-  assert.match(main, /release proof, dirty=false, and freshness\.fresh=true/);
+  assert.match(main, /release proof, dirty=false, freshness\.fresh=true, and arcigy\.get_production_completion_score quick-start coverage/);
   assert.match(main, /isProductionEvidenceVoiceCommand/);
   assert.match(main, /summarizeProductionEvidenceForVoice/);
   assert.match(main, /Production evidence je/);
@@ -1062,6 +1062,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /Jarvis capability audit/);
   assert.match(main, /Spytat sa Jarvisa na production evidence/);
   assert.match(main, /Jarvis production evidence/);
+  assert.match(main, /arcigy\.get_production_completion_score quick-start coverage/);
   assert.match(main, /Spytat sa Jarvisa na full launch proof/);
   assert.match(main, /Jarvis full launch proof/);
   assert.match(main, /Test Jarvis voice wake command/);
