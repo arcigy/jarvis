@@ -90,6 +90,7 @@ export type JarvisMcpToolName =
   | "arcigy.build_niche_ops_dashboard_preview"
   | "arcigy.build_cold_outreach_csv_import_preview"
   | "arcigy.build_daily_leadgen_runbook"
+  | "arcigy.build_lead_csv_mapping_preview"
   | "arcigy.parse_leads_csv"
   | "arcigy.filter_blacklisted_leads"
   | "arcigy.build_manual_review_queue"
@@ -573,6 +574,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.build_daily_leadgen_runbook",
       description: "Vytvori denny leadgen runbook s presnymi dalsimi MCP volaniami od discovery cez enrichment az po schvaleny Smartlead upload.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_lead_csv_mapping_preview",
+      description: "Ukaze, ako Jarvis mapuje Google Maps/Smartlead CSV stlpce na leady pred autopilotom, scrapom, AI intrami a Smartlead importom.",
       requiresApproval: false,
     },
     {

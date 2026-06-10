@@ -671,6 +671,14 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       includeSmartleadSetup: false,
     };
   }
+  if (toolName === "arcigy.build_lead_csv_mapping_preview") {
+    return {
+      sourceName: "kuchyne_sk_google_maps_2026-04-27.csv",
+      sourceType: "google_maps",
+      csvText: "company,district_city,phone,website,google_domain,matched_queries,priority_score,smartlead_statuses\nReady Studio,Bratislava,+421 900 111 222,https://ready.sk,ready.sk,kuchyne na mieru,92,",
+      sampleSize: 3,
+    };
+  }
   if (toolName === "arcigy.parse_leads_csv") return { csvText: "company_name,email,website\nModelova Firma,lead@example.com,https://example.com" };
   if (toolName === "arcigy.filter_blacklisted_leads") return { leads: [{ email: "lead@example.com", website: "https://example.com" }], domains: ["competitor.sk"], keywords: ["franchise"] };
   if (toolName === "arcigy.build_manual_review_queue") return { minScore: 70, leads: [{ email: "lead@example.com", companyName: "Modelova Firma", website: "https://example.com", personalizedIntro: "Kratke AI intro." }] };

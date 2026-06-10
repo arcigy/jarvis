@@ -51,6 +51,7 @@ import {
   enrichSlovakCompanyRegister,
   filterBlacklistedLeads,
   buildDailyLeadgenRunbook,
+  buildLeadCsvMappingPreview,
   parseLeadsCsv,
   previewSmartleadEmailRendering,
   previewLeadEnrichmentBatch,
@@ -1906,6 +1907,19 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         painPoint: optionalString(payload.painPoint),
         language: payload.language === "en" ? "en" : "sk",
         includeSmartleadSetup: payload.includeSmartleadSetup === true,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_lead_csv_mapping_preview") {
+    writeJson(response, 200, {
+      result: buildLeadCsvMappingPreview({
+        csvText: String(payload.csvText ?? ""),
+        delimiter: payload.delimiter === ";" ? ";" : payload.delimiter === "," ? "," : undefined,
+        maxRows: typeof payload.maxRows === "number" ? payload.maxRows : undefined,
+        sourceName: optionalString(payload.sourceName),
+        sourceType: ["google_maps", "csv", "serper", "manual", "other"].includes(String(payload.sourceType)) ? payload.sourceType as Parameters<typeof buildLeadCsvMappingPreview>[0]["sourceType"] : undefined,
+        sampleSize: typeof payload.sampleSize === "number" ? payload.sampleSize : undefined,
       }),
     });
     return;

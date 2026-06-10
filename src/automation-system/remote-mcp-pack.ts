@@ -1297,6 +1297,19 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Preview lead CSV column mapping",
+      tool: "arcigy.build_lead_csv_mapping_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_lead_csv_mapping_preview"),
+      body: {
+        sourceName: "kuchyne_sk_google_maps_2026-04-27.csv",
+        sourceType: "google_maps",
+        csvText: "company,district_city,phone,website,google_domain,matched_queries,priority_score,smartlead_statuses\nReady Studio,Bratislava,+421 900 111 222,https://ready.sk,ready.sk,kuchyne na mieru,92,",
+        sampleSize: 3,
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Export lead review CSV after approval",
       tool: "arcigy.export_leads_csv",
       method: "POST",

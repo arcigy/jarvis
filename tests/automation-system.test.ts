@@ -42,6 +42,7 @@ import {
   buildSmartleadSenderCapacityPreview,
   buildSmartleadDeliverabilityGuardPreview,
   buildDailyLeadgenRunbook,
+  buildLeadCsvMappingPreview,
   dedupeLeadCandidates,
   draftNicheSmartleadCampaignSetup,
   draftLeadIntro,
@@ -189,6 +190,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.build_niche_ops_dashboard_preview",
     "arcigy.build_cold_outreach_csv_import_preview",
     "arcigy.build_daily_leadgen_runbook",
+    "arcigy.build_lead_csv_mapping_preview",
     "arcigy.parse_leads_csv",
     "arcigy.filter_blacklisted_leads",
     "arcigy.build_manual_review_queue",
@@ -1449,7 +1451,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 100 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 101 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -3997,6 +3999,30 @@ test("lead CSV parsing, blacklist filtering, manual review, and export are deter
   const exported = serializeLeadsCsv({ leads: filtered.allowed, columns: ["companyName", "email", "website", "personalizedIntro"] });
   assert.equal(exported.rowCount, 1);
   assert.ok(exported.csvText.includes("Good Co,owner@good.sk,https://good.sk,Kratke intro"));
+});
+
+test("lead CSV mapping preview understands Google Maps and Smartlead enriched exports", () => {
+  const csvText = [
+    "company,district_city,address,phone,international_phone,website,google_domain,matched_queries,priority_score,smartlead_statuses,smartlead_emails",
+    "Ready Studio,Bratislava,Main 1,02 111 222,+421 2 111 222,,ready.sk,kuchyne na mieru,92,BLOCKED,jan@ready.sk",
+  ].join("\n");
+  const preview = buildLeadCsvMappingPreview({ csvText, sourceName: "kuchyne.csv", sourceType: "google_maps" });
+  const parsed = parseLeadsCsv({ csvText });
+
+  assert.equal(preview.mode, "lead-csv-mapping-preview");
+  assert.equal(preview.totals.mappedLeads, 1);
+  assert.equal(preview.totals.withCompany, 1);
+  assert.equal(preview.totals.withWebsite, 1);
+  assert.equal(preview.totals.withSmartleadStatus, 1);
+  assert.deepEqual(preview.mappedFields.companyName, ["company"]);
+  assert.deepEqual(preview.mappedFields.website, ["website", "google_domain"]);
+  assert.equal(parsed.leads[0].companyName, "Ready Studio");
+  assert.equal(parsed.leads[0].website, "https://ready.sk");
+  assert.equal(parsed.leads[0].phone, "+421 2 111 222");
+  assert.equal(parsed.leads[0].source, "kuchyne na mieru");
+  assert.equal(parsed.leads[0].customFields?.smartlead_statuses, "BLOCKED");
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_leadgen_autopilot_batch_preview" && !call.approvalRequired));
+  assert.match(preview.summary, /Ziadny zapis ani upload/);
 });
 
 test("Slovak register enrichment parses ORSR detail without live network", async () => {

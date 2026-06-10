@@ -149,6 +149,7 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.build_niche_ops_dashboard_preview`: summarizes niche/campaign health, daily targets, stuck/failed/ready leads, and proposes next MCP calls without writing.
 - `arcigy.build_cold_outreach_csv_import_preview`: parses pasted/exported lead CSV, applies blacklist filters, then builds leadgen pipeline and Smartlead launch previews without writing or uploading.
 - `arcigy.build_daily_leadgen_runbook`: returns the exact daily leadgen MCP call sequence from discovery through enrichment to approval-gated Smartlead upload.
+- `arcigy.build_lead_csv_mapping_preview`: previews how Google Maps, Smartlead-enriched, or generic CSV columns map into lead fields before scrape, AI intro, and Smartlead autopilot steps.
 - `arcigy.parse_leads_csv`: parses pasted CSV lead data into normalized lead candidates.
 - `arcigy.filter_blacklisted_leads`: filters lead candidates by blacklisted domains or keywords before import.
 - `arcigy.build_manual_review_queue`: splits leads into ready, manual review, and rejected groups.

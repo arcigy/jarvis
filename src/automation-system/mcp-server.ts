@@ -52,6 +52,7 @@ import {
   enrichSlovakCompanyRegister,
   filterBlacklistedLeads,
   buildDailyLeadgenRunbook,
+  buildLeadCsvMappingPreview,
   parseLeadsCsv,
   previewSmartleadEmailRendering,
   previewLeadEnrichmentBatch,
@@ -2769,6 +2770,29 @@ export function createJarvisMcpServer(): McpServer {
     personalizedIntro: z.string().optional(),
     customFields: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
   });
+
+  server.registerTool(
+    "arcigy.build_lead_csv_mapping_preview",
+    {
+      title: "Build lead CSV mapping preview",
+      description: "Preview how Jarvis maps Google Maps, Smartlead-enriched, or generic CSV lead columns before running scrape, AI intro, and Smartlead autopilot steps.",
+      inputSchema: {
+        csvText: z.string().min(1),
+        delimiter: z.enum([",", ";"]).optional(),
+        maxRows: z.number().int().min(1).max(10_000).default(1000),
+        sourceName: z.string().optional(),
+        sourceType: z.enum(["google_maps", "csv", "serper", "manual", "other"]).default("csv"),
+        sampleSize: z.number().int().min(1).max(25).default(5),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildLeadCsvMappingPreview(input))
+  );
 
   server.registerTool(
     "arcigy.parse_leads_csv",

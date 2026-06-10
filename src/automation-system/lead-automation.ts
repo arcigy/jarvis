@@ -121,6 +121,18 @@ export type LeadCsvRow = LeadCandidateInput & {
   raw: Record<string, string>;
 };
 
+export type LeadCsvMappingPreview = {
+  mode: "lead-csv-mapping-preview";
+  summary: string;
+  source: { name?: string; type?: "google_maps" | "csv" | "serper" | "manual" | "other" };
+  headers: string[];
+  totals: { rows: number; mappedLeads: number; withCompany: number; withWebsite: number; withEmail: number; withPhone: number; withSmartleadStatus: number; skippedRows: number };
+  mappedFields: Record<string, string[]>;
+  sampleLeads: LeadCsvRow[];
+  warnings: string[];
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type ManualReviewItem = {
   lead: LeadCandidateInput;
   score: number;
@@ -1165,6 +1177,60 @@ export function parseLeadsCsv(input: { csvText: string; delimiter?: "," | ";"; m
     return [mapCsvLead(raw)];
   });
   return { headers, leads, skipped };
+}
+
+export function buildLeadCsvMappingPreview(input: {
+  csvText: string;
+  delimiter?: "," | ";";
+  maxRows?: number;
+  sourceName?: string;
+  sourceType?: "google_maps" | "csv" | "serper" | "manual" | "other";
+  sampleSize?: number;
+}): LeadCsvMappingPreview {
+  const parsed = parseLeadsCsv({ csvText: input.csvText, delimiter: input.delimiter, maxRows: input.maxRows });
+  const sampleSize = Math.min(Math.max(Math.trunc(input.sampleSize ?? 5), 1), 25);
+  const mappedFields = csvMappedFields(parsed.headers);
+  const warnings: string[] = [];
+  if (!mappedFields.companyName?.length) warnings.push("No company column was detected.");
+  if (!mappedFields.website?.length) warnings.push("No website/domain column was detected; scraping will need manual URLs.");
+  if (!mappedFields.email?.length) warnings.push("No email column was detected; batch website scraping is likely needed.");
+  if (!mappedFields.personalizedIntro?.length) warnings.push("No AI intro column was detected; intro drafting will be needed.");
+  const withSmartleadStatus = parsed.leads.filter((lead) => Boolean(lead.customFields?.smartlead_statuses || lead.customFields?.smartlead_match)).length;
+  const nextToolCalls: LeadCsvMappingPreview["nextToolCalls"] = [
+    {
+      tool: "arcigy.build_leadgen_autopilot_batch_preview",
+      payload: {
+        sourceName: input.sourceName,
+        sourceType: input.sourceType ?? "csv",
+        csvText: input.csvText,
+        delimiter: input.delimiter,
+        maxRows: input.maxRows,
+        auditIntros: true,
+      },
+      reason: "Po kontrole mapovania spusti read-only autopilot runbook pre scrape, AI intra a Smartlead import.",
+      approvalRequired: false,
+    },
+  ];
+  return {
+    mode: "lead-csv-mapping-preview",
+    summary: `CSV mapping preview: ${parsed.leads.length} leadov, ${mappedFields.companyName?.length ? "company OK" : "company chyba"}, ${mappedFields.website?.length ? "web OK" : "web chyba"}, ${mappedFields.email?.length ? "email OK" : "email chyba"}. Ziadny zapis ani upload neprebehol.`,
+    source: { name: input.sourceName, type: input.sourceType },
+    headers: parsed.headers,
+    totals: {
+      rows: parsed.leads.length + parsed.skipped.length,
+      mappedLeads: parsed.leads.length,
+      withCompany: parsed.leads.filter((lead) => Boolean(lead.companyName)).length,
+      withWebsite: parsed.leads.filter((lead) => Boolean(lead.website)).length,
+      withEmail: parsed.leads.filter((lead) => Boolean(lead.email)).length,
+      withPhone: parsed.leads.filter((lead) => Boolean(lead.phone)).length,
+      withSmartleadStatus,
+      skippedRows: parsed.skipped.length,
+    },
+    mappedFields,
+    sampleLeads: parsed.leads.slice(0, sampleSize),
+    warnings,
+    nextToolCalls,
+  };
 }
 
 export function serializeLeadsCsv(input: { leads: LeadCandidateInput[]; columns?: string[] }): {
@@ -4225,22 +4291,75 @@ function mapCsvLead(raw: Record<string, string>): LeadCsvRow {
     const normalized = new Map(Object.entries(raw).map(([key, item]) => [slugify(key), item]));
     return aliases.map(slugify).map((alias) => normalized.get(alias)).find((item) => item && item.trim())?.trim();
   };
+  const website = value("website", "web", "url", "domain", "google_domain");
+  const source = value("source", "niche", "campaign_tag", "matched_queries", "smartlead_campaigns");
   return {
     raw,
-    email: value("email", "primary_email", "mail"),
-    companyName: value("companyName", "company_name", "official_company_name", "original_name", "name", "firma"),
+    email: value("email", "primary_email", "mail", "smartlead_emails"),
+    companyName: value("companyName", "company_name", "official_company_name", "original_name", "name", "firma", "company"),
     firstName: value("firstName", "first_name", "meno"),
     lastName: value("lastName", "last_name", "priezvisko", "decision_maker_last_name"),
-    website: value("website", "web", "url"),
-    phone: value("phone", "telefon", "tel"),
-    source: value("source", "niche", "campaign_tag"),
+    website: website ? normalizeWebsiteValue(website) : undefined,
+    phone: value("international_phone", "phone", "telefon", "tel"),
+    source,
     personalizedIntro: value("personalizedIntro", "personalized_intro", "icebreaker", "icebreaker_sentence"),
     customFields: Object.fromEntries(
       Object.entries(raw)
-        .filter(([key, item]) => item && ["ico", "address", "verification_status", "decision_maker_name"].includes(slugify(key).replace(/-/g, "_")))
+        .filter(([key, item]) => item && csvCustomFieldKeys.has(slugify(key).replace(/-/g, "_")))
         .map(([key, item]) => [slugify(key).replace(/-/g, "_"), item])
     ),
   };
+}
+
+const csvCustomFieldKeys = new Set([
+  "address",
+  "business_status",
+  "cold_email_sent",
+  "collected_at",
+  "decision_maker_name",
+  "district_city",
+  "google_domain",
+  "google_maps_url",
+  "ico",
+  "matched_queries",
+  "priority_score",
+  "rating",
+  "reviews",
+  "size_signal",
+  "smartlead_campaigns",
+  "smartlead_match",
+  "smartlead_replied",
+  "smartlead_sent_messages",
+  "smartlead_statuses",
+  "types",
+  "verification_status",
+]);
+
+function normalizeWebsiteValue(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed || /^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
+function csvMappedFields(headers: string[]): Record<string, string[]> {
+  const fields: Record<string, string[]> = {};
+  const groups: Record<string, string[]> = {
+    email: ["email", "primary_email", "mail", "smartlead_emails"],
+    companyName: ["companyName", "company_name", "official_company_name", "original_name", "name", "firma", "company"],
+    firstName: ["firstName", "first_name", "meno"],
+    lastName: ["lastName", "last_name", "priezvisko", "decision_maker_last_name"],
+    website: ["website", "web", "url", "domain", "google_domain"],
+    phone: ["international_phone", "phone", "telefon", "tel"],
+    source: ["source", "niche", "campaign_tag", "matched_queries", "smartlead_campaigns"],
+    personalizedIntro: ["personalizedIntro", "personalized_intro", "icebreaker", "icebreaker_sentence"],
+    smartleadStatus: ["smartlead_statuses", "smartlead_match", "smartlead_replied", "smartlead_sent_messages", "cold_email_sent"],
+  };
+  for (const [field, aliases] of Object.entries(groups)) {
+    const normalizedAliases = new Set(aliases.map(slugify));
+    const matches = headers.filter((header) => normalizedAliases.has(slugify(header)));
+    if (matches.length) fields[field] = matches;
+  }
+  return fields;
 }
 
 function csvEscape(value: unknown): string {
