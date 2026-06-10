@@ -281,9 +281,9 @@ const coreWorkflowSurfaces: CoreWorkflowSurface[] = [
   {
     id: "voice-workflow",
     title: "Jarvis voice workflow",
-    tools: ["arcigy.jarvis_voice_event", "arcigy.get_operator_briefing", "arcigy.get_production_verification_evidence"],
+    tools: ["arcigy.jarvis_voice_event", "arcigy.get_operator_briefing", "arcigy.get_production_verification_evidence", "arcigy.get_production_completion_score"],
     approvalRequired: [],
-    proof: "Wake-word command handling, operator briefing, and production evidence voice path are registered.",
+    proof: "Wake-word command handling, operator briefing, production evidence, and completion score voice paths are registered.",
   },
   {
     id: "proactive-digest-workflow",

@@ -208,6 +208,7 @@ test("production readiness report returns blockers and next actions without secr
   assert.ok(report.launchChecklist.some((item) => item.id === "outreach-workflow" && item.status === "ready"));
   assert.ok(report.launchChecklist.some((item) => item.id === "client-memory-workflow" && item.status === "ready"));
   assert.ok(report.launchChecklist.some((item) => item.id === "voice-workflow" && item.status === "ready"));
+  assert.ok(report.launchChecklist.some((item) => item.id === "voice-workflow" && item.proof.includes("completion score")));
   assert.ok(report.launchChecklist.some((item) => item.id === "proactive-digest-workflow" && item.status === "ready"));
   assert.ok(report.launchChecklist.some((item) => item.id === "remote-agent-workflow" && item.status === "ready"));
   assert.equal(report.launchEvidence.mode, "production-launch-evidence");

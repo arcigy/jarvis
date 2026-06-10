@@ -1221,7 +1221,7 @@ function jarvisCapabilityDefinitions() {
     {
       id: "voice-jarvis",
       title: "Jarvis wake-word desktop voice loop",
-      tools: ["arcigy.jarvis_voice_event", "arcigy.get_operator_briefing", "arcigy.get_production_verification_evidence"],
+      tools: ["arcigy.jarvis_voice_event", "arcigy.get_operator_briefing", "arcigy.get_production_verification_evidence", "arcigy.get_production_completion_score"],
       approvalRequired: [],
       evidence: ["ui-smoke", "ui-smoke-narrow", "voice-tool-call", "pack-voice-quick-start", "voice-outreach-style"],
     },
