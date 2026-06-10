@@ -494,16 +494,20 @@ test("local web bridge serves UI and API health", async () => {
 
     const completionScore = await fetch(`${baseUrl}/api/production-completion-score`);
     assert.equal(completionScore.status, 200);
-    const completionScoreBody = (await completionScore.json()) as { mode: string; status: string; percent: number; components: unknown[] };
+    const completionScoreBody = (await completionScore.json()) as { mode: string; status: string; percent: number; overallPercent: number; completionPercent: number; components: unknown[] };
     assert.equal(completionScoreBody.mode, "arcigy-jarvis-production-completion-score");
     assert.ok(["ready", "attention", "blocked"].includes(completionScoreBody.status));
     assert.equal(typeof completionScoreBody.percent, "number");
+    assert.equal(completionScoreBody.overallPercent, completionScoreBody.percent);
+    assert.equal(completionScoreBody.completionPercent, completionScoreBody.percent);
     assert.equal(Array.isArray(completionScoreBody.components), true);
     assert.equal(JSON.stringify(completionScoreBody).includes(syntheticGoogleKey), false);
 
     const mcpCompletionScore = await postJson(`${baseUrl}/api/mcp/arcigy.get_production_completion_score`, { live: false });
     assert.equal(mcpCompletionScore.result.mode, "arcigy-jarvis-production-completion-score");
     assert.equal(typeof mcpCompletionScore.result.percent, "number");
+    assert.equal(mcpCompletionScore.result.overallPercent, mcpCompletionScore.result.percent);
+    assert.equal(mcpCompletionScore.result.completionPercent, mcpCompletionScore.result.percent);
     assert.equal(JSON.stringify(mcpCompletionScore).includes(syntheticGoogleKey), false);
 
     const capabilityAudit = await fetch(`${baseUrl}/api/jarvis-capability-audit`);

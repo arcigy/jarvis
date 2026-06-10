@@ -178,6 +178,8 @@ test("Jarvis capability audit maps the full requested production surface to evid
   assert.equal(score.mode, "arcigy-jarvis-production-completion-score");
   assert.equal(score.status, "ready");
   assert.equal(score.percent, 100);
+  assert.equal(score.overallPercent, 100);
+  assert.equal(score.completionPercent, 100);
   assert.equal(score.components.length, 5);
   assert.equal(score.components.every((item) => item.status === "ready"), true);
   assert.match(summarizeProductionCompletionScoreForVoice(score), /Sme na 100% production completion/);

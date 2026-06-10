@@ -21,6 +21,8 @@ export type ProductionCompletionScore = {
   status: ProductionCompletionStatus;
   generatedAt: string;
   percent: number;
+  overallPercent: number;
+  completionPercent: number;
   summary: string;
   components: ProductionCompletionComponent[];
   nextActions: string[];
@@ -51,6 +53,8 @@ export function buildProductionCompletionScore(input: {
     status,
     generatedAt: input.generatedAt ?? new Date().toISOString(),
     percent,
+    overallPercent: percent,
+    completionPercent: percent,
     summary:
       status === "ready"
         ? `Jarvis production completion je ${percent}%. Vsetky hlavne vrstvy su evidence-ready.`
