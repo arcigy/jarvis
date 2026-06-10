@@ -37,6 +37,14 @@ export type LeadIntroDraft = LeadIntroInput & {
   model: string;
 };
 
+export type BatchLeadIntroDraft = {
+  mode: "batch-lead-intro-draft";
+  totals: { input: number; drafted: number; failed: number };
+  drafts: LeadIntroDraft[];
+  failures: Array<{ companyName: string; website?: string; error: string }>;
+  summary: string;
+};
+
 export type PreparedSmartleadLeadInput = {
   email: string;
   companyName?: string;
@@ -338,6 +346,44 @@ export async function draftLeadIntro(
     ...input,
     personalizedIntro: result.text.replace(/\s+/g, " ").trim(),
     model: result.model,
+  };
+}
+
+export async function batchDraftLeadIntros(
+  input: { leads: LeadIntroInput[]; offer?: string; language?: "sk" | "en"; maxLeads?: number },
+  env: RuntimeEnv = process.env,
+  fetchImpl: FetchLike = fetch
+): Promise<BatchLeadIntroDraft> {
+  const maxLeads = Math.min(Math.max(Math.trunc(input.maxLeads ?? 20), 1), 50);
+  const seen = new Set<string>();
+  const leads = input.leads
+    .filter((lead) => lead.companyName?.trim())
+    .filter((lead) => {
+      const key = `${lead.companyName.trim().toLowerCase()}|${lead.website?.trim().toLowerCase() ?? ""}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, maxLeads);
+  const drafts: LeadIntroDraft[] = [];
+  const failures: BatchLeadIntroDraft["failures"] = [];
+  for (const lead of leads) {
+    try {
+      drafts.push(await draftLeadIntro({ ...lead, offer: lead.offer ?? input.offer, language: lead.language ?? input.language }, env, fetchImpl));
+    } catch (error) {
+      failures.push({
+        companyName: lead.companyName,
+        website: lead.website,
+        error: redactSensitiveText(error instanceof Error ? error.message : String(error)),
+      });
+    }
+  }
+  return {
+    mode: "batch-lead-intro-draft",
+    totals: { input: leads.length, drafted: drafts.length, failed: failures.length },
+    drafts,
+    failures,
+    summary: `Batch AI intro draft hotovy: ${drafts.length}/${leads.length} leadov, ${failures.length} chyb. Ziadny email ani zapis neprebehol.`,
   };
 }
 

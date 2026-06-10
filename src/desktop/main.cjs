@@ -3049,6 +3049,7 @@ function listWebMcpTools() {
     { name: "arcigy.build_manual_review_queue", requiresApproval: false },
     { name: "arcigy.export_leads_csv", requiresApproval: true },
     { name: "arcigy.draft_lead_intro", requiresApproval: false },
+    { name: "arcigy.batch_draft_lead_intros", requiresApproval: false },
     { name: "arcigy.prepare_smartlead_leads", requiresApproval: false },
     { name: "arcigy.run_leadgen_research_pipeline", requiresApproval: false },
     { name: "arcigy.add_leads_to_smartlead_campaign", requiresApproval: true },

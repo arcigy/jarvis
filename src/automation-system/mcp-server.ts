@@ -21,6 +21,7 @@ import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerpe
 import {
   buildNicheLeadgenPlan,
   batchScrapeWebsiteContacts,
+  batchDraftLeadIntros,
   buildManualReviewPickupPlan,
   buildManualReviewQueue,
   buildSmartleadInjectionPlan,
@@ -2098,6 +2099,33 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(await draftLeadIntro(input))
+  );
+
+  server.registerTool(
+    "arcigy.batch_draft_lead_intros",
+    {
+      title: "Batch draft lead intros",
+      description: "Use Gemini to draft short personalized cold outreach intros for multiple leads without sending or writing.",
+      inputSchema: {
+        leads: z.array(z.object({
+          companyName: z.string().min(1),
+          website: z.string().optional(),
+          context: z.string().optional(),
+          offer: z.string().optional(),
+          language: z.enum(["sk", "en"]).optional(),
+        })).min(1).max(50),
+        offer: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        maxLeads: z.number().int().min(1).max(50).default(20),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (input) => jsonResult(await batchDraftLeadIntros(input))
   );
 
   server.registerTool(

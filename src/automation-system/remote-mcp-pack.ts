@@ -1076,6 +1076,22 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Batch draft AI intros for leads",
+      tool: "arcigy.batch_draft_lead_intros",
+      method: "POST",
+      url: toolUrl("arcigy.batch_draft_lead_intros"),
+      body: {
+        leads: [
+          { companyName: "Modelova Firma", website: "https://example.com", context: "Firma predava B2B sluzby." },
+          { companyName: "Druha Firma", website: "https://example.org", context: "Ma kontakt formular a servisne dopyty." },
+        ],
+        offer: "AI asistent na dopyty a follow-up",
+        language: "sk",
+        maxLeads: 10,
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Prepare Smartlead lead_list without writing",
       tool: "arcigy.prepare_smartlead_leads",
       method: "POST",

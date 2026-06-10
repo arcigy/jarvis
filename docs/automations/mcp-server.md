@@ -133,6 +133,7 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.build_manual_review_queue`: splits leads into ready, manual review, and rejected groups.
 - `arcigy.export_leads_csv`: approval-gated CSV export into the repository for manual review.
 - `arcigy.draft_lead_intro`: Gemini draft of one short personalized cold outreach intro for a lead.
+- `arcigy.batch_draft_lead_intros`: Gemini batch draft of personalized cold outreach intros for multiple leads without sending or writing.
 - `arcigy.prepare_smartlead_leads`: normalizes selected leads into Smartlead `lead_list` payload without writing.
 - `arcigy.run_leadgen_research_pipeline`: read-only discovery + optional website scraping + optional Gemini intro drafts for Smartlead-ready research.
 - `arcigy.add_leads_to_smartlead_campaign`: approval-gated upload of prepared `lead_list` batches to a Smartlead campaign.

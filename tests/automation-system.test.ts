@@ -18,6 +18,7 @@ import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerpe
 import {
   buildNicheLeadgenPlan,
   batchScrapeWebsiteContacts,
+  batchDraftLeadIntros,
   buildManualReviewPickupPlan,
   buildManualReviewQueue,
   buildSmartleadInjectionPlan,
@@ -151,6 +152,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.build_manual_review_queue",
     "arcigy.export_leads_csv",
     "arcigy.draft_lead_intro",
+    "arcigy.batch_draft_lead_intros",
     "arcigy.prepare_smartlead_leads",
     "arcigy.run_leadgen_research_pipeline",
     "arcigy.add_leads_to_smartlead_campaign",
@@ -1403,7 +1405,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 76 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 77 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -3012,6 +3014,39 @@ test("lead intro drafting and Smartlead preparation stay secret-safe", async () 
   assert.equal(prepared.leadList[0].website, "example.com");
   assert.equal(prepared.leadList[0].custom_fields?.source, "jarvis-test");
   assert.equal(prepared.skipped.length, 0);
+});
+
+test("batch lead intro drafting dedupes leads and reports failures", async () => {
+  let calls = 0;
+  const fetchImpl = async (_url: string | URL | Request, init?: RequestInit) => {
+    const body = JSON.parse(String(init?.body ?? "{}"));
+    const prompt = String(body.contents?.[0]?.parts?.[0]?.text ?? "");
+    if (prompt.includes("Bad Co")) throw new Error("Gemini failed with key AIza" + "A".repeat(32));
+    calls += 1;
+    return responseJson({ candidates: [{ content: { parts: [{ text: `Intro ${calls}` }] } }] });
+  };
+
+  const batch = await batchDraftLeadIntros(
+    {
+      leads: [
+        { companyName: "Good Co", website: "https://good.example", context: "Good context" },
+        { companyName: "Bad Co", website: "https://bad.example", context: "Bad context" },
+        { companyName: "Good Co", website: "https://good.example", context: "Duplicate" },
+      ],
+      offer: "AI follow-up",
+      language: "sk",
+    },
+    { GEMINI_API_KEY: "gemini-key" },
+    fetchImpl as typeof fetch
+  );
+
+  assert.equal(batch.mode, "batch-lead-intro-draft");
+  assert.equal(batch.totals.input, 2);
+  assert.equal(batch.totals.drafted, 1);
+  assert.equal(batch.totals.failed, 1);
+  assert.equal(batch.drafts[0].personalizedIntro, "Intro 1");
+  assert.equal(JSON.stringify(batch).includes("AIza" + "A".repeat(32)), false);
+  assert.match(batch.failures[0].error, /\[redacted-google-api-key\]/);
 });
 
 test("Smartlead lead upload posts approved lead_list batches without leaking API key", async () => {

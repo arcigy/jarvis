@@ -20,6 +20,7 @@ import { buildLeadgenDailyReport, buildLeadgenEveningSummary, buildLeadgenOpsDig
 import {
   buildNicheLeadgenPlan,
   batchScrapeWebsiteContacts,
+  batchDraftLeadIntros,
   buildManualReviewPickupPlan,
   buildManualReviewQueue,
   buildSmartleadInjectionPlan,
@@ -1586,6 +1587,17 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         context: optionalString(payload.context),
         offer: optionalString(payload.offer),
         language: payload.language === "en" ? "en" : "sk",
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.batch_draft_lead_intros") {
+    writeJson(response, 200, {
+      result: await batchDraftLeadIntros({
+        leads: Array.isArray(payload.leads) ? payload.leads as Parameters<typeof batchDraftLeadIntros>[0]["leads"] : [],
+        offer: optionalString(payload.offer),
+        language: payload.language === "en" ? "en" : "sk",
+        maxLeads: typeof payload.maxLeads === "number" ? payload.maxLeads : undefined,
       }),
     });
     return;

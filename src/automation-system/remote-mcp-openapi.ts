@@ -410,6 +410,17 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
   if (toolName === "arcigy.build_manual_review_queue") return { minScore: 70, leads: [{ email: "lead@example.com", companyName: "Modelova Firma", website: "https://example.com", personalizedIntro: "Kratke AI intro." }] };
   if (toolName === "arcigy.export_leads_csv") return { outputPath: "generated/leads/manual-review.csv", leads: [{ email: "lead@example.com", companyName: "Modelova Firma", website: "https://example.com" }], approval: { approved: true } };
   if (toolName === "arcigy.draft_lead_intro") return { companyName: "Modelova Firma", website: "https://example.com", context: "Firma riesi B2B obchod.", language: "sk" };
+  if (toolName === "arcigy.batch_draft_lead_intros") {
+    return {
+      leads: [
+        { companyName: "Modelova Firma", website: "https://example.com", context: "Firma riesi B2B obchod." },
+        { companyName: "Druha Firma", website: "https://example.org", context: "Ma kontakt formular a servisne dopyty." },
+      ],
+      offer: "AI asistent na dopyty a follow-up",
+      language: "sk",
+      maxLeads: 10,
+    };
+  }
   if (toolName === "arcigy.prepare_smartlead_leads") {
     return {
       defaultSource: "jarvis-mcp",
