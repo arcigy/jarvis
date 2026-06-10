@@ -892,6 +892,11 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(uiSmoke, /executeRendererJson/);
   assert.match(uiSmoke, /Renderer JavaScript timed out/);
   assert.match(uiSmoke, /Remote MCP smoke result was not rendered from the UI button flow/);
+  assert.match(uiSmoke, /runGrokPromptCopyFlow/);
+  assert.match(uiSmoke, /Grok startup prompt:/);
+  assert.match(uiSmoke, /OpenAPI schema:\\s\*http/);
+  assert.match(uiSmoke, /First tool:\\s\*arcigy\\.get_operator_briefing/);
+  assert.match(uiSmoke, /Grok handoff prompt leaked a sensitive pattern/);
   assert.match(uiSmoke, /Command core image did not load/);
   assert.match(uiSmoke, /handoffProofGatesText/);
   assert.match(uiSmoke, /proofReadyMatch/);

@@ -331,6 +331,21 @@ async function run() {
     if (!/Remote MCP smoke ready/i.test(remoteSmokeUi.remoteSmokeResultText) || !/READY manifest/i.test(remoteSmokeUi.remoteSmokeResultText)) {
       fail("Remote MCP smoke result was not rendered from the UI button flow.");
     }
+    const grokPrompt = await runGrokPromptCopyFlow(window);
+    if (
+      !/Grok startup prompt:/i.test(grokPrompt.clipboardText) ||
+      !/HANDOFF STAV:\s*READY/i.test(grokPrompt.clipboardText) ||
+      !/OpenAPI schema:\s*http:\/\/127\.0\.0\.1:8765\/api\/openapi\.json/i.test(grokPrompt.clipboardText) ||
+      !/Smoke test:\s*http:\/\/127\.0\.0\.1:8765\/api\/remote-mcp-smoke/i.test(grokPrompt.clipboardText) ||
+      !/First tool:\s*arcigy\.get_operator_briefing/i.test(grokPrompt.clipboardText) ||
+      !/Required proof gates:.*manifest.*approval-gate/is.test(grokPrompt.clipboardText) ||
+      !/Auth header:\s*Authorization: Bearer <JARVIS_WEB_TOKEN>/i.test(grokPrompt.clipboardText)
+    ) {
+      fail(`Grok handoff prompt is incomplete: ${grokPrompt.clipboardText.slice(0, 500)}.`);
+    }
+    if (/AIza|GOCSPX|1\/\/|postgres(?:ql)?:\/\/|redis:\/\//i.test(grokPrompt.clipboardText)) {
+      fail("Grok handoff prompt leaked a sensitive pattern.");
+    }
     const agentSetupText = String(dom.agentSetupProfilesText ?? "");
     for (const expected of ["Claude", "ChatGPT", "Grok", "openapi-custom-action", "openapi-or-http-json", "external-http-mcp"]) {
       if (!agentSetupText.includes(expected)) fail(`Agent setup profiles are not rendered: missing ${expected}.`);
@@ -455,6 +470,54 @@ async function runRemoteSmokeFromUi(window) {
     await new Promise((resolveDone) => setTimeout(resolveDone, 250));
   }
   fail(`Remote MCP smoke UI flow did not settle: ${state.handoffProofGatesText || state.remoteSmokeResultText || "empty"}.`);
+  return state;
+}
+
+async function runGrokPromptCopyFlow(window) {
+  const clicked = await executeRendererJson(window, `
+    (() => {
+      window.__jarvisSmokeClipboard = "";
+      try {
+        Object.defineProperty(navigator, "clipboard", {
+          configurable: true,
+          value: { writeText: async (text) => { window.__jarvisSmokeClipboard = String(text); } }
+        });
+      } catch (_error) {
+        try {
+          navigator.clipboard.writeText = async (text) => { window.__jarvisSmokeClipboard = String(text); };
+        } catch (_nestedError) {}
+      }
+      const originalExecCommand = document.execCommand?.bind(document);
+      document.execCommand = (command) => {
+        if (String(command).toLowerCase() === "copy") {
+          const active = document.activeElement;
+          window.__jarvisSmokeClipboard = active && "value" in active ? String(active.value) : String(window.getSelection?.() || "");
+          return true;
+        }
+        return originalExecCommand ? originalExecCommand(command) : false;
+      };
+      const button = document.getElementById("copyGrokPrompt");
+      if (!button) return false;
+      window.setTimeout(() => button.click(), 0);
+      return true;
+    })()
+  `, 5000);
+  if (!clicked) {
+    fail("Grok prompt copy button is missing.");
+    return { clipboardText: "", buttonText: "" };
+  }
+  const deadline = Date.now() + 5000;
+  let state = { clipboardText: "", buttonText: "" };
+  while (Date.now() < deadline) {
+    state = await executeRendererJson(window, `
+      (() => ({
+        clipboardText: String(window.__jarvisSmokeClipboard || ""),
+        buttonText: document.querySelector("#copyGrokPrompt")?.textContent.trim() || ""
+      }))()
+    `, 5000);
+    if (/Grok startup prompt:/i.test(state.clipboardText)) return state;
+    await new Promise((resolveDone) => setTimeout(resolveDone, 100));
+  }
   return state;
 }
 
