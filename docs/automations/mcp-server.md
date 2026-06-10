@@ -117,6 +117,7 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.discover_leads`: combines Serper and Google Places into normalized lead candidates.
 - `arcigy.fetch_url_preview`: safe read-only public URL/API fetch preview with private-host blocking and secret redaction.
 - `arcigy.scrape_website_contacts`: read-only website/contact-page fetcher for emails, phones, links, title, description, and text preview.
+- `arcigy.batch_scrape_website_contacts`: read-only batch website/contact-page scraping with per-site success/error reporting.
 - `arcigy.enrich_slovak_company_register`: read-only ORSR lookup by ICO or company name for company, address, executives, and source URL.
 - `arcigy.score_lead_quality`: scores lead candidates 0-100 using email type, website, `.sk` domain, decision maker, register verification, AI intro, and validation status.
 - `arcigy.dedupe_lead_candidates`: deduplicates lead candidates by email, website, phone, or company name before import.

@@ -58,6 +58,7 @@ export type JarvisMcpToolName =
   | "arcigy.search_google_places"
   | "arcigy.discover_leads"
   | "arcigy.scrape_website_contacts"
+  | "arcigy.batch_scrape_website_contacts"
   | "arcigy.enrich_slovak_company_register"
   | "arcigy.score_lead_quality"
   | "arcigy.dedupe_lead_candidates"
@@ -388,6 +389,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.scrape_website_contacts",
       description: "Fetchne web a kontaktne podstranky, vytiahne emaily, telefony, title, popis a textovy preview pre lead enrichment.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.batch_scrape_website_contacts",
+      description: "Batch read-only scrape viacerych webov pre emaily, telefony a text preview s per-site error reportom bez zapisu.",
       requiresApproval: false,
     },
     {

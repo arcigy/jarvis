@@ -154,6 +154,7 @@ const capabilityDefinitions: CapabilityDefinition[] = [
       "arcigy.discover_leads",
       "arcigy.fetch_url_preview",
       "arcigy.scrape_website_contacts",
+      "arcigy.batch_scrape_website_contacts",
       "arcigy.enrich_slovak_company_register",
       "arcigy.score_lead_quality",
       "arcigy.dedupe_lead_candidates",

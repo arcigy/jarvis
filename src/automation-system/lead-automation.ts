@@ -16,6 +16,14 @@ export type ScrapedWebsiteContacts = {
   fetchedAt: string;
 };
 
+export type BatchScrapedWebsiteContacts = {
+  mode: "batch-website-contact-scrape";
+  totals: { input: number; scraped: number; failed: number; emailsFound: number; phonesFound: number };
+  results: ScrapedWebsiteContacts[];
+  failures: Array<{ url: string; error: string }>;
+  summary: string;
+};
+
 export type LeadIntroInput = {
   companyName: string;
   website?: string;
@@ -271,6 +279,32 @@ export async function scrapeWebsiteContacts(
     phones,
     internalLinks: unique(pages.flatMap((page) => page.internalLinks)).slice(0, 30),
     fetchedAt: new Date().toISOString(),
+  };
+}
+
+export async function batchScrapeWebsiteContacts(
+  input: { urls: string[]; includePriorityPages?: boolean; maxPages?: number; maxSites?: number },
+  fetchImpl: FetchLike = fetch
+): Promise<BatchScrapedWebsiteContacts> {
+  const maxSites = Math.min(Math.max(Math.trunc(input.maxSites ?? 20), 1), 50);
+  const urls = unique(input.urls.map((url) => url.trim()).filter(Boolean)).slice(0, maxSites);
+  const results: ScrapedWebsiteContacts[] = [];
+  const failures: BatchScrapedWebsiteContacts["failures"] = [];
+  for (const url of urls) {
+    try {
+      results.push(await scrapeWebsiteContacts({ url, includePriorityPages: input.includePriorityPages, maxPages: input.maxPages }, fetchImpl));
+    } catch (error) {
+      failures.push({ url, error: redactSensitiveText(error instanceof Error ? error.message : String(error)) });
+    }
+  }
+  const emailsFound = unique(results.flatMap((result) => result.emails)).length;
+  const phonesFound = unique(results.flatMap((result) => result.phones)).length;
+  return {
+    mode: "batch-website-contact-scrape",
+    totals: { input: urls.length, scraped: results.length, failed: failures.length, emailsFound, phonesFound },
+    results,
+    failures,
+    summary: `Batch scrape hotovy: ${results.length}/${urls.length} webov, ${emailsFound} unikatnych emailov, ${phonesFound} telefonov. Ziadny zapis neprebehol.`,
   };
 }
 

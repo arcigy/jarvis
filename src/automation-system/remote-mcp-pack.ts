@@ -791,6 +791,14 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Batch scrape website contacts without writing",
+      tool: "arcigy.batch_scrape_website_contacts",
+      method: "POST",
+      url: toolUrl("arcigy.batch_scrape_website_contacts"),
+      body: { urls: ["https://example.com", "https://example.org"], includePriorityPages: true, maxPages: 4, maxSites: 10 },
+      approvalRequired: false,
+    },
+    {
       label: "Build a niche leadgen plan",
       tool: "arcigy.build_niche_leadgen_plan",
       method: "POST",

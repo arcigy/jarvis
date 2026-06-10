@@ -339,6 +339,7 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
   if (toolName === "arcigy.fetch_url_preview") return { url: "https://example.com/api/status", method: "GET", parseJson: true, maxBytes: 20000 };
   if (toolName === "arcigy.discover_leads") return { query: "automation agency Bratislava", maxResults: 5 };
   if (toolName === "arcigy.scrape_website_contacts") return { url: "https://example.com", includePriorityPages: true, maxPages: 4 };
+  if (toolName === "arcigy.batch_scrape_website_contacts") return { urls: ["https://example.com", "https://example.org"], includePriorityPages: true, maxPages: 4, maxSites: 10 };
   if (toolName === "arcigy.enrich_slovak_company_register") return { companyName: "Modelova Firma s.r.o." };
   if (toolName === "arcigy.score_lead_quality") {
     return { minScore: 70, leads: [{ email: "majitel@example.sk", website: "https://example.sk", decisionMaker: "Jan Novak", registerVerified: true, personalizedIntro: "Kratke AI intro." }] };

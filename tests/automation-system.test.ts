@@ -17,6 +17,7 @@ import { fetchPublicUrlPreview } from "../src/automation-system/http-fetch.ts";
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "../src/automation-system/lead-discovery.ts";
 import {
   buildNicheLeadgenPlan,
+  batchScrapeWebsiteContacts,
   buildManualReviewPickupPlan,
   buildManualReviewQueue,
   buildSmartleadInjectionPlan,
@@ -134,6 +135,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.search_google_places",
     "arcigy.discover_leads",
     "arcigy.scrape_website_contacts",
+    "arcigy.batch_scrape_website_contacts",
     "arcigy.enrich_slovak_company_register",
     "arcigy.score_lead_quality",
     "arcigy.dedupe_lead_candidates",
@@ -1401,7 +1403,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 75 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 76 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -2926,6 +2928,29 @@ test("website contact scraper extracts emails, phones, and priority page text", 
   assert.ok(scraped.emails.includes("hello@kuchyne-demo.sk"));
   assert.ok(scraped.emails.includes("obchod@kuchyne-demo.sk"));
   assert.ok(scraped.phones.some((phone) => phone.includes("905")));
+});
+
+test("batch website contact scraper summarizes successes and failures", async () => {
+  const fetchImpl = async (url: string | URL | Request) => {
+    const target = String(url);
+    if (target === "https://good.example/") {
+      return new Response(`<html><head><title>Good</title></head><body><a href="mailto:owner@good.example">Email</a><p>+421 900 111 222</p></body></html>`, { status: 200 });
+    }
+    if (target === "https://bad.example/") {
+      return { ok: false, status: 500, text: async () => "" } as Response;
+    }
+    throw new Error(`Unexpected URL: ${target}`);
+  };
+
+  const batch = await batchScrapeWebsiteContacts({ urls: ["good.example", "bad.example", "good.example"], maxSites: 10 }, fetchImpl as typeof fetch);
+
+  assert.equal(batch.mode, "batch-website-contact-scrape");
+  assert.equal(batch.totals.input, 2);
+  assert.equal(batch.totals.scraped, 1);
+  assert.equal(batch.totals.failed, 1);
+  assert.equal(batch.totals.emailsFound, 1);
+  assert.equal(batch.results[0].emails[0], "owner@good.example");
+  assert.match(batch.failures[0].error, /Website fetch failed: 500/);
 });
 
 test("public URL fetch preview redacts secrets and blocks private hosts", async () => {

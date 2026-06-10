@@ -19,6 +19,7 @@ import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerpe
 import { buildLeadgenDailyReport, buildLeadgenEveningSummary, buildLeadgenOpsDigest, buildLeadgenSlackReportPreview, selectNextNiche } from "../automation-system/leadgen-report.ts";
 import {
   buildNicheLeadgenPlan,
+  batchScrapeWebsiteContacts,
   buildManualReviewPickupPlan,
   buildManualReviewQueue,
   buildSmartleadInjectionPlan,
@@ -1408,6 +1409,17 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         url: String(payload.url ?? ""),
         includePriorityPages: payload.includePriorityPages !== false,
         maxPages: typeof payload.maxPages === "number" ? payload.maxPages : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.batch_scrape_website_contacts") {
+    writeJson(response, 200, {
+      result: await batchScrapeWebsiteContacts({
+        urls: Array.isArray(payload.urls) ? payload.urls.map(String) : [],
+        includePriorityPages: payload.includePriorityPages !== false,
+        maxPages: typeof payload.maxPages === "number" ? payload.maxPages : undefined,
+        maxSites: typeof payload.maxSites === "number" ? payload.maxSites : undefined,
       }),
     });
     return;

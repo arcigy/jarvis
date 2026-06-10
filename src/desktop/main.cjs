@@ -3033,6 +3033,7 @@ function listWebMcpTools() {
     { name: "arcigy.search_google_places", requiresApproval: false },
     { name: "arcigy.discover_leads", requiresApproval: false },
     { name: "arcigy.scrape_website_contacts", requiresApproval: false },
+    { name: "arcigy.batch_scrape_website_contacts", requiresApproval: false },
     { name: "arcigy.enrich_slovak_company_register", requiresApproval: false },
     { name: "arcigy.score_lead_quality", requiresApproval: false },
     { name: "arcigy.dedupe_lead_candidates", requiresApproval: false },

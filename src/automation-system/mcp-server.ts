@@ -20,6 +20,7 @@ import { buildLeadgenDailyReport, buildLeadgenEveningSummary, buildLeadgenOpsDig
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "./lead-discovery.ts";
 import {
   buildNicheLeadgenPlan,
+  batchScrapeWebsiteContacts,
   buildManualReviewPickupPlan,
   buildManualReviewQueue,
   buildSmartleadInjectionPlan,
@@ -1654,6 +1655,27 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(await scrapeWebsiteContacts(input))
+  );
+
+  server.registerTool(
+    "arcigy.batch_scrape_website_contacts",
+    {
+      title: "Batch scrape website contacts",
+      description: "Read-only batch scrape public websites and contact pages for emails, phones, title, description, and text preview with per-site errors.",
+      inputSchema: {
+        urls: z.array(z.string().min(1)).min(1).max(50),
+        includePriorityPages: z.boolean().default(true),
+        maxPages: z.number().int().min(1).max(8).default(4),
+        maxSites: z.number().int().min(1).max(50).default(20),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (input) => jsonResult(await batchScrapeWebsiteContacts(input))
   );
 
   server.registerTool(
