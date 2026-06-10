@@ -16,6 +16,7 @@ import { defaultGmailSyncQuery, encodeGmailRawMessage, listRecentGmailMessageEve
 import { batchFetchPublicUrlPreviews, fetchPublicUrlPreview } from "../src/automation-system/http-fetch.ts";
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "../src/automation-system/lead-discovery.ts";
 import {
+  buildBatchNicheDiscoveryPlan,
   buildNicheLeadgenPlan,
   batchScrapeWebsiteContacts,
   batchDraftLeadIntros,
@@ -149,6 +150,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.score_lead_quality",
     "arcigy.dedupe_lead_candidates",
     "arcigy.build_niche_leadgen_plan",
+    "arcigy.build_batch_niche_discovery_plan",
     "arcigy.draft_smartlead_campaign_sequence",
     "arcigy.preview_smartlead_email_rendering",
     "arcigy.preview_manual_review_pickup",
@@ -1419,7 +1421,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 85 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 86 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -2685,6 +2687,27 @@ test("lead enrichment preview and daily runbook prepare safe Smartlead next step
   assert.equal(runbook.target.discoveryCount, 60);
   assert.ok(runbook.steps.some((step) => step.tool === "arcigy.preview_lead_enrichment_batch" && step.writes === false));
   assert.ok(runbook.steps.some((step) => step.tool === "arcigy.add_leads_to_smartlead_campaign" && step.approvalRequired));
+});
+
+test("batch niche discovery plan prepares regional runbooks and read-only next calls", () => {
+  const plan = buildBatchNicheDiscoveryPlan({
+    niches: [
+      { id: "niche-1", slug: "autoservisy", name: "Autoservisy", keywords: ["autoservis"], regions: ["Bratislava", "Trnava"], dailyTarget: 25, campaignId: "123456" },
+      { id: "niche-2", slug: "zubna-klinika", name: "Zubne kliniky", keywords: ["zubna klinika"], regions: ["Nitra"], dailyTarget: 15 },
+    ],
+    maxNiches: 2,
+    maxRegionsPerNiche: 2,
+    offer: "AI follow-up system",
+  });
+
+  assert.equal(plan.mode, "batch-niche-discovery-plan");
+  assert.equal(plan.totals.niches, 2);
+  assert.equal(plan.totals.runbooks, 3);
+  assert.equal(plan.totals.estimatedDailyLimit, 65);
+  assert.equal(plan.plans[0].niche.region, "Bratislava");
+  assert.ok(plan.nextToolCalls.some((call) => call.tool === "arcigy.run_leadgen_research_pipeline" && call.approvalRequired === false));
+  assert.ok(plan.nextToolCalls.every((call) => call.tool !== "arcigy.add_leads_to_smartlead_campaign"));
+  assert.match(plan.summary, /Ziadny scraping ani upload neprebehol/);
 });
 
 test("leadgen campaign pipeline preview chains scrape intro enrichment and Smartlead next steps", () => {

@@ -18,6 +18,7 @@ import { buildJarvisCapabilityAudit, summarizeJarvisCapabilityAuditForVoice } fr
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "../automation-system/lead-discovery.ts";
 import { buildLeadgenDailyReport, buildLeadgenEveningSummary, buildLeadgenOpsDigest, buildLeadgenSlackReportPreview, selectNextNiche } from "../automation-system/leadgen-report.ts";
 import {
+  buildBatchNicheDiscoveryPlan,
   buildNicheLeadgenPlan,
   buildLeadgenCampaignPipelinePreview,
   batchScrapeWebsiteContacts,
@@ -1474,6 +1475,24 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         niche: String(payload.niche ?? ""),
         region: optionalString(payload.region),
         customKeywords: Array.isArray(payload.customKeywords) ? payload.customKeywords.map(String) : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_batch_niche_discovery_plan") {
+    writeJson(response, 200, {
+      result: buildBatchNicheDiscoveryPlan({
+        niches: (payload.niches ?? []) as Parameters<typeof buildBatchNicheDiscoveryPlan>[0]["niches"],
+        defaultRegions: Array.isArray(payload.defaultRegions) ? payload.defaultRegions.map(String) : undefined,
+        maxNiches: typeof payload.maxNiches === "number" ? payload.maxNiches : undefined,
+        maxRegionsPerNiche: typeof payload.maxRegionsPerNiche === "number" ? payload.maxRegionsPerNiche : undefined,
+        dailyLimit: typeof payload.dailyLimit === "number" ? payload.dailyLimit : undefined,
+        targetCount: typeof payload.targetCount === "number" ? payload.targetCount : undefined,
+        batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
+        offer: optionalString(payload.offer),
+        painPoint: optionalString(payload.painPoint),
+        language: payload.language === "en" ? "en" : "sk",
+        includeSmartleadSetup: payload.includeSmartleadSetup === true,
       }),
     });
     return;

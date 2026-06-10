@@ -343,6 +343,19 @@ export type DailyLeadgenRunbook = {
   safetyGates: string[];
 };
 
+export type BatchNicheDiscoveryPlan = {
+  mode: "batch-niche-discovery-plan";
+  summary: string;
+  totals: { niches: number; regions: number; runbooks: number; discoveryCalls: number; estimatedDailyLimit: number };
+  plans: Array<{
+    niche: { id?: string; slug: string; name: string; region?: string; campaignId?: string | number | null };
+    queryPlan: NicheLeadgenPlan;
+    runbook: DailyLeadgenRunbook;
+  }>;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+  warnings: string[];
+};
+
 const genericEmailPrefixes = new Set(["info", "kontakt", "contact", "office", "admin", "sales", "hello", "support", "recepcia"]);
 
 const nicheTemplates: Record<string, Omit<NicheLeadgenPlan, "niche" | "region" | "notes">> = {
@@ -1693,6 +1706,99 @@ export function buildDailyLeadgenRunbook(input: {
       "Manual review leady exportuj alebo oprav pred importom.",
       "Nikdy neber approval.approved=true ako implicitny suhlas bez operatora.",
     ],
+  };
+}
+
+export function buildBatchNicheDiscoveryPlan(input: {
+  niches: Array<{ id?: string; slug?: string; name: string; keywords?: string[]; regions?: string[]; dailyTarget?: number; campaignId?: string | number | null; smartleadCampaignId?: string | number | null }>;
+  defaultRegions?: string[];
+  maxNiches?: number;
+  maxRegionsPerNiche?: number;
+  dailyLimit?: number;
+  targetCount?: number;
+  batchSize?: number;
+  offer?: string;
+  painPoint?: string;
+  language?: "sk" | "en";
+  includeSmartleadSetup?: boolean;
+}): BatchNicheDiscoveryPlan {
+  const maxNiches = Math.min(Math.max(Math.trunc(input.maxNiches ?? 10), 1), 50);
+  const maxRegionsPerNiche = Math.min(Math.max(Math.trunc(input.maxRegionsPerNiche ?? 3), 1), 20);
+  const selectedNiches = input.niches.slice(0, maxNiches);
+  const defaultRegions = input.defaultRegions?.length ? input.defaultRegions : ["Slovensko"];
+  const plans: BatchNicheDiscoveryPlan["plans"] = [];
+  const warnings: string[] = [];
+  for (const sourceNiche of selectedNiches) {
+    const slug = sourceNiche.slug?.trim() || slugify(sourceNiche.name);
+    if (!slug || !sourceNiche.name.trim()) {
+      warnings.push(`Skipped niche with missing slug/name: ${JSON.stringify(sourceNiche).slice(0, 120)}`);
+      continue;
+    }
+    const regions = (sourceNiche.regions?.length ? sourceNiche.regions : defaultRegions).slice(0, maxRegionsPerNiche);
+    for (const region of regions) {
+      const niche = {
+        id: sourceNiche.id,
+        slug,
+        name: sourceNiche.name,
+        keywords: sourceNiche.keywords,
+        region,
+        campaignId: sourceNiche.campaignId ?? sourceNiche.smartleadCampaignId ?? null,
+      };
+      const runbook = buildDailyLeadgenRunbook({
+        niche,
+        targetCount: input.targetCount,
+        dailyLimit: input.dailyLimit ?? sourceNiche.dailyTarget,
+        batchSize: input.batchSize,
+        offer: input.offer,
+        painPoint: input.painPoint,
+        language: input.language,
+        includeSmartleadSetup: input.includeSmartleadSetup,
+      });
+      plans.push({ niche: runbook.niche, queryPlan: runbook.queryPlan, runbook });
+    }
+  }
+  const nextToolCalls = plans.flatMap((plan) => {
+    const primaryQuery = plan.queryPlan.mapsQueries[0] ?? `${plan.niche.name} ${plan.niche.region ?? "Slovensko"}`.trim();
+    return [
+      {
+        tool: "arcigy.build_daily_leadgen_runbook",
+        payload: {
+          niche: plan.niche,
+          targetCount: input.targetCount,
+          dailyLimit: input.dailyLimit,
+          batchSize: input.batchSize,
+          offer: input.offer,
+          painPoint: input.painPoint,
+          language: input.language ?? "sk",
+          includeSmartleadSetup: input.includeSmartleadSetup === true,
+        },
+        reason: `Priprav detailny denny runbook pre ${plan.niche.name}${plan.niche.region ? ` / ${plan.niche.region}` : ""}.`,
+        approvalRequired: false,
+      },
+      {
+        tool: "arcigy.run_leadgen_research_pipeline",
+        payload: {
+          query: primaryQuery,
+          placesQuery: primaryQuery,
+          maxResults: Math.min(plan.runbook.target.discoveryCount, 25),
+          scrapeWebsites: true,
+          draftIntros: true,
+          offer: input.offer,
+          language: input.language ?? "sk",
+        },
+        reason: "Spusti read-only discovery + scrape + AI intro pipeline pre prvy query slot.",
+        approvalRequired: false,
+      },
+    ];
+  });
+  const estimatedDailyLimit = plans.reduce((sum, plan) => sum + plan.runbook.target.dailyLimit, 0);
+  return {
+    mode: "batch-niche-discovery-plan",
+    summary: `Batch niche discovery plan: ${plans.length} runbookov pre ${selectedNiches.length} niche, odhad denny limit ${estimatedDailyLimit}. Ziadny scraping ani upload neprebehol.`,
+    totals: { niches: selectedNiches.length, regions: plans.length, runbooks: plans.length, discoveryCalls: plans.length, estimatedDailyLimit },
+    plans,
+    nextToolCalls,
+    warnings,
   };
 }
 

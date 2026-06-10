@@ -19,6 +19,7 @@ import { buildJarvisCapabilityAudit, summarizeJarvisCapabilityAuditForVoice } fr
 import { buildLeadgenDailyReport, buildLeadgenEveningSummary, buildLeadgenOpsDigest, buildLeadgenSlackReportPreview, selectNextNiche } from "./leadgen-report.ts";
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "./lead-discovery.ts";
 import {
+  buildBatchNicheDiscoveryPlan,
   buildNicheLeadgenPlan,
   buildLeadgenCampaignPipelinePreview,
   batchScrapeWebsiteContacts,
@@ -1842,6 +1843,45 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildNicheLeadgenPlan(input))
+  );
+
+  const batchNicheSchema = z.object({
+    id: z.string().optional(),
+    slug: z.string().optional(),
+    name: z.string().min(1),
+    keywords: z.array(z.string()).optional(),
+    regions: z.array(z.string()).optional(),
+    dailyTarget: z.number().int().min(1).max(250).optional(),
+    campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+    smartleadCampaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+  });
+
+  server.registerTool(
+    "arcigy.build_batch_niche_discovery_plan",
+    {
+      title: "Build batch niche discovery plan",
+      description: "Plan read-only discovery, scraping, AI intro, runbook, and Smartlead prep steps for multiple niches and regions without executing them.",
+      inputSchema: {
+        niches: z.array(batchNicheSchema).min(1).max(50),
+        defaultRegions: z.array(z.string()).optional(),
+        maxNiches: z.number().int().min(1).max(50).default(10),
+        maxRegionsPerNiche: z.number().int().min(1).max(20).default(3),
+        dailyLimit: z.number().int().min(1).max(250).optional(),
+        targetCount: z.number().int().min(1).max(500).optional(),
+        batchSize: z.number().int().min(1).max(100).optional(),
+        offer: z.string().optional(),
+        painPoint: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        includeSmartleadSetup: z.boolean().default(false),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildBatchNicheDiscoveryPlan(input))
   );
 
   server.registerTool(

@@ -65,6 +65,7 @@ export type JarvisMcpToolName =
   | "arcigy.score_lead_quality"
   | "arcigy.dedupe_lead_candidates"
   | "arcigy.build_niche_leadgen_plan"
+  | "arcigy.build_batch_niche_discovery_plan"
   | "arcigy.draft_smartlead_campaign_sequence"
   | "arcigy.preview_smartlead_email_rendering"
   | "arcigy.preview_manual_review_pickup"
@@ -433,6 +434,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.build_niche_leadgen_plan",
       description: "Vrati niche-specific Google Maps/Serper query plan a blacklist keywords pre slovensky leadgen.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_batch_niche_discovery_plan",
+      description: "Naplánuje discovery, scrape, AI intra, runbooky a Smartlead prep pre viac niche/regionov bez spustenia.",
       requiresApproval: false,
     },
     {

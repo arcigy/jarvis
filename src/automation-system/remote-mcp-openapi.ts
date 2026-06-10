@@ -359,6 +359,18 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
   }
   if (toolName === "arcigy.dedupe_lead_candidates") return { leads: [{ email: "lead@example.com", companyName: "Modelova Firma" }, { email: "lead@example.com", companyName: "Duplicita" }] };
   if (toolName === "arcigy.build_niche_leadgen_plan") return { niche: "autoservisy", region: "Bratislava" };
+  if (toolName === "arcigy.build_batch_niche_discovery_plan") {
+    return {
+      niches: [
+        { id: "niche-1", slug: "autoservisy", name: "Autoservisy", keywords: ["autoservis"], regions: ["Bratislava", "Trnava"], dailyTarget: 30, campaignId: "123456" },
+        { id: "niche-2", slug: "zubna-klinika", name: "Zubne kliniky", keywords: ["zubna klinika"], regions: ["Nitra"], dailyTarget: 20 },
+      ],
+      maxNiches: 5,
+      maxRegionsPerNiche: 2,
+      offer: "AI follow-up system",
+      language: "sk",
+    };
+  }
   if (toolName === "arcigy.draft_smartlead_campaign_sequence") return { niche: "autoservisy", painPoint: "manualne riesenie dopytov", offer: "AI asistent na odpovede a follow-up", language: "sk" };
   if (toolName === "arcigy.preview_smartlead_email_rendering") {
     return {

@@ -160,6 +160,7 @@ const capabilityDefinitions: CapabilityDefinition[] = [
       "arcigy.score_lead_quality",
       "arcigy.dedupe_lead_candidates",
       "arcigy.build_niche_leadgen_plan",
+      "arcigy.build_batch_niche_discovery_plan",
       "arcigy.select_next_niche",
       "arcigy.draft_smartlead_campaign_sequence",
       "arcigy.preview_smartlead_email_rendering",

@@ -815,6 +815,23 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Build a batch niche discovery plan",
+      tool: "arcigy.build_batch_niche_discovery_plan",
+      method: "POST",
+      url: toolUrl("arcigy.build_batch_niche_discovery_plan"),
+      body: {
+        niches: [
+          { id: "niche-1", slug: "autoservisy", name: "Autoservisy", keywords: ["autoservis"], regions: ["Bratislava", "Trnava"], dailyTarget: 30, campaignId: "123456" },
+          { id: "niche-2", slug: "zubna-klinika", name: "Zubne kliniky", keywords: ["zubna klinika"], regions: ["Nitra"], dailyTarget: 20 },
+        ],
+        maxNiches: 5,
+        maxRegionsPerNiche: 2,
+        offer: "AI follow-up system",
+        language: "sk",
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Enrich a Slovak company register record",
       tool: "arcigy.enrich_slovak_company_register",
       method: "POST",
