@@ -40,6 +40,11 @@ export type JarvisMcpToolName =
   | "arcigy.search_google_places"
   | "arcigy.discover_leads"
   | "arcigy.scrape_website_contacts"
+  | "arcigy.enrich_slovak_company_register"
+  | "arcigy.score_lead_quality"
+  | "arcigy.dedupe_lead_candidates"
+  | "arcigy.build_niche_leadgen_plan"
+  | "arcigy.draft_smartlead_campaign_sequence"
   | "arcigy.draft_lead_intro"
   | "arcigy.prepare_smartlead_leads"
   | "arcigy.run_leadgen_research_pipeline"
@@ -263,6 +268,31 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.scrape_website_contacts",
       description: "Fetchne web a kontaktne podstranky, vytiahne emaily, telefony, title, popis a textovy preview pre lead enrichment.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.enrich_slovak_company_register",
+      description: "Read-only vyhlada slovensku firmu v ORSR podla ICO alebo nazvu a vytiahne firmu, adresu a konatelov.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.score_lead_quality",
+      description: "Ohodnoti leady 0-100 podla emailu, webu, SK domeny, decision makera, ORSR overenia, AI intra a validation statusu.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.dedupe_lead_candidates",
+      description: "Zdeduplikuje lead candidates podla emailu, webu, telefonu alebo nazvu firmy pred importom do Smartlead/Sheets.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_niche_leadgen_plan",
+      description: "Vrati niche-specific Google Maps/Serper query plan a blacklist keywords pre slovensky leadgen.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.draft_smartlead_campaign_sequence",
+      description: "Vytvori draft Smartlead email sequence struktury s variantmi a follow-upom bez zapisu do Smartlead.",
       requiresApproval: false,
     },
     {

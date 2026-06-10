@@ -14,7 +14,17 @@ import { defaultGmailBriefingQuery, defaultGmailSyncQuery, listConfiguredGmailAc
 import { handleJarvisVoiceEvent, type JarvisVoiceSession } from "./jarvis-voice.ts";
 import { buildJarvisCapabilityAudit, summarizeJarvisCapabilityAuditForVoice } from "./jarvis-capability-audit.ts";
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "./lead-discovery.ts";
-import { draftLeadIntro, prepareSmartleadLeads, runLeadgenResearchPipeline, scrapeWebsiteContacts } from "./lead-automation.ts";
+import {
+  buildNicheLeadgenPlan,
+  dedupeLeadCandidates,
+  draftLeadIntro,
+  draftSmartleadCampaignSequence,
+  enrichSlovakCompanyRegister,
+  prepareSmartleadLeads,
+  runLeadgenResearchPipeline,
+  scoreLeadQuality,
+  scrapeWebsiteContacts,
+} from "./lead-automation.ts";
 import {
   buildContractGenerationCommand,
   getColdOutreachMcpAnswer,
@@ -1071,6 +1081,126 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(await scrapeWebsiteContacts(input))
+  );
+
+  server.registerTool(
+    "arcigy.enrich_slovak_company_register",
+    {
+      title: "Enrich Slovak company register",
+      description: "Read-only lookup in ORSR by ICO or company name, returning company, address, executives, and source URL.",
+      inputSchema: {
+        ico: z.string().optional(),
+        companyName: z.string().optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (input) => jsonResult(await enrichSlovakCompanyRegister(input))
+  );
+
+  server.registerTool(
+    "arcigy.score_lead_quality",
+    {
+      title: "Score lead quality",
+      description: "Score lead candidates from 0-100 using email, website, SK domain, decision maker, register verification, AI intro, and verification status.",
+      inputSchema: {
+        minScore: z.number().int().min(0).max(100).default(50),
+        leads: z.array(
+          z.object({
+            email: z.string().optional(),
+            companyName: z.string().optional(),
+            website: z.string().optional(),
+            decisionMaker: z.string().optional(),
+            ico: z.string().optional(),
+            registerVerified: z.boolean().optional(),
+            personalizedIntro: z.string().optional(),
+            verificationStatus: z.enum(["ok", "flagged", "failed"]).optional(),
+          })
+        ).min(1),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(scoreLeadQuality(input))
+  );
+
+  server.registerTool(
+    "arcigy.dedupe_lead_candidates",
+    {
+      title: "Dedupe lead candidates",
+      description: "Deduplicate lead candidates by email, website, phone, or company name before Smartlead or Sheets preparation.",
+      inputSchema: {
+        leads: z.array(
+          z.object({
+            email: z.string().optional().default(""),
+            companyName: z.string().optional(),
+            firstName: z.string().optional(),
+            lastName: z.string().optional(),
+            website: z.string().optional(),
+            phone: z.string().optional(),
+            source: z.string().optional(),
+            personalizedIntro: z.string().optional(),
+            customFields: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
+          })
+        ).min(1),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(dedupeLeadCandidates(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_niche_leadgen_plan",
+    {
+      title: "Build niche leadgen plan",
+      description: "Return niche-specific Google Maps and Serper query plan with blacklist keywords for Slovak leadgen.",
+      inputSchema: {
+        niche: z.string().min(1),
+        region: z.string().optional(),
+        customKeywords: z.array(z.string()).optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildNicheLeadgenPlan(input))
+  );
+
+  server.registerTool(
+    "arcigy.draft_smartlead_campaign_sequence",
+    {
+      title: "Draft Smartlead campaign sequence",
+      description: "Draft a Smartlead-compatible sequence payload with variants and an empty-subject follow-up, without writing to Smartlead.",
+      inputSchema: {
+        niche: z.string().min(1),
+        offer: z.string().optional(),
+        painPoint: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(draftSmartleadCampaignSequence(input))
   );
 
   server.registerTool(

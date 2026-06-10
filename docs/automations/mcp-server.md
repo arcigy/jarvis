@@ -99,6 +99,11 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.search_google_places`: read-only Google Places Text Search for company discovery.
 - `arcigy.discover_leads`: combines Serper and Google Places into normalized lead candidates.
 - `arcigy.scrape_website_contacts`: read-only website/contact-page fetcher for emails, phones, links, title, description, and text preview.
+- `arcigy.enrich_slovak_company_register`: read-only ORSR lookup by ICO or company name for company, address, executives, and source URL.
+- `arcigy.score_lead_quality`: scores lead candidates 0-100 using email type, website, `.sk` domain, decision maker, register verification, AI intro, and validation status.
+- `arcigy.dedupe_lead_candidates`: deduplicates lead candidates by email, website, phone, or company name before import.
+- `arcigy.build_niche_leadgen_plan`: returns niche-specific Google Maps and Serper query plans with blacklist keywords.
+- `arcigy.draft_smartlead_campaign_sequence`: drafts a Smartlead-compatible email sequence with variants and empty-subject follow-up without writing to Smartlead.
 - `arcigy.draft_lead_intro`: Gemini draft of one short personalized cold outreach intro for a lead.
 - `arcigy.prepare_smartlead_leads`: normalizes selected leads into Smartlead `lead_list` payload without writing.
 - `arcigy.run_leadgen_research_pipeline`: read-only discovery + optional website scraping + optional Gemini intro drafts for Smartlead-ready research.

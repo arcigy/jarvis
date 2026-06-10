@@ -15,7 +15,17 @@ import { defaultGmailBriefingQuery, defaultGmailSyncQuery, listConfiguredGmailAc
 import { containsWakeWord, extractCommandAfterWakeWord, type JarvisVoiceSession } from "../automation-system/jarvis-voice.ts";
 import { buildJarvisCapabilityAudit, summarizeJarvisCapabilityAuditForVoice } from "../automation-system/jarvis-capability-audit.ts";
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "../automation-system/lead-discovery.ts";
-import { draftLeadIntro, prepareSmartleadLeads, runLeadgenResearchPipeline, scrapeWebsiteContacts } from "../automation-system/lead-automation.ts";
+import {
+  buildNicheLeadgenPlan,
+  dedupeLeadCandidates,
+  draftLeadIntro,
+  draftSmartleadCampaignSequence,
+  enrichSlovakCompanyRegister,
+  prepareSmartleadLeads,
+  runLeadgenResearchPipeline,
+  scoreLeadQuality,
+  scrapeWebsiteContacts,
+} from "../automation-system/lead-automation.ts";
 import { buildContractGenerationCommand, getColdOutreachMcpAnswer, listJarvisMcpTools, localStateWriteToolNames } from "../automation-system/mcp-tools.ts";
 import { buildOperatorBriefing } from "../automation-system/operator-briefing.ts";
 import { buildProactiveAttentionDigest } from "../automation-system/proactive-attention-digest.ts";
@@ -1145,6 +1155,53 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         url: String(payload.url ?? ""),
         includePriorityPages: payload.includePriorityPages !== false,
         maxPages: typeof payload.maxPages === "number" ? payload.maxPages : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.enrich_slovak_company_register") {
+    writeJson(response, 200, {
+      result: await enrichSlovakCompanyRegister({
+        ico: optionalString(payload.ico),
+        companyName: optionalString(payload.companyName),
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.score_lead_quality") {
+    writeJson(response, 200, {
+      result: scoreLeadQuality({
+        minScore: typeof payload.minScore === "number" ? payload.minScore : undefined,
+        leads: (payload.leads ?? []) as Parameters<typeof scoreLeadQuality>[0]["leads"],
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.dedupe_lead_candidates") {
+    writeJson(response, 200, {
+      result: dedupeLeadCandidates({
+        leads: (payload.leads ?? []) as Parameters<typeof dedupeLeadCandidates>[0]["leads"],
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_niche_leadgen_plan") {
+    writeJson(response, 200, {
+      result: buildNicheLeadgenPlan({
+        niche: String(payload.niche ?? ""),
+        region: optionalString(payload.region),
+        customKeywords: Array.isArray(payload.customKeywords) ? payload.customKeywords.map(String) : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.draft_smartlead_campaign_sequence") {
+    writeJson(response, 200, {
+      result: draftSmartleadCampaignSequence({
+        niche: String(payload.niche ?? ""),
+        offer: optionalString(payload.offer),
+        painPoint: optionalString(payload.painPoint),
+        language: payload.language === "en" ? "en" : "sk",
       }),
     });
     return;

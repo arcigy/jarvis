@@ -14,7 +14,16 @@ import { getIntegrationHealth } from "../src/automation-system/env.ts";
 import { buildClientReplyPrompt, buildPositiveOutreachReplyPrompt, generateGeminiText } from "../src/automation-system/gemini.ts";
 import { defaultGmailSyncQuery, encodeGmailRawMessage, listRecentGmailMessageEvents, parseFromHeader, refreshGoogleAccessToken, sendGmailTextMessage } from "../src/automation-system/gmail.ts";
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "../src/automation-system/lead-discovery.ts";
-import { draftLeadIntro, prepareSmartleadLeads, scrapeWebsiteContacts } from "../src/automation-system/lead-automation.ts";
+import {
+  buildNicheLeadgenPlan,
+  dedupeLeadCandidates,
+  draftLeadIntro,
+  draftSmartleadCampaignSequence,
+  enrichSlovakCompanyRegister,
+  prepareSmartleadLeads,
+  scoreLeadQuality,
+  scrapeWebsiteContacts,
+} from "../src/automation-system/lead-automation.ts";
 import {
   buildContractGenerationCommand,
   getColdOutreachMcpAnswer,
@@ -82,6 +91,11 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.search_google_places",
     "arcigy.discover_leads",
     "arcigy.scrape_website_contacts",
+    "arcigy.enrich_slovak_company_register",
+    "arcigy.score_lead_quality",
+    "arcigy.dedupe_lead_candidates",
+    "arcigy.build_niche_leadgen_plan",
+    "arcigy.draft_smartlead_campaign_sequence",
     "arcigy.draft_lead_intro",
     "arcigy.prepare_smartlead_leads",
     "arcigy.run_leadgen_research_pipeline",
@@ -2606,6 +2620,73 @@ test("Smartlead lead upload posts approved lead_list batches without leaking API
   assert.equal(calls[0].body.lead_list[0].email, "lead1@example.com");
   assert.equal(calls[0].body.settings.ignore_global_block_list, false);
   assert.equal(JSON.stringify(result).includes("smartlead-secret"), false);
+});
+
+test("lead quality scoring and dedupe prepare imports safely", () => {
+  const scored = scoreLeadQuality({
+    minScore: 70,
+    leads: [
+      { email: "majitel@example.sk", website: "https://example.sk", decisionMaker: "Jan Novak", ico: "12345678", personalizedIntro: "Kratke intro." },
+      { email: "info@example.com", website: "https://example.com", verificationStatus: "flagged" },
+    ],
+  });
+
+  assert.equal(scored.passed, 1);
+  assert.equal(scored.failed, 1);
+  assert.equal(scored.scoredLeads[0].score, 100);
+  assert.ok(scored.scoredLeads[1].reasons.some((reason) => reason.includes("generic email")));
+
+  const deduped = dedupeLeadCandidates({
+    leads: [
+      { email: "Lead@Example.com", companyName: "A" },
+      { email: "lead@example.com", companyName: "B" },
+      { companyName: "No Email", website: "https://www.example.sk/kontakt" },
+      { companyName: "Same Site", website: "example.sk" },
+    ],
+  });
+  assert.equal(deduped.unique.length, 2);
+  assert.equal(deduped.duplicates.length, 2);
+});
+
+test("niche plan and Smartlead sequence drafts follow leadgen conventions", () => {
+  const plan = buildNicheLeadgenPlan({ niche: "autoservisy", region: "Nitra" });
+  assert.ok(plan.mapsQueries.some((query) => query.includes("autoservis") && query.includes("Nitra")));
+  assert.ok(plan.blacklistKeywords.includes("autobazar"));
+
+  const sequence = draftSmartleadCampaignSequence({ niche: "autoservisy", painPoint: "manualne dopyty", offer: "AI follow-up system" });
+  assert.equal(sequence.sequences[0].seq_variants.length, 2);
+  assert.equal(sequence.sequences[1].seq_variants[0].subject, "");
+  assert.ok(sequence.requiredVariables.includes("{{personalized_intro}}"));
+  assert.ok(sequence.sequences[0].seq_variants[0].email_body.includes("%signature%"));
+});
+
+test("Slovak register enrichment parses ORSR detail without live network", async () => {
+  const fetchImpl = async (url: string | URL | Request) => {
+    const target = String(url);
+    if (target.includes("hladaj_ico")) {
+      return {
+        ok: true,
+        status: 200,
+        text: async () => '<html><a href="vypis.asp?ID=123&SID=2&P=1">Aktualny</a></html>',
+      } as Response;
+    }
+    if (target.includes("vypis.asp")) {
+      return {
+        ok: true,
+        status: 200,
+        text: async () =>
+          "<html><body>Obchodne meno: Arcigy s. r. o. Sidlo: Hlavna 1, Bratislava ICO: 12345678 Statutarny organ: Jan Novak Spolocnici:</body></html>",
+      } as Response;
+    }
+    throw new Error(`Unexpected URL: ${target}`);
+  };
+
+  const result = await enrichSlovakCompanyRegister({ ico: "12345678" }, fetchImpl as typeof fetch);
+  assert.equal(result.found, true);
+  assert.equal(result.companyName, "Arcigy s. r. o.");
+  assert.equal(result.ico, "12345678");
+  assert.ok(result.executives.includes("Jan Novak"));
+  assert.equal(result.source, "orsr_ico");
 });
 
 test("integration diagnostics run live read-only checks with mocked providers", async () => {

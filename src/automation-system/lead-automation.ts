@@ -41,6 +41,75 @@ export type PreparedSmartleadLeadInput = {
   customFields?: Record<string, string | number | boolean | null | undefined>;
 };
 
+export type LeadCandidateInput = Partial<PreparedSmartleadLeadInput> & { email?: string };
+
+export type LeadQualityInput = {
+  email?: string;
+  companyName?: string;
+  website?: string;
+  decisionMaker?: string;
+  ico?: string;
+  registerVerified?: boolean;
+  personalizedIntro?: string;
+  verificationStatus?: "ok" | "flagged" | "failed";
+};
+
+export type NicheLeadgenPlan = {
+  niche: string;
+  region?: string;
+  mapsQueries: string[];
+  serperQueries: string[];
+  blacklistKeywords: string[];
+  notes: string[];
+};
+
+export type SlovakRegisterLookup = {
+  query: { ico?: string; companyName?: string };
+  found: boolean;
+  companyName?: string;
+  ico?: string;
+  address?: string;
+  executives: string[];
+  sourceUrl?: string;
+  source: "orsr_ico" | "orsr_name" | "not_found";
+  fetchedAt: string;
+};
+
+const genericEmailPrefixes = new Set(["info", "kontakt", "contact", "office", "admin", "sales", "hello", "support", "recepcia"]);
+
+const nicheTemplates: Record<string, Omit<NicheLeadgenPlan, "niche" | "region" | "notes">> = {
+  stavebniny: {
+    mapsQueries: ["stavebniny", "stavebny material", "stavebny sklad", "predaj tehal"],
+    serperQueries: ["predaj stavebneho materialu", "stavebny sklad staviva", "stavebniny SK"],
+    blacklistKeywords: ["baumax", "obi", "hornbach", "hobby", "bauhaus", "jysk"],
+  },
+  realitky: {
+    mapsQueries: ["realitna kancelaria", "nehnutelnosti", "reality", "realitna agentura"],
+    serperQueries: ["kupa predaj nehnutelnosti", "realitna kancelaria Slovakia", "predaj bytov"],
+    blacklistKeywords: ["bazos", "nehnutelnosti.sk", "reality.sk", "topreality", "sreality"],
+  },
+  autoservisy: {
+    mapsQueries: ["autoservis", "autoopravovna", "servis aut", "pneuservis", "car service"],
+    serperQueries: ["oprava aut servis", "autoopravovna pneuservis", "lakovacie stredisko"],
+    blacklistKeywords: ["autobazar", "autohaus", "skoda auto", "volkswagen dealership"],
+  },
+  "dom-na-kluc": {
+    mapsQueries: ["dom na kluc", "stavba domu na kluc", "rodinne domy na kluc", "montovany dom na kluc", "drevodomy na kluc"],
+    serperQueries: ['"dom na kluc" stavba', '"stavba domu na kluc" kontakt', '"rodinne domy na kluc" firma'],
+    blacklistKeywords: ["topreality", "nehnutelnosti", "bazos", "wikipedia", "openstreetmap", "booking", "tripadvisor"],
+  },
+  uctovnici: {
+    mapsQueries: ["uctovnik", "uctovnictvo", "danovy poradca", "mzdova agenda"],
+    serperQueries: ["externe uctovnictvo firma SK", "danovy poradca mzdova agenda"],
+    blacklistKeywords: [],
+  },
+  "tepelne-cerpadla": {
+    mapsQueries: ["montaz tepelnych cerpadiel", "tepelne cerpadla", "kurenie a chladenie", "plynoinstalacia kurenie"],
+    serperQueries: ["montaz tepelneho cerpadla firma SK", "tepelne cerpadla a solarne systemy", "predaj montaz tepelnych cerpadiel"],
+    blacklistKeywords: ["bazos", "heureka", "alza", "mall"],
+  },
+};
+
 export async function scrapeWebsiteContacts(
   input: { url: string; includePriorityPages?: boolean; maxPages?: number },
   fetchImpl: FetchLike = fetch
@@ -134,6 +203,156 @@ export function prepareSmartleadLeads(input: {
     ];
   });
   return { leadList: dedupeSmartleadLeads(leadList), skipped };
+}
+
+export function scoreLeadQuality(input: { leads: LeadQualityInput[]; minScore?: number }): {
+  minScore: number;
+  averageScore: number;
+  passed: number;
+  failed: number;
+  scoredLeads: Array<LeadQualityInput & { score: number; passed: boolean; reasons: string[] }>;
+  buckets: Record<string, number>;
+} {
+  const minScore = Math.min(Math.max(Math.trunc(input.minScore ?? 50), 0), 100);
+  const scoredLeads = input.leads.map((lead) => {
+    const { score, reasons } = scoreSingleLead(lead);
+    return { ...lead, score, passed: score >= minScore, reasons };
+  });
+  const total = scoredLeads.reduce((sum, lead) => sum + lead.score, 0);
+  return {
+    minScore,
+    averageScore: scoredLeads.length ? Math.round(total / scoredLeads.length) : 0,
+    passed: scoredLeads.filter((lead) => lead.passed).length,
+    failed: scoredLeads.filter((lead) => !lead.passed).length,
+    scoredLeads,
+    buckets: buildScoreBuckets(scoredLeads.map((lead) => lead.score)),
+  };
+}
+
+export function dedupeLeadCandidates(input: { leads: LeadCandidateInput[] }): {
+  unique: LeadCandidateInput[];
+  duplicates: Array<{ lead: LeadCandidateInput; duplicateOf: string; reason: string }>;
+} {
+  const seen = new Map<string, string>();
+  const uniqueLeads: LeadCandidateInput[] = [];
+  const duplicates: Array<{ lead: LeadCandidateInput; duplicateOf: string; reason: string }> = [];
+  for (const lead of input.leads) {
+    const key = leadIdentityKey(lead);
+    if (!key) {
+      uniqueLeads.push(lead);
+      continue;
+    }
+    const existing = seen.get(key.value);
+    if (existing) {
+      duplicates.push({ lead, duplicateOf: existing, reason: key.reason });
+      continue;
+    }
+    seen.set(key.value, lead.email || lead.companyName || lead.website || key.value);
+    uniqueLeads.push(lead);
+  }
+  return { unique: uniqueLeads, duplicates };
+}
+
+export function buildNicheLeadgenPlan(input: { niche: string; region?: string; customKeywords?: string[] }): NicheLeadgenPlan {
+  const slug = slugify(input.niche);
+  const template = nicheTemplates[slug] ?? {
+    mapsQueries: [input.niche],
+    serperQueries: [`${input.niche} kontakt`, `${input.niche} firma`],
+    blacklistKeywords: [],
+  };
+  const suffix = input.region ? ` ${input.region}` : "";
+  return {
+    niche: slug,
+    region: input.region,
+    mapsQueries: unique([...template.mapsQueries, ...(input.customKeywords ?? [])].map((query) => `${query}${suffix}`.trim())),
+    serperQueries: unique([...template.serperQueries, ...(input.customKeywords ?? []).map((keyword) => `${keyword} kontakt`)].map((query) => `${query}${suffix}`.trim())),
+    blacklistKeywords: template.blacklistKeywords,
+    notes: [
+      "Run discovery first, then scrape_website_contacts only for selected leads.",
+      "Use score_lead_quality before Smartlead upload.",
+      "Upload to Smartlead only after prepare_smartlead_leads and explicit approval.",
+    ],
+  };
+}
+
+export function draftSmartleadCampaignSequence(input: {
+  niche: string;
+  offer?: string;
+  painPoint?: string;
+  language?: "sk" | "en";
+}): {
+  sequences: Array<{
+    seq_number: number;
+    seq_delay_details: { delay_in_days: number };
+    seq_variants: Array<{ variant_label: string; subject: string; email_body: string }>;
+  }>;
+  requiredVariables: string[];
+  warnings: string[];
+} {
+  const niche = input.niche.trim() || "firmy";
+  const offer = input.offer?.trim() || "AI automatizacie a obchodne systemy";
+  const pain = input.painPoint?.trim() || "manualna administrativa a pomala reakcia na dopyty";
+  const language = input.language ?? "sk";
+  const isEnglish = language === "en";
+  const firstSubjectA = isEnglish ? "Quick thought about {{company_name}}" : "Len taka uvaha nad {{company_name}}";
+  const firstSubjectB = isEnglish ? "Question for {{company_name}}" : "Otazka k {{company_name}}";
+  const bodyA = isEnglish
+    ? `<p>{{personalized_intro}}</p><p>I help ${escapeHtml(niche)} reduce ${escapeHtml(pain)} with ${escapeHtml(offer)}.</p><p>Would it make sense to send one concrete idea for {{company_name}}?</p><p>%signature%</p>`
+    : `<p>{{personalized_intro}}</p><p>Pre ${escapeHtml(niche)} riesime ${escapeHtml(pain)} cez ${escapeHtml(offer)}.</p><p>Dava zmysel, aby som poslal jednu konkretnu myslienku pre {{company_name}}?</p><p>%signature%</p>`;
+  const bodyB = isEnglish
+    ? `<p>{{personalized_intro}}</p><p>Are you already solving ${escapeHtml(pain)}, or is it still handled manually?</p><p>%signature%</p>`
+    : `<p>{{personalized_intro}}</p><p>Riesite uz ${escapeHtml(pain)}, alebo to este ide rucne?</p><p>%signature%</p>`;
+  const followup = isEnglish
+    ? `<p>Just checking if this is relevant for {{company_name}}.</p><p>If yes, I can send a short proposal. If not, no problem.</p><p>%signature%</p>`
+    : `<p>Len overujem, ci je toto pre {{company_name}} relevantne.</p><p>Ak ano, poslem kratky navrh. Ak nie, v poriadku.</p><p>%signature%</p>`;
+  return {
+    sequences: [
+      {
+        seq_number: 1,
+        seq_delay_details: { delay_in_days: 0 },
+        seq_variants: [
+          { variant_label: "A", subject: firstSubjectA, email_body: bodyA },
+          { variant_label: "B", subject: firstSubjectB, email_body: bodyB },
+        ],
+      },
+      {
+        seq_number: 2,
+        seq_delay_details: { delay_in_days: 3 },
+        seq_variants: [{ variant_label: "A", subject: "", email_body: followup }],
+      },
+    ],
+    requiredVariables: ["{{company_name}}", "{{personalized_intro}}", "%signature%"],
+    warnings: ["Follow-up subject is intentionally empty so Smartlead keeps the same thread.", "Review copy before uploading to Smartlead."],
+  };
+}
+
+export async function enrichSlovakCompanyRegister(
+  input: { ico?: string; companyName?: string },
+  fetchImpl: FetchLike = fetch
+): Promise<SlovakRegisterLookup> {
+  const ico = input.ico?.replace(/\s/g, "");
+  const companyName = input.companyName?.trim();
+  if (!ico && !companyName) throw new Error("ICO or companyName is required.");
+  const searchUrl = ico && /^\d{6,8}$/.test(ico)
+    ? `https://www.orsr.sk/hladaj_ico.asp?ICO=${encodeURIComponent(ico)}&SID=0`
+    : `https://www.orsr.sk/hladaj_subjekt.asp?OBMENO=${encodeURIComponent(companyName ?? "")}&SID=0`;
+  const searchHtml = await fetchRegisterHtml(searchUrl, fetchImpl);
+  const detailHref = extractFirstRegisterDetailHref(searchHtml);
+  if (!detailHref) return notFoundRegisterResult(input);
+  const detailUrl = new URL(detailHref, "https://www.orsr.sk/").toString();
+  const detailHtml = await fetchRegisterHtml(detailUrl, fetchImpl);
+  const parsed = parseSlovakRegisterDetail(detailHtml);
+  return {
+    query: { ico, companyName },
+    found: Boolean(parsed.companyName || parsed.ico || parsed.executives.length),
+    companyName: parsed.companyName,
+    ico: parsed.ico || ico,
+    address: parsed.address,
+    executives: parsed.executives,
+    sourceUrl: detailUrl,
+    source: ico ? "orsr_ico" : "orsr_name",
+    fetchedAt: new Date().toISOString(),
+  };
 }
 
 export async function runLeadgenResearchPipeline(
@@ -291,6 +510,140 @@ function decodeHtml(value: string): string {
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&nbsp;/g, " ");
+}
+
+async function fetchRegisterHtml(url: string, fetchImpl: FetchLike): Promise<string> {
+  const response = await fetchImpl(url, {
+    headers: {
+      "user-agent": "Arcigy-Jarvis/1.0 (+https://arcigy.group)",
+      accept: "text/html,application/xhtml+xml",
+    },
+    redirect: "follow",
+  });
+  if (!response.ok) throw new Error(`Register fetch failed: ${response.status}`);
+  const anyResponse = response as Response & { arrayBuffer?: () => Promise<ArrayBuffer> };
+  if (typeof anyResponse.arrayBuffer === "function") {
+    const buffer = await anyResponse.arrayBuffer();
+    return new TextDecoder("windows-1250").decode(buffer);
+  }
+  return response.text();
+}
+
+function extractFirstRegisterDetailHref(html: string): string | null {
+  const links = [...html.matchAll(/<a[^>]+href=["']([^"']*vypis\.asp[^"']*)["'][^>]*>/gi)].map((match) => decodeHtml(match[1]));
+  return links[0] ?? null;
+}
+
+function parseSlovakRegisterDetail(html: string): { companyName?: string; ico?: string; address?: string; executives: string[] } {
+  const text = normalizeRegisterText(htmlToText(html));
+  const companyName = extractAfterLabel(text, "Obchodne meno");
+  const address = extractAfterLabel(text, "Sidlo");
+  const ico = extractAfterLabel(text, "ICO")?.replace(/\D/g, "").slice(0, 8) || text.match(/\b\d{8}\b/)?.[0];
+  const executives = extractExecutives(text);
+  return { companyName, ico, address, executives };
+}
+
+function normalizeRegisterText(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractAfterLabel(text: string, label: string): string | undefined {
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = new RegExp(`${escaped}:?\\s+(.{2,160}?)(?=\\s+(Obchodne meno|Sidlo|ICO|Den zapisu|Pravna forma|Statutarny organ|Konatelia|Spolocnici):|$)`, "i").exec(text);
+  return cleanupRegisterValue(match?.[1]);
+}
+
+function extractExecutives(text: string): string[] {
+  const section = /(?:Statutarny organ|Konatelia):?\s+(.{2,500}?)(?=\s+(Spolocnici|Dozorna rada|Zakladne imanie|Predmet podnikania):|$)/i.exec(text)?.[1] ?? "";
+  const matches = section.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3}\b/g) ?? [];
+  return unique(matches.map(cleanupRegisterValue).filter((value): value is string => Boolean(value && !/\b(od|vznik|funkcie)\b/i.test(value)))).slice(0, 5);
+}
+
+function cleanupRegisterValue(value?: string): string | undefined {
+  const cleaned = value?.replace(/\s*\(od:.*$/i, "").replace(/\s+/g, " ").trim();
+  return cleaned || undefined;
+}
+
+function notFoundRegisterResult(input: { ico?: string; companyName?: string }): SlovakRegisterLookup {
+  return {
+    query: { ico: input.ico?.replace(/\s/g, ""), companyName: input.companyName?.trim() },
+    found: false,
+    executives: [],
+    source: "not_found",
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
+function scoreSingleLead(lead: LeadQualityInput): { score: number; reasons: string[] } {
+  let score = 0;
+  const reasons: string[] = [];
+  const email = lead.email?.trim().toLowerCase();
+  if (email && !isGenericEmail(email)) addScore(30, "personal email");
+  if (lead.website) addScore(20, "has website");
+  if (lead.website && /\.sk(?:\/|$)/i.test(lead.website)) addScore(10, "sk domain");
+  if (lead.decisionMaker) addScore(25, "decision maker");
+  if (lead.registerVerified || lead.ico) addScore(15, "register verified");
+  if (lead.personalizedIntro) addScore(10, "AI intro");
+  if (email && isGenericEmail(email)) addScore(-20, "generic email");
+  if (!email) addScore(-10, "missing email");
+  if (lead.verificationStatus === "flagged") addScore(-15, "flagged");
+  if (lead.verificationStatus === "failed") addScore(-30, "verification failed");
+  return { score: Math.min(Math.max(score, 0), 100), reasons };
+
+  function addScore(points: number, reason: string) {
+    score += points;
+    reasons.push(`${points > 0 ? "+" : ""}${points} ${reason}`);
+  }
+}
+
+function buildScoreBuckets(scores: number[]): Record<string, number> {
+  return {
+    "0-29": scores.filter((score) => score <= 29).length,
+    "30-49": scores.filter((score) => score >= 30 && score <= 49).length,
+    "50-69": scores.filter((score) => score >= 50 && score <= 69).length,
+    "70-89": scores.filter((score) => score >= 70 && score <= 89).length,
+    "90-100": scores.filter((score) => score >= 90).length,
+  };
+}
+
+function isGenericEmail(email: string): boolean {
+  const prefix = email.split("@")[0]?.toLowerCase();
+  return genericEmailPrefixes.has(prefix);
+}
+
+function leadIdentityKey(lead: LeadCandidateInput): { value: string; reason: string } | null {
+  if (lead.email?.trim()) return { value: `email:${lead.email.trim().toLowerCase()}`, reason: "same email" };
+  if (lead.website?.trim()) return { value: `website:${normalizeWebsiteIdentity(lead.website)}`, reason: "same website" };
+  const phone = lead.phone?.replace(/\D/g, "");
+  if (phone && phone.length >= 9) return { value: `phone:${phone}`, reason: "same phone" };
+  if (lead.companyName?.trim()) return { value: `company:${slugify(lead.companyName)}`, reason: "same company name" };
+  return null;
+}
+
+function normalizeWebsiteIdentity(value: string): string {
+  try {
+    const url = new URL(/^https?:\/\//i.test(value) ? value : `https://${value}`);
+    return url.hostname.replace(/^www\./i, "").toLowerCase();
+  } catch {
+    return value.trim().toLowerCase();
+  }
+}
+
+function slugify(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 function dedupeSmartleadLeads(leads: SmartleadLead[]): SmartleadLead[] {
