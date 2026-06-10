@@ -23,6 +23,7 @@ import {
   buildLeadgenGapReport,
   buildLeadgenCampaignPipelinePreview,
   buildLeadSourceImportQueuePreview,
+  buildLeadRepairQueuePreview,
   batchScrapeWebsiteContacts,
   batchDraftLeadIntros,
   buildManualReviewPickupPlan,
@@ -1668,6 +1669,18 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         language: payload.language === "en" ? "en" : "sk",
         minScore: typeof payload.minScore === "number" ? payload.minScore : undefined,
         batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
+        maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_lead_repair_queue_preview") {
+    writeJson(response, 200, {
+      result: buildLeadRepairQueuePreview({
+        leads: Array.isArray(payload.leads) ? payload.leads as Parameters<typeof buildLeadRepairQueuePreview>[0]["leads"] : [],
+        offer: optionalString(payload.offer),
+        language: payload.language === "en" ? "en" : "sk",
+        minScore: typeof payload.minScore === "number" ? payload.minScore : undefined,
         maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
       }),
     });

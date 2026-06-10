@@ -25,6 +25,7 @@ import {
   buildLeadgenGapReport,
   buildLeadgenCampaignPipelinePreview,
   buildLeadSourceImportQueuePreview,
+  buildLeadRepairQueuePreview,
   buildColdOutreachCsvImportPreview,
   buildSmartleadCampaignLaunchPreview,
   buildSmartleadCampaignQaPreview,
@@ -166,6 +167,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.build_leadgen_gap_report",
     "arcigy.build_leadgen_campaign_pipeline_preview",
     "arcigy.build_lead_source_import_queue_preview",
+    "arcigy.build_lead_repair_queue_preview",
     "arcigy.build_cold_outreach_csv_import_preview",
     "arcigy.build_daily_leadgen_runbook",
     "arcigy.parse_leads_csv",
@@ -1427,7 +1429,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 89 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 90 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -2847,6 +2849,32 @@ test("lead source import queue preview groups Google Maps leads before Smartlead
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_scrape_website_contacts" && !call.approvalRequired));
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.get_smartlead_campaign_leads" && !call.approvalRequired));
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.add_leads_to_smartlead_campaign" && call.approvalRequired));
+  assert.match(preview.summary, /Ziadny zapis ani upload/);
+});
+
+test("lead repair queue preview detects broken leads and proposes safe fixes", () => {
+  const preview = buildLeadRepairQueuePreview({
+    leads: [
+      { companyName: "Needs Email", website: "https://needs-email.sk", personalizedIntro: "Dobry den, vsimol som si vas web.", firstName: "Jan" },
+      { companyName: "Needs Intro", website: "https://needs-intro.sk", email: "info@needs-intro.sk", phone: "+421 900 111 222" },
+      { companyName: "Failed Lead", website: "https://failed.sk", email: "lead@failed.sk", verificationStatus: "failed" },
+      { companyName: "Ready Lead", website: "https://ready.sk", email: "jan@ready.sk", firstName: "Jan", phone: "+421 900 222 333", personalizedIntro: "Vsimol som si vase nove realizacie." },
+    ],
+    offer: "AI automatizacie pre dopyty.",
+    minScore: 70,
+  });
+
+  assert.equal(preview.mode, "lead-repair-queue-preview");
+  assert.equal(preview.totals.input, 4);
+  assert.equal(preview.totals.needsEmail, 2);
+  assert.equal(preview.totals.needsIntro, 1);
+  assert.equal(preview.totals.badIntro, 1);
+  assert.equal(preview.totals.failedVerification, 1);
+  assert.equal(preview.repairBatches.websitesToScrape.includes("https://needs-email.sk"), true);
+  assert.equal(preview.repairBatches.introsToDraft.some((lead) => lead.companyName === "Needs Intro"), true);
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_scrape_website_contacts" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_draft_lead_intros" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_manual_review_queue" && !call.approvalRequired));
   assert.match(preview.summary, /Ziadny zapis ani upload/);
 });
 

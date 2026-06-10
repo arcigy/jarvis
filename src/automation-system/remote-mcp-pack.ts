@@ -1079,6 +1079,23 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Build lead repair queue preview",
+      tool: "arcigy.build_lead_repair_queue_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_lead_repair_queue_preview"),
+      body: {
+        leads: [
+          { companyName: "Needs Email", website: "https://needs-email.sk", personalizedIntro: "Dobry den, vsimol som si vas web.", firstName: "Jan" },
+          { companyName: "Needs Intro", website: "https://needs-intro.sk", email: "info@needs-intro.sk", phone: "+421 900 111 222" },
+          { companyName: "Failed Lead", website: "https://failed.sk", email: "lead@failed.sk", verificationStatus: "failed" },
+        ],
+        offer: "AI automatizacie pre dopyty a follow-up.",
+        language: "sk",
+        minScore: 70,
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Build cold outreach CSV import preview",
       tool: "arcigy.build_cold_outreach_csv_import_preview",
       method: "POST",

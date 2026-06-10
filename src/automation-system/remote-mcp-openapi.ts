@@ -512,6 +512,18 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       language: "sk",
     };
   }
+  if (toolName === "arcigy.build_lead_repair_queue_preview") {
+    return {
+      leads: [
+        { companyName: "Needs Email", website: "https://needs-email.sk", personalizedIntro: "Dobry den, vsimol som si vas web.", firstName: "Jan" },
+        { companyName: "Needs Intro", website: "https://needs-intro.sk", email: "info@needs-intro.sk", phone: "+421 900 111 222" },
+        { companyName: "Failed Lead", website: "https://failed.sk", email: "lead@failed.sk", verificationStatus: "failed" },
+      ],
+      offer: "AI automatizacie pre dopyty a follow-up.",
+      language: "sk",
+      minScore: 70,
+    };
+  }
   if (toolName === "arcigy.build_cold_outreach_csv_import_preview") {
     return {
       csvText: "company_name,email,website,personalized_intro\nModelova Firma,jan.novak@example.com,https://example.com,Vsimol som si vas servis.\nBlocked Firma,lead@competitor.sk,https://competitor.sk,",

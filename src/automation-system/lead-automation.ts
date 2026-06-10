@@ -324,6 +324,52 @@ export type LeadSourceImportQueuePreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type LeadRepairQueueLead = LeadCandidateInput & {
+  id?: string | number;
+  ico?: string;
+  verificationStatus?: "ok" | "flagged" | "failed";
+  verificationNotes?: string;
+  sentToSmartlead?: boolean;
+  manuallyReviewed?: boolean;
+  scraped?: Partial<ScrapedWebsiteContacts>;
+  register?: Partial<SlovakRegisterLookup>;
+  intro?: Partial<LeadIntroDraft>;
+  context?: string;
+};
+
+export type LeadRepairQueuePreview = {
+  mode: "lead-repair-queue-preview";
+  summary: string;
+  totals: {
+    input: number;
+    unique: number;
+    duplicates: number;
+    readyNow: number;
+    needsEmail: number;
+    needsWebsite: number;
+    needsIntro: number;
+    badIntro: number;
+    needsDecisionMaker: number;
+    failedVerification: number;
+    alreadySent: number;
+    manualReview: number;
+    rejected: number;
+  };
+  items: Array<{
+    lead: LeadRepairQueueLead;
+    issues: string[];
+    severity: "ready" | "repair" | "manual_review" | "reject";
+    recommendedTools: string[];
+  }>;
+  duplicates: ReturnType<typeof dedupeLeadCandidates>["duplicates"];
+  repairBatches: {
+    websitesToScrape: string[];
+    introsToDraft: LeadIntroInput[];
+    registerLookups: Array<{ ico?: string; companyName?: string }>;
+  };
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type LeadEnrichmentBatchPreview = {
   mode: "lead-enrichment-batch-preview";
   summary: string;
@@ -1987,6 +2033,97 @@ export function buildLeadSourceImportQueuePreview(input: {
   };
 }
 
+export function buildLeadRepairQueuePreview(input: {
+  leads: LeadRepairQueueLead[];
+  offer?: string;
+  language?: "sk" | "en";
+  minScore?: number;
+  maxNextCalls?: number;
+}): LeadRepairQueuePreview {
+  const normalized = input.leads.map((lead) => normalizePipelineLead(lead) as LeadRepairQueueLead);
+  const deduped = dedupeLeadCandidates({ leads: normalized });
+  const duplicateKeys = new Set(deduped.duplicates.map((item) => leadIdentityKey(item.lead)?.value).filter((value): value is string => Boolean(value)));
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 30), 1), 80);
+  const items = deduped.unique.map((lead) => {
+    const issues = leadRepairIssues(lead, duplicateKeys);
+    const recommendedTools = repairToolsForIssues(issues);
+    const severity = leadRepairSeverity(issues);
+    return { lead: lead as LeadRepairQueueLead, issues, severity, recommendedTools };
+  });
+  const websitesToScrape = unique(items.filter((item) => item.issues.some((issue) => ["missing_email", "invalid_email", "generic_email"].includes(issue)) && item.lead.website).map((item) => item.lead.website as string)).slice(0, maxNextCalls);
+  const introsToDraft = items
+    .filter((item) => item.issues.includes("missing_intro") || item.issues.includes("bad_intro_greeting") || item.issues.includes("bad_intro_too_short"))
+    .filter((item) => item.lead.companyName)
+    .map((item) => ({
+      companyName: item.lead.companyName as string,
+      website: item.lead.website,
+      context: stringField(item.lead.customFields ?? {}, "context_preview") ?? item.lead.context,
+      offer: input.offer,
+      language: input.language ?? "sk",
+    }))
+    .slice(0, maxNextCalls);
+  const registerLookups = items
+    .filter((item) => item.issues.includes("missing_decision_maker"))
+    .map((item) => ({ ico: item.lead.ico ?? stringField(item.lead.customFields ?? {}, "ico"), companyName: item.lead.companyName }))
+    .filter((item) => item.ico || item.companyName)
+    .slice(0, Math.min(maxNextCalls, 20));
+  const nextToolCalls: LeadRepairQueuePreview["nextToolCalls"] = [];
+  if (websitesToScrape.length) {
+    nextToolCalls.push({
+      tool: "arcigy.batch_scrape_website_contacts",
+      payload: { urls: websitesToScrape, includePriorityPages: true, maxPages: 4, maxSites: websitesToScrape.length },
+      reason: "Oprav leady s chybajucim, nevalidnym alebo generic emailom cez website scrape.",
+      approvalRequired: false,
+    });
+  }
+  if (introsToDraft.length) {
+    nextToolCalls.push({
+      tool: "arcigy.batch_draft_lead_intros",
+      payload: { leads: introsToDraft, offer: input.offer, language: input.language ?? "sk", maxLeads: introsToDraft.length },
+      reason: "Oprav chybajuce alebo zle AI intra pred cold outreachom.",
+      approvalRequired: false,
+    });
+  }
+  for (const lookup of registerLookups.slice(0, 5)) {
+    nextToolCalls.push({
+      tool: "arcigy.enrich_slovak_company_register",
+      payload: lookup,
+      reason: "Dopln decision maker alebo oficialne firemne udaje cez slovensky register.",
+      approvalRequired: false,
+    });
+  }
+  nextToolCalls.push({
+    tool: "arcigy.build_manual_review_queue",
+    payload: { leads: deduped.unique, minScore: input.minScore ?? 70 },
+    reason: "Po opravach znovu rozdel leady na ready/manual/reject.",
+    approvalRequired: false,
+  });
+  const totals = {
+    input: input.leads.length,
+    unique: deduped.unique.length,
+    duplicates: deduped.duplicates.length,
+    readyNow: items.filter((item) => item.severity === "ready").length,
+    needsEmail: items.filter((item) => item.issues.some((issue) => ["missing_email", "invalid_email", "generic_email"].includes(issue))).length,
+    needsWebsite: items.filter((item) => item.issues.includes("missing_website")).length,
+    needsIntro: items.filter((item) => item.issues.includes("missing_intro")).length,
+    badIntro: items.filter((item) => item.issues.includes("bad_intro_greeting") || item.issues.includes("bad_intro_too_short")).length,
+    needsDecisionMaker: items.filter((item) => item.issues.includes("missing_decision_maker")).length,
+    failedVerification: items.filter((item) => item.issues.includes("verification_failed")).length,
+    alreadySent: items.filter((item) => item.issues.includes("already_sent_to_smartlead")).length,
+    manualReview: items.filter((item) => item.severity === "manual_review").length,
+    rejected: items.filter((item) => item.severity === "reject").length,
+  };
+  return {
+    mode: "lead-repair-queue-preview",
+    summary: `Lead repair queue: ${totals.readyNow} ready, ${totals.manualReview} manual review, ${totals.rejected} reject, ${totals.needsEmail} email oprav, ${totals.needsIntro + totals.badIntro} intro oprav. Ziadny zapis ani upload neprebehol.`,
+    totals,
+    items,
+    duplicates: deduped.duplicates,
+    repairBatches: { websitesToScrape, introsToDraft, registerLookups },
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls).slice(0, maxNextCalls),
+  };
+}
+
 export function buildDailyLeadgenRunbook(input: {
   niche: { id?: string; slug: string; name: string; keywords?: string[]; region?: string; campaignId?: string | number | null };
   targetCount?: number;
@@ -2409,6 +2546,45 @@ function dedupeNextToolCalls<T extends { tool: string; payload: Record<string, u
     result.push(call);
   }
   return result;
+}
+
+function leadRepairIssues(lead: LeadRepairQueueLead, duplicateKeys: Set<string>): string[] {
+  const issues: string[] = [];
+  const verificationStatus = lead.verificationStatus ?? (lead.customFields?.verification_status as LeadRepairQueueLead["verificationStatus"]);
+  if (verificationStatus === "failed") return ["verification_failed"];
+  if (lead.sentToSmartlead) return ["already_sent_to_smartlead"];
+  const email = lead.email?.trim().toLowerCase();
+  const identity = leadIdentityKey(lead)?.value;
+  if (!email) issues.push("missing_email");
+  else if (!email.includes("@")) issues.push("invalid_email");
+  else if (isGenericEmail(email)) issues.push("generic_email");
+  if (!lead.website) issues.push("missing_website");
+  if (!lead.companyName) issues.push("missing_company_name");
+  const intro = lead.personalizedIntro?.trim();
+  if (!intro) issues.push("missing_intro");
+  else {
+    if (/^(ahoj|dobry den|dobrý deň|hello|hi|dear)\b/i.test(intro)) issues.push("bad_intro_greeting");
+    if (intro.length < 18) issues.push("bad_intro_too_short");
+  }
+  if (![lead.firstName, lead.lastName].filter(Boolean).join(" ") && !lead.customFields?.decision_maker_name && !lead.register?.executives?.length) issues.push("missing_decision_maker");
+  if (identity && duplicateKeys.has(identity)) issues.push("duplicate_candidate");
+  return issues;
+}
+
+function repairToolsForIssues(issues: string[]): string[] {
+  const tools = new Set<string>();
+  if (issues.some((issue) => ["missing_email", "invalid_email", "generic_email"].includes(issue))) tools.add("arcigy.batch_scrape_website_contacts");
+  if (issues.some((issue) => ["missing_intro", "bad_intro_greeting", "bad_intro_too_short"].includes(issue))) tools.add("arcigy.batch_draft_lead_intros");
+  if (issues.includes("missing_decision_maker")) tools.add("arcigy.enrich_slovak_company_register");
+  tools.add("arcigy.build_manual_review_queue");
+  return [...tools];
+}
+
+function leadRepairSeverity(issues: string[]): "ready" | "repair" | "manual_review" | "reject" {
+  if (issues.includes("verification_failed") || issues.includes("already_sent_to_smartlead")) return "reject";
+  if (issues.includes("missing_company_name") || issues.includes("missing_website")) return "manual_review";
+  if (issues.length) return "repair";
+  return "ready";
 }
 
 function leadGaps(lead: LeadCandidateInput): string[] {

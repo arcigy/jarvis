@@ -24,6 +24,7 @@ import {
   buildLeadgenGapReport,
   buildLeadgenCampaignPipelinePreview,
   buildLeadSourceImportQueuePreview,
+  buildLeadRepairQueuePreview,
   batchScrapeWebsiteContacts,
   batchDraftLeadIntros,
   buildManualReviewPickupPlan,
@@ -1972,6 +1973,14 @@ export function createJarvisMcpServer(): McpServer {
     rating: z.number().optional(),
     reviewCount: z.number().int().nonnegative().optional(),
   });
+  const leadRepairQueueLeadSchema = pipelineLeadSchema.extend({
+    id: z.union([z.string(), z.number()]).optional(),
+    ico: z.string().optional(),
+    verificationStatus: z.enum(["ok", "flagged", "failed"]).optional(),
+    verificationNotes: z.string().optional(),
+    sentToSmartlead: z.boolean().optional(),
+    manuallyReviewed: z.boolean().optional(),
+  });
   const queueNicheSchema = z.object({
     id: z.string().optional(),
     slug: z.string().min(1),
@@ -2297,6 +2306,28 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildLeadSourceImportQueuePreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_lead_repair_queue_preview",
+    {
+      title: "Build lead repair queue preview",
+      description: "Detect broken leads, bad AI intros, missing emails, missing decision makers, failed verification, and propose exact read-only repair MCP calls.",
+      inputSchema: {
+        leads: z.array(leadRepairQueueLeadSchema).min(1).max(1000),
+        offer: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        minScore: z.number().int().min(0).max(100).default(70),
+        maxNextCalls: z.number().int().min(1).max(80).default(30),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildLeadRepairQueuePreview(input))
   );
 
   server.registerTool(
