@@ -367,6 +367,9 @@ async function run() {
     if (!/Jarvis cold outreach status/i.test(voiceUi.transcriptText) || !/zachytene/i.test(voiceUi.voiceLastEventText)) {
       fail(`Jarvis text voice flow did not record transcript state: ${voiceUi.transcriptText} / ${voiceUi.voiceLastEventText}.`);
     }
+    if (voiceUi.speechSpeakCount < 1 || !/(cold outreach|Smartlead)/i.test(voiceUi.lastSpokenText)) {
+      fail(`Jarvis text voice flow did not call speech output: ${voiceUi.speechSpeakCount} / ${voiceUi.lastSpokenText}.`);
+    }
     assertBox("sidebar", dom.sidebar, { width: isNarrowViewport ? 300 : 180, height: 60 });
     assertBox("navigation", dom.nav, { width: isNarrowViewport ? 300 : 150, height: 40 });
     assertBox("header", dom.header, { width: isNarrowViewport ? 300 : 400, height: 40 });
@@ -524,6 +527,26 @@ async function runGrokPromptCopyFlow(window) {
 async function runJarvisTextVoiceFlow(window) {
   const started = await executeRendererJson(window, `
     (() => {
+      window.__jarvisSmokeSpeech = { cancelCount: 0, speakCount: 0, texts: [] };
+      try {
+        Object.defineProperty(window, "SpeechSynthesisUtterance", {
+          configurable: true,
+          value: function SmokeUtterance(text) {
+            this.text = String(text || "");
+            this.lang = "";
+          }
+        });
+        Object.defineProperty(window, "speechSynthesis", {
+          configurable: true,
+          value: {
+            cancel: () => { window.__jarvisSmokeSpeech.cancelCount += 1; },
+            speak: (utterance) => {
+              window.__jarvisSmokeSpeech.speakCount += 1;
+              window.__jarvisSmokeSpeech.texts.push(String(utterance?.text || ""));
+            }
+          }
+        });
+      } catch (_error) {}
       const transcript = document.getElementById("transcript");
       const button = document.getElementById("submitTranscript");
       if (!transcript || !button) return false;
@@ -535,25 +558,31 @@ async function runJarvisTextVoiceFlow(window) {
   `, 5000);
   if (!started) {
     fail("Jarvis text voice controls are missing.");
-    return { responseText: "", transcriptText: "", voiceLastEventText: "" };
+    return { responseText: "", transcriptText: "", voiceLastEventText: "", speechSpeakCount: 0, lastSpokenText: "" };
   }
 
   const deadline = Date.now() + 10000;
-  let state = { responseText: "", transcriptText: "", voiceLastEventText: "" };
+  let state = { responseText: "", transcriptText: "", voiceLastEventText: "", speechSpeakCount: 0, lastSpokenText: "" };
   while (Date.now() < deadline) {
     state = await executeRendererJson(window, `
-      (() => ({
-        responseText: document.querySelector("#response")?.textContent.trim() || "",
-        transcriptText: document.querySelector("#transcript")?.value.trim() || "",
-        voiceLastEventText: document.querySelector("#voiceLastEvent")?.textContent.trim() || ""
-      }))()
+      (() => {
+        const speech = window.__jarvisSmokeSpeech || { speakCount: 0, texts: [] };
+        return {
+          responseText: document.querySelector("#response")?.textContent.trim() || "",
+          transcriptText: document.querySelector("#transcript")?.value.trim() || "",
+          voiceLastEventText: document.querySelector("#voiceLastEvent")?.textContent.trim() || "",
+          speechSpeakCount: Number(speech.speakCount || 0),
+          lastSpokenText: String((speech.texts || [])[speech.texts.length - 1] || "")
+        };
+      })()
     `, 5000);
     if (
       /(cold outreach|Smartlead)/i.test(state.responseText) &&
       /napisali\s+\d+\s+ludom/i.test(state.responseText) &&
       /\d+(?:\.\d+)?%\s+si email otvorilo/i.test(state.responseText) &&
       /\d+\s+ludi odpisalo/i.test(state.responseText) &&
-      /\d+\s+pozitivne/i.test(state.responseText)
+      /\d+\s+pozitivne/i.test(state.responseText) &&
+      state.speechSpeakCount >= 1
     ) {
       return state;
     }

@@ -886,6 +886,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(uiSmoke, /\^pripraveny\$/);
   assert.match(uiSmoke, /mikrofon ready\|text fallback/);
   assert.match(uiSmoke, /hlas ready\|iba obrazovka/);
+  assert.match(uiSmoke, /__jarvisSmokeSpeech/);
+  assert.match(uiSmoke, /SpeechSynthesisUtterance/);
+  assert.match(uiSmoke, /Jarvis text voice flow did not call speech output/);
   assert.match(uiSmoke, /Button text overflows/);
   assert.match(uiSmoke, /runRemoteSmokeFromUi/);
   assert.match(uiSmoke, /button\.click\(\)/);
