@@ -1088,6 +1088,24 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Build Smartlead backup plan before risky changes",
+      tool: "arcigy.build_smartlead_campaign_backup_plan",
+      method: "POST",
+      url: toolUrl("arcigy.build_smartlead_campaign_backup_plan"),
+      body: {
+        createdAt: "2026-06-10T12:00:00.000Z",
+        backupRoot: "outputs/smartlead-backups",
+        includeDeletePlan: true,
+        campaigns: [
+          { id: 3209165, name: "KUCHYNE-NA-MIRU-CZ_SK_FIXED", status: "ACTIVE", total_leads: 420, sequenceCount: 3 },
+          { id: 123456, name: "Autoservisy BA test", status: "DRAFT", total_leads: 80, sequenceCount: 2 },
+        ],
+        protectedCampaignIds: [3209165],
+        protectedNameParts: ["KUCHYNE"],
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Draft niche Smartlead campaign setup",
       tool: "arcigy.draft_niche_smartlead_campaign_setup",
       method: "POST",

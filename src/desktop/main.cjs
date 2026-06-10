@@ -3054,6 +3054,7 @@ function listWebMcpTools() {
     { name: "arcigy.build_smartlead_import_audit_preview", requiresApproval: false },
     { name: "arcigy.build_smartlead_sender_capacity_preview", requiresApproval: false },
     { name: "arcigy.build_smartlead_deliverability_guard_preview", requiresApproval: false },
+    { name: "arcigy.build_smartlead_campaign_backup_plan", requiresApproval: false },
     { name: "arcigy.draft_niche_smartlead_campaign_setup", requiresApproval: false },
     { name: "arcigy.build_smartlead_campaign_launch_preview", requiresApproval: false },
     { name: "arcigy.build_smartlead_campaign_qa_preview", requiresApproval: false },

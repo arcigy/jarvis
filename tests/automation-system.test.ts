@@ -42,6 +42,7 @@ import {
   buildSmartleadCampaignLaunchPreview,
   buildSmartleadCampaignQaPreview,
   buildSmartleadCampaignHandoffPackagePreview,
+  buildSmartleadCampaignBackupPlan,
   buildSmartleadInjectionPlan,
   buildSmartleadImportAuditPreview,
   buildSmartleadSenderCapacityPreview,
@@ -185,6 +186,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.build_smartlead_import_audit_preview",
     "arcigy.build_smartlead_sender_capacity_preview",
     "arcigy.build_smartlead_deliverability_guard_preview",
+    "arcigy.build_smartlead_campaign_backup_plan",
     "arcigy.draft_niche_smartlead_campaign_setup",
     "arcigy.build_smartlead_campaign_launch_preview",
     "arcigy.build_smartlead_campaign_qa_preview",
@@ -1463,7 +1465,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 107 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 108 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -2734,6 +2736,34 @@ test("Smartlead deliverability guard recommends reduced sending before more uplo
   assert.ok(guard.nextToolCalls.some((call) => call.tool === "arcigy.get_smartlead_outreach_brief" && !call.approvalRequired));
   assert.ok(guard.nextToolCalls.some((call) => call.tool === "arcigy.configure_smartlead_campaign" && call.approvalRequired));
   assert.match(guard.summary, /Ziadny zapis ani upload/);
+});
+
+test("Smartlead campaign backup plan protects campaigns before risky changes", () => {
+  const plan = buildSmartleadCampaignBackupPlan({
+    createdAt: "2026-06-10T12:00:00.000Z",
+    backupRoot: "outputs/smartlead-backups",
+    includeDeletePlan: true,
+    campaigns: [
+      { id: 3209165, name: "KUCHYNE-NA-MIRU-CZ_SK_FIXED", status: "ACTIVE", total_leads: 420, sequences: [{ seq_number: 1 }] },
+      { id: 123456, name: "Autoservisy BA test", status: "DRAFT", leads: [{ email: "lead@example.com" }], webhooks: [{}], email_accounts: [{ id: "acct-1" }] },
+    ],
+    protectedCampaignIds: [3209165],
+    protectedNameParts: ["KUCHYNE"],
+  });
+
+  assert.equal(plan.mode, "smartlead-campaign-backup-plan");
+  assert.equal(plan.status, "attention");
+  assert.equal(plan.totals.campaigns, 2);
+  assert.equal(plan.totals.protected, 1);
+  assert.equal(plan.totals.deleteCandidates, 1);
+  assert.equal(plan.totals.estimatedLeads, 421);
+  assert.equal(plan.protectedCampaigns[0].id, "3209165");
+  assert.equal(plan.deleteCandidates[0].id, "123456");
+  assert.equal(plan.manifestTemplate.execute_delete, false);
+  assert.ok(plan.campaigns[0].fetchEndpoints.some((endpoint) => endpoint.artifact === "leads" && endpoint.paginated));
+  assert.ok(plan.safetyGates.some((gate) => gate.includes("nikdy nemaze")));
+  assert.ok(plan.nextToolCalls.some((call) => call.tool === "arcigy.get_smartlead_campaign_leads" && !call.approvalRequired));
+  assert.match(plan.summary, /Ziadny backup, delete ani Smartlead zapis/);
 });
 
 test("Smartlead campaign handoff package combines launch QA capacity and approvals", () => {

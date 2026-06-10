@@ -43,6 +43,7 @@ import {
   buildSmartleadCampaignLaunchPreview,
   buildSmartleadCampaignQaPreview,
   buildSmartleadCampaignHandoffPackagePreview,
+  buildSmartleadCampaignBackupPlan,
   buildSmartleadInjectionPlan,
   buildSmartleadImportAuditPreview,
   buildSmartleadSenderCapacityPreview,
@@ -1700,6 +1701,23 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         minReplyRate: typeof payload.minReplyRate === "number" ? payload.minReplyRate : undefined,
         minOpenRate: typeof payload.minOpenRate === "number" ? payload.minOpenRate : undefined,
         minTimeBetweenEmailsMinutes: typeof payload.minTimeBetweenEmailsMinutes === "number" ? payload.minTimeBetweenEmailsMinutes : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_smartlead_campaign_backup_plan") {
+    writeJson(response, 200, {
+      result: buildSmartleadCampaignBackupPlan({
+        campaigns: Array.isArray(payload.campaigns) ? payload.campaigns as Parameters<typeof buildSmartleadCampaignBackupPlan>[0]["campaigns"] : undefined,
+        runId: optionalString(payload.runId),
+        createdAt: optionalString(payload.createdAt),
+        backupRoot: optionalString(payload.backupRoot),
+        note: optionalString(payload.note),
+        protectedCampaignIds: Array.isArray(payload.protectedCampaignIds) ? payload.protectedCampaignIds as Array<string | number> : undefined,
+        protectedNameParts: Array.isArray(payload.protectedNameParts) ? payload.protectedNameParts.map(String) : undefined,
+        includeDeletePlan: payload.includeDeletePlan === true,
+        maxCampaigns: typeof payload.maxCampaigns === "number" ? payload.maxCampaigns : undefined,
+        leadPageSize: typeof payload.leadPageSize === "number" ? payload.leadPageSize : undefined,
       }),
     });
     return;

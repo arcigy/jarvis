@@ -554,6 +554,19 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       requestedDailyLimit: 40,
     };
   }
+  if (toolName === "arcigy.build_smartlead_campaign_backup_plan") {
+    return {
+      createdAt: "2026-06-10T12:00:00.000Z",
+      backupRoot: "outputs/smartlead-backups",
+      includeDeletePlan: true,
+      campaigns: [
+        { id: 3209165, name: "KUCHYNE-NA-MIRU-CZ_SK_FIXED", status: "ACTIVE", total_leads: 420, sequenceCount: 3 },
+        { id: 123456, name: "Autoservisy BA test", status: "DRAFT", total_leads: 80, sequenceCount: 2 },
+      ],
+      protectedCampaignIds: [3209165],
+      protectedNameParts: ["KUCHYNE"],
+    };
+  }
   if (toolName === "arcigy.draft_niche_smartlead_campaign_setup") {
     return {
       niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy" },

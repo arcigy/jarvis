@@ -701,6 +701,77 @@ export type SmartleadCampaignHandoffPackagePreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type SmartleadCampaignBackupPlanCampaign = {
+  id?: string | number;
+  name?: string;
+  status?: string;
+  protected?: boolean;
+  leadCount?: number;
+  lead_count?: number;
+  total_leads?: number;
+  sequenceCount?: number;
+  sequence_count?: number;
+  webhookCount?: number;
+  webhook_count?: number;
+  emailAccountCount?: number;
+  email_account_count?: number;
+  leads?: unknown[];
+  sequences?: unknown[];
+  webhooks?: unknown[];
+  emailAccounts?: unknown[];
+  email_accounts?: unknown[];
+  [key: string]: unknown;
+};
+
+export type SmartleadCampaignBackupPlan = {
+  mode: "smartlead-campaign-backup-plan";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  run: {
+    runId: string;
+    createdAt: string;
+    backupRoot: string;
+    runDir: string;
+    sqlitePath: string;
+    note?: string;
+  };
+  totals: {
+    campaigns: number;
+    protected: number;
+    backupCandidates: number;
+    deleteCandidates: number;
+    estimatedLeads: number;
+    missingLeadCounts: number;
+  };
+  campaigns: Array<{
+    id: string;
+    name: string;
+    status?: string;
+    protected: boolean;
+    protectionReasons: string[];
+    leadCount?: number;
+    sequenceCount?: number;
+    webhookCount?: number;
+    emailAccountCount?: number;
+    backupDir: string;
+    fetchEndpoints: Array<{ artifact: "campaign" | "sequences" | "leads" | "webhooks" | "email_accounts"; method: "GET"; path: string; paginated?: boolean }>;
+  }>;
+  protectedCampaigns: SmartleadCampaignBackupPlan["campaigns"];
+  deleteCandidates: SmartleadCampaignBackupPlan["campaigns"];
+  manifestTemplate: {
+    run_id: string;
+    created_at: string;
+    db_path: string;
+    backup_dir: string;
+    execute_delete: false;
+    protected_campaigns: Array<{ id: string; name: string }>;
+    delete_candidates: Array<{ id: string; name: string }>;
+    delete_results: [];
+  };
+  safetyGates: string[];
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type LeadEnrichmentBatchPreview = {
   mode: "lead-enrichment-batch-preview";
   summary: string;
@@ -3896,6 +3967,130 @@ export function buildSmartleadCampaignHandoffPackagePreview(input: {
   };
 }
 
+export function buildSmartleadCampaignBackupPlan(input: {
+  campaigns?: SmartleadCampaignBackupPlanCampaign[];
+  runId?: string;
+  createdAt?: string;
+  backupRoot?: string;
+  note?: string;
+  protectedCampaignIds?: Array<string | number>;
+  protectedNameParts?: string[];
+  includeDeletePlan?: boolean;
+  maxCampaigns?: number;
+  leadPageSize?: number;
+}): SmartleadCampaignBackupPlan {
+  const createdAt = input.createdAt ?? new Date().toISOString();
+  const runId = input.runId?.trim() || `smartlead_backup_${createdAt.replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z")}`;
+  const backupRoot = (input.backupRoot?.trim() || "outputs/smartlead-backups").replace(/[\\/]+$/g, "");
+  const runDir = `${backupRoot}/${runId}`;
+  const sqlitePath = `${backupRoot}/smartlead_campaign_backup.sqlite`;
+  const maxCampaigns = Math.min(Math.max(Math.trunc(input.maxCampaigns ?? 100), 1), 500);
+  const leadPageSize = Math.min(Math.max(Math.trunc(input.leadPageSize ?? 100), 1), 500);
+  const protectedIds = new Set(["3209165", "3085887", ...(input.protectedCampaignIds ?? []).map(String)]);
+  const protectedNameParts = unique(["KUCHYNE_SK", "KUCHYNE-NA-MIRU-CZ", "KUCHYNE-NA-MIRU", ...(input.protectedNameParts ?? [])]
+    .map((part) => part.trim().toUpperCase())
+    .filter(Boolean));
+  const rawCampaigns = (input.campaigns ?? []).slice(0, maxCampaigns);
+
+  const campaigns = rawCampaigns
+    .map((campaign, index) => {
+      const id = stringField(campaign, "id", "campaign_id", "campaignId") ?? String(index + 1);
+      const name = stringField(campaign, "name", "campaign_name", "campaignName") ?? `campaign-${id}`;
+      const status = stringField(campaign, "status");
+      const upperName = name.toUpperCase();
+      const matchedNameParts = protectedNameParts.filter((part) => upperName.includes(part));
+      const explicitProtected = campaign.protected === true;
+      const protectionReasons = [
+        explicitProtected ? "explicit protected flag" : null,
+        protectedIds.has(String(id)) ? "protected campaign id" : null,
+        ...matchedNameParts.map((part) => `protected name match: ${part}`),
+      ].filter((reason): reason is string => Boolean(reason));
+      const protectedCampaign = protectionReasons.length > 0;
+      const leadCount = numberField(campaign, "leadCount", "lead_count", "total_leads") ?? arrayLengthField(campaign, "leads");
+      const sequenceCount = numberField(campaign, "sequenceCount", "sequence_count") ?? arrayLengthField(campaign, "sequences");
+      const webhookCount = numberField(campaign, "webhookCount", "webhook_count") ?? arrayLengthField(campaign, "webhooks");
+      const emailAccountCount = numberField(campaign, "emailAccountCount", "email_account_count") ?? arrayLengthField(campaign, "emailAccounts", "email_accounts");
+      const backupDir = `${runDir}/${id}_${slugify(name).slice(0, 80)}`;
+      return {
+        id: String(id),
+        name,
+        status,
+        protected: protectedCampaign,
+        protectionReasons,
+        leadCount,
+        sequenceCount,
+        webhookCount,
+        emailAccountCount,
+        backupDir,
+        fetchEndpoints: smartleadBackupFetchEndpoints(String(id), leadPageSize),
+      };
+    });
+
+  const protectedCampaigns = campaigns.filter((campaign) => campaign.protected);
+  const deleteCandidates = input.includeDeletePlan ? campaigns.filter((campaign) => !campaign.protected) : [];
+  const missingLeadCounts = campaigns.filter((campaign) => typeof campaign.leadCount !== "number").length;
+  const nextToolCalls: SmartleadCampaignBackupPlan["nextToolCalls"] = [];
+  if (!campaigns.length) {
+    nextToolCalls.push({
+      tool: "arcigy.get_smartlead_campaign_status",
+      payload: {},
+      reason: "Najprv nacitaj zoznam Smartlead kampani, potom z neho vytvor backup plan.",
+      approvalRequired: false,
+    });
+  }
+  for (const campaign of campaigns.slice(0, 10)) {
+    nextToolCalls.push({
+      tool: "arcigy.get_smartlead_campaign_status",
+      payload: { campaignId: campaign.id },
+      reason: "Stiahni campaign detail/statistiky pred backup manifestom.",
+      approvalRequired: false,
+    });
+    nextToolCalls.push({
+      tool: "arcigy.get_smartlead_campaign_leads",
+      payload: { campaignId: campaign.id, offset: 0, limit: leadPageSize },
+      reason: "Stiahni prvu stranu leadov; pri vacsom pocte pokracuj offsetom po limit.",
+      approvalRequired: false,
+    });
+  }
+
+  const status: SmartleadCampaignBackupPlan["status"] = !campaigns.length ? "blocked" : deleteCandidates.length ? "attention" : "ready";
+  return {
+    mode: "smartlead-campaign-backup-plan",
+    status,
+    summary: `Smartlead backup plan: ${campaigns.length} kampani, ${protectedCampaigns.length} protected, ${deleteCandidates.length} delete kandidatov. Ziadny backup, delete ani Smartlead zapis neprebehol.`,
+    run: { runId, createdAt, backupRoot, runDir, sqlitePath, note: input.note },
+    totals: {
+      campaigns: campaigns.length,
+      protected: protectedCampaigns.length,
+      backupCandidates: campaigns.length,
+      deleteCandidates: deleteCandidates.length,
+      estimatedLeads: campaigns.reduce((sum, campaign) => sum + (campaign.leadCount ?? 0), 0),
+      missingLeadCounts,
+    },
+    campaigns,
+    protectedCampaigns,
+    deleteCandidates,
+    manifestTemplate: {
+      run_id: runId,
+      created_at: createdAt,
+      db_path: sqlitePath,
+      backup_dir: runDir,
+      execute_delete: false,
+      protected_campaigns: protectedCampaigns.map((campaign) => ({ id: campaign.id, name: campaign.name })),
+      delete_candidates: deleteCandidates.map((campaign) => ({ id: campaign.id, name: campaign.name })),
+      delete_results: [],
+    },
+    safetyGates: [
+      "Pred akoukolvek zmenou kampane uloz campaign.json, sequences.json, leads.json, webhooks.json a email_accounts.json.",
+      "Delete kandidat je iba navrh; tento MCP tool nikdy nemaze kampane.",
+      "Kampane oznacene protected sa nesmu mazat ani hromadne prepisat bez samostatneho operator approval.",
+      "Ak chyba leadCount, najprv dotiahni vsetky strany /campaigns/{id}/leads cez offset/limit.",
+      "Po backupe porovnaj pocet leadov v manifeste so Smartlead countom.",
+    ],
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls),
+  };
+}
+
 export function buildDailyLeadgenRunbook(input: {
   niche: { id?: string; slug: string; name: string; keywords?: string[]; region?: string; campaignId?: string | number | null };
   targetCount?: number;
@@ -4662,6 +4857,25 @@ function numberField(record: Record<string, unknown>, ...keys: string[]): number
     if (typeof value === "string" && value.trim() && Number.isFinite(Number(value))) return Number(value);
   }
   return undefined;
+}
+
+function arrayLengthField(record: Record<string, unknown>, ...keys: string[]): number | undefined {
+  for (const key of keys) {
+    const value = record[key];
+    if (Array.isArray(value)) return value.length;
+  }
+  return undefined;
+}
+
+function smartleadBackupFetchEndpoints(campaignId: string, leadPageSize: number): SmartleadCampaignBackupPlan["campaigns"][number]["fetchEndpoints"] {
+  const encoded = encodeURIComponent(campaignId);
+  return [
+    { artifact: "campaign", method: "GET", path: `/campaigns/${encoded}` },
+    { artifact: "sequences", method: "GET", path: `/campaigns/${encoded}/sequences` },
+    { artifact: "leads", method: "GET", path: `/campaigns/${encoded}/leads?offset=0&limit=${leadPageSize}`, paginated: true },
+    { artifact: "webhooks", method: "GET", path: `/campaigns/${encoded}/webhooks` },
+    { artifact: "email_accounts", method: "GET", path: `/campaigns/${encoded}/email-accounts` },
+  ];
 }
 
 function normalizeSourceQueueLead(lead: LeadSourceImportQueueLead, sourceName?: string, defaultSource?: string): LeadSourceImportQueueLead {

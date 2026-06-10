@@ -44,6 +44,7 @@ import {
   buildSmartleadCampaignLaunchPreview,
   buildSmartleadCampaignQaPreview,
   buildSmartleadCampaignHandoffPackagePreview,
+  buildSmartleadCampaignBackupPlan,
   buildSmartleadInjectionPlan,
   buildSmartleadImportAuditPreview,
   buildSmartleadSenderCapacityPreview,
@@ -2386,6 +2387,33 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildSmartleadDeliverabilityGuardPreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_smartlead_campaign_backup_plan",
+    {
+      title: "Build Smartlead campaign backup plan",
+      description: "Prepare a read-only Smartlead campaign backup manifest, protected campaign classification, fetch endpoints, and delete safety gates before risky campaign changes.",
+      inputSchema: {
+        campaigns: z.array(z.object({}).passthrough()).optional(),
+        runId: z.string().optional(),
+        createdAt: z.string().optional(),
+        backupRoot: z.string().optional(),
+        note: z.string().optional(),
+        protectedCampaignIds: z.array(z.union([z.string(), z.number()])).optional(),
+        protectedNameParts: z.array(z.string()).optional(),
+        includeDeletePlan: z.boolean().default(false),
+        maxCampaigns: z.number().int().min(1).max(500).default(100),
+        leadPageSize: z.number().int().min(1).max(500).default(100),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildSmartleadCampaignBackupPlan(input))
   );
 
   server.registerTool(
