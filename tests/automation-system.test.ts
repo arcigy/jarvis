@@ -255,7 +255,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.equal(document["x-arcigy-agent-setup"].proofPolicy.freshnessMaxAgeHours, 24);
   assert.ok(document["x-arcigy-agent-setup"].firstTools.includes("arcigy.get_jarvis_capability_audit"));
   assert.ok(document["x-arcigy-agent-setup"].firstTools.includes("arcigy.get_production_completion_score"));
-  assert.ok(document["x-arcigy-agent-setup"].proofPolicy.beforeAnyWork.some((step) => step.includes("smokeTestUrl") && step.includes("status=ready")));
+  assert.ok(document["x-arcigy-agent-setup"].proofPolicy.beforeAnyWork.some((step) => step.includes("smokeTestUrl") && step.includes("status=ready") && step.includes("all 37 required remote MCP smoke gates")));
   assert.ok(document["x-arcigy-agent-setup"].proofPolicy.beforeAnyWork.some((step) => step.includes("arcigy.get_production_completion_score") && step.includes("quick-start coverage")));
   assert.ok(document["x-arcigy-agent-setup"].proofPolicy.beforeAnyWork.some((step) => step.includes("productionVerificationEvidenceUrl") && step.includes("dirty=false") && step.includes("freshness.fresh=true")));
   assert.ok(document["x-arcigy-agent-setup"].proofPolicy.beforeWrites.some((step) => step.includes("approval.approved=true")));

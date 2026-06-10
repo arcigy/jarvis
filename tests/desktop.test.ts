@@ -1056,6 +1056,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /hasValidQuickStartUrls/);
   assert.match(main, /hasQuickStartApprovalParity/);
   assert.match(main, /sameStringArray/);
+  assert.match(main, /hasValidOpenApiAgentSetup[\s\S]*arcigy\.get_production_completion_score[\s\S]*quick-start coverage/);
   assert.match(main, /pack-contract-quick-start/);
   assert.match(main, /pack-contract-draft-quick-start/);
   assert.match(main, /Spytat sa Jarvisa na capability audit/);

@@ -594,7 +594,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(openApiBody["x-arcigy-agent-setup"].recommendedImports.openApiSchemaUrl, `${baseUrl}/api/openapi.json`);
     assert.equal(openApiBody["x-arcigy-agent-setup"].recommendedImports.connectionPackUrl, `${baseUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`);
     assert.equal(openApiBody["x-arcigy-agent-setup"].proofPolicy.freshnessMaxAgeHours, 24);
-    assert.ok(openApiBody["x-arcigy-agent-setup"].proofPolicy.beforeAnyWork.some((step) => step.includes("smokeTestUrl") && step.includes("status=ready")));
+    assert.ok(openApiBody["x-arcigy-agent-setup"].proofPolicy.beforeAnyWork.some((step) => step.includes("smokeTestUrl") && step.includes("status=ready") && step.includes("all 37 required remote MCP smoke gates")));
     assert.ok(openApiBody["x-arcigy-agent-setup"].proofPolicy.beforeAnyWork.some((step) => step.includes("arcigy.get_production_completion_score") && step.includes("quick-start coverage")));
     assert.ok(openApiBody["x-arcigy-agent-setup"].proofPolicy.beforeAnyWork.some((step) => step.includes("productionVerificationEvidenceUrl") && step.includes("dirty=false") && step.includes("freshness.fresh=true")));
     assert.ok(openApiBody["x-arcigy-agent-setup"].proofPolicy.beforeWrites.some((step) => step.includes("approval.approved=true")));

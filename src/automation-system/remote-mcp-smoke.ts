@@ -526,9 +526,11 @@ function hasValidOpenApiAgentSetup(value: unknown, baseUrl: string): boolean {
     setup.recommendedImports?.mcpToolCallPattern === `${baseUrl}/api/mcp/{toolName}` &&
     firstTools.includes("arcigy.get_operator_briefing") &&
     firstTools.includes("arcigy.get_jarvis_capability_audit") &&
+    firstTools.includes("arcigy.get_production_completion_score") &&
     firstTools.includes("arcigy.get_production_verification_evidence") &&
     setup.proofPolicy?.freshnessMaxAgeHours === 24 &&
-    beforeAnyWork.some((step) => typeof step === "string" && step.includes("smokeTestUrl") && step.includes("status=ready")) &&
+    beforeAnyWork.some((step) => typeof step === "string" && step.includes("smokeTestUrl") && step.includes("status=ready") && step.includes("all 37 required remote MCP smoke gates")) &&
+    beforeAnyWork.some((step) => typeof step === "string" && step.includes("arcigy.get_production_completion_score") && step.includes("quick-start coverage")) &&
     beforeAnyWork.some((step) => typeof step === "string" && step.includes("productionVerificationEvidenceUrl") && step.includes("freshness.fresh=true")) &&
     beforeWrites.some((step) => typeof step === "string" && step.includes("approval.approved=true")) &&
     safetyRails.some((rail) => typeof rail === "string" && rail.includes("family-friendly")) &&
