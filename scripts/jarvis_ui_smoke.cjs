@@ -120,7 +120,7 @@ async function run() {
     await waitForCapabilityAudit(window);
 
     const dom = await window.webContents.executeJavaScript(`
-      (() => {
+    (() => {
         const box = (selector) => {
           const node = document.querySelector(selector);
           if (!node) return null;
@@ -681,9 +681,10 @@ async function runGrokPromptCopyFlow(window) {
 
 async function runJarvisTextVoiceFlow(window) {
   const started = await executeRendererJson(window, `
-    (() => {
+      (() => {
       window.__jarvisSmokeSpeech = { cancelCount: 0, speakCount: 0, texts: [] };
       window.__jarvisSmokeVoiceResponse = null;
+      window.__arcigyJarvisLastVoiceResponse = null;
       if (!window.__jarvisSmokeOriginalFetch) window.__jarvisSmokeOriginalFetch = window.fetch.bind(window);
       window.fetch = async (...args) => {
         const response = await window.__jarvisSmokeOriginalFetch(...args);
@@ -736,7 +737,7 @@ async function runJarvisTextVoiceFlow(window) {
     state = await executeRendererJson(window, `
       (() => {
         const speech = window.__jarvisSmokeSpeech || { speakCount: 0, texts: [] };
-        const voice = window.__jarvisSmokeVoiceResponse || {};
+        const voice = window.__arcigyJarvisLastVoiceResponse || window.__jarvisSmokeVoiceResponse || {};
         const responseText = document.querySelector("#response")?.textContent.trim() || "";
         return {
           responseText,

@@ -2389,6 +2389,7 @@ async function handleTranscript(text) {
   });
 
   state.session = result.session;
+  window.__arcigyJarvisLastVoiceResponse = result;
   setMode(result.session.state);
   if (result.speakText) {
     elements.response.textContent = result.speakText;
