@@ -182,6 +182,7 @@ function buildLaunchChecklist(
   const approvalTools = tools.filter((tool) => tool.requiresApproval).map((tool) => String(tool.name));
   const requiredApprovalTools = [
     "arcigy.generate_contract_documents",
+    "arcigy.generate_price_offer_document",
     "arcigy.approve_prepared_outreach_reply",
     "arcigy.send_approved_outreach_reply",
     "arcigy.export_leads_csv",
@@ -251,9 +252,9 @@ const coreWorkflowSurfaces: CoreWorkflowSurface[] = [
   {
     id: "contract-workflow",
     title: "Contract automation workflow",
-    tools: ["arcigy.draft_contract_intake", "arcigy.generate_contract_documents"],
-    approvalRequired: ["arcigy.generate_contract_documents"],
-    proof: "Gemini intake draft and approval-gated DOCX contract generation are registered.",
+    tools: ["arcigy.draft_contract_intake", "arcigy.generate_contract_documents", "arcigy.draft_price_offer_intake", "arcigy.generate_price_offer_document"],
+    approvalRequired: ["arcigy.generate_contract_documents", "arcigy.generate_price_offer_document"],
+    proof: "Gemini intake drafts and approval-gated DOCX contract/price-offer generation are registered.",
   },
   {
     id: "outreach-workflow",

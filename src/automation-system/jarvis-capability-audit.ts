@@ -47,9 +47,9 @@ type CapabilityDefinition = {
 const capabilityDefinitions: CapabilityDefinition[] = [
   {
     id: "contracts",
-    title: "Universal Arcigy contract automation",
-    tools: ["arcigy.draft_contract_intake", "arcigy.generate_contract_documents"],
-    approvalRequired: ["arcigy.generate_contract_documents"],
+    title: "Universal Arcigy document automation",
+    tools: ["arcigy.draft_contract_intake", "arcigy.generate_contract_documents", "arcigy.draft_price_offer_intake", "arcigy.generate_price_offer_document"],
+    approvalRequired: ["arcigy.generate_contract_documents", "arcigy.generate_price_offer_document"],
     evidence: ["contract-template-safety", "tests", "ui-smoke"],
     envKeys: ["gemini"],
   },
@@ -179,6 +179,7 @@ const capabilityDefinitions: CapabilityDefinition[] = [
     tools: ["arcigy.get_approval_queue", "arcigy.get_audit_events", "arcigy.run_remote_mcp_smoke"],
     approvalRequired: [
       "arcigy.generate_contract_documents",
+      "arcigy.generate_price_offer_document",
       "arcigy.approve_prepared_outreach_reply",
       "arcigy.send_approved_outreach_reply",
       "arcigy.update_client_need_status",

@@ -608,6 +608,7 @@ function buildReadinessLaunchChecklist(integrations, bridge, blockers, diagnosti
   const approvalTools = bridge.riskyToolsRequiringApproval || [];
   const requiredApprovalTools = [
     "arcigy.generate_contract_documents",
+    "arcigy.generate_price_offer_document",
     "arcigy.approve_prepared_outreach_reply",
     "arcigy.send_approved_outreach_reply",
     "arcigy.send_smartlead_thread_reply",
@@ -665,9 +666,9 @@ const coreWebWorkflowSurfaces = [
   {
     id: "contract-workflow",
     title: "Contract automation workflow",
-    tools: ["arcigy.draft_contract_intake", "arcigy.generate_contract_documents"],
-    approvalRequired: ["arcigy.generate_contract_documents"],
-    proof: "Gemini intake draft and approval-gated DOCX contract generation are registered.",
+    tools: ["arcigy.draft_contract_intake", "arcigy.generate_contract_documents", "arcigy.draft_price_offer_intake", "arcigy.generate_price_offer_document"],
+    approvalRequired: ["arcigy.generate_contract_documents", "arcigy.generate_price_offer_document"],
+    proof: "Gemini intake drafts and approval-gated DOCX contract/price-offer generation are registered.",
   },
   {
     id: "outreach-workflow",
@@ -1186,7 +1187,7 @@ function jarvisCapabilityDefinitions() {
       id: "contracts",
       title: "Universal Arcigy contract automation",
       tools: ["arcigy.draft_contract_intake", "arcigy.generate_contract_documents"],
-      approvalRequired: ["arcigy.generate_contract_documents"],
+      approvalRequired: ["arcigy.generate_contract_documents", "arcigy.generate_price_offer_document"],
       evidence: ["contract-template-safety", "tests", "ui-smoke"],
       envKeys: ["gemini"],
     },
@@ -1302,6 +1303,7 @@ function jarvisCapabilityDefinitions() {
       tools: ["arcigy.get_approval_queue", "arcigy.get_audit_events", "arcigy.run_remote_mcp_smoke"],
       approvalRequired: [
         "arcigy.generate_contract_documents",
+        "arcigy.generate_price_offer_document",
         "arcigy.approve_prepared_outreach_reply",
         "arcigy.send_approved_outreach_reply",
         "arcigy.update_client_need_status",
@@ -1441,7 +1443,7 @@ async function getRemoteMcpPack(payload = {}) {
       "Call MCP tools with POST JSON to mcpToolCallPattern.",
       "Use the bearer auth header placeholder; the real token must be supplied by the operator and is never returned by this pack.",
       "Use tunnel.statusUrl to inspect public tunnel URLs from the redacted secure-tunnel log. Browser-launched tunnel start requires a strong JARVIS_WEB_TOKEN.",
-      "Treat generate_contract_documents, approve_prepared_outreach_reply, send_approved_outreach_reply, send_smartlead_thread_reply, update_client_need_status, export_leads_csv, create_smartlead_campaign, configure_smartlead_campaign, add_leads_to_smartlead_campaign, and append_leads_to_google_sheet as approval-gated actions.",
+      "Treat generate_contract_documents, generate_price_offer_document, approve_prepared_outreach_reply, send_approved_outreach_reply, send_smartlead_thread_reply, update_client_need_status, export_leads_csv, create_smartlead_campaign, configure_smartlead_campaign, add_leads_to_smartlead_campaign, and append_leads_to_google_sheet as approval-gated actions.",
       "Treat localStateWrite tools as local memory writes. Prefer dryRun: true for sync_gmail_recent_messages before ingesting messages.",
       "Use get_operator_briefing for a Jarvis-style daily status before making recommendations.",
     ],
@@ -1917,6 +1919,16 @@ function buildRemoteMcpQuickStartCalls(baseUrl) {
       approvalRequired: false,
     },
     {
+      label: "Draft price offer intake JSON without writing files",
+      tool: "arcigy.draft_price_offer_intake",
+      method: "POST",
+      url: toolUrl("arcigy.draft_price_offer_intake"),
+      body: {
+        brief: "Klient Modelova Firma chce automatizovat dopyty, setup 2000 EUR, mesacne 200 EUR, ciel je usetrit obchodnikovi 8 hodin tyzdenne.",
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Discover leads without writing",
       tool: "arcigy.discover_leads",
       method: "POST",
@@ -1938,6 +1950,26 @@ function buildRemoteMcpQuickStartCalls(baseUrl) {
       method: "POST",
       url: toolUrl("arcigy.generate_contract_documents"),
       body: { approval: { approved: true }, intake: contractIntake },
+      approvalRequired: true,
+    },
+    {
+      label: "Generate price offer document after approval",
+      tool: "arcigy.generate_price_offer_document",
+      method: "POST",
+      url: toolUrl("arcigy.generate_price_offer_document"),
+      body: {
+        approval: { approved: true },
+        offer: {
+          company: "Modelova Firma s.r.o.",
+          ico: "12345678",
+          customerName: "pan Novak",
+          what_to_do: "Automatizacia spracovania dopytov a nasledny Smartlead follow-up.",
+          cost_one: 2000,
+          cost_two: 200,
+          cost: 2200,
+          roi_rows: [{ label: "Uspora casu obchodnika", value: "8 hodin tyzdenne" }],
+        },
+      },
       approvalRequired: true,
     },
   ]);
@@ -2262,6 +2294,7 @@ function hasSensitiveLeak(value, bearerToken) {
 async function checkApprovalGates(baseUrl, token, topLevelApproved) {
   const payloads = [
     ["arcigy.generate_contract_documents", { intake: {} }],
+    ["arcigy.generate_price_offer_document", { offer: {} }],
     ["arcigy.approve_prepared_outreach_reply", { preparedEventId: "smoke-prepared-reply" }],
     ["arcigy.send_approved_outreach_reply", { preparedEventId: "smoke-prepared-reply" }],
     ["arcigy.update_client_need_status", { needSignalId: "smoke-client-need", status: "resolved" }],
@@ -2429,6 +2462,7 @@ function hasSafeOpenApiExample(toolName, value) {
   if (toolName === "arcigy.sync_gmail_recent_messages") return value.dryRun === true;
   if (toolName === "arcigy.identify_email") return typeof value.email === "string" && value.email.includes("@");
   if (toolName === "arcigy.generate_contract_documents") return value.approval?.approved === true && typeof value.intake === "object";
+  if (toolName === "arcigy.generate_price_offer_document") return value.approval?.approved === true && typeof value.offer === "object";
   if (toolName === "arcigy.export_leads_csv") return value.approval?.approved === true && Array.isArray(value.leads);
   if (toolName === "arcigy.append_leads_to_google_sheet") return value.approval?.approved === true && Array.isArray(value.rows);
   if (toolName === "arcigy.add_leads_to_smartlead_campaign") return value.approval?.approved === true && Array.isArray(value.leads);
@@ -2895,6 +2929,8 @@ function listWebMcpTools() {
   return [
     { name: "arcigy.generate_contract_documents", requiresApproval: true },
     { name: "arcigy.draft_contract_intake", requiresApproval: false },
+    { name: "arcigy.draft_price_offer_intake", requiresApproval: false },
+    { name: "arcigy.generate_price_offer_document", requiresApproval: true },
     { name: "arcigy.get_cold_outreach_brief", requiresApproval: false },
     { name: "arcigy.get_cold_outreach_brief_from_db", requiresApproval: false },
     { name: "arcigy.add_cold_outreach_event", requiresApproval: false },

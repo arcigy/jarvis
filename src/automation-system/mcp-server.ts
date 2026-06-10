@@ -37,6 +37,7 @@ import {
   identifyEmailMcpAnswer,
 } from "./mcp-tools.ts";
 import { buildOperatorBriefing } from "./operator-briefing.ts";
+import { draftPriceOfferIntake } from "./price-offer.ts";
 import { buildProactiveAttentionDigest } from "./proactive-attention-digest.ts";
 import { buildProductionCompletionScore, summarizeProductionCompletionScoreForVoice } from "./production-completion-score.ts";
 import { buildProductionReadinessReport } from "./production-readiness.ts";
@@ -123,6 +124,57 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async ({ brief, baseIntake }) => jsonResult(await draftContractIntake({ brief, baseIntake }))
+  );
+
+  server.registerTool(
+    "arcigy.draft_price_offer_intake",
+    {
+      title: "Draft price offer intake",
+      description: "Use Gemini to draft an Arcigy price-offer JSON object from a short business brief.",
+      inputSchema: {
+        brief: z.string().min(1),
+        baseOffer: z.record(z.string(), z.unknown()).optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async ({ brief, baseOffer }) => jsonResult(await draftPriceOfferIntake({ brief, baseOffer }))
+  );
+
+  server.registerTool(
+    "arcigy.generate_price_offer_document",
+    {
+      title: "Generate Arcigy price offer",
+      description: "Generate an Arcigy price offer DOCX from a filled JSON intake form.",
+      inputSchema: {
+        inputJsonPath: z.string().min(1).optional(),
+        offer: z.record(z.string(), z.unknown()).optional(),
+        outputDir: z.string().min(1).optional(),
+        approval: approvalSchema,
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+    },
+    async ({ inputJsonPath, offer, outputDir, approval }) => {
+      requireExplicitApproval("arcigy.generate_price_offer_document", { approval });
+      if (!inputJsonPath && !offer) {
+        throw new Error("Provide either inputJsonPath or inline offer payload.");
+      }
+      const safeOutputDir = resolveRepoPath(outputDir, "generated/price-offers", "outputDir");
+      const args = inputJsonPath
+        ? ["scripts/generate_price_offer.py", "--input", resolveRepoPath(inputJsonPath, "", "inputJsonPath"), "--output-dir", safeOutputDir]
+        : ["scripts/generate_price_offer.py", "--payload", JSON.stringify(offer), "--output-dir", safeOutputDir];
+      const result = runPython(args);
+      return textResult(result.stdout.trim() || "Price offer document generated.");
+    }
   );
 
   server.registerTool(

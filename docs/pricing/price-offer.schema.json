@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Arcigy Price Offer Intake",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "customerName": { "type": "string" },
+    "last_name_with_salution": { "type": "string" },
+    "company": { "type": "string" },
+    "ico": { "type": ["string", "number"] },
+    "what_to_do": { "type": "string" },
+    "cost_one": { "type": ["string", "number"] },
+    "cost_two": { "type": ["string", "number"] },
+    "cost": { "type": ["string", "number"] },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["description", "pricePerUnit"],
+        "properties": {
+          "description": { "type": "string" },
+          "quantity": { "type": "number", "default": 1 },
+          "unit": { "type": "string", "default": "ks" },
+          "pricePerUnit": { "type": "number" },
+          "total": { "type": "number" }
+        }
+      }
+    },
+    "roi_rows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["label", "value"],
+        "properties": {
+          "label": { "type": "string" },
+          "value": { "type": "string" },
+          "highlight": { "type": "boolean" }
+        }
+      }
+    },
+    "notes": { "type": "string" }
+  },
+  "required": ["company", "what_to_do", "cost"]
+}

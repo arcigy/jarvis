@@ -32,6 +32,7 @@ import {
 } from "../automation-system/lead-automation.ts";
 import { buildContractGenerationCommand, getColdOutreachMcpAnswer, listJarvisMcpTools, localStateWriteToolNames } from "../automation-system/mcp-tools.ts";
 import { buildOperatorBriefing } from "../automation-system/operator-briefing.ts";
+import { draftPriceOfferIntake } from "../automation-system/price-offer.ts";
 import { buildProactiveAttentionDigest } from "../automation-system/proactive-attention-digest.ts";
 import { buildProductionCompletionScore, summarizeProductionCompletionScoreForVoice } from "../automation-system/production-completion-score.ts";
 import { buildProductionReadinessReport } from "../automation-system/production-readiness.ts";
@@ -977,6 +978,30 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
     const result = runPython(args);
     const responseBody = { result: result.stdout.trim() || "Contract documents generated." };
     addAuditEvent("arcigy.generate_contract_documents", "generated", payload, responseBody, true);
+    writeJson(response, 200, responseBody);
+    return;
+  }
+  if (name === "arcigy.draft_price_offer_intake") {
+    writeJson(response, 200, {
+      result: await draftPriceOfferIntake({
+        brief: String(payload.brief ?? ""),
+        baseOffer: payload.baseOffer && typeof payload.baseOffer === "object" ? payload.baseOffer as Record<string, unknown> : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.generate_price_offer_document") {
+    if (!payload.inputJsonPath && !payload.offer) {
+      writeJson(response, 400, { error: "Provide either inputJsonPath or inline offer payload." });
+      return;
+    }
+    const safeOutputDir = resolveRepoPath(payload.outputDir, join(repoRoot, "generated", "price-offers"), "outputDir");
+    const args = payload.inputJsonPath
+      ? ["scripts/generate_price_offer.py", "--input", resolveRepoPath(payload.inputJsonPath, "", "inputJsonPath"), "--output-dir", safeOutputDir]
+      : ["scripts/generate_price_offer.py", "--payload", JSON.stringify(payload.offer), "--output-dir", safeOutputDir];
+    const result = runPython(args);
+    const responseBody = { result: result.stdout.trim() || "Price offer document generated." };
+    addAuditEvent("arcigy.generate_price_offer_document", "generated", payload, responseBody, true);
     writeJson(response, 200, responseBody);
     return;
   }

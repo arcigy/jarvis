@@ -253,7 +253,7 @@ export async function buildRemoteMcpConnectionPack(
       "Call MCP tools with POST JSON to mcpToolCallPattern.",
       "Use the bearer auth header placeholder; the real token must be supplied by the operator and is never returned by this pack.",
       "Use tunnel.statusUrl to inspect public tunnel URLs from the redacted secure-tunnel log. Browser-launched tunnel start requires a strong JARVIS_WEB_TOKEN.",
-      "Treat generate_contract_documents, approve_prepared_outreach_reply, send_approved_outreach_reply, send_smartlead_thread_reply, update_client_need_status, export_leads_csv, create_smartlead_campaign, configure_smartlead_campaign, add_leads_to_smartlead_campaign, and append_leads_to_google_sheet as approval-gated actions.",
+      "Treat generate_contract_documents, generate_price_offer_document, approve_prepared_outreach_reply, send_approved_outreach_reply, send_smartlead_thread_reply, update_client_need_status, export_leads_csv, create_smartlead_campaign, configure_smartlead_campaign, add_leads_to_smartlead_campaign, and append_leads_to_google_sheet as approval-gated actions.",
       "Treat localStateWrite tools as local memory writes. Prefer dryRun: true for sync_gmail_recent_messages before ingesting messages.",
       "Use get_operator_briefing for a Jarvis-style daily status before making recommendations.",
     ],
@@ -692,6 +692,16 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Draft price offer intake JSON without writing files",
+      tool: "arcigy.draft_price_offer_intake",
+      method: "POST",
+      url: toolUrl("arcigy.draft_price_offer_intake"),
+      body: {
+        brief: "Klient Modelova Firma chce automatizovat dopyty, setup 2000 EUR, mesacne 200 EUR, ciel je usetrit obchodnikovi 8 hodin tyzdenne.",
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Discover leads without writing",
       tool: "arcigy.discover_leads",
       method: "POST",
@@ -900,6 +910,26 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       method: "POST",
       url: toolUrl("arcigy.generate_contract_documents"),
       body: { approval: { approved: true }, intake: contractIntake },
+      approvalRequired: true,
+    },
+    {
+      label: "Generate price offer document after approval",
+      tool: "arcigy.generate_price_offer_document",
+      method: "POST",
+      url: toolUrl("arcigy.generate_price_offer_document"),
+      body: {
+        approval: { approved: true },
+        offer: {
+          company: "Modelova Firma s.r.o.",
+          ico: "12345678",
+          customerName: "pan Novak",
+          what_to_do: "Automatizacia spracovania dopytov a nasledny Smartlead follow-up.",
+          cost_one: 2000,
+          cost_two: 200,
+          cost: 2200,
+          roi_rows: [{ label: "Uspora casu obchodnika", value: "8 hodin tyzdenne" }],
+        },
+      },
       approvalRequired: true,
     },
   ]);

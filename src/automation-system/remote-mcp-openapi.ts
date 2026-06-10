@@ -216,6 +216,22 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
   if (toolName === "arcigy.get_audit_events") return { limit: 20 };
   if (toolName === "arcigy.get_local_memory_snapshot") return { limit: 10 };
   if (toolName === "arcigy.draft_contract_intake") return { brief: "Klient potrebuje webovu aplikaciu pre lead intake, reporting a klientsku evidenciu." };
+  if (toolName === "arcigy.draft_price_offer_intake") return { brief: "Klient Modelova Firma chce automatizovat dopyty, setup 2000 EUR, mesacne 200 EUR, ciel je usetrit obchodnikovi 8 hodin tyzdenne." };
+  if (toolName === "arcigy.generate_price_offer_document") {
+    return {
+      approval: { approved: true },
+      offer: {
+        company: "Modelova Firma s.r.o.",
+        ico: "12345678",
+        customerName: "pan Novak",
+        what_to_do: "Automatizacia spracovania dopytov a nasledny Smartlead follow-up.",
+        cost_one: 2000,
+        cost_two: 200,
+        cost: 2200,
+        roi_rows: [{ label: "Uspora casu obchodnika", value: "8 hodin tyzdenne" }],
+      },
+    };
+  }
   if (toolName === "arcigy.generate_ai_reply") return { message: "Potrebujem upravit onboarding automatizaciu do piatku.", language: "sk", tone: "executive" };
   if (toolName === "arcigy.sync_gmail_recent_messages") return { dryRun: true, maxResults: 5 };
   if (toolName === "arcigy.get_smartlead_outreach_brief") return { periodLabel: "poslednych 7 dni" };

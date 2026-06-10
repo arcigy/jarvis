@@ -322,6 +322,7 @@ export async function runRemoteMcpSmoke(input: RemoteMcpSmokeInput = {}): Promis
 async function checkApprovalGates(fetchImpl: typeof fetch, baseUrl: string, bearerToken: string | undefined, topLevelApproved: boolean): Promise<{ ok: boolean; bodies: unknown[] }> {
   const payloads: Array<[string, Record<string, unknown>]> = [
     ["arcigy.generate_contract_documents", { intake: {} }],
+    ["arcigy.generate_price_offer_document", { offer: {} }],
     ["arcigy.approve_prepared_outreach_reply", { preparedEventId: "smoke-prepared-reply" }],
     ["arcigy.send_approved_outreach_reply", { preparedEventId: "smoke-prepared-reply" }],
     ["arcigy.update_client_need_status", { needSignalId: "smoke-client-need", status: "resolved" }],
@@ -552,6 +553,7 @@ function hasSafeOpenApiExample(toolName: string, value: unknown): boolean {
   if (toolName === "arcigy.sync_gmail_recent_messages") return payload.dryRun === true;
   if (toolName === "arcigy.identify_email") return typeof payload.email === "string" && payload.email.includes("@");
   if (toolName === "arcigy.generate_contract_documents") return (payload.approval as { approved?: unknown } | undefined)?.approved === true && typeof payload.intake === "object";
+  if (toolName === "arcigy.generate_price_offer_document") return (payload.approval as { approved?: unknown } | undefined)?.approved === true && typeof payload.offer === "object";
   if (toolName === "arcigy.export_leads_csv") return (payload.approval as { approved?: unknown } | undefined)?.approved === true && Array.isArray(payload.leads);
   if (toolName === "arcigy.append_leads_to_google_sheet") return (payload.approval as { approved?: unknown } | undefined)?.approved === true && Array.isArray(payload.rows);
   if (toolName === "arcigy.add_leads_to_smartlead_campaign") return (payload.approval as { approved?: unknown } | undefined)?.approved === true && Array.isArray(payload.leads);

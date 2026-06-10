@@ -66,6 +66,8 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 
 - `arcigy.generate_contract_documents`: JSON intake form -> framework agreement + project appendix DOCX. Accepts either `inputJsonPath` or inline `intake`.
 - `arcigy.draft_contract_intake`: uses Gemini to draft contract intake JSON from a short business brief without generating documents.
+- `arcigy.draft_price_offer_intake`: uses Gemini to draft a price-offer JSON intake from a client/project brief without generating a document.
+- `arcigy.generate_price_offer_document`: approval-gated DOCX price offer generation from a filled `offer` JSON payload or `inputJsonPath`.
 - `arcigy.get_cold_outreach_brief`: Slovak cold outreach summary.
 - `/api/cold-outreach-brief` with `live=true` prefers live Smartlead statistics and falls back to local SQLite.
 - `arcigy.add_cold_outreach_event`: stores local cold outreach activity.

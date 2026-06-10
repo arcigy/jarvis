@@ -56,6 +56,7 @@ import {
 import { answerJarvisIntent, resolveJarvisIntentFromTranscript } from "../src/automation-system/jarvis-intents.ts";
 import { buildProductionReadinessReport } from "../src/automation-system/production-readiness.ts";
 import { buildOperatorBriefing } from "../src/automation-system/operator-briefing.ts";
+import { draftPriceOfferIntake } from "../src/automation-system/price-offer.ts";
 import { buildProactiveAttentionDigest } from "../src/automation-system/proactive-attention-digest.ts";
 import { buildJarvisCapabilityAudit } from "../src/automation-system/jarvis-capability-audit.ts";
 import { buildProductionCompletionScore, summarizeProductionCompletionScoreForVoice } from "../src/automation-system/production-completion-score.ts";
@@ -70,6 +71,8 @@ test("MCP tools expose the requested automation surface", () => {
   assert.deepEqual(names, [
     "arcigy.generate_contract_documents",
     "arcigy.draft_contract_intake",
+    "arcigy.draft_price_offer_intake",
+    "arcigy.generate_price_offer_document",
     "arcigy.get_cold_outreach_brief",
     "arcigy.get_cold_outreach_brief_from_db",
     "arcigy.add_cold_outreach_event",
@@ -368,6 +371,7 @@ test("remote MCP smoke checks every response for bearer token leaks", async () =
     }
     if (
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
+      url.endsWith("/api/mcp/arcigy.generate_price_offer_document") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
@@ -431,6 +435,7 @@ test("remote MCP smoke requires valid quick-start URLs", async () => {
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
+      url.endsWith("/api/mcp/arcigy.generate_price_offer_document") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
@@ -489,6 +494,7 @@ test("remote MCP smoke requires quick-start approval policy parity", async () =>
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
+      url.endsWith("/api/mcp/arcigy.generate_price_offer_document") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
@@ -547,6 +553,7 @@ test("remote MCP smoke requires exact MCP call parity in quick-starts", async ()
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
+      url.endsWith("/api/mcp/arcigy.generate_price_offer_document") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
@@ -625,6 +632,7 @@ test("remote MCP smoke blocks generic secret patterns in response bodies", async
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
+      url.endsWith("/api/mcp/arcigy.generate_price_offer_document") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
@@ -682,6 +690,7 @@ test("remote MCP smoke requires exact manifest and pack tool registries", async 
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
+      url.endsWith("/api/mcp/arcigy.generate_price_offer_document") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
@@ -741,6 +750,7 @@ test("remote MCP smoke requires valid manifest tool metadata", async () => {
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
+      url.endsWith("/api/mcp/arcigy.generate_price_offer_document") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
@@ -797,6 +807,7 @@ test("remote MCP smoke requires exact manifest and pack tool policies", async ()
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
+      url.endsWith("/api/mcp/arcigy.generate_price_offer_document") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
@@ -854,6 +865,7 @@ test("remote MCP smoke requires guarded connection pack limits", async () => {
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
+      url.endsWith("/api/mcp/arcigy.generate_price_offer_document") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
@@ -1128,6 +1140,7 @@ test("remote MCP smoke requires the audit trail quick-start", async () => {
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
+      url.endsWith("/api/mcp/arcigy.generate_price_offer_document") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
@@ -1194,6 +1207,7 @@ test("remote MCP smoke requires the production evidence quick-start", async () =
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
+      url.endsWith("/api/mcp/arcigy.generate_price_offer_document") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
@@ -1260,6 +1274,7 @@ test("remote MCP smoke requires the production evidence voice quick-start", asyn
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
+      url.endsWith("/api/mcp/arcigy.generate_price_offer_document") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
@@ -1362,7 +1377,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 58 toolov, 11 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 60 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -1392,6 +1407,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     }
     if (
       url.endsWith("/api/mcp/arcigy.generate_contract_documents") ||
+      url.endsWith("/api/mcp/arcigy.generate_price_offer_document") ||
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
@@ -1863,6 +1879,65 @@ test("contract generator creates core documents, extra attachments, and manifest
   assert.equal(manifest.client, "Test Klient s. r. o.");
   assert.equal(manifest.generatedFiles.length, 3);
   assert.ok(manifest.generatedFiles.some((path: string) => path.endsWith("doplnkova-priloha-servisne-pravidla.docx")));
+});
+
+test("price offer intake draft parses Gemini JSON output", async () => {
+  const fetchImpl = async () =>
+    responseJson({
+      candidates: [
+        {
+          content: {
+            parts: [
+              {
+                text: JSON.stringify({
+                  company: "Modelova Firma s.r.o.",
+                  ico: "12345678",
+                  customerName: "pan Novak",
+                  what_to_do: "Automatizacia spracovania dopytov.",
+                  cost_one: 2000,
+                  cost_two: 200,
+                  cost: 2200,
+                  roi_rows: [{ label: "Uspora casu", value: "8 hodin tyzdenne" }],
+                }),
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+  const draft = await draftPriceOfferIntake(
+    { brief: "Klient chce automatizovat dopyty, setup 2000 EUR a mesacne 200 EUR." },
+    { GEMINI_API_KEY: "gemini-key" },
+    fetchImpl as typeof fetch
+  );
+
+  assert.equal(draft.company, "Modelova Firma s.r.o.");
+  assert.equal(draft.cost, 2200);
+});
+
+test("price offer generator creates a DOCX from the bundled template", () => {
+  const dir = mkdtempSync(join(tmpdir(), "jarvis-price-offer-"));
+  const payload = JSON.stringify({
+    company: "Modelova Firma s.r.o.",
+    ico: "12345678",
+    customerName: "pan Novak",
+    what_to_do: "Automatizacia spracovania dopytov a nasledny Smartlead follow-up.",
+    cost_one: 2000,
+    cost_two: 200,
+    cost: 2200,
+    roi_rows: [{ label: "Uspora casu obchodnika", value: "8 hodin tyzdenne" }],
+  });
+  const result = spawnSync(process.env.JARVIS_PYTHON || "python", ["scripts/generate_price_offer.py", "--payload", payload, "--output-dir", dir], {
+    cwd: process.cwd(),
+    encoding: "utf-8",
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  const output = JSON.parse(result.stdout);
+  assert.equal(existsSync(output.generatedFile), true);
+  assert.equal(output.generatedFile.endsWith(".docx"), true);
+  assert.equal(existsSync(output.manifest), true);
 });
 
 test("contract generator accepts inline JSON payload", () => {
