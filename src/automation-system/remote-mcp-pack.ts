@@ -1008,6 +1008,24 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Build leadgen gap report before Smartlead",
+      tool: "arcigy.build_leadgen_gap_report",
+      method: "POST",
+      url: toolUrl("arcigy.build_leadgen_gap_report"),
+      body: {
+        niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456" },
+        campaignTag: "autoservisy-ba",
+        offer: "AI asistent na odpovede a follow-up",
+        leads: [
+          { companyName: "Ready Firma", website: "https://ready.sk", email: "jan@ready.sk", personalizedIntro: "Kratke AI intro." },
+          { companyName: "Chyba Email", website: "https://missing-email.sk" },
+        ],
+        minScore: 70,
+        batchSize: 50,
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Build full leadgen campaign pipeline preview",
       tool: "arcigy.build_leadgen_campaign_pipeline_preview",
       method: "POST",

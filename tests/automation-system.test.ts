@@ -22,6 +22,7 @@ import {
   batchDraftLeadIntros,
   buildManualReviewPickupPlan,
   buildManualReviewQueue,
+  buildLeadgenGapReport,
   buildLeadgenCampaignPipelinePreview,
   buildColdOutreachCsvImportPreview,
   buildSmartleadCampaignLaunchPreview,
@@ -159,6 +160,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.build_smartlead_campaign_launch_preview",
     "arcigy.build_smartlead_campaign_qa_preview",
     "arcigy.preview_lead_enrichment_batch",
+    "arcigy.build_leadgen_gap_report",
     "arcigy.build_leadgen_campaign_pipeline_preview",
     "arcigy.build_cold_outreach_csv_import_preview",
     "arcigy.build_daily_leadgen_runbook",
@@ -1421,7 +1423,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 86 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 87 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -2708,6 +2710,30 @@ test("batch niche discovery plan prepares regional runbooks and read-only next c
   assert.ok(plan.nextToolCalls.some((call) => call.tool === "arcigy.run_leadgen_research_pipeline" && call.approvalRequired === false));
   assert.ok(plan.nextToolCalls.every((call) => call.tool !== "arcigy.add_leads_to_smartlead_campaign"));
   assert.match(plan.summary, /Ziadny scraping ani upload neprebehol/);
+});
+
+test("leadgen gap report audits missing fields and proposes safe next calls", () => {
+  const report = buildLeadgenGapReport({
+    niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456" },
+    campaignTag: "autoservisy-ba",
+    offer: "AI follow-up system",
+    leads: [
+      { companyName: "Ready Firma", website: "https://ready.sk", email: "jan@ready.sk", personalizedIntro: "Kratke AI intro.", firstName: "Jan" },
+      { companyName: "Chyba Email", website: "https://missing-email.sk" },
+      { companyName: "Bez Webu", email: "info@bezwebu.sk" },
+    ],
+    minScore: 70,
+  });
+
+  assert.equal(report.mode, "leadgen-gap-report");
+  assert.equal(report.totals.input, 3);
+  assert.equal(report.totals.missingEmail, 1);
+  assert.equal(report.totals.missingWebsite, 1);
+  assert.equal(report.totals.missingIntro, 2);
+  assert.ok(report.nextToolCalls.some((call) => call.tool === "arcigy.batch_scrape_website_contacts" && call.approvalRequired === false));
+  assert.ok(report.nextToolCalls.some((call) => call.tool === "arcigy.batch_draft_lead_intros" && call.approvalRequired === false));
+  assert.ok(report.nextToolCalls.some((call) => call.tool === "arcigy.add_leads_to_smartlead_campaign" && call.approvalRequired === true));
+  assert.match(report.summary, /Ziadny zapis ani upload neprebehol/);
 });
 
 test("leadgen campaign pipeline preview chains scrape intro enrichment and Smartlead next steps", () => {

@@ -289,6 +289,27 @@ export type LeadEnrichmentBatchPreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string }>;
 };
 
+export type LeadgenGapReport = {
+  mode: "leadgen-gap-report";
+  summary: string;
+  totals: {
+    input: number;
+    unique: number;
+    duplicates: number;
+    readyForSmartlead: number;
+    manualReview: number;
+    rejected: number;
+    missingEmail: number;
+    missingWebsite: number;
+    missingIntro: number;
+    missingDecisionMaker: number;
+    missingCampaignId: number;
+  };
+  leads: Array<{ lead: LeadCandidateInput; gaps: string[]; recommendation: "ready_for_import" | "manual_review" | "reject"; score: number }>;
+  duplicates: ReturnType<typeof dedupeLeadCandidates>["duplicates"];
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type LeadgenCampaignPipelinePreview = {
   mode: "leadgen-campaign-pipeline-preview";
   summary: string;
@@ -1429,6 +1450,117 @@ export function previewLeadEnrichmentBatch(input: {
   };
 }
 
+export function buildLeadgenGapReport(input: {
+  leads: Array<LeadCandidateInput & { scraped?: Partial<ScrapedWebsiteContacts>; intro?: Partial<LeadIntroDraft>; context?: string }>;
+  niche?: { id?: string; slug: string; name: string; campaignId?: string | number | null };
+  minScore?: number;
+  batchSize?: number;
+  campaignTag?: string;
+  defaultSource?: string;
+  offer?: string;
+  language?: "sk" | "en";
+}): LeadgenGapReport {
+  const normalized = input.leads.map((lead) => normalizePipelineLead(lead, input.campaignTag ?? input.niche?.slug, input.defaultSource));
+  const deduped = dedupeLeadCandidates({ leads: normalized });
+  const score = scoreLeadQuality({
+    leads: deduped.unique.map((lead) => ({
+      email: lead.email,
+      companyName: lead.companyName,
+      website: lead.website,
+      decisionMaker: [lead.firstName, lead.lastName].filter(Boolean).join(" ") || String(lead.customFields?.decision_maker_name ?? ""),
+      personalizedIntro: lead.personalizedIntro,
+      verificationStatus: lead.customFields?.verification_status === "failed" ? "failed" : lead.customFields?.verification_status === "flagged" ? "flagged" : undefined,
+    })),
+    minScore: input.minScore ?? 70,
+  });
+  const queue = buildManualReviewQueue({ leads: deduped.unique, minScore: input.minScore ?? 70 });
+  const scoredByKey = new Map(score.scoredLeads.map((lead) => [leadIdentityKey(lead)?.value ?? `${lead.companyName ?? ""}|${lead.email ?? ""}|${lead.website ?? ""}`, lead]));
+  const recommendationByKey = new Map(
+    [...queue.ready, ...queue.review, ...queue.rejected].map((item) => [leadIdentityKey(item.lead)?.value ?? `${item.lead.companyName ?? ""}|${item.lead.email ?? ""}|${item.lead.website ?? ""}`, item])
+  );
+  const leads = deduped.unique.map((lead) => {
+    const key = leadIdentityKey(lead)?.value ?? `${lead.companyName ?? ""}|${lead.email ?? ""}|${lead.website ?? ""}`;
+    const scored = scoredByKey.get(key);
+    const recommendation = recommendationByKey.get(key);
+    return {
+      lead,
+      gaps: leadGaps(lead),
+      recommendation: recommendation?.recommendation ?? (scored?.passed ? "ready_for_import" as const : "manual_review" as const),
+      score: scored?.score ?? 0,
+    };
+  });
+  const readyLeads = queue.ready.map((item) => item.lead);
+  const smartleadPlan = input.niche && readyLeads.length
+    ? buildSmartleadInjectionPlan({ niche: input.niche, leads: readyLeads, batchSize: input.batchSize })
+    : undefined;
+  const websitesToScrape = unique(deduped.unique.filter((lead) => lead.website && !lead.email).map((lead) => String(lead.website))).slice(0, 50);
+  const introsToDraft = deduped.unique
+    .filter((lead) => lead.companyName && !lead.personalizedIntro)
+    .slice(0, 50)
+    .map((lead) => ({ companyName: String(lead.companyName), website: lead.website, context: String(lead.customFields?.context_preview ?? ""), offer: input.offer, language: input.language ?? "sk" }));
+  const nextToolCalls: LeadgenGapReport["nextToolCalls"] = [];
+  if (websitesToScrape.length) {
+    nextToolCalls.push({
+      tool: "arcigy.batch_scrape_website_contacts",
+      payload: { urls: websitesToScrape, includePriorityPages: true, maxPages: 4, maxSites: Math.min(websitesToScrape.length, 50) },
+      reason: "Leady maju web, ale chyba email; najprv skus batch scrape kontaktov.",
+      approvalRequired: false,
+    });
+  }
+  if (introsToDraft.length) {
+    nextToolCalls.push({
+      tool: "arcigy.batch_draft_lead_intros",
+      payload: { leads: introsToDraft, offer: input.offer, language: input.language ?? "sk", maxLeads: Math.min(introsToDraft.length, 50) },
+      reason: "Chybaju personalizovane AI intra pred Smartlead sekvenciou.",
+      approvalRequired: false,
+    });
+  }
+  if (input.niche && readyLeads.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_smartlead_injection_plan",
+      payload: { niche: input.niche, leads: readyLeads, batchSize: input.batchSize },
+      reason: "Ready leady priprav do Smartlead lead_list batchov bez uploadu.",
+      approvalRequired: false,
+    });
+  }
+  if (smartleadPlan?.addLeadsApprovalPayload) {
+    nextToolCalls.push({
+      tool: "arcigy.add_leads_to_smartlead_campaign",
+      payload: smartleadPlan.addLeadsApprovalPayload as unknown as Record<string, unknown>,
+      reason: "Upload do Smartlead az po explicitnom schvaleni operatora.",
+      approvalRequired: true,
+    });
+  } else if (input.niche && readyLeads.length) {
+    nextToolCalls.push({
+      tool: "arcigy.draft_niche_smartlead_campaign_setup",
+      payload: { niche: { id: input.niche.id, slug: input.niche.slug, name: input.niche.name }, offer: input.offer, language: input.language ?? "sk" },
+      reason: "Niche nema campaignId; pred uploadom priprav Smartlead kampan.",
+      approvalRequired: false,
+    });
+  }
+  const totals = {
+    input: input.leads.length,
+    unique: deduped.unique.length,
+    duplicates: deduped.duplicates.length,
+    readyForSmartlead: queue.ready.length,
+    manualReview: queue.review.length,
+    rejected: queue.rejected.length,
+    missingEmail: leads.filter((item) => item.gaps.includes("email")).length,
+    missingWebsite: leads.filter((item) => item.gaps.includes("website")).length,
+    missingIntro: leads.filter((item) => item.gaps.includes("personalized_intro")).length,
+    missingDecisionMaker: leads.filter((item) => item.gaps.includes("decision_maker")).length,
+    missingCampaignId: input.niche?.campaignId ? 0 : queue.ready.length,
+  };
+  return {
+    mode: "leadgen-gap-report",
+    summary: `Leadgen gap report: ${totals.readyForSmartlead} ready, ${totals.manualReview} manual review, ${totals.rejected} rejected; chyba ${totals.missingEmail} emailov, ${totals.missingIntro} intier. Ziadny zapis ani upload neprebehol.`,
+    totals,
+    leads,
+    duplicates: deduped.duplicates,
+    nextToolCalls,
+  };
+}
+
 export function buildLeadgenCampaignPipelinePreview(input: {
   leads: Array<LeadCandidateInput & {
     scraped?: Partial<ScrapedWebsiteContacts>;
@@ -1960,6 +2092,16 @@ function normalizePipelineLead(
       context_preview: contextPreview ? redactSensitiveText(contextPreview).slice(0, 1200) : undefined,
     },
   };
+}
+
+function leadGaps(lead: LeadCandidateInput): string[] {
+  const gaps: string[] = [];
+  if (!lead.email) gaps.push("email");
+  if (!lead.website) gaps.push("website");
+  if (!lead.companyName) gaps.push("company_name");
+  if (!lead.personalizedIntro) gaps.push("personalized_intro");
+  if (![lead.firstName, lead.lastName].filter(Boolean).join(" ") && !lead.customFields?.decision_maker_name) gaps.push("decision_maker");
+  return gaps;
 }
 
 function emptyBatchScrape(urls: string[]): BatchScrapedWebsiteContacts {

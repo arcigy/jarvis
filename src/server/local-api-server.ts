@@ -20,6 +20,7 @@ import { buildLeadgenDailyReport, buildLeadgenEveningSummary, buildLeadgenOpsDig
 import {
   buildBatchNicheDiscoveryPlan,
   buildNicheLeadgenPlan,
+  buildLeadgenGapReport,
   buildLeadgenCampaignPipelinePreview,
   batchScrapeWebsiteContacts,
   batchDraftLeadIntros,
@@ -1598,6 +1599,21 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         niche: payload.niche as Parameters<typeof previewLeadEnrichmentBatch>[0]["niche"],
         campaignTag: optionalString(payload.campaignTag),
         defaultSource: optionalString(payload.defaultSource),
+        minScore: typeof payload.minScore === "number" ? payload.minScore : undefined,
+        batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_leadgen_gap_report") {
+    writeJson(response, 200, {
+      result: buildLeadgenGapReport({
+        leads: (payload.leads ?? []) as Parameters<typeof buildLeadgenGapReport>[0]["leads"],
+        niche: payload.niche as Parameters<typeof buildLeadgenGapReport>[0]["niche"],
+        campaignTag: optionalString(payload.campaignTag),
+        defaultSource: optionalString(payload.defaultSource),
+        offer: optionalString(payload.offer),
+        language: payload.language === "en" ? "en" : "sk",
         minScore: typeof payload.minScore === "number" ? payload.minScore : undefined,
         batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
       }),

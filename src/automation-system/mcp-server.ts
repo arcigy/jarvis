@@ -21,6 +21,7 @@ import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerpe
 import {
   buildBatchNicheDiscoveryPlan,
   buildNicheLeadgenPlan,
+  buildLeadgenGapReport,
   buildLeadgenCampaignPipelinePreview,
   batchScrapeWebsiteContacts,
   batchDraftLeadIntros,
@@ -2155,6 +2156,36 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(previewLeadEnrichmentBatch(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_leadgen_gap_report",
+    {
+      title: "Build leadgen gap report",
+      description: "Audit a lead batch before Smartlead, report missing email/website/AI intro/decision-maker gaps, and propose safe next MCP calls without writes.",
+      inputSchema: {
+        leads: z.array(pipelineLeadSchema).min(1),
+        niche: z.object({
+          id: z.string().optional(),
+          slug: z.string().min(1),
+          name: z.string().min(1),
+          campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+        }).optional(),
+        campaignTag: z.string().optional(),
+        defaultSource: z.string().optional(),
+        offer: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        minScore: z.number().int().min(0).max(100).default(70),
+        batchSize: z.number().int().min(1).max(100).default(50),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildLeadgenGapReport(input))
   );
 
   server.registerTool(
