@@ -37,6 +37,7 @@ import {
   filterBlacklistedLeads,
   buildDailyLeadgenRunbook,
   parseLeadsCsv,
+  previewSmartleadEmailRendering,
   previewLeadEnrichmentBatch,
   prepareSmartleadLeads,
   runLeadgenResearchPipeline,
@@ -1473,6 +1474,18 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         offer: optionalString(payload.offer),
         painPoint: optionalString(payload.painPoint),
         language: payload.language === "en" ? "en" : "sk",
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.preview_smartlead_email_rendering") {
+    writeJson(response, 200, {
+      result: previewSmartleadEmailRendering({
+        leads: (payload.leads ?? []) as Parameters<typeof previewSmartleadEmailRendering>[0]["leads"],
+        sequences: (payload.sequences ?? []) as Parameters<typeof previewSmartleadEmailRendering>[0]["sequences"],
+        signature: optionalString(payload.signature),
+        maxLeads: typeof payload.maxLeads === "number" ? payload.maxLeads : undefined,
+        maxRendered: typeof payload.maxRendered === "number" ? payload.maxRendered : undefined,
       }),
     });
     return;

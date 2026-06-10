@@ -36,6 +36,7 @@ import {
   filterBlacklistedLeads,
   parseLeadsCsv,
   previewLeadEnrichmentBatch,
+  previewSmartleadEmailRendering,
   prepareSmartleadLeads,
   scoreLeadQuality,
   serializeLeadsCsv,
@@ -147,6 +148,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.dedupe_lead_candidates",
     "arcigy.build_niche_leadgen_plan",
     "arcigy.draft_smartlead_campaign_sequence",
+    "arcigy.preview_smartlead_email_rendering",
     "arcigy.preview_manual_review_pickup",
     "arcigy.build_smartlead_injection_plan",
     "arcigy.draft_niche_smartlead_campaign_setup",
@@ -1415,7 +1417,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 82 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 83 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -3417,6 +3419,42 @@ test("niche plan and Smartlead sequence drafts follow leadgen conventions", () =
   assert.equal(sequence.sequences[1].seq_variants[0].subject, "");
   assert.ok(sequence.requiredVariables.includes("{{personalized_intro}}"));
   assert.ok(sequence.sequences[0].seq_variants[0].email_body.includes("%signature%"));
+});
+
+test("Smartlead email rendering preview substitutes lead variables without sending", () => {
+  const preview = previewSmartleadEmailRendering({
+    leads: [
+      {
+        email: "jan@example.com",
+        first_name: "Jan",
+        company_name: "Modelova Firma",
+        website: "example.com",
+        custom_fields: { personalized_intro: "Kratke AI intro.", extra_note: "VIP" },
+      },
+    ],
+    sequences: [
+      {
+        seq_number: 1,
+        seq_delay_details: { delay_in_days: 0 },
+        seq_variants: [
+          {
+            variant_label: "A",
+            subject: "Otazka k {{company_name}}",
+            email_body: "<p>{{personalized_intro}}</p><p>{{extra_note}}</p><p>%signature%</p>",
+          },
+        ],
+      },
+    ],
+    signature: "Branislav z Arcigy",
+  });
+
+  assert.equal(preview.mode, "smartlead-email-rendering-preview");
+  assert.equal(preview.totals.renderedEmails, 1);
+  assert.equal(preview.rendered[0].subject, "Otazka k Modelova Firma");
+  assert.match(preview.rendered[0].emailBody, /Kratke AI intro/);
+  assert.match(preview.rendered[0].emailBody, /Branislav z Arcigy/);
+  assert.deepEqual(preview.rendered[0].missingVariables, []);
+  assert.match(preview.summary, /Ziadny email nebol odoslany/);
 });
 
 test("lead CSV parsing, blacklist filtering, manual review, and export are deterministic", () => {

@@ -235,6 +235,22 @@ export type SmartleadCampaignQaPreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type SmartleadEmailRenderingPreview = {
+  mode: "smartlead-email-rendering-preview";
+  summary: string;
+  totals: { leads: number; sequenceSteps: number; variants: number; renderedEmails: number; missingVariableInstances: number };
+  rendered: Array<{
+    email: string;
+    companyName?: string;
+    sequenceNumber: number;
+    variantLabel: string;
+    subject: string;
+    emailBody: string;
+    missingVariables: string[];
+  }>;
+  warnings: string[];
+};
+
 export type ColdOutreachCsvImportPreview = {
   mode: "cold-outreach-csv-import-preview";
   summary: string;
@@ -1287,6 +1303,54 @@ export function buildSmartleadCampaignQaPreview(input: {
   };
 }
 
+export function previewSmartleadEmailRendering(input: {
+  leads: SmartleadLead[];
+  sequences: NicheSmartleadCampaignSetupDraft["sequences"];
+  signature?: string;
+  maxLeads?: number;
+  maxRendered?: number;
+}): SmartleadEmailRenderingPreview {
+  const maxLeads = Math.min(Math.max(Math.trunc(input.maxLeads ?? 10), 1), 50);
+  const maxRendered = Math.min(Math.max(Math.trunc(input.maxRendered ?? 50), 1), 250);
+  const leads = input.leads.slice(0, maxLeads);
+  const signature = input.signature ?? "%signature%";
+  const rendered: SmartleadEmailRenderingPreview["rendered"] = [];
+  for (const lead of leads) {
+    const values = smartleadTemplateValues(lead, signature);
+    for (const sequence of input.sequences) {
+      for (const variant of sequence.seq_variants) {
+        const subject = renderTemplate(variant.subject, values);
+        const emailBody = renderTemplate(variant.email_body, values);
+        const missingVariables = unique([...unresolvedTemplateVariables(subject), ...unresolvedTemplateVariables(emailBody)]);
+        rendered.push({
+          email: lead.email,
+          companyName: lead.company_name,
+          sequenceNumber: sequence.seq_number,
+          variantLabel: variant.variant_label,
+          subject,
+          emailBody,
+          missingVariables,
+        });
+        if (rendered.length >= maxRendered) break;
+      }
+      if (rendered.length >= maxRendered) break;
+    }
+    if (rendered.length >= maxRendered) break;
+  }
+  const warnings: string[] = [];
+  const missingVariableInstances = rendered.reduce((sum, item) => sum + item.missingVariables.length, 0);
+  if (missingVariableInstances) warnings.push(`${missingVariableInstances} unresolved template variable instance(s).`);
+  if (input.signature === undefined) warnings.push("Signature placeholder was left as %signature%; Smartlead/account signature should fill it.");
+  const variants = input.sequences.reduce((sum, sequence) => sum + sequence.seq_variants.length, 0);
+  return {
+    mode: "smartlead-email-rendering-preview",
+    summary: `Smartlead email rendering preview: ${rendered.length} email variantov pre ${leads.length} leadov, ${missingVariableInstances} unresolved premennych. Ziadny email nebol odoslany.`,
+    totals: { leads: leads.length, sequenceSteps: input.sequences.length, variants, renderedEmails: rendered.length, missingVariableInstances },
+    rendered,
+    warnings,
+  };
+}
+
 export function previewLeadEnrichmentBatch(input: {
   leads: Array<ManualReviewPickupLead & {
     scraped?: Partial<ScrapedWebsiteContacts>;
@@ -1825,6 +1889,29 @@ function duplicateValues(values: string[]): string[] {
 }
 
 function extractTemplateVariables(value: string): string[] {
+  return [...value.matchAll(/\{\{[a-zA-Z0-9_]+\}\}/g)].map((match) => match[0]);
+}
+
+function smartleadTemplateValues(lead: SmartleadLead, signature: string): Record<string, string> {
+  const custom = Object.fromEntries(Object.entries(lead.custom_fields ?? {}).map(([key, value]) => [key, String(value)]));
+  return {
+    ...custom,
+    email: lead.email,
+    first_name: lead.first_name ?? "",
+    last_name: lead.last_name ?? "",
+    company_name: lead.company_name ?? "",
+    website: lead.website ?? "",
+    personalized_intro: String(lead.custom_fields?.personalized_intro ?? ""),
+    "%signature%": signature,
+  };
+}
+
+function renderTemplate(template: string, values: Record<string, string>): string {
+  const withVariables = template.replace(/\{\{([a-zA-Z0-9_]+)\}\}/g, (match, key) => values[key] ?? match);
+  return withVariables.replace(/%signature%/g, values["%signature%"] ?? "%signature%");
+}
+
+function unresolvedTemplateVariables(value: string): string[] {
   return [...value.matchAll(/\{\{[a-zA-Z0-9_]+\}\}/g)].map((match) => match[0]);
 }
 

@@ -38,6 +38,7 @@ import {
   filterBlacklistedLeads,
   buildDailyLeadgenRunbook,
   parseLeadsCsv,
+  previewSmartleadEmailRendering,
   previewLeadEnrichmentBatch,
   prepareSmartleadLeads,
   runLeadgenResearchPipeline,
@@ -1859,6 +1860,43 @@ export function createJarvisMcpServer(): McpServer {
     }).partial().optional(),
     context: z.string().optional(),
   });
+
+  server.registerTool(
+    "arcigy.preview_smartlead_email_rendering",
+    {
+      title: "Preview Smartlead email rendering",
+      description: "Render Smartlead sequence variants for concrete leads and report unresolved variables without sending emails.",
+      inputSchema: {
+        leads: z.array(z.object({
+          email: z.string().min(1),
+          first_name: z.string().optional(),
+          last_name: z.string().optional(),
+          company_name: z.string().optional(),
+          website: z.string().optional(),
+          custom_fields: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
+        })).min(1).max(50),
+        sequences: z.array(z.object({
+          seq_number: z.number().int().min(1),
+          seq_delay_details: z.object({ delay_in_days: z.number().int().min(0) }),
+          seq_variants: z.array(z.object({
+            variant_label: z.string().min(1),
+            subject: z.string(),
+            email_body: z.string(),
+          })).min(1),
+        })).min(1),
+        signature: z.string().optional(),
+        maxLeads: z.number().int().min(1).max(50).default(10),
+        maxRendered: z.number().int().min(1).max(250).default(50),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(previewSmartleadEmailRendering(input))
+  );
 
   server.registerTool(
     "arcigy.preview_manual_review_pickup",
