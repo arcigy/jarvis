@@ -267,6 +267,11 @@ async function handleVoiceEvent(payload) {
     return voiceDone(session, text, summarizeCapabilityAuditForVoice(audit));
   }
 
+  if (isProductionCompletionVoiceCommand(lowered)) {
+    const score = await getProductionCompletionScore({ ...payload, live: payload?.live === true || lowered.includes("live") });
+    return voiceDone(session, text, summarizeProductionCompletionScoreForVoice(score));
+  }
+
   if (isProductionReadinessVoiceCommand(lowered)) {
     const report = await getProductionReadiness({ ...payload, live: payload?.live === true || lowered.includes("live") });
     return voiceDone(session, text, summarizeReadinessForVoice(report));
@@ -1005,6 +1010,88 @@ async function getJarvisCapabilityAudit(payload = {}) {
   const readiness = await getProductionReadiness({ live: payload?.live === true });
   const productionEvidence = getProductionVerificationEvidence();
   return buildJarvisCapabilityAudit({ readiness, productionEvidence });
+}
+
+async function getProductionCompletionScore(payload = {}) {
+  const readiness = await getProductionReadiness({ live: payload?.live === true });
+  const productionEvidence = getProductionVerificationEvidence();
+  const capabilityAudit = buildJarvisCapabilityAudit({ readiness, productionEvidence });
+  return buildProductionCompletionScore({ readiness, productionEvidence, capabilityAudit });
+}
+
+function buildProductionCompletionScore({ readiness, productionEvidence, capabilityAudit }) {
+  const tools = listWebMcpTools();
+  const approvalCount = tools.filter((tool) => tool.requiresApproval).length;
+  const health = getSystemHealth();
+  const requiredIntegrations = health.integrations.filter((item) => item.requiredForProduction !== false);
+  const readyRequiredIntegrations = requiredIntegrations.filter((item) => item.configured);
+  const components = [
+    productionCompletionComponent(
+      "verification-evidence",
+      "Production verification evidence",
+      productionEvidence?.status === "ready" && productionEvidence?.freshness?.fresh === true && productionEvidence?.release?.dirty === false,
+      productionEvidence?.summary || "Production evidence missing.",
+      "Run npm run verify:production and require ready evidence with dirty=false."
+    ),
+    productionCompletionComponent(
+      "capability-coverage",
+      "Jarvis capability coverage",
+      capabilityAudit?.status === "ready",
+      capabilityAudit?.summary || "Capability audit missing.",
+      capabilityAudit?.nextActions?.[0] || "Restore capability coverage and rerun production verifier."
+    ),
+    productionCompletionComponent(
+      "readiness-launch",
+      "Readiness and launch checklist",
+      readiness?.status === "ready",
+      readiness?.summary || "Readiness report missing.",
+      readiness?.nextActions?.[0] || "Open production readiness and clear attention queue."
+    ),
+    productionCompletionComponent(
+      "mcp-approval-safety",
+      "MCP and approval safety",
+      tools.length >= 37 && approvalCount >= 6,
+      `${tools.length} MCP tools, ${approvalCount} approval locks.`,
+      "Restore MCP registry parity and approval gates."
+    ),
+    productionCompletionComponent(
+      "production-integrations",
+      "Production integrations",
+      readyRequiredIntegrations.length === requiredIntegrations.length,
+      `${readyRequiredIntegrations.length}/${requiredIntegrations.length} required integration groups configured.`,
+      "Configure missing required integrations in .env.local."
+    ),
+  ];
+  const ready = components.filter((item) => item.status === "ready").length;
+  const percent = Math.round((ready / Math.max(components.length, 1)) * 100);
+  const status = percent >= 95 ? "ready" : percent >= 75 ? "attention" : "blocked";
+  return {
+    mode: "arcigy-jarvis-production-completion-score",
+    status,
+    generatedAt: new Date().toISOString(),
+    percent,
+    overallPercent: percent,
+    completionPercent: percent,
+    summary:
+      status === "ready"
+        ? `Jarvis production completion je ${percent}%. Vsetky hlavne vrstvy su evidence-ready.`
+        : `Jarvis production completion je ${percent}%. ${components.length - ready} oblast(i) potrebuje attention.`,
+    components,
+    nextActions: components.filter((item) => item.status !== "ready").map((item) => item.nextAction),
+    secretPolicy: "Secret-safe: score uses only statuses, counts, proof gates, and redacted evidence.",
+  };
+}
+
+function productionCompletionComponent(id, title, ready, proof, nextAction) {
+  return {
+    id,
+    title,
+    score: ready ? 1 : 0,
+    maxScore: 1,
+    status: ready ? "ready" : "attention",
+    proof,
+    nextAction,
+  };
 }
 
 function buildJarvisCapabilityAudit({ readiness, productionEvidence }) {
@@ -3012,6 +3099,21 @@ function summarizeCapabilityAuditForVoice(audit) {
   ].filter(Boolean).join(" ");
 }
 
+function summarizeProductionCompletionScoreForVoice(score) {
+  const components = Array.isArray(score?.components) ? score.components : [];
+  const ready = components.filter((item) => item?.status === "ready").length;
+  const attention = components.filter((item) => item?.status === "attention").length;
+  const blocked = components.filter((item) => item?.status === "blocked").length;
+  const next = Array.isArray(score?.nextActions) && score.nextActions.length ? score.nextActions[0] : "Drz production proof cerstvy.";
+  return [
+    `Sme na ${Number(score?.percent ?? 0)}% production completion.`,
+    `Status: ${score?.status || "unknown"}.`,
+    typeof score?.summary === "string" ? score.summary : null,
+    `Komponenty: ${ready}/${components.length} ready, ${attention} attention, ${blocked} blocked.`,
+    `Najblizsi krok: ${next}`,
+  ].filter(Boolean).join(" ");
+}
+
 function summarizeRemoteMcpForVoice(pack) {
   const tools = pack.tools || {};
   const approvalRequired = Array.isArray(tools.approvalRequired) ? tools.approvalRequired : [];
@@ -3066,6 +3168,10 @@ function isProductionEvidenceVoiceCommand(text) {
 
 function isCapabilityAuditVoiceCommand(text) {
   return ["capability audit", "coverage audit", "jarvis coverage", "pokrytie", "pokryte", "co vsetko funguje", "co vsetko je hotove"].some((term) => text.includes(term));
+}
+
+function isProductionCompletionVoiceCommand(text) {
+  return ["kolko percent", "na kolko percent", "percent hotove", "production completion", "completion score", "kolko sme ready"].some((term) => text.includes(term));
 }
 
 function isRemoteMcpVoiceCommand(text) {
