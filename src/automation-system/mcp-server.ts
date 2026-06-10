@@ -23,6 +23,7 @@ import {
   buildNicheLeadgenPlan,
   buildLeadgenGapReport,
   buildLeadgenCampaignPipelinePreview,
+  buildLeadSourceImportQueuePreview,
   batchScrapeWebsiteContacts,
   batchDraftLeadIntros,
   buildManualReviewPickupPlan,
@@ -1962,6 +1963,22 @@ export function createJarvisMcpServer(): McpServer {
     }).partial().optional(),
     context: z.string().optional(),
   });
+  const leadSourceQueueLeadSchema = pipelineLeadSchema.extend({
+    nicheSlug: z.string().optional(),
+    nicheName: z.string().optional(),
+    campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+    smartleadCampaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+    placeId: z.string().optional(),
+    rating: z.number().optional(),
+    reviewCount: z.number().int().nonnegative().optional(),
+  });
+  const queueNicheSchema = z.object({
+    id: z.string().optional(),
+    slug: z.string().min(1),
+    name: z.string().min(1),
+    campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+    aliases: z.array(z.string()).optional(),
+  });
 
   server.registerTool(
     "arcigy.preview_smartlead_email_rendering",
@@ -2245,6 +2262,41 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildLeadgenCampaignPipelinePreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_lead_source_import_queue_preview",
+    {
+      title: "Build lead source import queue preview",
+      description: "Turn Google Maps, CSV, Serper, or manual lead source rows into niche/campaign import queues with scrape, intro, review, and Smartlead audit next steps without writes.",
+      inputSchema: {
+        sourceName: z.string().optional(),
+        sourceType: z.enum(["google_maps", "csv", "serper", "manual", "other"]).default("manual"),
+        leads: z.array(leadSourceQueueLeadSchema).optional(),
+        csvText: z.string().optional(),
+        delimiter: z.enum([",", ";"]).optional(),
+        maxRows: z.number().int().min(1).max(10_000).default(1000),
+        niches: z.array(queueNicheSchema).optional(),
+        defaultNiche: queueNicheSchema.omit({ aliases: true }).optional(),
+        blacklistDomains: z.array(z.string()).optional(),
+        blacklistKeywords: z.array(z.string()).optional(),
+        existingSmartleadLeadsByCampaign: z.record(z.string(), z.array(z.record(z.string(), z.unknown()))).optional(),
+        campaignTag: z.string().optional(),
+        defaultSource: z.string().optional(),
+        offer: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        minScore: z.number().int().min(0).max(100).default(70),
+        batchSize: z.number().int().min(1).max(100).default(50),
+        maxNextCalls: z.number().int().min(1).max(80).default(30),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildLeadSourceImportQueuePreview(input))
   );
 
   server.registerTool(

@@ -498,6 +498,20 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       batchSize: 50,
     };
   }
+  if (toolName === "arcigy.build_lead_source_import_queue_preview") {
+    return {
+      sourceName: "kuchyne_sk_google_maps_2026-04-27.csv",
+      sourceType: "google_maps",
+      niches: [{ slug: "kuchyne", name: "Kuchynske studia", campaignId: "123456", aliases: ["kuchyne", "kuchynske studio"] }],
+      leads: [
+        { companyName: "Ready Studio", website: "https://ready.sk", email: "jan@ready.sk", personalizedIntro: "Vsimol som si vase realizacie kuchyn.", nicheSlug: "kuchyne" },
+        { companyName: "Needs Scrape", website: "https://needs-scrape.sk", nicheSlug: "kuchyne", placeId: "place-1", rating: 4.8, reviewCount: 42 },
+      ],
+      existingSmartleadLeadsByCampaign: { "123456": [{ email: "old@ready.sk" }] },
+      offer: "AI automatizacie pre dopyty a follow-up.",
+      language: "sk",
+    };
+  }
   if (toolName === "arcigy.build_cold_outreach_csv_import_preview") {
     return {
       csvText: "company_name,email,website,personalized_intro\nModelova Firma,jan.novak@example.com,https://example.com,Vsimol som si vas servis.\nBlocked Firma,lead@competitor.sk,https://competitor.sk,",

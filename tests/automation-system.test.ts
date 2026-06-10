@@ -24,6 +24,7 @@ import {
   buildManualReviewQueue,
   buildLeadgenGapReport,
   buildLeadgenCampaignPipelinePreview,
+  buildLeadSourceImportQueuePreview,
   buildColdOutreachCsvImportPreview,
   buildSmartleadCampaignLaunchPreview,
   buildSmartleadCampaignQaPreview,
@@ -164,6 +165,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.preview_lead_enrichment_batch",
     "arcigy.build_leadgen_gap_report",
     "arcigy.build_leadgen_campaign_pipeline_preview",
+    "arcigy.build_lead_source_import_queue_preview",
     "arcigy.build_cold_outreach_csv_import_preview",
     "arcigy.build_daily_leadgen_runbook",
     "arcigy.parse_leads_csv",
@@ -1425,7 +1427,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 88 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 89 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -2798,6 +2800,53 @@ test("leadgen campaign pipeline preview chains scrape intro enrichment and Smart
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_scrape_website_contacts"));
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_draft_lead_intros"));
   assert.equal(preview.smartleadPlan?.addLeadsApprovalPayload?.campaignId, "123456");
+  assert.match(preview.summary, /Ziadny zapis ani upload/);
+});
+
+test("lead source import queue preview groups Google Maps leads before Smartlead import", () => {
+  const preview = buildLeadSourceImportQueuePreview({
+    sourceName: "kuchyne_sk_google_maps_2026-04-27.csv",
+    sourceType: "google_maps",
+    niches: [{ slug: "kuchyne", name: "Kuchynske studia", campaignId: "123456", aliases: ["kuchynske studio"] }],
+    leads: [
+      {
+        companyName: "Ready Studio",
+        website: "https://ready.sk",
+        email: "jan@ready.sk",
+        firstName: "Jan",
+        phone: "+421 900 111 222",
+        personalizedIntro: "Vsimol som si vase realizacie kuchyn.",
+        nicheSlug: "kuchyne",
+        placeId: "place-1",
+        rating: 4.8,
+        reviewCount: 42,
+      },
+      {
+        companyName: "Needs Scrape",
+        website: "https://needs-scrape.sk",
+        nicheSlug: "kuchyne",
+      },
+      {
+        companyName: "Unassigned Firma",
+        website: "https://unassigned.sk",
+      },
+    ],
+    existingSmartleadLeadsByCampaign: { "123456": [{ email: "old@ready.sk" }] },
+    offer: "AI automatizacie pre dopyty.",
+    minScore: 70,
+  });
+
+  assert.equal(preview.mode, "lead-source-import-queue-preview");
+  assert.equal(preview.source.type, "google_maps");
+  assert.equal(preview.totals.input, 3);
+  assert.equal(preview.totals.groups, 1);
+  assert.equal(preview.totals.unassigned, 1);
+  assert.equal(preview.groups[0].niche.campaignId, "123456");
+  assert.equal(preview.groups[0].pipelinePreview.totals.readyForSmartlead, 1);
+  assert.equal(preview.groups[0].importAudit?.totals.newLeads, 1);
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_scrape_website_contacts" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.get_smartlead_campaign_leads" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.add_leads_to_smartlead_campaign" && call.approvalRequired));
   assert.match(preview.summary, /Ziadny zapis ani upload/);
 });
 

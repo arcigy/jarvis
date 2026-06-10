@@ -77,6 +77,7 @@ export type JarvisMcpToolName =
   | "arcigy.preview_lead_enrichment_batch"
   | "arcigy.build_leadgen_gap_report"
   | "arcigy.build_leadgen_campaign_pipeline_preview"
+  | "arcigy.build_lead_source_import_queue_preview"
   | "arcigy.build_cold_outreach_csv_import_preview"
   | "arcigy.build_daily_leadgen_runbook"
   | "arcigy.parse_leads_csv"
@@ -496,6 +497,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.build_leadgen_campaign_pipeline_preview",
       description: "Z jedneho batchu leadov pripravi scrape, AI intro, enrichment a Smartlead next-step plan bez zapisu alebo uploadu.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_lead_source_import_queue_preview",
+      description: "Z Google Maps/CSV/manual lead source pripravi import queue po niche/kampaniach, gapy a Smartlead audit bez zapisu alebo uploadu.",
       requiresApproval: false,
     },
     {

@@ -283,6 +283,47 @@ export type ColdOutreachCsvImportPreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type LeadSourceImportQueueLead = LeadCandidateInput & {
+  nicheSlug?: string;
+  nicheName?: string;
+  campaignId?: string | number | null;
+  smartleadCampaignId?: string | number | null;
+  placeId?: string;
+  rating?: number;
+  reviewCount?: number;
+  scraped?: Partial<ScrapedWebsiteContacts>;
+  intro?: Partial<LeadIntroDraft>;
+  context?: string;
+};
+
+export type LeadSourceImportQueuePreview = {
+  mode: "lead-source-import-queue-preview";
+  summary: string;
+  source: { name: string; type: "google_maps" | "csv" | "serper" | "manual" | "other" };
+  totals: {
+    input: number;
+    parsedFromCsv: number;
+    allowed: number;
+    blocked: number;
+    groups: number;
+    readyForSmartlead: number;
+    manualReview: number;
+    rejected: number;
+    websitesToScrape: number;
+    introsToDraft: number;
+    unassigned: number;
+  };
+  groups: Array<{
+    niche: { id?: string; slug: string; name: string; campaignId?: string | number | null };
+    leads: LeadSourceImportQueueLead[];
+    pipelinePreview: LeadgenCampaignPipelinePreview;
+    importAudit?: SmartleadImportAuditPreview;
+  }>;
+  unassigned: LeadSourceImportQueueLead[];
+  blocked: ReturnType<typeof filterBlacklistedLeads>["blocked"];
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type LeadEnrichmentBatchPreview = {
   mode: "lead-enrichment-batch-preview";
   summary: string;
@@ -1829,6 +1870,123 @@ export function buildColdOutreachCsvImportPreview(input: {
   };
 }
 
+export function buildLeadSourceImportQueuePreview(input: {
+  sourceName?: string;
+  sourceType?: "google_maps" | "csv" | "serper" | "manual" | "other";
+  leads?: LeadSourceImportQueueLead[];
+  csvText?: string;
+  delimiter?: "," | ";";
+  maxRows?: number;
+  niches?: Array<{ id?: string; slug: string; name: string; campaignId?: string | number | null; aliases?: string[] }>;
+  defaultNiche?: { id?: string; slug: string; name: string; campaignId?: string | number | null };
+  blacklistDomains?: string[];
+  blacklistKeywords?: string[];
+  existingSmartleadLeadsByCampaign?: Record<string, Array<Record<string, unknown>>>;
+  campaignTag?: string;
+  defaultSource?: string;
+  offer?: string;
+  language?: "sk" | "en";
+  minScore?: number;
+  batchSize?: number;
+  maxNextCalls?: number;
+}): LeadSourceImportQueuePreview {
+  const parsed = input.csvText
+    ? parseLeadsCsv({ csvText: input.csvText, delimiter: input.delimiter, maxRows: input.maxRows })
+    : { headers: [], leads: [], skipped: [] };
+  const rawLeads = [...(input.leads ?? []), ...parsed.leads] as LeadSourceImportQueueLead[];
+  const filtered = filterBlacklistedLeads({
+    leads: rawLeads,
+    domains: input.blacklistDomains,
+    keywords: input.blacklistKeywords,
+  });
+  const allowed = filtered.allowed.map((lead) => normalizeSourceQueueLead(lead as LeadSourceImportQueueLead, input.sourceName, input.defaultSource));
+  const groups = new Map<string, { niche: { id?: string; slug: string; name: string; campaignId?: string | number | null }; leads: LeadSourceImportQueueLead[] }>();
+  const unassigned: LeadSourceImportQueueLead[] = [];
+  for (const lead of allowed) {
+    const niche = resolveLeadQueueNiche(lead, input.niches, input.defaultNiche);
+    if (!niche) {
+      unassigned.push(lead);
+      continue;
+    }
+    const key = niche.slug;
+    const group = groups.get(key) ?? { niche, leads: [] };
+    group.leads.push(lead);
+    groups.set(key, group);
+  }
+
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 30), 1), 80);
+  const nextToolCalls: LeadSourceImportQueuePreview["nextToolCalls"] = [];
+  const groupResults = [...groups.values()].map((group) => {
+    const pipelinePreview = buildLeadgenCampaignPipelinePreview({
+      leads: group.leads,
+      niche: group.niche,
+      campaignTag: input.campaignTag ?? group.niche.slug,
+      defaultSource: input.defaultSource ?? input.sourceName ?? "lead-source-import",
+      offer: input.offer,
+      language: input.language,
+      minScore: input.minScore,
+      batchSize: input.batchSize,
+      maxNextCalls,
+    });
+    const readyLeads = pipelinePreview.enrichmentPreview.reviewQueue.ready
+      .map((item) => item.lead)
+      .filter((lead): lead is PreparedSmartleadLeadInput => Boolean(lead.email));
+    const smartleadLeads = prepareSmartleadLeads({ leads: readyLeads, defaultSource: input.defaultSource ?? input.sourceName }).leadList;
+    const campaignKey = group.niche.campaignId === undefined || group.niche.campaignId === null ? undefined : String(group.niche.campaignId);
+    const importAudit = smartleadLeads.length
+      ? buildSmartleadImportAuditPreview({
+          campaignId: group.niche.campaignId,
+          leads: smartleadLeads,
+          existingSmartleadLeads: campaignKey ? input.existingSmartleadLeadsByCampaign?.[campaignKey] : undefined,
+        })
+      : undefined;
+    nextToolCalls.push(
+      ...pipelinePreview.nextToolCalls.map((call) => ({
+        ...call,
+        approvalRequired: call.tool === "arcigy.add_leads_to_smartlead_campaign",
+      }))
+    );
+    if (importAudit) nextToolCalls.push(...importAudit.nextToolCalls);
+    return { niche: group.niche, leads: group.leads, pipelinePreview, importAudit };
+  });
+
+  if (unassigned.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_batch_niche_discovery_plan",
+      payload: {
+        niches: unique(unassigned.map((lead) => lead.companyName ?? lead.website ?? "unassigned-leads")).slice(0, Math.min(unassigned.length, 20)).map((name) => ({ slug: slugify(String(name)), name: String(name) })),
+      },
+      reason: "Cast leadov nema priradenu niche/kampan; najprv priprav niche mapping pred Smartlead importom.",
+      approvalRequired: false,
+    });
+  }
+
+  const dedupedCalls = dedupeNextToolCalls(nextToolCalls).slice(0, maxNextCalls);
+  const totals = {
+    input: rawLeads.length,
+    parsedFromCsv: parsed.leads.length,
+    allowed: allowed.length,
+    blocked: filtered.blocked.length,
+    groups: groupResults.length,
+    readyForSmartlead: groupResults.reduce((sum, group) => sum + group.pipelinePreview.totals.readyForSmartlead, 0),
+    manualReview: groupResults.reduce((sum, group) => sum + group.pipelinePreview.totals.manualReview, 0),
+    rejected: groupResults.reduce((sum, group) => sum + group.pipelinePreview.totals.rejected, 0),
+    websitesToScrape: groupResults.reduce((sum, group) => sum + group.pipelinePreview.totals.websitesToScrape, 0),
+    introsToDraft: groupResults.reduce((sum, group) => sum + group.pipelinePreview.totals.introsToDraft, 0),
+    unassigned: unassigned.length,
+  };
+  return {
+    mode: "lead-source-import-queue-preview",
+    summary: `Lead source import queue: ${totals.groups} skupin, ${totals.readyForSmartlead} ready do Smartlead, ${totals.manualReview} manual review, ${totals.websitesToScrape} webov na scrape, ${totals.introsToDraft} intro draftov. Ziadny zapis ani upload neprebehol.`,
+    source: { name: input.sourceName ?? "lead-source", type: input.sourceType ?? (input.csvText ? "csv" : "manual") },
+    totals,
+    groups: groupResults,
+    unassigned,
+    blocked: filtered.blocked,
+    nextToolCalls: dedupedCalls,
+  };
+}
+
 export function buildDailyLeadgenRunbook(input: {
   niche: { id?: string; slug: string; name: string; keywords?: string[]; region?: string; campaignId?: string | number | null };
   targetCount?: number;
@@ -2198,6 +2356,59 @@ function normalizePipelineLead(
       context_preview: contextPreview ? redactSensitiveText(contextPreview).slice(0, 1200) : undefined,
     },
   };
+}
+
+function normalizeSourceQueueLead(lead: LeadSourceImportQueueLead, sourceName?: string, defaultSource?: string): LeadSourceImportQueueLead {
+  const normalized = normalizePipelineLead(lead, lead.nicheSlug, defaultSource ?? sourceName) as LeadSourceImportQueueLead;
+  const customFields = { ...(normalized.customFields ?? {}) };
+  if (lead.nicheSlug) customFields.niche_slug = lead.nicheSlug;
+  if (lead.nicheName) customFields.niche_name = lead.nicheName;
+  if (lead.placeId) customFields.google_place_id = lead.placeId;
+  if (typeof lead.rating === "number") customFields.google_rating = lead.rating;
+  if (typeof lead.reviewCount === "number") customFields.google_review_count = lead.reviewCount;
+  if (sourceName) customFields.source_name = sourceName;
+  return {
+    ...normalized,
+    nicheSlug: lead.nicheSlug,
+    nicheName: lead.nicheName,
+    campaignId: lead.campaignId,
+    placeId: lead.placeId,
+    rating: lead.rating,
+    reviewCount: lead.reviewCount,
+    customFields,
+  };
+}
+
+function resolveLeadQueueNiche(
+  lead: LeadSourceImportQueueLead,
+  niches?: Array<{ id?: string; slug: string; name: string; campaignId?: string | number | null; aliases?: string[] }>,
+  defaultNiche?: { id?: string; slug: string; name: string; campaignId?: string | number | null }
+): { id?: string; slug: string; name: string; campaignId?: string | number | null } | undefined {
+  const explicitSlug = lead.nicheSlug ?? stringField(lead.customFields ?? {}, "niche_slug");
+  const explicitName = lead.nicheName ?? stringField(lead.customFields ?? {}, "niche_name");
+  const campaignId = lead.campaignId ?? lead.smartleadCampaignId ?? stringField(lead.customFields ?? {}, "campaign_id", "smartlead_campaign_id");
+  const direct = (niches ?? []).find((niche) => {
+    const aliases = [niche.slug, niche.name, ...(niche.aliases ?? [])].map(slugify);
+    return (explicitSlug && aliases.includes(slugify(explicitSlug))) || (explicitName && aliases.includes(slugify(explicitName))) || (campaignId !== undefined && campaignId !== null && String(niche.campaignId ?? "") === String(campaignId));
+  });
+  if (direct) return { id: direct.id, slug: direct.slug, name: direct.name, campaignId: direct.campaignId ?? campaignId };
+  if (explicitSlug || explicitName || campaignId !== undefined) {
+    const name = explicitName ?? explicitSlug ?? `Campaign ${campaignId}`;
+    return { slug: explicitSlug ? slugify(explicitSlug) : slugify(String(name)), name: String(name), campaignId };
+  }
+  return defaultNiche;
+}
+
+function dedupeNextToolCalls<T extends { tool: string; payload: Record<string, unknown> }>(calls: T[]): T[] {
+  const seen = new Set<string>();
+  const result: T[] = [];
+  for (const call of calls) {
+    const key = `${call.tool}:${JSON.stringify(call.payload)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(call);
+  }
+  return result;
 }
 
 function leadGaps(lead: LeadCandidateInput): string[] {
