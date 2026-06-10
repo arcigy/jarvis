@@ -33,6 +33,7 @@ import {
   buildSmartleadCampaignQaPreview,
   buildSmartleadInjectionPlan,
   buildSmartleadImportAuditPreview,
+  buildSmartleadSenderCapacityPreview,
   buildColdOutreachCsvImportPreview,
   dedupeLeadCandidates,
   draftNicheSmartleadCampaignSetup,
@@ -1552,6 +1553,20 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         campaignId: (payload.campaignId ?? null) as string | number | null,
         leads: (payload.leads ?? []) as Parameters<typeof buildSmartleadImportAuditPreview>[0]["leads"],
         existingSmartleadLeads: Array.isArray(payload.existingSmartleadLeads) ? payload.existingSmartleadLeads as Array<Record<string, unknown>> : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_smartlead_sender_capacity_preview") {
+    writeJson(response, 200, {
+      result: buildSmartleadSenderCapacityPreview({
+        campaignId: (payload.campaignId ?? null) as string | number | null,
+        accounts: Array.isArray(payload.accounts) ? payload.accounts as Parameters<typeof buildSmartleadSenderCapacityPreview>[0]["accounts"] : [],
+        leadBacklog: typeof payload.leadBacklog === "number" ? payload.leadBacklog : undefined,
+        requestedDailyLimit: typeof payload.requestedDailyLimit === "number" ? payload.requestedDailyLimit : undefined,
+        minTimeBetweenEmailsMinutes: typeof payload.minTimeBetweenEmailsMinutes === "number" ? payload.minTimeBetweenEmailsMinutes : undefined,
+        maxPerAccountPerDay: typeof payload.maxPerAccountPerDay === "number" ? payload.maxPerAccountPerDay : undefined,
+        includePausedAccounts: payload.includePausedAccounts === true,
       }),
     });
     return;

@@ -955,6 +955,23 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Preview Smartlead sender capacity",
+      tool: "arcigy.build_smartlead_sender_capacity_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_smartlead_sender_capacity_preview"),
+      body: {
+        campaignId: "123456",
+        leadBacklog: 180,
+        requestedDailyLimit: 60,
+        minTimeBetweenEmailsMinutes: 12,
+        accounts: [
+          { id: "acct-1", email: "andrej@arcigy.group", status: "active", warmupStatus: "active", dailyLimit: 40, sentToday: 12, bounceRate: 1.2, reputationScore: 92 },
+          { id: "acct-2", email: "sales@arcigy.group", status: "active", warmupStatus: "warming", dailyLimit: 30, sentToday: 4, bounceRate: 2.1, reputationScore: 84 },
+        ],
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Draft niche Smartlead campaign setup",
       tool: "arcigy.draft_niche_smartlead_campaign_setup",
       method: "POST",

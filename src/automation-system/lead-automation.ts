@@ -403,6 +403,43 @@ export type NicheOpsDashboardPreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type SmartleadSenderAccountInput = {
+  id: string | number;
+  email: string;
+  status?: "active" | "paused" | "error" | "warming" | "unknown";
+  warmupStatus?: "active" | "paused" | "error" | "warming" | "unknown";
+  dailyLimit?: number;
+  sentToday?: number;
+  bounceRate?: number;
+  replyRate?: number;
+  reputationScore?: number;
+};
+
+export type SmartleadSenderCapacityPreview = {
+  mode: "smartlead-sender-capacity-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  totals: {
+    accounts: number;
+    usableAccounts: number;
+    blockedAccounts: number;
+    dailyCapacity: number;
+    remainingToday: number;
+    requestedDailyLimit: number;
+    recommendedDailyLimit: number;
+    leadBacklog: number;
+    estimatedDays: number;
+  };
+  accounts: Array<SmartleadSenderAccountInput & { usable: boolean; remainingToday: number; warnings: string[] }>;
+  warnings: string[];
+  configureCampaignPayload?: {
+    campaignId: string | number;
+    emailAccountIds: Array<string | number>;
+    schedule: { max_new_leads_per_day: number; min_time_btw_emails: number };
+  };
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type LeadEnrichmentBatchPreview = {
   mode: "lead-enrichment-batch-preview";
   summary: string;
@@ -2233,6 +2270,92 @@ export function buildNicheOpsDashboardPreview(input: {
     totals,
     niches,
     nextToolCalls: allCalls,
+  };
+}
+
+export function buildSmartleadSenderCapacityPreview(input: {
+  campaignId?: string | number | null;
+  accounts: SmartleadSenderAccountInput[];
+  leadBacklog?: number;
+  requestedDailyLimit?: number;
+  minTimeBetweenEmailsMinutes?: number;
+  maxPerAccountPerDay?: number;
+  includePausedAccounts?: boolean;
+}): SmartleadSenderCapacityPreview {
+  const maxPerAccount = Math.min(Math.max(Math.trunc(input.maxPerAccountPerDay ?? 40), 1), 200);
+  const requestedDailyLimit = Math.min(Math.max(Math.trunc(input.requestedDailyLimit ?? 30), 1), 1000);
+  const leadBacklog = Math.max(Math.trunc(input.leadBacklog ?? 0), 0);
+  const accounts = input.accounts.map((account) => {
+    const dailyLimit = Math.min(Math.max(Math.trunc(account.dailyLimit ?? maxPerAccount), 0), maxPerAccount);
+    const sentToday = Math.max(Math.trunc(account.sentToday ?? 0), 0);
+    const remainingToday = Math.max(dailyLimit - sentToday, 0);
+    const warnings: string[] = [];
+    const status = account.status ?? "unknown";
+    const warmupStatus = account.warmupStatus ?? "unknown";
+    if (!["active", "unknown"].includes(status)) warnings.push(`account_status_${status}`);
+    if (["paused", "error"].includes(warmupStatus)) warnings.push(`warmup_${warmupStatus}`);
+    if ((account.bounceRate ?? 0) >= 5) warnings.push("high_bounce_rate");
+    if ((account.reputationScore ?? 100) < 70) warnings.push("low_reputation");
+    if (remainingToday <= 0) warnings.push("no_remaining_capacity_today");
+    const usable = (input.includePausedAccounts === true || !warnings.some((warning) => warning.startsWith("account_status_") || warning.startsWith("warmup_"))) && remainingToday > 0;
+    return { ...account, dailyLimit, sentToday, usable, remainingToday, warnings };
+  });
+  const usableAccounts = accounts.filter((account) => account.usable);
+  const dailyCapacity = usableAccounts.reduce((sum, account) => sum + Math.min(account.dailyLimit ?? maxPerAccount, maxPerAccount), 0);
+  const remainingToday = usableAccounts.reduce((sum, account) => sum + account.remainingToday, 0);
+  const recommendedDailyLimit = Math.min(requestedDailyLimit, dailyCapacity || requestedDailyLimit);
+  const warnings = unique(accounts.flatMap((account) => account.warnings));
+  if (!usableAccounts.length) warnings.push("no_usable_sender_accounts");
+  if (requestedDailyLimit > dailyCapacity && dailyCapacity > 0) warnings.push("requested_limit_exceeds_sender_capacity");
+  if (leadBacklog > 0 && recommendedDailyLimit <= 0) warnings.push("cannot_send_backlog_without_capacity");
+  const status: SmartleadSenderCapacityPreview["status"] = !usableAccounts.length ? "blocked" : warnings.length ? "attention" : "ready";
+  const estimatedDays = leadBacklog > 0 && recommendedDailyLimit > 0 ? Math.ceil(leadBacklog / recommendedDailyLimit) : 0;
+  const configureCampaignPayload = input.campaignId && usableAccounts.length
+    ? {
+        campaignId: input.campaignId,
+        emailAccountIds: usableAccounts.map((account) => account.id),
+        schedule: {
+          max_new_leads_per_day: recommendedDailyLimit,
+          min_time_btw_emails: Math.max(Math.trunc(input.minTimeBetweenEmailsMinutes ?? 12), 1),
+        },
+      }
+    : undefined;
+  const nextToolCalls: SmartleadSenderCapacityPreview["nextToolCalls"] = [];
+  if (configureCampaignPayload) {
+    nextToolCalls.push({
+      tool: "arcigy.configure_smartlead_campaign",
+      payload: { ...configureCampaignPayload, approval: { approved: true } },
+      reason: "Prirad usable sender ucty a nastav denny limit az po explicitnom schvaleni operatora.",
+      approvalRequired: true,
+    });
+  }
+  if (!input.campaignId) {
+    nextToolCalls.push({
+      tool: "arcigy.get_smartlead_campaign_status",
+      payload: { maxCampaigns: 50 },
+      reason: "Chyba campaignId; najprv vyber existujucu Smartlead kampan alebo priprav niche campaign setup.",
+      approvalRequired: false,
+    });
+  }
+  return {
+    mode: "smartlead-sender-capacity-preview",
+    status,
+    summary: `Smartlead sender capacity: ${usableAccounts.length}/${accounts.length} usable uctov, odporucany denny limit ${recommendedDailyLimit}, backlog ${leadBacklog}${estimatedDays ? ` na ~${estimatedDays} dni` : ""}. Ziadny zapis ani upload neprebehol.`,
+    totals: {
+      accounts: accounts.length,
+      usableAccounts: usableAccounts.length,
+      blockedAccounts: accounts.length - usableAccounts.length,
+      dailyCapacity,
+      remainingToday,
+      requestedDailyLimit,
+      recommendedDailyLimit,
+      leadBacklog,
+      estimatedDays,
+    },
+    accounts,
+    warnings,
+    configureCampaignPayload,
+    nextToolCalls,
   };
 }
 

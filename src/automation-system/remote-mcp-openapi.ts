@@ -421,6 +421,18 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       existingSmartleadLeads: [{ email: "existing@example.com", id: "lead-1" }],
     };
   }
+  if (toolName === "arcigy.build_smartlead_sender_capacity_preview") {
+    return {
+      campaignId: "123456",
+      leadBacklog: 180,
+      requestedDailyLimit: 60,
+      minTimeBetweenEmailsMinutes: 12,
+      accounts: [
+        { id: "acct-1", email: "andrej@arcigy.group", status: "active", warmupStatus: "active", dailyLimit: 40, sentToday: 12, bounceRate: 1.2, reputationScore: 92 },
+        { id: "acct-2", email: "sales@arcigy.group", status: "active", warmupStatus: "warming", dailyLimit: 30, sentToday: 4, bounceRate: 2.1, reputationScore: 84 },
+      ],
+    };
+  }
   if (toolName === "arcigy.draft_niche_smartlead_campaign_setup") {
     return {
       niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy" },

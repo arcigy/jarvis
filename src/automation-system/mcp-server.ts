@@ -34,6 +34,7 @@ import {
   buildSmartleadCampaignQaPreview,
   buildSmartleadInjectionPlan,
   buildSmartleadImportAuditPreview,
+  buildSmartleadSenderCapacityPreview,
   buildColdOutreachCsvImportPreview,
   dedupeLeadCandidates,
   draftNicheSmartleadCampaignSetup,
@@ -2014,6 +2015,17 @@ export function createJarvisMcpServer(): McpServer {
     readyLeads: z.array(leadRepairQueueLeadSchema).optional(),
     failedLeads: z.array(leadRepairQueueLeadSchema).optional(),
   });
+  const smartleadSenderAccountSchema = z.object({
+    id: z.union([z.string(), z.number()]),
+    email: z.string().email(),
+    status: z.enum(["active", "paused", "error", "warming", "unknown"]).optional(),
+    warmupStatus: z.enum(["active", "paused", "error", "warming", "unknown"]).optional(),
+    dailyLimit: z.number().int().nonnegative().optional(),
+    sentToday: z.number().int().nonnegative().optional(),
+    bounceRate: z.number().min(0).optional(),
+    replyRate: z.number().min(0).optional(),
+    reputationScore: z.number().min(0).max(100).optional(),
+  });
 
   server.registerTool(
     "arcigy.preview_smartlead_email_rendering",
@@ -2123,6 +2135,30 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildSmartleadImportAuditPreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_smartlead_sender_capacity_preview",
+    {
+      title: "Build Smartlead sender capacity preview",
+      description: "Check sender accounts, warmup status, reputation, remaining capacity, and prepare a safe campaign configure payload without writing.",
+      inputSchema: {
+        campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+        accounts: z.array(smartleadSenderAccountSchema).min(1).max(100),
+        leadBacklog: z.number().int().nonnegative().optional(),
+        requestedDailyLimit: z.number().int().min(1).max(1000).default(30),
+        minTimeBetweenEmailsMinutes: z.number().int().min(1).max(240).default(12),
+        maxPerAccountPerDay: z.number().int().min(1).max(200).default(40),
+        includePausedAccounts: z.boolean().default(false),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildSmartleadSenderCapacityPreview(input))
   );
 
   server.registerTool(
