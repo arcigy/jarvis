@@ -1974,12 +1974,31 @@ function resolveColdOutreachPeriod(text: string) {
   const lowered = normalizeTranscript(text);
   const now = new Date();
   const until = now.toISOString();
+
   if (lowered.includes("dnes") || lowered.includes("today")) {
     const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     return { since: start.toISOString(), until, periodLabel: "dnes" };
   }
-  const since = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  return { since: since.toISOString(), until, periodLabel: "poslednych 7 dni" };
+
+  if (lowered.includes("vcera") || lowered.includes("yesterday")) {
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+    return { since: yesterday.toISOString(), until: today.toISOString(), periodLabel: "vcera" };
+  }
+
+  const explicitDays = lowered.match(/\b(?:poslednych|posledne|za)?\s*(\d{1,3})\s*(?:dni|den|days?)\b/);
+  if (explicitDays) return rollingColdOutreachPeriod(now, Number(explicitDays[1]));
+
+  if (lowered.includes("tyzden") || lowered.includes("week")) return rollingColdOutreachPeriod(now, 7);
+  if (lowered.includes("mesiac") || lowered.includes("month")) return rollingColdOutreachPeriod(now, 30);
+
+  return rollingColdOutreachPeriod(now, 7);
+}
+
+function rollingColdOutreachPeriod(now: Date, requestedDays: number) {
+  const days = Math.min(Math.max(Math.trunc(requestedDays) || 7, 1), 365);
+  const since = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+  return { since: since.toISOString(), until: now.toISOString(), periodLabel: `poslednych ${days} dni` };
 }
 
 function normalizeTranscript(text: string) {

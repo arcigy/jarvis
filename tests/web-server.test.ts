@@ -150,6 +150,28 @@ test("local web bridge serves UI and API health", async () => {
     });
     assert.match(String(mcpBrief.result), /Za dnes/);
 
+    const periodDbDir = join(process.cwd(), "generated", "web-server-period-test");
+    mkdirSync(periodDbDir, { recursive: true });
+    const periodDbPath = join(periodDbDir, `period-${Date.now()}.db`);
+    const fourteenDayBrief = await postJson(`${baseUrl}/api/cold-outreach-brief`, {
+      text: "Jarvis cold outreach za poslednych 14 dni",
+      live: false,
+      dbPath: periodDbPath,
+    });
+    assert.match(String(fourteenDayBrief), /Za poslednych 14 dni/);
+    const yesterdayBrief = await postJson(`${baseUrl}/api/cold-outreach-brief`, {
+      text: "Jarvis cold outreach vcera",
+      live: false,
+      dbPath: periodDbPath,
+    });
+    assert.match(String(yesterdayBrief), /Za vcera/);
+    const monthBrief = await postJson(`${baseUrl}/api/cold-outreach-brief`, {
+      text: "Jarvis cold outreach za mesiac",
+      live: false,
+      dbPath: periodDbPath,
+    });
+    assert.match(String(monthBrief), /Za poslednych 30 dni/);
+
     const unapprovedDirectSheetExport = await fetch(`${baseUrl}/api/append-leads-to-google-sheet`, {
       method: "POST",
       headers: { "content-type": "application/json" },

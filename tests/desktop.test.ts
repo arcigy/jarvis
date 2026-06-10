@@ -946,6 +946,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.doesNotMatch(html, /[\u0102\u00c4\u0139\u00e2]/);
   assert.doesNotMatch(main, /[\u0102\u00c4\u0139\u00e2]/);
   assert.match(main, /ipcMain\.handle\("jarvis:coldOutreachBrief"/);
+  assert.match(main, /function rollingColdOutreachPeriod/);
+  assert.match(main, /lowered\.includes\("vcera"\)/);
+  assert.match(main, /lowered\.includes\("mesiac"\)/);
   assert.match(main, /ipcMain\.handle\("jarvis:identifyEmail"/);
   assert.match(main, /ipcMain\.handle\("jarvis:ingestClientMessage"/);
   assert.match(main, /ipcMain\.handle\("jarvis:getClientNeedAlerts"/);
