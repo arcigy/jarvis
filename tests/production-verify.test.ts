@@ -33,9 +33,16 @@ test("production verifier wires every live release gate", () => {
   assert.equal(packageJson.scripts["local:memory:smoke"], "node scripts/local_memory_smoke.ts");
   assert.match(script, /runNpm\("local-memory-smoke", \["run", "local:memory:smoke"\]\)/);
   assert.match(script, /process\.env\.npm_execpath/);
+  assert.match(script, /const verifyEnv = \{ \.\.\.process\.env \}/);
+  assert.match(script, /loadLocalEnv\(repoRoot, verifyEnv\)/);
   assert.match(script, /ensureWebBridge/);
   assert.match(script, /doctor", "--", "--live-integrations"/);
   assert.match(script, /remote:mcp:smoke/);
+  assert.match(script, /runExternalRemoteMcpSmokeIfConfigured/);
+  assert.match(script, /JARVIS_VERIFY_REMOTE_MCP_URL/);
+  assert.match(script, /JARVIS_REMOTE_MCP_URL/);
+  assert.match(script, /external-remote-mcp-smoke/);
+  assert.match(script, /external-remote-mcp-smoke-required-gates/);
   assert.match(script, /requiredRemoteMcpSmokeGates/);
   assert.match(script, /remote-mcp-smoke-required-gates/);
   assert.match(script, /parseRemoteMcpSmokeJson/);
@@ -68,6 +75,7 @@ test("production verifier wires every live release gate", () => {
   assert.match(script, /Secret-safe: command output is streamed through redactSensitiveText/);
   assert.match(script, /git", \["ls-files", "-z"\]/);
   assert.match(script, /JARVIS_VERIFY_WEB_URL/);
+  assert.match(script, /No external MCP URL configured/);
   assert.match(script, /redactSensitiveText/);
   assert.match(script, /process\.stdout\.write\(redactSensitiveText\(result\.stdout\)\)/);
   assert.match(script, /process\.stderr\.write\(redactSensitiveText\(result\.stderr\)\)/);

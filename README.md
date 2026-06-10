@@ -250,6 +250,8 @@ npm run remote:mcp:smoke -- --url https://your-ngrok-url.ngrok-free.app --token-
 npm run remote:mcp:smoke -- --json
 ```
 
+To make `npm run verify:production` include the real public tunnel, set `JARVIS_VERIFY_REMOTE_MCP_URL` or `JARVIS_REMOTE_MCP_URL` to the current ngrok URL before running it. The verifier then runs the same 37-gate smoke proof against the external URL and writes only redacted evidence.
+
 Advanced/manual flow:
 
 ```powershell

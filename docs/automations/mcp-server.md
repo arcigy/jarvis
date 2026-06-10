@@ -38,6 +38,8 @@ npm run remote:mcp:smoke
 npm run remote:mcp:smoke -- --url https://your-ngrok-url.ngrok-free.app --token-env JARVIS_WEB_TOKEN
 ```
 
+For release verification against a real public tunnel, set `JARVIS_VERIFY_REMOTE_MCP_URL` or `JARVIS_REMOTE_MCP_URL` to the current ngrok URL before `npm run verify:production`. The verifier runs the same remote smoke proof against that external URL and stores only redacted readiness evidence.
+
 `npm run readiness` prints the same secret-safe blockers and fix guide exposed by `arcigy.get_production_readiness`. Status `ready` means there are no findings, `attention` means only non-blocking advisories remain, and `blocked` means an operator must fix production gates before exposing workflows. The tunnel runner starts the local web bridge if needed, checks `/api/web-bridge-preflight`, starts ngrok, finds the public HTTPS URL, and verifies the protected manifest before printing remote MCP URLs.
 
 Redis is currently treated as a non-blocking infrastructure advisory because no shipped Jarvis workflow depends on Redis for state. Local memory, cold outreach, client requests, and approvals use SQLite; live API work uses the configured Google, Gemini, Smartlead, Serper, and Google Maps credentials. If a Redis-backed queue/cache is added later, move Redis back into the blocking production gate before enabling that feature.

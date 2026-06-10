@@ -6,12 +6,15 @@ import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 
 import { hasUnsafeAiActionClaim, redactSensitiveText, sanitizeAiDraftOutput } from "../src/automation-system/ai-safety.ts";
+import { getEnv, loadLocalEnv } from "../src/automation-system/env.ts";
 import { buildColdOutreachBrief } from "../src/automation-system/cold-outreach-summary.ts";
 import { generateGeminiText } from "../src/automation-system/gemini.ts";
 import { createJarvisVoiceSession, handleJarvisVoiceEvent } from "../src/automation-system/jarvis-voice.ts";
 
 const repoRoot = fileURLToPath(new URL("../", import.meta.url));
-const webUrl = process.env.JARVIS_VERIFY_WEB_URL || "http://127.0.0.1:8765";
+const verifyEnv = { ...process.env };
+loadLocalEnv(repoRoot, verifyEnv);
+const webUrl = verifyEnv.JARVIS_VERIFY_WEB_URL || "http://127.0.0.1:8765";
 const evidencePath = join(repoRoot, "generated", "production-verification", "latest.json");
 const latestReadyEvidencePath = join(repoRoot, "generated", "production-verification", "latest-ready.json");
 const productionEvidenceMaxAgeHours = 24;
@@ -77,6 +80,7 @@ async function main() {
   writeEvidence();
   const remoteMcpSmokeOutput = runNpm("remote-mcp-smoke", ["run", "remote:mcp:smoke", "--", "--url", webUrl, "--json"]);
   requireRemoteMcpSmokeGates(remoteMcpSmokeOutput);
+  runExternalRemoteMcpSmokeIfConfigured();
   runNpm("ui-smoke", ["run", "ui:smoke"], {
     JARVIS_UI_SMOKE_URL: `${webUrl}/index.html`,
     JARVIS_UI_SMOKE_OUT: "generated/jarvis-ui-smoke.png",
@@ -261,8 +265,8 @@ function runNpm(name: string, args: string[], extraEnv: Record<string, string> =
   return runCommand(name, process.platform === "win32" ? "npm.cmd" : "npm", args, extraEnv);
 }
 
-function requireRemoteMcpSmokeGates(output: string) {
-  process.stdout.write(`\n[verify] remote-mcp-smoke-required-gates\n`);
+function requireRemoteMcpSmokeGates(output: string, checkName = "remote-mcp-smoke-required-gates") {
+  process.stdout.write(`\n[verify] ${checkName}\n`);
   try {
     const report = parseRemoteMcpSmokeJson(output) as {
       status?: unknown;
@@ -272,7 +276,7 @@ function requireRemoteMcpSmokeGates(output: string) {
     const missing = requiredRemoteMcpSmokeGates.filter((key) => !readyChecks.has(key));
     if (report.status !== "ready" || missing.length > 0) {
       checks.push({
-        name: "remote-mcp-smoke-required-gates",
+        name: checkName,
         status: "failed",
         detail: missing.length ? `Remote MCP smoke is missing required ready gate(s): ${missing.join(", ")}.` : "Remote MCP smoke report is not ready.",
       });
@@ -281,13 +285,13 @@ function requireRemoteMcpSmokeGates(output: string) {
       process.exit(1);
     }
     checks.push({
-      name: "remote-mcp-smoke-required-gates",
+      name: checkName,
       status: "ready",
       detail: `Remote MCP smoke required gates are ready: ${requiredRemoteMcpSmokeGates.join(", ")}.`,
     });
   } catch (error) {
     checks.push({
-      name: "remote-mcp-smoke-required-gates",
+      name: checkName,
       status: "failed",
       detail: redactSensitiveText(error instanceof Error ? error.message : String(error)),
     });
@@ -295,6 +299,37 @@ function requireRemoteMcpSmokeGates(output: string) {
     process.stdout.write(renderSummary());
     process.exit(1);
   }
+}
+
+function runExternalRemoteMcpSmokeIfConfigured() {
+  const configuredUrl = getEnv(verifyEnv, "JARVIS_VERIFY_REMOTE_MCP_URL") || getEnv(verifyEnv, "JARVIS_REMOTE_MCP_URL");
+  if (!configuredUrl) {
+    checks.push({
+      name: "external-remote-mcp-smoke",
+      status: "ready",
+      detail: "No external MCP URL configured. Set JARVIS_VERIFY_REMOTE_MCP_URL or JARVIS_REMOTE_MCP_URL to include the public tunnel in production verification.",
+    });
+    return;
+  }
+
+  let normalizedUrl: string;
+  try {
+    const parsed = new URL(configuredUrl);
+    if (!["http:", "https:"].includes(parsed.protocol)) throw new Error("External MCP URL must use http or https.");
+    normalizedUrl = parsed.toString().replace(/\/$/, "");
+  } catch (error) {
+    checks.push({
+      name: "external-remote-mcp-smoke",
+      status: "failed",
+      detail: redactSensitiveText(error instanceof Error ? error.message : String(error)),
+    });
+    writeEvidence();
+    process.stdout.write(renderSummary());
+    process.exit(1);
+  }
+
+  const output = runNpm("external-remote-mcp-smoke", ["run", "remote:mcp:smoke", "--", "--url", normalizedUrl, "--json"]);
+  requireRemoteMcpSmokeGates(output, "external-remote-mcp-smoke-required-gates");
 }
 
 function parseRemoteMcpSmokeJson(output: string): unknown {
