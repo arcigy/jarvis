@@ -44,6 +44,7 @@ import {
   buildSmartleadCampaignQaPreview,
   buildSmartleadCampaignHandoffPackagePreview,
   buildSmartleadCampaignBackupPlan,
+  buildSmartleadCampaignRestorePlan,
   buildSmartleadInjectionPlan,
   buildSmartleadImportAuditPreview,
   buildSmartleadSenderCapacityPreview,
@@ -1718,6 +1719,22 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         includeDeletePlan: payload.includeDeletePlan === true,
         maxCampaigns: typeof payload.maxCampaigns === "number" ? payload.maxCampaigns : undefined,
         leadPageSize: typeof payload.leadPageSize === "number" ? payload.leadPageSize : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_smartlead_campaign_restore_plan") {
+    writeJson(response, 200, {
+      result: buildSmartleadCampaignRestorePlan({
+        backups: Array.isArray(payload.backups) ? payload.backups as Parameters<typeof buildSmartleadCampaignRestorePlan>[0]["backups"] : [],
+        restoreMode: payload.restoreMode === "configure-existing" ? "configure-existing" : payload.restoreMode === "create-new" ? "create-new" : undefined,
+        targetNameSuffix: optionalString(payload.targetNameSuffix),
+        targetCampaignId: (payload.targetCampaignId ?? null) as string | number | null,
+        clientId: (payload.clientId ?? null) as string | number | null,
+        batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
+        maxLeadsPerCampaign: typeof payload.maxLeadsPerCampaign === "number" ? payload.maxLeadsPerCampaign : undefined,
+        includeLeads: payload.includeLeads !== false,
+        includeWebhooks: payload.includeWebhooks === true,
       }),
     });
     return;

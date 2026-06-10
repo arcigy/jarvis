@@ -43,6 +43,7 @@ import {
   buildSmartleadCampaignQaPreview,
   buildSmartleadCampaignHandoffPackagePreview,
   buildSmartleadCampaignBackupPlan,
+  buildSmartleadCampaignRestorePlan,
   buildSmartleadInjectionPlan,
   buildSmartleadImportAuditPreview,
   buildSmartleadSenderCapacityPreview,
@@ -187,6 +188,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.build_smartlead_sender_capacity_preview",
     "arcigy.build_smartlead_deliverability_guard_preview",
     "arcigy.build_smartlead_campaign_backup_plan",
+    "arcigy.build_smartlead_campaign_restore_plan",
     "arcigy.draft_niche_smartlead_campaign_setup",
     "arcigy.build_smartlead_campaign_launch_preview",
     "arcigy.build_smartlead_campaign_qa_preview",
@@ -1465,7 +1467,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 108 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 109 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -2764,6 +2766,49 @@ test("Smartlead campaign backup plan protects campaigns before risky changes", (
   assert.ok(plan.safetyGates.some((gate) => gate.includes("nikdy nemaze")));
   assert.ok(plan.nextToolCalls.some((call) => call.tool === "arcigy.get_smartlead_campaign_leads" && !call.approvalRequired));
   assert.match(plan.summary, /Ziadny backup, delete ani Smartlead zapis/);
+});
+
+test("Smartlead campaign restore plan normalizes backup JSON into approval payloads", () => {
+  const plan = buildSmartleadCampaignRestorePlan({
+    restoreMode: "create-new",
+    targetNameSuffix: " RESTORE",
+    batchSize: 1,
+    backups: [{
+      sourceBackupDir: "outputs/smartlead-backups/run/3209165_KUCHYNE",
+      campaign: {
+        id: 3209165,
+        name: "KUCHYNE_SK",
+        scheduler_cron_value: { tz: "Europe/Bratislava", days: [1, 2, 3, 4, 5], startHour: "08:00", endHour: "18:00" },
+        max_leads_per_day: 30,
+        min_time_btwn_emails: 15,
+        stop_lead_settings: "REPLY_TO_AN_EMAIL",
+        follow_up_percentage: 100,
+      },
+      sequences: [
+        { seq_number: 1, seq_delay_details: { delayInDays: 0 }, subject: "Otazka k {{company_name}}", email_body: "<p>{{personalized_intro}}</p><p>%signature%</p>" },
+        { seq_number: 2, seq_delay_details: { delayInDays: 3 }, sequence_variants: [{ variant_label: "A", subject: "", email_body: "<p>Follow-up</p>" }] },
+      ],
+      leads: [
+        { lead: { email: "jan@example.com", first_name: "Jan", company_name: "Ready Firma", website: "https://ready.sk", custom_fields: { personalized_intro: "Kratke AI intro.", ico: "12345678" } } },
+        { lead: { email: "eva@example.com", first_name: "Eva", company_name: "Druha Firma", website: "https://druha.sk", custom_fields: { personalized_intro: "Druhe intro." } } },
+      ],
+      email_accounts: [{ id: 14382544, from_email: "branislav@arcigy.group" }],
+    }],
+  });
+
+  assert.equal(plan.mode, "smartlead-campaign-restore-plan");
+  assert.equal(plan.status, "ready");
+  assert.equal(plan.totals.backups, 1);
+  assert.equal(plan.totals.leads, 2);
+  assert.equal(plan.totals.batches, 2);
+  assert.equal(plan.campaigns[0].targetCampaignName, "KUCHYNE_SK RESTORE");
+  assert.equal(plan.campaigns[0].sequences[1].seq_delay_details.delay_in_days, 3);
+  assert.deepEqual(plan.campaigns[0].emailAccountIds, ["14382544"]);
+  assert.equal(plan.campaigns[0].leadBatches[0].leads[0].email, "jan@example.com");
+  assert.equal(plan.campaigns[0].approvalPayloads.createCampaign?.["name"], "KUCHYNE_SK RESTORE");
+  assert.ok(plan.nextToolCalls.some((call) => call.tool === "arcigy.create_smartlead_campaign" && call.approvalRequired));
+  assert.ok(plan.nextToolCalls.some((call) => call.tool === "arcigy.add_leads_to_smartlead_campaign" && call.approvalRequired));
+  assert.match(plan.summary, /Ziadny Smartlead zapis ani upload/);
 });
 
 test("Smartlead campaign handoff package combines launch QA capacity and approvals", () => {

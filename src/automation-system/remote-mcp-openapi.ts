@@ -567,6 +567,21 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       protectedNameParts: ["KUCHYNE"],
     };
   }
+  if (toolName === "arcigy.build_smartlead_campaign_restore_plan") {
+    return {
+      restoreMode: "create-new",
+      targetNameSuffix: " RESTORE",
+      batchSize: 100,
+      maxLeadsPerCampaign: 200,
+      backups: [{
+        sourceBackupDir: "outputs/smartlead-backups/smartlead_backup_20260528T174641Z/3209165_KUCHYNE-NA-MIRU-CZ_SK_FIXED",
+        campaign: { id: 3209165, name: "KUCHYNE-NA-MIRU-CZ_SK_FIXED", scheduler_cron_value: { tz: "Europe/Bratislava", days: [1, 2, 3, 4, 5], startHour: "08:00", endHour: "18:00" }, max_leads_per_day: 30, min_time_btwn_emails: 15, stop_lead_settings: "REPLY_TO_AN_EMAIL", follow_up_percentage: 100 },
+        sequences: [{ seq_number: 1, seq_delay_details: { delayInDays: 0 }, subject: "Otazka k {{company_name}}", email_body: "<p>{{personalized_intro}}</p><p>%signature%</p>" }],
+        leads: [{ lead: { email: "lead@example.com", first_name: "Jan", company_name: "Modelova Firma", website: "https://example.com", custom_fields: { personalized_intro: "Kratke AI intro." } } }],
+        email_accounts: [{ id: 14382544, from_email: "branislav@arcigy.group" }],
+      }],
+    };
+  }
   if (toolName === "arcigy.draft_niche_smartlead_campaign_setup") {
     return {
       niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy" },

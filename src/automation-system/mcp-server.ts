@@ -45,6 +45,7 @@ import {
   buildSmartleadCampaignQaPreview,
   buildSmartleadCampaignHandoffPackagePreview,
   buildSmartleadCampaignBackupPlan,
+  buildSmartleadCampaignRestorePlan,
   buildSmartleadInjectionPlan,
   buildSmartleadImportAuditPreview,
   buildSmartleadSenderCapacityPreview,
@@ -2414,6 +2415,32 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildSmartleadCampaignBackupPlan(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_smartlead_campaign_restore_plan",
+    {
+      title: "Build Smartlead campaign restore plan",
+      description: "Normalize Smartlead backup JSON into approval-gated create/configure/add-leads restore payloads without writing to Smartlead.",
+      inputSchema: {
+        backups: z.array(z.object({}).passthrough()).min(1).max(50),
+        restoreMode: z.enum(["create-new", "configure-existing"]).optional(),
+        targetNameSuffix: z.string().optional(),
+        targetCampaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+        clientId: z.union([z.string(), z.number(), z.null()]).optional(),
+        batchSize: z.number().int().min(1).max(100).default(100),
+        maxLeadsPerCampaign: z.number().int().min(0).max(10_000).default(1000),
+        includeLeads: z.boolean().default(true),
+        includeWebhooks: z.boolean().default(false),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildSmartleadCampaignRestorePlan(input))
   );
 
   server.registerTool(

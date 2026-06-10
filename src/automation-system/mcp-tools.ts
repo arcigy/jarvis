@@ -80,6 +80,7 @@ export type JarvisMcpToolName =
   | "arcigy.build_smartlead_sender_capacity_preview"
   | "arcigy.build_smartlead_deliverability_guard_preview"
   | "arcigy.build_smartlead_campaign_backup_plan"
+  | "arcigy.build_smartlead_campaign_restore_plan"
   | "arcigy.draft_niche_smartlead_campaign_setup"
   | "arcigy.build_smartlead_campaign_launch_preview"
   | "arcigy.build_smartlead_campaign_qa_preview"
@@ -531,6 +532,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.build_smartlead_campaign_backup_plan",
       description: "Pripravi read-only Smartlead backup manifest, protected kampane, fetch endpointy a delete safety gates pred rizikovymi zmenami.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_smartlead_campaign_restore_plan",
+      description: "Normalizuje Smartlead backup JSON do approval-gated create/configure/add-leads restore payloadov bez zapisu.",
       requiresApproval: false,
     },
     {

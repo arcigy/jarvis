@@ -1,6 +1,6 @@
 import { redactSensitiveText, safeAiPromptPart, safeUntrustedAiPromptPart } from "./ai-safety.ts";
 import { discoverLeads, type NormalizedLead } from "./lead-discovery.ts";
-import { buildSmartleadLead, type SmartleadLead } from "./smartlead.ts";
+import { buildSmartleadLead, type SmartleadLead, type SmartleadSchedule, type SmartleadSequence } from "./smartlead.ts";
 import { generateGeminiText, type FetchLike } from "./gemini.ts";
 import type { RuntimeEnv } from "./env.ts";
 
@@ -768,6 +768,59 @@ export type SmartleadCampaignBackupPlan = {
     delete_candidates: Array<{ id: string; name: string }>;
     delete_results: [];
   };
+  safetyGates: string[];
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
+export type SmartleadCampaignRestoreBackup = {
+  campaign?: Record<string, unknown>;
+  sequences?: unknown[];
+  leads?: unknown[];
+  webhooks?: unknown[];
+  emailAccounts?: unknown[];
+  email_accounts?: unknown[];
+  sourceBackupDir?: string;
+  targetCampaignId?: string | number | null;
+  targetCampaignName?: string;
+  restoreMode?: "create-new" | "configure-existing";
+  [key: string]: unknown;
+};
+
+export type SmartleadCampaignRestorePlan = {
+  mode: "smartlead-campaign-restore-plan";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  totals: {
+    backups: number;
+    restorable: number;
+    blocked: number;
+    protectedSources: number;
+    leads: number;
+    batches: number;
+    approvalCalls: number;
+  };
+  campaigns: Array<{
+    sourceCampaignId?: string;
+    sourceName: string;
+    targetCampaignId?: string | number | null;
+    targetCampaignName: string;
+    restoreMode: "create-new" | "configure-existing";
+    status: "ready" | "attention" | "blocked";
+    issues: string[];
+    sourceBackupDir?: string;
+    sequences: SmartleadSequence[];
+    emailAccountIds: Array<string | number>;
+    schedule?: SmartleadSchedule;
+    settings?: { trackOpen?: boolean; stopOnReply?: boolean; followUpPercentage?: number };
+    webhook?: { url: string; name?: string; eventTypes?: string[] };
+    leadBatches: Array<{ index: number; size: number; leads: SmartleadLead[] }>;
+    approvalPayloads: {
+      createCampaign?: Record<string, unknown>;
+      configureCampaign?: Record<string, unknown>;
+      addLeads: Array<Record<string, unknown>>;
+    };
+    nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+  }>;
   safetyGates: string[];
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
@@ -4091,6 +4144,140 @@ export function buildSmartleadCampaignBackupPlan(input: {
   };
 }
 
+export function buildSmartleadCampaignRestorePlan(input: {
+  backups: SmartleadCampaignRestoreBackup[];
+  restoreMode?: "create-new" | "configure-existing";
+  targetNameSuffix?: string;
+  targetCampaignId?: string | number | null;
+  clientId?: string | number | null;
+  batchSize?: number;
+  maxLeadsPerCampaign?: number;
+  includeLeads?: boolean;
+  includeWebhooks?: boolean;
+}): SmartleadCampaignRestorePlan {
+  const batchSize = Math.min(Math.max(Math.trunc(input.batchSize ?? 100), 1), 100);
+  const maxLeadsPerCampaign = Math.min(Math.max(Math.trunc(input.maxLeadsPerCampaign ?? 1000), 0), 10_000);
+  const includeLeads = input.includeLeads !== false;
+  const includeWebhooks = input.includeWebhooks === true;
+  const campaigns = input.backups.map((backup, index) => {
+    const campaign = isRecord(backup.campaign) ? backup.campaign : backup;
+    const sourceCampaignId = stringField(campaign, "id", "campaign_id", "campaignId");
+    const sourceName = stringField(campaign, "name", "campaign_name", "campaignName") ?? `restored-campaign-${index + 1}`;
+    const restoreMode = backup.restoreMode ?? input.restoreMode ?? (backup.targetCampaignId || input.targetCampaignId ? "configure-existing" : "create-new");
+    const targetCampaignId = backup.targetCampaignId ?? input.targetCampaignId ?? null;
+    const targetCampaignName = backup.targetCampaignName ?? `${sourceName}${input.targetNameSuffix ?? " RESTORE"}`;
+    const sequences = normalizeBackupSequences(Array.isArray(backup.sequences) ? backup.sequences : []);
+    const leads = includeLeads ? normalizeBackupLeads(Array.isArray(backup.leads) ? backup.leads : []).slice(0, maxLeadsPerCampaign) : [];
+    const emailAccountIds = normalizeBackupEmailAccountIds(Array.isArray(backup.emailAccounts) ? backup.emailAccounts : Array.isArray(backup.email_accounts) ? backup.email_accounts : []);
+    const schedule = normalizeBackupSchedule(campaign);
+    const settings = normalizeBackupSettings(campaign);
+    const webhook = includeWebhooks ? normalizeBackupWebhook(Array.isArray(backup.webhooks) ? backup.webhooks : []) : undefined;
+    const issues: string[] = [];
+    if (restoreMode === "configure-existing" && !targetCampaignId) issues.push("missing targetCampaignId for configure-existing restore");
+    if (restoreMode === "create-new" && !targetCampaignName.trim()) issues.push("missing target campaign name");
+    if (!sequences.length) issues.push("missing sequences backup");
+    if (includeLeads && !leads.length) issues.push("missing leads backup or includeLeads=false is required");
+    if (!emailAccountIds.length) issues.push("missing email account ids; restore can still draft campaign but cannot link senders");
+    const status: SmartleadCampaignRestorePlan["campaigns"][number]["status"] = issues.some((issue) => issue.startsWith("missing target") || issue === "missing sequences backup") ? "blocked" : issues.length ? "attention" : "ready";
+    const leadBatches = chunk(leads, batchSize).map((batch, batchIndex) => ({ index: batchIndex + 1, size: batch.length, leads: batch }));
+    const approvalPayloads: SmartleadCampaignRestorePlan["campaigns"][number]["approvalPayloads"] = { addLeads: [] };
+    const nextToolCalls: SmartleadCampaignRestorePlan["campaigns"][number]["nextToolCalls"] = [];
+    if (restoreMode === "create-new") {
+      approvalPayloads.createCampaign = {
+        name: targetCampaignName,
+        clientId: input.clientId ?? null,
+        sequences,
+        emailAccountIds,
+        schedule,
+        settings,
+        webhook,
+        approval: { approved: true },
+      };
+      nextToolCalls.push({
+        tool: "arcigy.create_smartlead_campaign",
+        payload: approvalPayloads.createCampaign,
+        reason: "Vytvor obnovenu Smartlead kampan az po explicitnom schvaleni operatora.",
+        approvalRequired: true,
+      });
+    } else {
+      approvalPayloads.configureCampaign = {
+        campaignId: targetCampaignId,
+        sequences,
+        emailAccountIds,
+        schedule,
+        settings,
+        webhook,
+        approval: { approved: true },
+      };
+      nextToolCalls.push({
+        tool: "arcigy.configure_smartlead_campaign",
+        payload: approvalPayloads.configureCampaign,
+        reason: "Nakonfiguruj existujucu Smartlead kampan zo zalohy az po explicitnom schvaleni operatora.",
+        approvalRequired: true,
+      });
+    }
+    for (const batch of leadBatches) {
+      const payload = {
+        campaignId: restoreMode === "configure-existing" ? targetCampaignId : "NEW_CAMPAIGN_ID_FROM_CREATE_STEP",
+        leads: batch.leads,
+        settings: { ignore_global_block_list: false, ignore_unsubscribe_list: false },
+        approval: { approved: true },
+      };
+      approvalPayloads.addLeads.push(payload);
+      nextToolCalls.push({
+        tool: "arcigy.add_leads_to_smartlead_campaign",
+        payload,
+        reason: "Obnov leadov po batchi az po vytvoreni/konfiguracii kampane a explicitnom schvaleni.",
+        approvalRequired: true,
+      });
+    }
+    return {
+      sourceCampaignId,
+      sourceName,
+      targetCampaignId,
+      targetCampaignName,
+      restoreMode,
+      status,
+      issues,
+      sourceBackupDir: backup.sourceBackupDir,
+      sequences,
+      emailAccountIds,
+      schedule,
+      settings,
+      webhook,
+      leadBatches,
+      approvalPayloads,
+      nextToolCalls,
+    };
+  });
+  const blocked = campaigns.filter((campaign) => campaign.status === "blocked").length;
+  const approvalCalls = campaigns.reduce((sum, campaign) => sum + campaign.nextToolCalls.filter((call) => call.approvalRequired).length, 0);
+  const status: SmartleadCampaignRestorePlan["status"] = !campaigns.length || blocked === campaigns.length ? "blocked" : blocked ? "attention" : campaigns.some((campaign) => campaign.status === "attention") ? "attention" : "ready";
+  return {
+    mode: "smartlead-campaign-restore-plan",
+    status,
+    summary: `Smartlead restore plan: ${campaigns.length} backupov, ${campaigns.length - blocked} restorable, ${blocked} blocked, ${approvalCalls} approval krokov. Ziadny Smartlead zapis ani upload neprebehol.`,
+    totals: {
+      backups: campaigns.length,
+      restorable: campaigns.length - blocked,
+      blocked,
+      protectedSources: campaigns.filter((campaign) => /kuchyne|protected/i.test(campaign.sourceName)).length,
+      leads: campaigns.reduce((sum, campaign) => sum + campaign.leadBatches.reduce((batchSum, batch) => batchSum + batch.size, 0), 0),
+      batches: campaigns.reduce((sum, campaign) => sum + campaign.leadBatches.length, 0),
+      approvalCalls,
+    },
+    campaigns,
+    safetyGates: [
+      "Restore plan iba pripravuje approval payloady; nespusta create/configure/add-leads.",
+      "Pri create-new najprv vytvor kampan, potom nahraj leady s NEW_CAMPAIGN_ID_FROM_CREATE_STEP nahradenym realnym ID.",
+      "Pred restore porovnaj lead count zo zalohy s poctom pripravenych leadov v batchoch.",
+      "Neprepajaj stare tracking/webhook URL bez kontroly, ak includeWebhooks nie je explicitne true.",
+      "Pouzi ignore_global_block_list=false a ignore_unsubscribe_list=false pri restore leadov.",
+    ],
+    nextToolCalls: dedupeNextToolCalls(campaigns.flatMap((campaign) => campaign.nextToolCalls)),
+  };
+}
+
 export function buildDailyLeadgenRunbook(input: {
   niche: { id?: string; slug: string; name: string; keywords?: string[]; region?: string; campaignId?: string | number | null };
   targetCount?: number;
@@ -4876,6 +5063,100 @@ function smartleadBackupFetchEndpoints(campaignId: string, leadPageSize: number)
     { artifact: "webhooks", method: "GET", path: `/campaigns/${encoded}/webhooks` },
     { artifact: "email_accounts", method: "GET", path: `/campaigns/${encoded}/email-accounts` },
   ];
+}
+
+function normalizeBackupSequences(rows: unknown[]): SmartleadSequence[] {
+  return rows
+    .filter(isRecord)
+    .map((row, index) => {
+      const seqNumber = numberField(row, "seq_number", "seqNumber") ?? index + 1;
+      const delayDetails = isRecord(row.seq_delay_details) ? row.seq_delay_details : {};
+      const delay = numberField(delayDetails, "delay_in_days", "delayInDays", "delay") ?? 0;
+      const variantsSource = Array.isArray(row.sequence_variants) && row.sequence_variants.length ? row.sequence_variants.filter(isRecord) : [row];
+      const seqVariants = variantsSource
+        .filter((variant) => booleanField(variant, "is_deleted") !== true)
+        .map((variant, variantIndex) => ({
+          variant_label: stringField(variant, "variant_label", "variantLabel") ?? String.fromCharCode(65 + variantIndex),
+          subject: stringField(variant, "subject") ?? "",
+          email_body: stringField(variant, "email_body", "emailBody") ?? "",
+        }))
+        .filter((variant) => variant.subject || variant.email_body);
+      return {
+        seq_number: seqNumber,
+        seq_delay_details: { delay_in_days: delay },
+        seq_variants: seqVariants.length ? seqVariants : [{ variant_label: "A", subject: "", email_body: "" }],
+      };
+    })
+    .filter((sequence) => sequence.seq_variants.some((variant) => variant.subject || variant.email_body));
+}
+
+function normalizeBackupLeads(rows: unknown[]): SmartleadLead[] {
+  const leads: SmartleadLead[] = [];
+  const seen = new Set<string>();
+  for (const row of rows.filter(isRecord)) {
+    const source = isRecord(row.lead) ? row.lead : row;
+    const email = stringField(source, "email", "lead_email", "primary_email")?.toLowerCase();
+    if (!email || seen.has(email)) continue;
+    seen.add(email);
+    const custom = isRecord(source.custom_fields) ? source.custom_fields : {};
+    leads.push(buildSmartleadLead({
+      email,
+      firstName: stringField(source, "first_name", "firstName"),
+      lastName: stringField(source, "last_name", "lastName"),
+      companyName: stringField(source, "company_name", "companyName"),
+      website: stringField(source, "website", "company_url", "companyUrl"),
+      customFields: normalizeSmartleadCustomFields(custom),
+    }));
+  }
+  return leads;
+}
+
+function normalizeSmartleadCustomFields(record: Record<string, unknown>): Record<string, string | number | boolean | null | undefined> {
+  return Object.fromEntries(
+    Object.entries(record)
+      .filter(([, value]) => value === null || ["string", "number", "boolean"].includes(typeof value))
+      .map(([key, value]) => [key, value as string | number | boolean | null])
+  );
+}
+
+function normalizeBackupEmailAccountIds(rows: unknown[]): Array<string | number> {
+  return unique(rows.filter(isRecord).map((row) => stringField(row, "id", "email_account_id", "emailAccountId")).filter((value): value is string => Boolean(value)));
+}
+
+function normalizeBackupSchedule(campaign: Record<string, unknown>): SmartleadSchedule | undefined {
+  const cron = isRecord(campaign.scheduler_cron_value) ? campaign.scheduler_cron_value : {};
+  const days = Array.isArray(cron.days) ? cron.days.map(Number).filter((day) => Number.isInteger(day) && day >= 0 && day <= 6) : undefined;
+  const schedule: SmartleadSchedule = {
+    timezone: stringField(cron, "tz", "timezone") ?? "Europe/Bratislava",
+    start_hour: stringField(cron, "startHour", "start_hour"),
+    end_hour: stringField(cron, "endHour", "end_hour"),
+    days_of_the_week: days?.length ? days : undefined,
+    max_new_leads_per_day: numberField(campaign, "max_leads_per_day", "maxNewLeadsPerDay"),
+    min_time_btw_emails: numberField(campaign, "min_time_btwn_emails", "min_time_btw_emails", "minTimeBetweenEmails"),
+    schedule_start_time: stringField(campaign, "schedule_start_time") ?? null,
+  };
+  return Object.values(schedule).some((value) => value !== undefined && value !== null) ? schedule : undefined;
+}
+
+function normalizeBackupSettings(campaign: Record<string, unknown>): { trackOpen?: boolean; stopOnReply?: boolean; followUpPercentage?: number } {
+  const trackSettings = Array.isArray(campaign.track_settings) ? campaign.track_settings.map(String) : [];
+  return {
+    trackOpen: !trackSettings.includes("DONT_TRACK_EMAIL_OPEN"),
+    stopOnReply: stringField(campaign, "stop_lead_settings") !== "DONT_STOP",
+    followUpPercentage: numberField(campaign, "follow_up_percentage"),
+  };
+}
+
+function normalizeBackupWebhook(rows: unknown[]): { url: string; name?: string; eventTypes?: string[] } | undefined {
+  const first = rows.find(isRecord);
+  if (!first) return undefined;
+  const url = stringField(first, "webhook_url", "url");
+  if (!url) return undefined;
+  return {
+    url,
+    name: stringField(first, "name"),
+    eventTypes: Array.isArray(first.event_types) ? first.event_types.map(String) : undefined,
+  };
 }
 
 function normalizeSourceQueueLead(lead: LeadSourceImportQueueLead, sourceName?: string, defaultSource?: string): LeadSourceImportQueueLead {
