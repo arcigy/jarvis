@@ -13,7 +13,7 @@ import { runIntegrationDiagnostics } from "./diagnostics.ts";
 import { getIntegrationHealth, loadLocalEnv, summarizeIntegrationHealth } from "./env.ts";
 import { buildClientReplyPrompt, buildPositiveOutreachReplyPrompt, generateGeminiText } from "./gemini.ts";
 import { defaultGmailBriefingQuery, defaultGmailSyncQuery, listConfiguredGmailAccounts, listRecentGmailMessageEvents, sendGmailTextMessage } from "./gmail.ts";
-import { fetchPublicUrlPreview } from "./http-fetch.ts";
+import { batchFetchPublicUrlPreviews, fetchPublicUrlPreview } from "./http-fetch.ts";
 import { handleJarvisVoiceEvent, type JarvisVoiceSession } from "./jarvis-voice.ts";
 import { buildJarvisCapabilityAudit, summarizeJarvisCapabilityAuditForVoice } from "./jarvis-capability-audit.ts";
 import { buildLeadgenDailyReport, buildLeadgenEveningSummary, buildLeadgenOpsDigest, buildLeadgenSlackReportPreview, selectNextNiche } from "./leadgen-report.ts";
@@ -1616,6 +1616,30 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(await fetchPublicUrlPreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.batch_fetch_url_previews",
+    {
+      title: "Batch fetch URL previews",
+      description: "Safely fetch multiple public HTTP/HTTPS URLs with GET or HEAD, blocking localhost/private hosts and returning redacted per-URL previews.",
+      inputSchema: {
+        urls: z.array(z.string().min(1)).min(1).max(50),
+        method: z.enum(["GET", "HEAD"]).default("GET"),
+        headers: z.record(z.string(), z.string()).optional(),
+        timeoutMs: z.number().int().min(1000).max(30000).default(10000),
+        maxBytes: z.number().int().min(1000).max(100000).default(20000),
+        parseJson: z.boolean().optional(),
+        maxUrls: z.number().int().min(1).max(50).default(20),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (input) => jsonResult(await batchFetchPublicUrlPreviews(input))
   );
 
   server.registerTool(

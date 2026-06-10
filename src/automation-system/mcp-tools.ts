@@ -55,6 +55,7 @@ export type JarvisMcpToolName =
   | "arcigy.create_smartlead_campaign"
   | "arcigy.configure_smartlead_campaign"
   | "arcigy.fetch_url_preview"
+  | "arcigy.batch_fetch_url_previews"
   | "arcigy.search_serper"
   | "arcigy.search_google_places"
   | "arcigy.discover_leads"
@@ -382,6 +383,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.fetch_url_preview",
       description: "Bezpecne fetchne verejnu HTTP/HTTPS URL cez GET alebo HEAD, blokuje private hosty a vrati redigovany text/JSON preview.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.batch_fetch_url_previews",
+      description: "Bezpecne fetchne viac verejnych HTTP/HTTPS URL naraz a vrati redigovane per-URL preview bez zapisu.",
       requiresApproval: false,
     },
     {

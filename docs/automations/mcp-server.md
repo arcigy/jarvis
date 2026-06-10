@@ -117,6 +117,7 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.search_google_places`: read-only Google Places Text Search for company discovery.
 - `arcigy.discover_leads`: combines Serper and Google Places into normalized lead candidates.
 - `arcigy.fetch_url_preview`: safe read-only public URL/API fetch preview with private-host blocking and secret redaction.
+- `arcigy.batch_fetch_url_previews`: safe read-only batch fetch preview for multiple public URLs/API endpoints with per-URL errors and no writes.
 - `arcigy.scrape_website_contacts`: read-only website/contact-page fetcher for emails, phones, links, title, description, and text preview.
 - `arcigy.batch_scrape_website_contacts`: read-only batch website/contact-page scraping with per-site success/error reporting.
 - `arcigy.enrich_slovak_company_register`: read-only ORSR lookup by ICO or company name for company, address, executives, and source URL.

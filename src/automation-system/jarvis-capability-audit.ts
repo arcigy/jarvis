@@ -153,6 +153,7 @@ const capabilityDefinitions: CapabilityDefinition[] = [
       "arcigy.search_google_places",
       "arcigy.discover_leads",
       "arcigy.fetch_url_preview",
+      "arcigy.batch_fetch_url_previews",
       "arcigy.scrape_website_contacts",
       "arcigy.batch_scrape_website_contacts",
       "arcigy.enrich_slovak_company_register",

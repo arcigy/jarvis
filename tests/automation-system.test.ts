@@ -13,7 +13,7 @@ import { runIntegrationDiagnostics } from "../src/automation-system/diagnostics.
 import { getIntegrationHealth } from "../src/automation-system/env.ts";
 import { buildClientReplyPrompt, buildPositiveOutreachReplyPrompt, generateGeminiText } from "../src/automation-system/gemini.ts";
 import { defaultGmailSyncQuery, encodeGmailRawMessage, listRecentGmailMessageEvents, parseFromHeader, refreshGoogleAccessToken, sendGmailTextMessage } from "../src/automation-system/gmail.ts";
-import { fetchPublicUrlPreview } from "../src/automation-system/http-fetch.ts";
+import { batchFetchPublicUrlPreviews, fetchPublicUrlPreview } from "../src/automation-system/http-fetch.ts";
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "../src/automation-system/lead-discovery.ts";
 import {
   buildNicheLeadgenPlan,
@@ -139,6 +139,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.create_smartlead_campaign",
     "arcigy.configure_smartlead_campaign",
     "arcigy.fetch_url_preview",
+    "arcigy.batch_fetch_url_previews",
     "arcigy.search_serper",
     "arcigy.search_google_places",
     "arcigy.discover_leads",
@@ -1418,7 +1419,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 84 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 85 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -3142,6 +3143,32 @@ test("public URL fetch preview redacts secrets and blocks private hosts", async 
   assert.equal(JSON.stringify(fetched).includes("sk-" + "a".repeat(48)), false);
   assert.match(fetched.textPreview ?? "", /\[redacted-hex-secret\]/);
   await assert.rejects(() => fetchPublicUrlPreview({ url: "http://127.0.0.1:8765/api/system-health" }, fetchImpl as typeof fetch), /Private, localhost/);
+});
+
+test("batch public URL fetch preview summarizes successes and blocked hosts", async () => {
+  const fetchImpl = async (url: string | URL | Request) => {
+    const target = String(url);
+    if (target === "https://api.example.com/one") {
+      return new Response(JSON.stringify({ ok: true, token: "sk-" + "b".repeat(48) }), { status: 200, headers: { "content-type": "application/json" } });
+    }
+    if (target === "https://api.example.com/two") {
+      return new Response("plain text", { status: 200, headers: { "content-type": "text/plain" } });
+    }
+    throw new Error(`Unexpected URL: ${target}`);
+  };
+
+  const batch = await batchFetchPublicUrlPreviews(
+    { urls: ["api.example.com/one", "https://api.example.com/two", "http://127.0.0.1/private"], parseJson: true, maxBytes: 5000 },
+    fetchImpl as typeof fetch
+  );
+
+  assert.equal(batch.mode, "public-url-batch-fetch-preview");
+  assert.equal(batch.totals.requested, 3);
+  assert.equal(batch.totals.fetched, 2);
+  assert.equal(batch.totals.failed, 1);
+  assert.match(batch.results[2].error ?? "", /Private, localhost/);
+  assert.equal(JSON.stringify(batch).includes("sk-" + "b".repeat(48)), false);
+  assert.match(batch.summary, /No data was written/);
 });
 
 test("lead intro drafting and Smartlead preparation stay secret-safe", async () => {

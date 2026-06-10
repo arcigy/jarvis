@@ -12,7 +12,7 @@ import { runIntegrationDiagnostics } from "../automation-system/diagnostics.ts";
 import { getIntegrationHealth, loadLocalEnv } from "../automation-system/env.ts";
 import { buildClientReplyPrompt, buildPositiveOutreachReplyPrompt, generateGeminiText } from "../automation-system/gemini.ts";
 import { defaultGmailBriefingQuery, defaultGmailSyncQuery, listConfiguredGmailAccounts, listRecentGmailMessageEvents, sendGmailTextMessage } from "../automation-system/gmail.ts";
-import { fetchPublicUrlPreview } from "../automation-system/http-fetch.ts";
+import { batchFetchPublicUrlPreviews, fetchPublicUrlPreview } from "../automation-system/http-fetch.ts";
 import { containsWakeWord, extractCommandAfterWakeWord, type JarvisVoiceSession } from "../automation-system/jarvis-voice.ts";
 import { buildJarvisCapabilityAudit, summarizeJarvisCapabilityAuditForVoice } from "../automation-system/jarvis-capability-audit.ts";
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "../automation-system/lead-discovery.ts";
@@ -1764,6 +1764,20 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         timeoutMs: typeof payload.timeoutMs === "number" ? payload.timeoutMs : undefined,
         maxBytes: typeof payload.maxBytes === "number" ? payload.maxBytes : undefined,
         parseJson: payload.parseJson === true,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.batch_fetch_url_previews") {
+    writeJson(response, 200, {
+      result: await batchFetchPublicUrlPreviews({
+        urls: Array.isArray(payload.urls) ? payload.urls.map(String) : [],
+        method: payload.method === "HEAD" ? "HEAD" : "GET",
+        headers: isRecord(payload.headers) ? objectToStringRecord(payload.headers) : undefined,
+        timeoutMs: typeof payload.timeoutMs === "number" ? payload.timeoutMs : undefined,
+        maxBytes: typeof payload.maxBytes === "number" ? payload.maxBytes : undefined,
+        parseJson: payload.parseJson === true,
+        maxUrls: typeof payload.maxUrls === "number" ? payload.maxUrls : undefined,
       }),
     });
     return;

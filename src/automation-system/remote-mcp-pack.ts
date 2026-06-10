@@ -783,6 +783,14 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Batch fetch public URL previews without writing",
+      tool: "arcigy.batch_fetch_url_previews",
+      method: "POST",
+      url: toolUrl("arcigy.batch_fetch_url_previews"),
+      body: { urls: ["https://example.com/api/status", "https://example.com/robots.txt"], method: "GET", parseJson: true, maxBytes: 12000, maxUrls: 10 },
+      approvalRequired: false,
+    },
+    {
       label: "Scrape website contacts without writing",
       tool: "arcigy.scrape_website_contacts",
       method: "POST",

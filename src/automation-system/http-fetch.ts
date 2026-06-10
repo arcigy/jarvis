@@ -25,6 +25,13 @@ export type PublicUrlFetchPreview = {
   fetchedAt: string;
 };
 
+export type PublicUrlBatchFetchPreview = {
+  mode: "public-url-batch-fetch-preview";
+  summary: string;
+  totals: { requested: number; fetched: number; failed: number; truncated: number };
+  results: Array<{ url: string; result?: PublicUrlFetchPreview; error?: string }>;
+};
+
 const blockedHeaderNames = new Set(["authorization", "cookie", "set-cookie", "x-api-key", "proxy-authorization"]);
 
 export async function fetchPublicUrlPreview(
@@ -66,6 +73,52 @@ export async function fetchPublicUrlPreview(
   } finally {
     clearTimeout(timeout);
   }
+}
+
+export async function batchFetchPublicUrlPreviews(
+  input: {
+    urls: string[];
+    method?: "GET" | "HEAD";
+    headers?: Record<string, string>;
+    timeoutMs?: number;
+    maxBytes?: number;
+    parseJson?: boolean;
+    maxUrls?: number;
+  },
+  fetchImpl: FetchLike = fetch
+): Promise<PublicUrlBatchFetchPreview> {
+  const maxUrls = Math.min(Math.max(Math.trunc(input.maxUrls ?? 20), 1), 50);
+  const urls = input.urls.slice(0, maxUrls);
+  const results: PublicUrlBatchFetchPreview["results"] = [];
+  for (const url of urls) {
+    try {
+      results.push({
+        url,
+        result: await fetchPublicUrlPreview(
+          {
+            url,
+            method: input.method,
+            headers: input.headers,
+            timeoutMs: input.timeoutMs,
+            maxBytes: input.maxBytes,
+            parseJson: input.parseJson,
+          },
+          fetchImpl
+        ),
+      });
+    } catch (error) {
+      results.push({ url, error: redactSensitiveText(error instanceof Error ? error.message : String(error)) });
+    }
+  }
+  const fetched = results.filter((item) => item.result).length;
+  const failed = results.length - fetched;
+  const truncated = results.filter((item) => item.result?.truncated).length;
+  return {
+    mode: "public-url-batch-fetch-preview",
+    summary: `Batch fetch preview: ${fetched}/${results.length} URL fetched, ${failed} failed, ${truncated} truncated. No data was written.`,
+    totals: { requested: results.length, fetched, failed, truncated },
+    results,
+  };
 }
 
 function normalizePublicFetchUrl(value: string): string {
