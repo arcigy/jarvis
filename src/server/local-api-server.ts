@@ -12,6 +12,7 @@ import { runIntegrationDiagnostics } from "../automation-system/diagnostics.ts";
 import { getIntegrationHealth, loadLocalEnv } from "../automation-system/env.ts";
 import { buildClientReplyPrompt, buildPositiveOutreachReplyPrompt, generateGeminiText } from "../automation-system/gemini.ts";
 import { defaultGmailBriefingQuery, defaultGmailSyncQuery, listConfiguredGmailAccounts, listRecentGmailMessageEvents, sendGmailTextMessage } from "../automation-system/gmail.ts";
+import { fetchPublicUrlPreview } from "../automation-system/http-fetch.ts";
 import { containsWakeWord, extractCommandAfterWakeWord, type JarvisVoiceSession } from "../automation-system/jarvis-voice.ts";
 import { buildJarvisCapabilityAudit, summarizeJarvisCapabilityAuditForVoice } from "../automation-system/jarvis-capability-audit.ts";
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "../automation-system/lead-discovery.ts";
@@ -1600,6 +1601,19 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
     });
     return;
   }
+  if (name === "arcigy.fetch_url_preview") {
+    writeJson(response, 200, {
+      result: await fetchPublicUrlPreview({
+        url: String(payload.url ?? ""),
+        method: payload.method === "HEAD" ? "HEAD" : "GET",
+        headers: isRecord(payload.headers) ? objectToStringRecord(payload.headers) : undefined,
+        timeoutMs: typeof payload.timeoutMs === "number" ? payload.timeoutMs : undefined,
+        maxBytes: typeof payload.maxBytes === "number" ? payload.maxBytes : undefined,
+        parseJson: payload.parseJson === true,
+      }),
+    });
+    return;
+  }
   if (name === "arcigy.search_serper") {
     writeJson(response, 200, {
       result: await searchSerper({
@@ -2716,6 +2730,14 @@ function parseContractIntake(value: unknown): unknown {
 
 function optionalString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function objectToStringRecord(value: Record<string, unknown>): Record<string, string> {
+  return Object.fromEntries(Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
 }
 
 function toClientReplyDraftInput(payload: Record<string, unknown>) {

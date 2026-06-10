@@ -53,6 +53,7 @@ export type JarvisMcpToolName =
   | "arcigy.send_smartlead_thread_reply"
   | "arcigy.create_smartlead_campaign"
   | "arcigy.configure_smartlead_campaign"
+  | "arcigy.fetch_url_preview"
   | "arcigy.search_serper"
   | "arcigy.search_google_places"
   | "arcigy.discover_leads"
@@ -363,6 +364,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
       name: "arcigy.configure_smartlead_campaign",
       description: "Nastavi existujucu Smartlead kampan: sekvencie, email ucty, schedule, settings alebo webhook po explicitnom schvaleni.",
       requiresApproval: true,
+    },
+    {
+      name: "arcigy.fetch_url_preview",
+      description: "Bezpecne fetchne verejnu HTTP/HTTPS URL cez GET alebo HEAD, blokuje private hosty a vrati redigovany text/JSON preview.",
+      requiresApproval: false,
     },
     {
       name: "arcigy.search_serper",

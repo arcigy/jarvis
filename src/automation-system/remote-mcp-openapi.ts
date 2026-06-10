@@ -336,6 +336,7 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       approval: { approved: true },
     };
   }
+  if (toolName === "arcigy.fetch_url_preview") return { url: "https://example.com/api/status", method: "GET", parseJson: true, maxBytes: 20000 };
   if (toolName === "arcigy.discover_leads") return { query: "automation agency Bratislava", maxResults: 5 };
   if (toolName === "arcigy.scrape_website_contacts") return { url: "https://example.com", includePriorityPages: true, maxPages: 4 };
   if (toolName === "arcigy.enrich_slovak_company_register") return { companyName: "Modelova Firma s.r.o." };

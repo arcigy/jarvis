@@ -13,6 +13,7 @@ import { runIntegrationDiagnostics } from "../src/automation-system/diagnostics.
 import { getIntegrationHealth } from "../src/automation-system/env.ts";
 import { buildClientReplyPrompt, buildPositiveOutreachReplyPrompt, generateGeminiText } from "../src/automation-system/gemini.ts";
 import { defaultGmailSyncQuery, encodeGmailRawMessage, listRecentGmailMessageEvents, parseFromHeader, refreshGoogleAccessToken, sendGmailTextMessage } from "../src/automation-system/gmail.ts";
+import { fetchPublicUrlPreview } from "../src/automation-system/http-fetch.ts";
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "../src/automation-system/lead-discovery.ts";
 import {
   buildNicheLeadgenPlan,
@@ -128,6 +129,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.send_smartlead_thread_reply",
     "arcigy.create_smartlead_campaign",
     "arcigy.configure_smartlead_campaign",
+    "arcigy.fetch_url_preview",
     "arcigy.search_serper",
     "arcigy.search_google_places",
     "arcigy.discover_leads",
@@ -1399,7 +1401,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 74 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 75 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -2924,6 +2926,35 @@ test("website contact scraper extracts emails, phones, and priority page text", 
   assert.ok(scraped.emails.includes("hello@kuchyne-demo.sk"));
   assert.ok(scraped.emails.includes("obchod@kuchyne-demo.sk"));
   assert.ok(scraped.phones.some((phone) => phone.includes("905")));
+});
+
+test("public URL fetch preview redacts secrets and blocks private hosts", async () => {
+  const fetchImpl = async (url: string | URL | Request, init?: RequestInit) => {
+    const target = String(url);
+    assert.equal(target, "https://api.example.com/status");
+    const headers = init?.headers as Record<string, string>;
+    assert.equal(headers.authorization, undefined);
+    return new Response(JSON.stringify({ ok: true, apiKey: "sk-" + "a".repeat(48), nested: { token: "secret-token" } }), {
+      status: 200,
+      headers: { "content-type": "application/json", "set-cookie": "private=1" },
+    });
+  };
+
+  const fetched = await fetchPublicUrlPreview(
+    {
+      url: "https://api.example.com/status",
+      headers: { Authorization: "Bearer private", Accept: "application/json" },
+      parseJson: true,
+    },
+    fetchImpl as typeof fetch
+  );
+
+  assert.equal(fetched.mode, "public-url-fetch-preview");
+  assert.equal(fetched.status, 200);
+  assert.equal(fetched.headers["set-cookie"], undefined);
+  assert.equal(JSON.stringify(fetched).includes("sk-" + "a".repeat(48)), false);
+  assert.match(fetched.textPreview ?? "", /\[redacted-hex-secret\]/);
+  await assert.rejects(() => fetchPublicUrlPreview({ url: "http://127.0.0.1:8765/api/system-health" }, fetchImpl as typeof fetch), /Private, localhost/);
 });
 
 test("lead intro drafting and Smartlead preparation stay secret-safe", async () => {
