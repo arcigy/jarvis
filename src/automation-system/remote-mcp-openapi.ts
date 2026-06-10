@@ -693,6 +693,18 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       minScore: 70,
     };
   }
+  if (toolName === "arcigy.build_orphan_lead_assignment_preview") {
+    return {
+      sourceName: "orphan-leads-db-export",
+      csvText: "company,website,email,matched_queries\nAuto Alfa,https://autoalfa.sk,jan@autoalfa.sk,autoservis Bratislava\nKitchen Beta,https://kitchenbeta.sk,,kuchynske studio Trnava\nUnknown Lead,https://unknown.sk,,",
+      niches: [
+        { id: "niche-1", slug: "autoservisy", name: "Autoservisy", aliases: ["autoservis"], keywords: ["autoservis", "pneuservis"], campaignId: "123456" },
+        { id: "niche-2", slug: "kuchyne", name: "Kuchynske studia", aliases: ["kuchynske studio"], keywords: ["kuchyne", "kuchynske studio"] },
+      ],
+      offer: "AI automatizacie pre dopyty a follow-up.",
+      language: "sk",
+    };
+  }
   if (toolName === "arcigy.build_niche_ops_dashboard_preview") {
     return {
       niches: [

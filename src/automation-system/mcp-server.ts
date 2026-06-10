@@ -29,6 +29,7 @@ import {
   buildLeadSourceImportQueuePreview,
   buildLeadSourceBundlePreview,
   buildLeadSourceBundleCampaignLaunchPreview,
+  buildOrphanLeadAssignmentPreview,
   buildUrlIntelligenceQueuePreview,
   buildLeadRepairQueuePreview,
   buildNicheOpsDashboardPreview,
@@ -2865,6 +2866,35 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildLeadRepairQueuePreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_orphan_lead_assignment_preview",
+    {
+      title: "Build orphan lead assignment preview",
+      description: "Analyze leads without niche assignment, infer likely niches/campaigns, and prepare repair/import next steps without database writes.",
+      inputSchema: {
+        leads: z.array(leadSourceQueueLeadSchema).optional(),
+        csvText: z.string().optional(),
+        delimiter: z.enum([",", ";"]).optional(),
+        maxRows: z.number().int().min(1).max(10_000).default(1000),
+        niches: z.array(queueNicheSchema.extend({ keywords: z.array(z.string()).optional() })).min(1).max(100),
+        sourceName: z.string().optional(),
+        defaultSource: z.string().optional(),
+        offer: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        minScore: z.number().int().min(0).max(100).default(70),
+        batchSize: z.number().int().min(1).max(100).default(50),
+        maxNextCalls: z.number().int().min(1).max(120).default(50),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildOrphanLeadAssignmentPreview(input))
   );
 
   server.registerTool(

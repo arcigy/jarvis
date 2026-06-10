@@ -1347,6 +1347,14 @@ test("local web bridge exposes Streamable HTTP MCP for ChatGPT action refresh", 
   };
 
   try {
+    const unauthenticated = await fetch(`${baseUrl}/mcp`, {
+      method: "POST",
+      headers: { "x-forwarded-host": "jarvis.example", accept: "application/json, text/event-stream" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 0, method: "tools/list", params: {} }),
+    });
+    assert.equal(unauthenticated.status, 401);
+    assert.match(unauthenticated.headers.get("www-authenticate") ?? "", /resource_metadata="https:\/\/jarvis\.example\/\.well-known\/oauth-protected-resource"/);
+
     const initialize = await fetch(`${baseUrl}/mcp`, {
       method: "POST",
       headers,

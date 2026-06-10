@@ -92,6 +92,7 @@ export type JarvisMcpToolName =
   | "arcigy.build_lead_source_bundle_campaign_launch_preview"
   | "arcigy.build_leadgen_autopilot_batch_preview"
   | "arcigy.build_lead_repair_queue_preview"
+  | "arcigy.build_orphan_lead_assignment_preview"
   | "arcigy.build_niche_ops_dashboard_preview"
   | "arcigy.build_cold_outreach_csv_import_preview"
   | "arcigy.build_daily_leadgen_runbook"
@@ -589,6 +590,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.build_lead_repair_queue_preview",
       description: "Najde pokazene leady, zle AI intra, chybajuce emaily/decision makerov a navrhne presne repair MCP kroky bez zapisu.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_orphan_lead_assignment_preview",
+      description: "Analyzuje orphan leady bez niche, navrhne niche/kampan priradenie a repair/import next kroky bez DB zapisu.",
       requiresApproval: false,
     },
     {

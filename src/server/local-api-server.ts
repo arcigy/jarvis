@@ -28,6 +28,7 @@ import {
   buildLeadSourceImportQueuePreview,
   buildLeadSourceBundlePreview,
   buildLeadSourceBundleCampaignLaunchPreview,
+  buildOrphanLeadAssignmentPreview,
   buildUrlIntelligenceQueuePreview,
   buildLeadRepairQueuePreview,
   buildNicheOpsDashboardPreview,
@@ -167,7 +168,7 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
     }
     writeJson(response, 401, {
       error: "Jarvis web API is locked. Provide a bearer token using JARVIS_WEB_TOKEN or API_SECRET_KEY.",
-    });
+    }, buildBearerAuthChallengeHeaders(request));
     return;
   }
 
@@ -608,6 +609,13 @@ function buildOAuthProtectedResourceMetadata(request: IncomingMessage) {
     authorization_servers: [origin],
     bearer_methods_supported: ["header"],
     scopes_supported: ["jarvis"],
+  };
+}
+
+function buildBearerAuthChallengeHeaders(request: IncomingMessage): Record<string, string> {
+  const origin = getRequestOrigin(request);
+  return {
+    "www-authenticate": `Bearer resource_metadata="${origin}/.well-known/oauth-protected-resource", scope="jarvis"`,
   };
 }
 
@@ -1939,6 +1947,25 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         offer: optionalString(payload.offer),
         language: payload.language === "en" ? "en" : "sk",
         minScore: typeof payload.minScore === "number" ? payload.minScore : undefined,
+        maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_orphan_lead_assignment_preview") {
+    writeJson(response, 200, {
+      result: buildOrphanLeadAssignmentPreview({
+        leads: Array.isArray(payload.leads) ? payload.leads as Parameters<typeof buildOrphanLeadAssignmentPreview>[0]["leads"] : undefined,
+        csvText: optionalString(payload.csvText),
+        delimiter: payload.delimiter === ";" ? ";" : payload.delimiter === "," ? "," : undefined,
+        maxRows: typeof payload.maxRows === "number" ? payload.maxRows : undefined,
+        niches: Array.isArray(payload.niches) ? payload.niches as Parameters<typeof buildOrphanLeadAssignmentPreview>[0]["niches"] : [],
+        sourceName: optionalString(payload.sourceName),
+        defaultSource: optionalString(payload.defaultSource),
+        offer: optionalString(payload.offer),
+        language: payload.language === "en" ? "en" : "sk",
+        minScore: typeof payload.minScore === "number" ? payload.minScore : undefined,
+        batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
         maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
       }),
     });

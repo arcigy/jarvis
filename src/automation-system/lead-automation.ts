@@ -485,6 +485,28 @@ export type LeadRepairQueuePreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type OrphanLeadAssignmentPreview = {
+  mode: "orphan-lead-assignment-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  totals: {
+    input: number;
+    assigned: number;
+    unassigned: number;
+    readyNow: number;
+    needsRepair: number;
+    needsEmail: number;
+    needsIntro: number;
+    needsDecisionMaker: number;
+    groups: number;
+  };
+  assigned: Array<{ lead: LeadSourceImportQueueLead; niche: { id?: string; slug: string; name: string; campaignId?: string | number | null }; confidence: number; reasons: string[] }>;
+  unassigned: LeadSourceImportQueueLead[];
+  repairPreview: LeadRepairQueuePreview;
+  importQueuePreview?: LeadSourceImportQueuePreview;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type UrlIntelligenceQueuePreview = {
   mode: "url-intelligence-queue-preview";
   summary: string;
@@ -3304,6 +3326,101 @@ export function buildLeadRepairQueuePreview(input: {
   };
 }
 
+export function buildOrphanLeadAssignmentPreview(input: {
+  leads?: LeadSourceImportQueueLead[];
+  csvText?: string;
+  delimiter?: "," | ";";
+  maxRows?: number;
+  niches: Array<{ id?: string; slug: string; name: string; campaignId?: string | number | null; aliases?: string[]; keywords?: string[] }>;
+  sourceName?: string;
+  defaultSource?: string;
+  offer?: string;
+  language?: "sk" | "en";
+  minScore?: number;
+  batchSize?: number;
+  maxNextCalls?: number;
+}): OrphanLeadAssignmentPreview {
+  const parsed = input.csvText ? parseLeadsCsv({ csvText: input.csvText, delimiter: input.delimiter, maxRows: input.maxRows }) : { leads: [] as LeadCsvRow[] };
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 50), 1), 120);
+  const orphanLeads = [...(input.leads ?? []), ...parsed.leads].map((lead) => normalizeSourceQueueLead(lead as LeadSourceImportQueueLead, input.sourceName, input.defaultSource ?? "orphan-leads"));
+  const assigned: OrphanLeadAssignmentPreview["assigned"] = [];
+  const unassigned: LeadSourceImportQueueLead[] = [];
+  for (const lead of orphanLeads) {
+    const match = inferOrphanLeadNiche(lead, input.niches);
+    if (!match) {
+      unassigned.push(lead);
+      continue;
+    }
+    assigned.push({
+      lead: { ...lead, nicheSlug: match.niche.slug, nicheName: match.niche.name, campaignId: lead.campaignId ?? lead.smartleadCampaignId ?? match.niche.campaignId },
+      niche: match.niche,
+      confidence: match.confidence,
+      reasons: match.reasons,
+    });
+  }
+  const assignedLeads = assigned.map((item) => item.lead);
+  const repairPreview = buildLeadRepairQueuePreview({
+    leads: orphanLeads as LeadRepairQueueLead[],
+    offer: input.offer,
+    language: input.language,
+    minScore: input.minScore,
+    maxNextCalls,
+  });
+  const importQueuePreview = assignedLeads.length
+    ? buildLeadSourceImportQueuePreview({
+        sourceName: input.sourceName ?? "orphan-leads",
+        sourceType: input.csvText ? "csv" : "manual",
+        leads: assignedLeads,
+        niches: input.niches,
+        defaultSource: input.defaultSource ?? "orphan-leads",
+        offer: input.offer,
+        language: input.language,
+        minScore: input.minScore,
+        batchSize: input.batchSize,
+        maxNextCalls,
+      })
+    : undefined;
+  const nextToolCalls = dedupeNextToolCalls([
+    ...repairPreview.nextToolCalls,
+    ...(importQueuePreview?.nextToolCalls ?? []),
+  ]).slice(0, maxNextCalls);
+  if (unassigned.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_lead_source_import_queue_preview",
+      payload: { sourceName: input.sourceName ?? "orphan-leads-unassigned", sourceType: input.csvText ? "csv" : "manual", leads: unassigned, niches: input.niches, offer: input.offer, language: input.language ?? "sk" },
+      reason: "Orphan leady bez jasnej niche skontroluj manualne alebo dopln aliases/keywords.",
+      approvalRequired: false,
+    });
+  }
+  const totals = {
+    input: orphanLeads.length,
+    assigned: assigned.length,
+    unassigned: unassigned.length,
+    readyNow: repairPreview.totals.readyNow,
+    needsRepair: repairPreview.totals.unique - repairPreview.totals.readyNow,
+    needsEmail: repairPreview.totals.needsEmail,
+    needsIntro: repairPreview.totals.needsIntro + repairPreview.totals.badIntro,
+    needsDecisionMaker: repairPreview.totals.needsDecisionMaker,
+    groups: importQueuePreview?.totals.groups ?? 0,
+  };
+  const status: OrphanLeadAssignmentPreview["status"] = totals.input === 0 || input.niches.length === 0
+    ? "blocked"
+    : totals.unassigned > 0 || totals.needsRepair > 0
+      ? "attention"
+      : "ready";
+  return {
+    mode: "orphan-lead-assignment-preview",
+    status,
+    summary: `Orphan lead assignment: ${status}, ${totals.assigned}/${totals.input} priradenych, ${totals.readyNow} ready, ${totals.needsRepair} potrebuje opravu, ${totals.groups} import skupin. Ziadny zapis ani upload neprebehol.`,
+    totals,
+    assigned,
+    unassigned,
+    repairPreview,
+    importQueuePreview,
+    nextToolCalls: nextToolCalls.slice(0, maxNextCalls),
+  };
+}
+
 export function buildUrlIntelligenceQueuePreview(input: {
   urls?: string[];
   leads?: LeadSourceImportQueueLead[];
@@ -4586,6 +4703,30 @@ function resolveLeadQueueNiche(
     return { slug: explicitSlug ? slugify(explicitSlug) : slugify(String(name)), name: String(name), campaignId };
   }
   return defaultNiche;
+}
+
+function inferOrphanLeadNiche(
+  lead: LeadSourceImportQueueLead,
+  niches: Array<{ id?: string; slug: string; name: string; campaignId?: string | number | null; aliases?: string[]; keywords?: string[] }>
+): { niche: { id?: string; slug: string; name: string; campaignId?: string | number | null }; confidence: number; reasons: string[] } | null {
+  const direct = resolveLeadQueueNiche(lead, niches);
+  if (direct) return { niche: direct, confidence: 100, reasons: ["explicit niche/campaign field"] };
+  const haystack = [
+    lead.companyName,
+    lead.website,
+    lead.source,
+    lead.context,
+    stringField(lead.customFields ?? {}, "matched_queries", "source_name", "source", "types", "google_maps_url", "campaign_tag"),
+  ].filter(Boolean).join(" ").toLowerCase();
+  let best: { niche: { id?: string; slug: string; name: string; campaignId?: string | number | null }; confidence: number; reasons: string[] } | null = null;
+  for (const niche of niches) {
+    const terms = unique([niche.slug, niche.name, ...(niche.aliases ?? []), ...(niche.keywords ?? [])].map((term) => term.trim()).filter(Boolean));
+    const hits = terms.filter((term) => haystack.includes(term.toLowerCase()));
+    if (!hits.length) continue;
+    const confidence = Math.min(95, 45 + hits.length * 20);
+    if (!best || confidence > best.confidence) best = { niche: { id: niche.id, slug: niche.slug, name: niche.name, campaignId: niche.campaignId }, confidence, reasons: hits.map((hit) => `matched ${hit}`) };
+  }
+  return best;
 }
 
 function dedupeNextToolCalls<T extends { tool: string; payload: Record<string, unknown> }>(calls: T[]): T[] {

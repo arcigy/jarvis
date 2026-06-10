@@ -1311,6 +1311,23 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Assign orphan leads to niches before repair/import",
+      tool: "arcigy.build_orphan_lead_assignment_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_orphan_lead_assignment_preview"),
+      body: {
+        sourceName: "orphan-leads-db-export",
+        csvText: "company,website,email,matched_queries\nAuto Alfa,https://autoalfa.sk,jan@autoalfa.sk,autoservis Bratislava\nKitchen Beta,https://kitchenbeta.sk,,kuchynske studio Trnava\nUnknown Lead,https://unknown.sk,,",
+        niches: [
+          { id: "niche-1", slug: "autoservisy", name: "Autoservisy", aliases: ["autoservis"], keywords: ["autoservis", "pneuservis"], campaignId: "123456" },
+          { id: "niche-2", slug: "kuchyne", name: "Kuchynske studia", aliases: ["kuchynske studio"], keywords: ["kuchyne", "kuchynske studio"] },
+        ],
+        offer: "AI automatizacie pre dopyty a follow-up.",
+        language: "sk",
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Build leadgen autopilot batch runbook",
       tool: "arcigy.build_leadgen_autopilot_batch_preview",
       method: "POST",
