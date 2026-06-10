@@ -194,6 +194,28 @@ export type NicheSmartleadCampaignSetupDraft = {
   summary: string;
 };
 
+export type SmartleadCampaignLaunchPreview = {
+  mode: "smartlead-campaign-launch-preview";
+  summary: string;
+  campaignMode: "create" | "configure-existing";
+  campaignSetup: NicheSmartleadCampaignSetupDraft;
+  injectionPlan: SmartleadInjectionPlan;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+  approvalPayloads: {
+    createCampaign?: NicheSmartleadCampaignSetupDraft["createCampaignApprovalPayload"];
+    configureCampaign?: {
+      campaignId: string | number;
+      sequences: NicheSmartleadCampaignSetupDraft["sequences"];
+      emailAccountIds?: Array<string | number>;
+      schedule: NicheSmartleadCampaignSetupDraft["schedule"];
+      settings: NicheSmartleadCampaignSetupDraft["settings"];
+      webhook: NicheSmartleadCampaignSetupDraft["webhook"];
+      approval: { approved: true };
+    };
+    addLeads?: NonNullable<SmartleadInjectionPlan["addLeadsApprovalPayload"]>;
+  };
+};
+
 export type LeadEnrichmentBatchPreview = {
   mode: "lead-enrichment-batch-preview";
   summary: string;
@@ -937,6 +959,88 @@ export function draftNicheSmartleadCampaignSetup(input: {
       approval: { approved: true },
     },
     summary: `Smartlead campaign setup draft pre ${input.niche.name}: ${campaignName}. Vytvorenie kampane vyzaduje explicitne schvalenie.`,
+  };
+}
+
+export function buildSmartleadCampaignLaunchPreview(input: {
+  niche: { id?: string; slug: string; name: string; campaignId?: string | number | null };
+  leads: ManualReviewPickupLead[];
+  offer?: string;
+  painPoint?: string;
+  language?: "sk" | "en";
+  clientId?: string | number | null;
+  emailAccountIds?: Array<string | number>;
+  webhookUrl?: string;
+  schedule?: Parameters<typeof draftNicheSmartleadCampaignSetup>[0]["schedule"];
+  settings?: Parameters<typeof draftNicheSmartleadCampaignSetup>[0]["settings"];
+  batchSize?: number;
+}): SmartleadCampaignLaunchPreview {
+  const campaignSetup = draftNicheSmartleadCampaignSetup({
+    niche: { id: input.niche.id, slug: input.niche.slug, name: input.niche.name },
+    offer: input.offer,
+    painPoint: input.painPoint,
+    language: input.language,
+    clientId: input.clientId,
+    emailAccountIds: input.emailAccountIds,
+    webhookUrl: input.webhookUrl,
+    schedule: input.schedule,
+    settings: input.settings,
+  });
+  const injectionPlan = buildSmartleadInjectionPlan({
+    niche: input.niche,
+    leads: input.leads,
+    batchSize: input.batchSize,
+  });
+  const campaignId = input.niche.campaignId ?? undefined;
+  const configureCampaign = campaignId
+    ? {
+        campaignId,
+        sequences: campaignSetup.sequences,
+        emailAccountIds: input.emailAccountIds,
+        schedule: campaignSetup.schedule,
+        settings: campaignSetup.settings,
+        webhook: campaignSetup.webhook,
+        approval: { approved: true as const },
+      }
+    : undefined;
+  const nextToolCalls: SmartleadCampaignLaunchPreview["nextToolCalls"] = [];
+  if (campaignId && configureCampaign) {
+    nextToolCalls.push({
+      tool: "arcigy.configure_smartlead_campaign",
+      payload: configureCampaign as unknown as Record<string, unknown>,
+      reason: "Existujuca Smartlead kampan sa da nakonfigurovat sekvenciami, schedule, settings a webhookom po schvaleni.",
+      approvalRequired: true,
+    });
+  } else {
+    nextToolCalls.push({
+      tool: "arcigy.create_smartlead_campaign",
+      payload: campaignSetup.createCampaignApprovalPayload as unknown as Record<string, unknown>,
+      reason: "Niche nema campaignId; najprv vytvor Smartlead kampan po explicitnom schvaleni.",
+      approvalRequired: true,
+    });
+  }
+  if (injectionPlan.addLeadsApprovalPayload) {
+    nextToolCalls.push({
+      tool: "arcigy.add_leads_to_smartlead_campaign",
+      payload: injectionPlan.addLeadsApprovalPayload as unknown as Record<string, unknown>,
+      reason: "Ready leady mozu ist do existujucej kampane az po kontrole payloadu a schvaleni.",
+      approvalRequired: true,
+    });
+  }
+  return {
+    mode: "smartlead-campaign-launch-preview",
+    summary: campaignId
+      ? `Smartlead launch preview: nakonfiguruj kampan ${campaignId} a priprav ${injectionPlan.totals.prepared} leadov v ${injectionPlan.totals.batches} batchoch. Ziadny zapis ani upload neprebehol.`
+      : `Smartlead launch preview: pripravena nova kampan ${campaignSetup.campaignName} a ${injectionPlan.totals.prepared} leadov. Po vytvoreni kampane dopln campaignId a spusti add-leads preview.`,
+    campaignMode: campaignId ? "configure-existing" : "create",
+    campaignSetup,
+    injectionPlan,
+    nextToolCalls,
+    approvalPayloads: {
+      createCampaign: campaignId ? undefined : campaignSetup.createCampaignApprovalPayload,
+      configureCampaign,
+      addLeads: injectionPlan.addLeadsApprovalPayload,
+    },
   };
 }
 

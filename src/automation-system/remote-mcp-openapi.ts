@@ -382,6 +382,19 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       language: "sk",
     };
   }
+  if (toolName === "arcigy.build_smartlead_campaign_launch_preview") {
+    return {
+      niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456" },
+      offer: "AI asistent na odpovede a follow-up",
+      painPoint: "manualne spracovanie dopytov",
+      language: "sk",
+      emailAccountIds: ["email-account-1"],
+      leads: [
+        { email: "jan.novak@example.com", companyName: "Modelova Firma", website: "https://example.com", personalizedIntro: "Vsimol som si, ze riesite servis pre firemnych klientov.", phone: "+421 900 111 222" },
+      ],
+      batchSize: 50,
+    };
+  }
   if (toolName === "arcigy.preview_lead_enrichment_batch") {
     return {
       niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456" },

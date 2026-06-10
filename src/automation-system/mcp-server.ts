@@ -25,6 +25,7 @@ import {
   batchDraftLeadIntros,
   buildManualReviewPickupPlan,
   buildManualReviewQueue,
+  buildSmartleadCampaignLaunchPreview,
   buildSmartleadInjectionPlan,
   dedupeLeadCandidates,
   draftNicheSmartleadCampaignSetup,
@@ -1926,6 +1927,39 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(draftNicheSmartleadCampaignSetup(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_smartlead_campaign_launch_preview",
+    {
+      title: "Build Smartlead campaign launch preview",
+      description: "Prepare a complete Smartlead campaign launch plan with campaign setup, configure payload, webhook, and lead upload payloads without writes.",
+      inputSchema: {
+        niche: z.object({
+          id: z.string().optional(),
+          slug: z.string().min(1),
+          name: z.string().min(1),
+          campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+        }),
+        leads: z.array(manualReviewPickupLeadSchema).min(1),
+        offer: z.string().optional(),
+        painPoint: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        clientId: z.union([z.string(), z.number(), z.null()]).optional(),
+        emailAccountIds: z.array(z.union([z.string(), z.number()])).optional(),
+        webhookUrl: z.string().url().optional(),
+        schedule: smartleadScheduleSchema.optional(),
+        settings: smartleadSettingsSchema.optional(),
+        batchSize: z.number().int().min(1).max(100).default(50),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildSmartleadCampaignLaunchPreview(input))
   );
 
   server.registerTool(

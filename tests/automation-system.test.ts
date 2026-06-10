@@ -22,6 +22,7 @@ import {
   buildManualReviewPickupPlan,
   buildManualReviewQueue,
   buildLeadgenCampaignPipelinePreview,
+  buildSmartleadCampaignLaunchPreview,
   buildSmartleadInjectionPlan,
   buildDailyLeadgenRunbook,
   dedupeLeadCandidates,
@@ -146,6 +147,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.preview_manual_review_pickup",
     "arcigy.build_smartlead_injection_plan",
     "arcigy.draft_niche_smartlead_campaign_setup",
+    "arcigy.build_smartlead_campaign_launch_preview",
     "arcigy.preview_lead_enrichment_batch",
     "arcigy.build_leadgen_campaign_pipeline_preview",
     "arcigy.build_daily_leadgen_runbook",
@@ -1407,7 +1409,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 78 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 79 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -2581,6 +2583,15 @@ test("manual review pickup builds Smartlead injection and campaign setup drafts"
     painPoint: "manualne dopyty",
     language: "sk",
   });
+  const launch = buildSmartleadCampaignLaunchPreview({
+    niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456" },
+    leads: [leads[0]],
+    offer: "AI asistent na odpovede a follow-up",
+    painPoint: "manualne dopyty",
+    language: "sk",
+    emailAccountIds: ["email-account-1"],
+    batchSize: 1,
+  });
 
   assert.equal(pickup.mode, "manual-review-pickup-preview");
   assert.equal(pickup.totals.preparedSmartleadLeads, 1);
@@ -2591,6 +2602,12 @@ test("manual review pickup builds Smartlead injection and campaign setup drafts"
   assert.equal(setup.campaignName, "autoservisy_SK");
   assert.equal(setup.createCampaignApprovalPayload.approval.approved, true);
   assert.ok(setup.webhook.eventTypes.includes("EMAIL_REPLY"));
+  assert.equal(launch.mode, "smartlead-campaign-launch-preview");
+  assert.equal(launch.campaignMode, "configure-existing");
+  assert.equal(launch.approvalPayloads.configureCampaign?.campaignId, "123456");
+  assert.equal(launch.approvalPayloads.addLeads?.leads[0].email, "lead@example.com");
+  assert.ok(launch.nextToolCalls.some((call) => call.tool === "arcigy.configure_smartlead_campaign" && call.approvalRequired));
+  assert.ok(launch.nextToolCalls.some((call) => call.tool === "arcigy.add_leads_to_smartlead_campaign" && call.approvalRequired));
 });
 
 test("lead enrichment preview and daily runbook prepare safe Smartlead next steps", () => {

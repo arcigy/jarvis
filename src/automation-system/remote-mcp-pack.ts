@@ -911,6 +911,24 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Build Smartlead campaign launch preview",
+      tool: "arcigy.build_smartlead_campaign_launch_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_smartlead_campaign_launch_preview"),
+      body: {
+        niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456" },
+        offer: "AI asistent na odpovede a follow-up",
+        painPoint: "manualne spracovanie dopytov",
+        language: "sk",
+        emailAccountIds: ["email-account-1"],
+        leads: [
+          { email: "jan.novak@example.com", companyName: "Modelova Firma", website: "https://example.com", personalizedIntro: "Vsimol som si, ze riesite servis pre firemnych klientov.", phone: "+421 900 111 222" },
+        ],
+        batchSize: 50,
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Preview enriched lead batch before Smartlead",
       tool: "arcigy.preview_lead_enrichment_batch",
       method: "POST",

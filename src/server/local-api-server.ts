@@ -24,6 +24,7 @@ import {
   batchDraftLeadIntros,
   buildManualReviewPickupPlan,
   buildManualReviewQueue,
+  buildSmartleadCampaignLaunchPreview,
   buildSmartleadInjectionPlan,
   dedupeLeadCandidates,
   draftNicheSmartleadCampaignSetup,
@@ -1506,6 +1507,24 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         webhookUrl: optionalString(payload.webhookUrl),
         schedule: payload.schedule as Parameters<typeof draftNicheSmartleadCampaignSetup>[0]["schedule"],
         settings: payload.settings as Parameters<typeof draftNicheSmartleadCampaignSetup>[0]["settings"],
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_smartlead_campaign_launch_preview") {
+    writeJson(response, 200, {
+      result: buildSmartleadCampaignLaunchPreview({
+        niche: (payload.niche ?? {}) as Parameters<typeof buildSmartleadCampaignLaunchPreview>[0]["niche"],
+        leads: (payload.leads ?? []) as Parameters<typeof buildSmartleadCampaignLaunchPreview>[0]["leads"],
+        offer: optionalString(payload.offer),
+        painPoint: optionalString(payload.painPoint),
+        language: payload.language === "en" ? "en" : "sk",
+        clientId: (payload.clientId ?? null) as string | number | null,
+        emailAccountIds: Array.isArray(payload.emailAccountIds) ? (payload.emailAccountIds as Array<string | number>) : undefined,
+        webhookUrl: optionalString(payload.webhookUrl),
+        schedule: payload.schedule as Parameters<typeof buildSmartleadCampaignLaunchPreview>[0]["schedule"],
+        settings: payload.settings as Parameters<typeof buildSmartleadCampaignLaunchPreview>[0]["settings"],
+        batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
       }),
     });
     return;
