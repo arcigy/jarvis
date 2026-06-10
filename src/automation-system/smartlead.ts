@@ -124,6 +124,32 @@ export type SmartleadCampaignLeadsResult = {
   leads: unknown;
 };
 
+export type SmartleadLeadSyncPreviewInput = {
+  campaignIds?: Array<string | number>;
+  maxCampaigns?: number;
+  limitPerCampaign?: number;
+};
+
+export type SmartleadLeadSyncPreview = {
+  mode: "smartlead-lead-sync-preview";
+  campaignCount: number;
+  leadCount: number;
+  updates: Array<{
+    campaignId: string;
+    smartleadContactId?: string;
+    email?: string;
+    status?: string;
+    categoryName?: string | null;
+    localUpdate: {
+      sent_to_smartlead: true;
+      smartlead_contact_id?: string;
+      reply_status?: string;
+      reply_sentiment?: string | null;
+    };
+  }>;
+  summary: string;
+};
+
 export type SmartleadMessageHistoryResult = {
   campaignId: string;
   email: string;
@@ -241,6 +267,50 @@ export async function getSmartleadMessageHistory(
     fetchImpl
   );
   return { campaignId, email, messages, latestSentEmail: latestSentEmailForReply(messages) };
+}
+
+export async function previewSmartleadLeadSync(
+  input: SmartleadLeadSyncPreviewInput = {},
+  env: RuntimeEnv = process.env,
+  fetchImpl: FetchLike = fetch
+): Promise<SmartleadLeadSyncPreview> {
+  const campaignIds = input.campaignIds?.length
+    ? input.campaignIds.map((id) => requireCampaignId(id))
+    : (await getSmartleadCampaignStatus({}, env, fetchImpl)).campaigns?.slice(0, clampMaxCampaigns(input.maxCampaigns)).map((campaign) => requireCampaignId(campaign.id)) ?? [];
+  const limit = nonNegativeInteger(input.limitPerCampaign, 200, 500);
+  const updates: SmartleadLeadSyncPreview["updates"] = [];
+
+  for (const campaignId of campaignIds) {
+    const result = await getSmartleadCampaignLeads({ campaignId, offset: 0, limit }, env, fetchImpl);
+    for (const lead of smartleadLeadList(result.leads)) {
+      const email = stringField(lead, ["email", "lead_email", "primary_email"]);
+      if (!email) continue;
+      const smartleadContactId = stringField(lead, ["id", "lead_id", "campaign_lead_map_id"]);
+      const status = stringField(lead, ["status", "reply_status", "lead_status"]);
+      const categoryName = stringField(lead, ["category_name", "lead_category", "reply_sentiment"]);
+      updates.push({
+        campaignId,
+        smartleadContactId,
+        email: email.toLowerCase(),
+        status,
+        categoryName: categoryName ?? null,
+        localUpdate: {
+          sent_to_smartlead: true,
+          smartlead_contact_id: smartleadContactId,
+          reply_status: status,
+          reply_sentiment: categoryName ?? null,
+        },
+      });
+    }
+  }
+
+  return {
+    mode: "smartlead-lead-sync-preview",
+    campaignCount: campaignIds.length,
+    leadCount: updates.length,
+    updates,
+    summary: `Smartlead sync preview: ${updates.length} leadov z ${campaignIds.length} kampani. Ziadny zapis do lokalnej DB nebol vykonany.`,
+  };
 }
 
 export async function draftSmartleadThreadReply(
@@ -751,6 +821,26 @@ function formatMessageHistoryForPrompt(messages: unknown): string {
 
 function stripHtml(value: string): string {
   return value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function smartleadLeadList(value: unknown): Array<Record<string, unknown>> {
+  const list = Array.isArray(value)
+    ? value
+    : Array.isArray((value as { data?: unknown[] } | null)?.data)
+      ? (value as { data: unknown[] }).data
+      : Array.isArray((value as { leads?: unknown[] } | null)?.leads)
+        ? (value as { leads: unknown[] }).leads
+        : [];
+  return list.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object" && !Array.isArray(item)));
+}
+
+function stringField(record: Record<string, unknown>, keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  }
+  return undefined;
 }
 
 function cleanWebsite(value: string | undefined): string | undefined {

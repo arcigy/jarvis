@@ -15,6 +15,7 @@ import { defaultGmailBriefingQuery, defaultGmailSyncQuery, listConfiguredGmailAc
 import { containsWakeWord, extractCommandAfterWakeWord, type JarvisVoiceSession } from "../automation-system/jarvis-voice.ts";
 import { buildJarvisCapabilityAudit, summarizeJarvisCapabilityAuditForVoice } from "../automation-system/jarvis-capability-audit.ts";
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "../automation-system/lead-discovery.ts";
+import { buildLeadgenDailyReport, buildLeadgenEveningSummary, selectNextNiche } from "../automation-system/leadgen-report.ts";
 import {
   buildNicheLeadgenPlan,
   buildManualReviewQueue,
@@ -50,6 +51,7 @@ import {
   getSmartleadCampaignStatus,
   getSmartleadMessageHistory,
   getSmartleadOutreachBrief,
+  previewSmartleadLeadSync,
   sendSmartleadThreadReply,
 } from "../automation-system/smartlead.ts";
 
@@ -1131,6 +1133,37 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
     writeJson(response, 200, { result: await getProactiveAttentionDigest(payload) });
     return;
   }
+  if (name === "arcigy.get_leadgen_daily_report") {
+    writeJson(response, 200, {
+      result: buildLeadgenDailyReport({
+        periodLabel: optionalString(payload.periodLabel),
+        campaigns: payload.campaigns,
+        stuckLeads: Array.isArray(payload.stuckLeads) ? payload.stuckLeads as Parameters<typeof buildLeadgenDailyReport>[0]["stuckLeads"] : undefined,
+        settings: payload.settings && typeof payload.settings === "object" ? payload.settings as Parameters<typeof buildLeadgenDailyReport>[0]["settings"] : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.get_leadgen_evening_summary") {
+    writeJson(response, 200, {
+      result: buildLeadgenEveningSummary({
+        periodLabel: optionalString(payload.periodLabel),
+        sentToday: typeof payload.sentToday === "number" ? payload.sentToday : undefined,
+        repliesToday: typeof payload.repliesToday === "number" ? payload.repliesToday : undefined,
+        positiveToday: typeof payload.positiveToday === "number" ? payload.positiveToday : undefined,
+        recentReplies: Array.isArray(payload.recentReplies) ? payload.recentReplies as Parameters<typeof buildLeadgenEveningSummary>[0]["recentReplies"] : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.select_next_niche") {
+    writeJson(response, 200, {
+      result: selectNextNiche({
+        niches: Array.isArray(payload.niches) ? payload.niches as Parameters<typeof selectNextNiche>[0]["niches"] : [],
+      }),
+    });
+    return;
+  }
   if (name === "arcigy.draft_contract_intake") {
     writeJson(response, 200, {
       result: await draftContractIntake({
@@ -1184,6 +1217,16 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         campaignId: (payload.campaignId ?? "") as string | number,
         offset: typeof payload.offset === "number" ? payload.offset : undefined,
         limit: typeof payload.limit === "number" ? payload.limit : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.preview_smartlead_lead_sync") {
+    writeJson(response, 200, {
+      result: await previewSmartleadLeadSync({
+        campaignIds: Array.isArray(payload.campaignIds) ? payload.campaignIds as Array<string | number> : undefined,
+        maxCampaigns: typeof payload.maxCampaigns === "number" ? payload.maxCampaigns : undefined,
+        limitPerCampaign: typeof payload.limitPerCampaign === "number" ? payload.limitPerCampaign : undefined,
       }),
     });
     return;

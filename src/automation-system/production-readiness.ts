@@ -268,6 +268,8 @@ const coreWorkflowSurfaces: CoreWorkflowSurface[] = [
       "arcigy.send_approved_outreach_reply",
       "arcigy.draft_smartlead_thread_reply",
       "arcigy.send_smartlead_thread_reply",
+      "arcigy.get_leadgen_daily_report",
+      "arcigy.get_leadgen_evening_summary",
     ],
     approvalRequired: ["arcigy.send_approved_outreach_reply", "arcigy.send_smartlead_thread_reply"],
     proof: "Smartlead/local outreach briefs, Gemini positive reply drafts, Smartlead thread draft, approval queue, and approval-gated sends are registered.",

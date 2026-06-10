@@ -54,11 +54,15 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(names.includes("arcigy.run_remote_mcp_smoke"));
   assert.ok(names.includes("arcigy.get_operator_briefing"));
   assert.ok(names.includes("arcigy.get_proactive_attention_digest"));
+  assert.ok(names.includes("arcigy.get_leadgen_daily_report"));
+  assert.ok(names.includes("arcigy.get_leadgen_evening_summary"));
+  assert.ok(names.includes("arcigy.select_next_niche"));
   assert.ok(names.includes("arcigy.generate_ai_reply"));
   assert.ok(names.includes("arcigy.sync_gmail_recent_messages"));
   assert.ok(names.includes("arcigy.get_smartlead_campaign_status"));
   assert.ok(names.includes("arcigy.get_smartlead_outreach_brief"));
   assert.ok(names.includes("arcigy.get_smartlead_campaign_leads"));
+  assert.ok(names.includes("arcigy.preview_smartlead_lead_sync"));
   assert.ok(names.includes("arcigy.get_smartlead_message_history"));
   assert.ok(names.includes("arcigy.draft_smartlead_thread_reply"));
   assert.ok(names.includes("arcigy.send_smartlead_thread_reply"));

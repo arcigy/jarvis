@@ -34,11 +34,15 @@ export type JarvisMcpToolName =
   | "arcigy.run_remote_mcp_smoke"
   | "arcigy.get_operator_briefing"
   | "arcigy.get_proactive_attention_digest"
+  | "arcigy.get_leadgen_daily_report"
+  | "arcigy.get_leadgen_evening_summary"
+  | "arcigy.select_next_niche"
   | "arcigy.generate_ai_reply"
   | "arcigy.sync_gmail_recent_messages"
   | "arcigy.get_smartlead_campaign_status"
   | "arcigy.get_smartlead_outreach_brief"
   | "arcigy.get_smartlead_campaign_leads"
+  | "arcigy.preview_smartlead_lead_sync"
   | "arcigy.get_smartlead_message_history"
   | "arcigy.draft_smartlead_thread_reply"
   | "arcigy.send_smartlead_thread_reply"
@@ -256,6 +260,21 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
       requiresApproval: false,
     },
     {
+      name: "arcigy.get_leadgen_daily_report",
+      description: "Vytvori denny leadgen report zo Smartlead stats, stuck leadov a system settingov bez Slack odoslania.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.get_leadgen_evening_summary",
+      description: "Vytvori vecerny prehlad odoslanych emailov, odpovedi, pozitivnych reakcii a dnesnych reply signalov.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.select_next_niche",
+      description: "Read-only preview niche-manager rotacie: vyberie dalsi niche a region bez posunu indexu v databaze.",
+      requiresApproval: false,
+    },
+    {
       name: "arcigy.generate_ai_reply",
       description: "Pouzije Gemini na pripravu navrhu odpovede klientovi bez odoslania.",
       requiresApproval: false,
@@ -278,6 +297,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.get_smartlead_campaign_leads",
       description: "Read-only nacita leadov v Smartlead kampani s offset/limit pre audit alebo kontrolu importu.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.preview_smartlead_lead_sync",
+      description: "Read-only nacita Smartlead lead statusy a vrati lokalne update kandidaty bez zapisu do databazy.",
       requiresApproval: false,
     },
     {

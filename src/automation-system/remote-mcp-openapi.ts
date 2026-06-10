@@ -207,6 +207,27 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
   if (toolName === "arcigy.run_remote_mcp_smoke") return {};
   if (toolName === "arcigy.get_operator_briefing") return { periodLabel: "poslednych 7 dni", live: false, syncGmail: false };
   if (toolName === "arcigy.get_proactive_attention_digest") return { periodLabel: "poslednych 7 dni", live: false, syncGmail: false };
+  if (toolName === "arcigy.get_leadgen_daily_report") {
+    return {
+      periodLabel: "dnes",
+      campaigns: [{ stats: { sent_count: 100, open_count: 55, reply_count: 8, positive_reply_count: 2 } }],
+      stuckLeads: [{ website: "https://example.com", email: "lead@example.com", nicheName: "kuchynske studia" }],
+      settings: { leadgenActive: true, aiRepliesActive: true },
+    };
+  }
+  if (toolName === "arcigy.get_leadgen_evening_summary") {
+    return {
+      sentToday: 30,
+      repliesToday: 4,
+      positiveToday: 1,
+      recentReplies: [{ decisionMakerName: "Jan Novak", companyName: "Modelova Firma", replySentiment: "Interested", website: "https://example.com" }],
+    };
+  }
+  if (toolName === "arcigy.select_next_niche") {
+    return {
+      niches: [{ id: "niche-1", slug: "kuchyne", name: "Kuchynske studia", keywords: ["kuchyne na mieru"], regions: ["Bratislava", "Trnava"], currentRegionIndex: 0, dailyTarget: 25 }],
+    };
+  }
   if (toolName === "arcigy.get_production_readiness") return { live: false };
   if (toolName === "arcigy.get_production_completion_score") return { live: false };
   if (toolName === "arcigy.get_jarvis_capability_audit") return { live: false };
@@ -236,6 +257,7 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
   if (toolName === "arcigy.sync_gmail_recent_messages") return { dryRun: true, maxResults: 5 };
   if (toolName === "arcigy.get_smartlead_outreach_brief") return { periodLabel: "poslednych 7 dni" };
   if (toolName === "arcigy.get_smartlead_campaign_leads") return { campaignId: "123456", offset: 0, limit: 100 };
+  if (toolName === "arcigy.preview_smartlead_lead_sync") return { campaignIds: ["123456"], limitPerCampaign: 100 };
   if (toolName === "arcigy.get_smartlead_message_history") return { campaignId: "123456", email: "lead@example.com" };
   if (toolName === "arcigy.draft_smartlead_thread_reply") {
     return {

@@ -15,6 +15,7 @@ import { buildClientReplyPrompt, buildPositiveOutreachReplyPrompt, generateGemin
 import { defaultGmailBriefingQuery, defaultGmailSyncQuery, listConfiguredGmailAccounts, listRecentGmailMessageEvents, sendGmailTextMessage } from "./gmail.ts";
 import { handleJarvisVoiceEvent, type JarvisVoiceSession } from "./jarvis-voice.ts";
 import { buildJarvisCapabilityAudit, summarizeJarvisCapabilityAuditForVoice } from "./jarvis-capability-audit.ts";
+import { buildLeadgenDailyReport, buildLeadgenEveningSummary, selectNextNiche } from "./leadgen-report.ts";
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "./lead-discovery.ts";
 import {
   buildNicheLeadgenPlan,
@@ -53,6 +54,7 @@ import {
   getSmartleadCampaignStatus,
   getSmartleadMessageHistory,
   getSmartleadOutreachBrief,
+  previewSmartleadLeadSync,
   sendSmartleadThreadReply,
 } from "./smartlead.ts";
 import type { ClientNeedSignal, LocalPerson } from "./types.ts";
@@ -952,6 +954,95 @@ export function createJarvisMcpServer(): McpServer {
   );
 
   server.registerTool(
+    "arcigy.get_leadgen_daily_report",
+    {
+      title: "Leadgen daily report",
+      description: "Build a daily leadgen report from Smartlead-like campaign stats, stuck leads, and system settings without sending Slack.",
+      inputSchema: {
+        periodLabel: z.string().default("dnes"),
+        campaigns: z.unknown().optional(),
+        stuckLeads: z.array(z.object({
+          website: z.string().optional(),
+          email: z.string().optional(),
+          nicheName: z.string().optional(),
+          decisionMakerName: z.string().optional(),
+          phone: z.string().optional(),
+        })).optional(),
+        settings: z.object({
+          leadgenActive: z.boolean().optional(),
+          aiRepliesActive: z.boolean().optional(),
+        }).optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildLeadgenDailyReport(input))
+  );
+
+  server.registerTool(
+    "arcigy.get_leadgen_evening_summary",
+    {
+      title: "Leadgen evening summary",
+      description: "Build an evening outreach summary from sent/reply/positive counts and recent reply signals.",
+      inputSchema: {
+        periodLabel: z.string().default("poslednych 24 hodin"),
+        sentToday: z.number().int().nonnegative().default(0),
+        repliesToday: z.number().int().nonnegative().default(0),
+        positiveToday: z.number().int().nonnegative().default(0),
+        recentReplies: z.array(z.object({
+          decisionMakerName: z.string().optional(),
+          companyName: z.string().optional(),
+          replySentiment: z.string().optional(),
+          website: z.string().optional(),
+        })).optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildLeadgenEveningSummary(input))
+  );
+
+  server.registerTool(
+    "arcigy.select_next_niche",
+    {
+      title: "Select next niche",
+      description: "Preview niche-manager rotation: choose the next active niche and region without updating the database.",
+      inputSchema: {
+        niches: z.array(z.object({
+          id: z.string(),
+          slug: z.string().optional(),
+          name: z.string(),
+          keywords: z.array(z.string()).optional(),
+          regions: z.array(z.string()).min(1),
+          currentRegionIndex: z.number().int().optional(),
+          dailyTarget: z.number().int().nonnegative().optional(),
+          smartleadCampaignId: z.string().nullable().optional(),
+          todaySent: z.number().int().nonnegative().optional(),
+          status: z.string().optional(),
+          tier: z.number().int().optional(),
+          lastWorkedAt: z.string().nullable().optional(),
+          createdAt: z.string().nullable().optional(),
+        })).min(1),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(selectNextNiche(input))
+  );
+
+  server.registerTool(
     "arcigy.generate_ai_reply",
     {
       title: "Generate AI reply",
@@ -1087,6 +1178,26 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(await getSmartleadCampaignLeads(input))
+  );
+
+  server.registerTool(
+    "arcigy.preview_smartlead_lead_sync",
+    {
+      title: "Preview Smartlead lead sync",
+      description: "Fetch Smartlead lead statuses and return local update candidates without writing to the database.",
+      inputSchema: {
+        campaignIds: z.array(z.union([z.string(), z.number()])).optional(),
+        maxCampaigns: z.number().int().min(1).max(25).default(10),
+        limitPerCampaign: z.number().int().min(1).max(500).default(200),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (input) => jsonResult(await previewSmartleadLeadSync(input))
   );
 
   server.registerTool(

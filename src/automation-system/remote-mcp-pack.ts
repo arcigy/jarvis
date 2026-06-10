@@ -647,6 +647,42 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Build leadgen daily report without Slack",
+      tool: "arcigy.get_leadgen_daily_report",
+      method: "POST",
+      url: toolUrl("arcigy.get_leadgen_daily_report"),
+      body: {
+        periodLabel: "dnes",
+        campaigns: [{ stats: { sent_count: 100, open_count: 55, reply_count: 8, positive_reply_count: 2 } }],
+        stuckLeads: [{ website: "https://example.com", email: "lead@example.com", nicheName: "kuchynske studia" }],
+        settings: { leadgenActive: true, aiRepliesActive: true },
+      },
+      approvalRequired: false,
+    },
+    {
+      label: "Build leadgen evening summary",
+      tool: "arcigy.get_leadgen_evening_summary",
+      method: "POST",
+      url: toolUrl("arcigy.get_leadgen_evening_summary"),
+      body: {
+        sentToday: 30,
+        repliesToday: 4,
+        positiveToday: 1,
+        recentReplies: [{ decisionMakerName: "Jan Novak", companyName: "Modelova Firma", replySentiment: "Interested", website: "https://example.com" }],
+      },
+      approvalRequired: false,
+    },
+    {
+      label: "Preview next niche rotation",
+      tool: "arcigy.select_next_niche",
+      method: "POST",
+      url: toolUrl("arcigy.select_next_niche"),
+      body: {
+        niches: [{ id: "niche-1", slug: "kuchyne", name: "Kuchynske studia", keywords: ["kuchyne na mieru"], regions: ["Bratislava", "Trnava"], currentRegionIndex: 0, dailyTarget: 25 }],
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Draft a Gemini client reply",
       tool: "arcigy.generate_ai_reply",
       method: "POST",
@@ -795,6 +831,14 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       method: "POST",
       url: toolUrl("arcigy.get_smartlead_campaign_leads"),
       body: { campaignId: "123456", offset: 0, limit: 100 },
+      approvalRequired: false,
+    },
+    {
+      label: "Preview Smartlead lead status sync without DB writes",
+      tool: "arcigy.preview_smartlead_lead_sync",
+      method: "POST",
+      url: toolUrl("arcigy.preview_smartlead_lead_sync"),
+      body: { campaignIds: ["123456"], limitPerCampaign: 100 },
       approvalRequired: false,
     },
     {

@@ -93,11 +93,15 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.get_remote_mcp_pack`: returns a secret-safe connection pack for Claude, ChatGPT, Grok, or another remote MCP agent.
 - `arcigy.run_remote_mcp_smoke`: verifies remote web MCP manifest, action manifest, OpenAPI schema, CORS preflight, external auth gate, connection pack, production evidence quick-starts, completion score quick-start coverage, read-only tool call, production evidence tool call, approval gate, approval-shape-gate, and token redaction.
 - `arcigy.get_operator_briefing`: combines readiness, cold outreach, open client requests, and prepared reply approvals into one Jarvis briefing; with `live=true`, it syncs recent Gmail messages, cold outreach prefers live Smartlead statistics, and both fall back safely.
+- `arcigy.get_leadgen_daily_report`: builds a daily leadgen report from campaign stats, stuck/manual-review leads, and system settings without sending Slack.
+- `arcigy.get_leadgen_evening_summary`: builds an evening outreach summary from sent, reply, positive-reply counts, and recent reply signals.
+- `arcigy.select_next_niche`: previews the next niche-manager niche/region selection without advancing the database index.
 - `arcigy.generate_ai_reply`: uses Gemini to draft a client reply without sending it.
 - `arcigy.sync_gmail_recent_messages`: fetches Gmail messages and ingests client requests into SQLite.
 - `arcigy.get_smartlead_campaign_status`: reads Smartlead campaigns or campaign statistics.
 - `arcigy.get_smartlead_outreach_brief`: normalizes one Smartlead campaign, or aggregates recent campaign statistics when `campaignId` is omitted, into one Jarvis cold outreach briefing.
 - `arcigy.get_smartlead_campaign_leads`: read-only fetch of campaign leads with offset/limit for audit and import checks.
+- `arcigy.preview_smartlead_lead_sync`: read-only Smartlead status sync preview that returns local update candidates without writing to the database.
 - `arcigy.get_smartlead_message_history`: read-only fetch of one lead's Smartlead message history plus latest sent-email reply metadata.
 - `arcigy.draft_smartlead_thread_reply`: drafts a Smartlead thread reply from message history without sending.
 - `arcigy.send_smartlead_thread_reply`: approval-gated send into an existing Smartlead thread through `reply-email-thread`.

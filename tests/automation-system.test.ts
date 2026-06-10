@@ -45,6 +45,7 @@ import {
   getSmartleadCampaignStatus,
   getSmartleadMessageHistory,
   getSmartleadOutreachBrief,
+  previewSmartleadLeadSync,
   sendSmartleadThreadReply,
 } from "../src/automation-system/smartlead.ts";
 import {
@@ -56,6 +57,7 @@ import {
 import { answerJarvisIntent, resolveJarvisIntentFromTranscript } from "../src/automation-system/jarvis-intents.ts";
 import { buildProductionReadinessReport } from "../src/automation-system/production-readiness.ts";
 import { buildOperatorBriefing } from "../src/automation-system/operator-briefing.ts";
+import { buildLeadgenDailyReport, buildLeadgenEveningSummary, selectNextNiche } from "../src/automation-system/leadgen-report.ts";
 import { draftPriceOfferIntake } from "../src/automation-system/price-offer.ts";
 import { buildProactiveAttentionDigest } from "../src/automation-system/proactive-attention-digest.ts";
 import { buildJarvisCapabilityAudit } from "../src/automation-system/jarvis-capability-audit.ts";
@@ -101,11 +103,15 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.run_remote_mcp_smoke",
     "arcigy.get_operator_briefing",
     "arcigy.get_proactive_attention_digest",
+    "arcigy.get_leadgen_daily_report",
+    "arcigy.get_leadgen_evening_summary",
+    "arcigy.select_next_niche",
     "arcigy.generate_ai_reply",
     "arcigy.sync_gmail_recent_messages",
     "arcigy.get_smartlead_campaign_status",
     "arcigy.get_smartlead_outreach_brief",
     "arcigy.get_smartlead_campaign_leads",
+    "arcigy.preview_smartlead_lead_sync",
     "arcigy.get_smartlead_message_history",
     "arcigy.draft_smartlead_thread_reply",
     "arcigy.send_smartlead_thread_reply",
@@ -1377,7 +1383,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 60 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 64 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -1610,6 +1616,10 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_production_completion_score" && call.body.live === false && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_jarvis_capability_audit" && call.body.live === false && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_proactive_attention_digest" && call.body.syncGmail === false && call.approvalRequired === false));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_leadgen_daily_report" && call.approvalRequired === false));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_leadgen_evening_summary" && call.approvalRequired === false));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.select_next_niche" && call.approvalRequired === false));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.preview_smartlead_lead_sync" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.label === "Spustit remote MCP smoke proof"));
   assert.ok(pack.quickStartCalls.some((call) => call.label === "Ziskat najnovsiu production verification evidence"));
   assert.ok(pack.quickStartCalls.some((call) => call.label === "Spytat sa Jarvisa na production evidence"));
@@ -2464,6 +2474,75 @@ test("Smartlead outreach brief uses locally prepared positives when Smartlead om
   assert.match(brief.summary, /z toho 2 lokalne klasifikovane pozitivne/);
   assert.match(brief.summary, /Pripravil som ti 2 odpovede/);
   assert.ok(brief.notes.some((note) => note.includes("using locally prepared positive replies")));
+});
+
+test("leadgen daily and evening reports summarize outreach without writes", () => {
+  const daily = buildLeadgenDailyReport({
+    periodLabel: "dnes",
+    campaigns: [{ sent_count: 100, open_count: 60, reply_count: 10, positive_reply_count: 3 }],
+    stuckLeads: [{ website: "https://example.com", email: "lead@example.com", nicheName: "autoservisy" }],
+    settings: { leadgenActive: true, aiRepliesActive: false },
+  });
+  const evening = buildLeadgenEveningSummary({
+    sentToday: 40,
+    repliesToday: 5,
+    positiveToday: 2,
+    recentReplies: [{ decisionMakerName: "Jan Novak", companyName: "Modelova Firma", replySentiment: "Interested" }],
+  });
+
+  assert.equal(daily.mode, "leadgen-daily-report");
+  assert.equal(daily.stuckLeadCount, 1);
+  assert.equal(daily.controls.aiReplies, "paused");
+  assert.match(daily.summary, /Na manualnu kontrolu caka 1 leadov/);
+  assert.equal(evening.metrics.positiveRate, 40);
+  assert.equal(evening.recentReplies.length, 1);
+  assert.match(evening.summary, /pozitivne 2/);
+});
+
+test("niche rotation preview selects next active niche and wraps region index", () => {
+  const preview = selectNextNiche({
+    niches: [
+      { id: "inactive", name: "Inactive", regions: ["Kosice"], status: "paused", tier: 1 },
+      { id: "older", name: "Older", regions: ["Bratislava", "Trnava"], currentRegionIndex: 1, dailyTarget: 20, todaySent: 5, tier: 1, lastWorkedAt: "2026-06-01T00:00:00.000Z" },
+      { id: "newer", name: "Newer", regions: ["Zilina"], currentRegionIndex: 0, tier: 1, lastWorkedAt: "2026-06-09T00:00:00.000Z" },
+    ],
+  });
+
+  assert.equal(preview.selected?.id, "older");
+  assert.equal(preview.selected?.activeRegion, "Trnava");
+  assert.equal(preview.selected?.nextRegionIndex, 0);
+  assert.match(preview.summary, /Dalsi niche: Older/);
+});
+
+test("Smartlead lead sync preview maps remote leads to local update candidates", async () => {
+  const calls: string[] = [];
+  const fetchImpl = async (url: string | URL | Request) => {
+    const target = String(url);
+    calls.push(target);
+    if (target.includes("/campaigns/123/leads?")) {
+      return responseJson({
+        data: [
+          { id: 55, email: "Lead@Example.com", status: "replied", category_name: "Interested" },
+          { id: 56, email: "", status: "skipped" },
+        ],
+      });
+    }
+    throw new Error(`Unexpected Smartlead URL: ${target}`);
+  };
+
+  const preview = await previewSmartleadLeadSync(
+    { campaignIds: ["123"], limitPerCampaign: 50 },
+    { SMARTLEAD_API_KEY: "smartlead-secret" },
+    fetchImpl as typeof fetch
+  );
+
+  assert.equal(preview.mode, "smartlead-lead-sync-preview");
+  assert.equal(preview.campaignCount, 1);
+  assert.equal(preview.leadCount, 1);
+  assert.equal(preview.updates[0].email, "lead@example.com");
+  assert.equal(preview.updates[0].localUpdate.reply_sentiment, "Interested");
+  assert.ok(calls[0].includes("limit=50"));
+  assert.equal(JSON.stringify(preview).includes("smartlead-secret"), false);
 });
 
 test("lead discovery helpers call Serper, Google Places, and Google Sheets", async () => {
