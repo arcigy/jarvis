@@ -59,6 +59,11 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(names.includes("arcigy.search_serper"));
   assert.ok(names.includes("arcigy.search_google_places"));
   assert.ok(names.includes("arcigy.discover_leads"));
+  assert.ok(names.includes("arcigy.scrape_website_contacts"));
+  assert.ok(names.includes("arcigy.draft_lead_intro"));
+  assert.ok(names.includes("arcigy.prepare_smartlead_leads"));
+  assert.ok(names.includes("arcigy.run_leadgen_research_pipeline"));
+  assert.ok(names.includes("arcigy.add_leads_to_smartlead_campaign"));
   assert.ok(names.includes("arcigy.append_leads_to_google_sheet"));
   assert.match(readFileSync("src/automation-system/mcp-server.ts", "utf-8"), /localCold\.metrics\?\.preparedPositiveReplyCount/);
   assert.match(readFileSync("src/automation-system/mcp-server.ts", "utf-8"), /pendingPositiveApprovalCount/);

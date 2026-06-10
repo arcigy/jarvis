@@ -184,6 +184,7 @@ function buildLaunchChecklist(
     "arcigy.generate_contract_documents",
     "arcigy.approve_prepared_outreach_reply",
     "arcigy.send_approved_outreach_reply",
+    "arcigy.add_leads_to_smartlead_campaign",
     "arcigy.append_leads_to_google_sheet",
   ];
   const approvalReady = requiredApprovalTools.every((tool) => approvalTools.includes(tool));

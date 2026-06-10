@@ -39,6 +39,11 @@ export type JarvisMcpToolName =
   | "arcigy.search_serper"
   | "arcigy.search_google_places"
   | "arcigy.discover_leads"
+  | "arcigy.scrape_website_contacts"
+  | "arcigy.draft_lead_intro"
+  | "arcigy.prepare_smartlead_leads"
+  | "arcigy.run_leadgen_research_pipeline"
+  | "arcigy.add_leads_to_smartlead_campaign"
   | "arcigy.append_leads_to_google_sheet"
   | "arcigy.jarvis_voice_event";
 
@@ -254,6 +259,31 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
       name: "arcigy.discover_leads",
       description: "Skombinuje Serper a Google Places do normalizovaneho zoznamu leadov.",
       requiresApproval: false,
+    },
+    {
+      name: "arcigy.scrape_website_contacts",
+      description: "Fetchne web a kontaktne podstranky, vytiahne emaily, telefony, title, popis a textovy preview pre lead enrichment.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.draft_lead_intro",
+      description: "Pouzije Gemini na vytvorenie kratkeho personalizovaneho intra pre cold outreach lead bez odoslania.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.prepare_smartlead_leads",
+      description: "Normalizuje vybrane leady do Smartlead lead_list payloadu vratane custom_fields a personalized_intro bez zapisu.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.run_leadgen_research_pipeline",
+      description: "Spusti read-only pipeline: discovery cez Serper/Google Places, volitelny scrape webov a volitelne Gemini intra pre Smartlead import.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.add_leads_to_smartlead_campaign",
+      description: "Nahra pripraveny Smartlead lead_list do kampane po explicitnom schvaleni operatorom.",
+      requiresApproval: true,
     },
     {
       name: "arcigy.append_leads_to_google_sheet",

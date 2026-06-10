@@ -1275,11 +1275,21 @@ function jarvisCapabilityDefinitions() {
     },
     {
       id: "lead-discovery",
-      title: "Lead discovery and Google Sheets export",
-      tools: ["arcigy.search_serper", "arcigy.search_google_places", "arcigy.discover_leads", "arcigy.append_leads_to_google_sheet"],
-      approvalRequired: ["arcigy.append_leads_to_google_sheet"],
+      title: "Lead discovery, scraping, AI intros, and exports",
+      tools: [
+        "arcigy.search_serper",
+        "arcigy.search_google_places",
+        "arcigy.discover_leads",
+        "arcigy.scrape_website_contacts",
+        "arcigy.draft_lead_intro",
+        "arcigy.prepare_smartlead_leads",
+        "arcigy.run_leadgen_research_pipeline",
+        "arcigy.add_leads_to_smartlead_campaign",
+        "arcigy.append_leads_to_google_sheet",
+      ],
+      approvalRequired: ["arcigy.add_leads_to_smartlead_campaign", "arcigy.append_leads_to_google_sheet"],
       evidence: ["tests", "doctor-live"],
-      envKeys: ["serper", "googleMaps", "googleSheets"],
+      envKeys: ["serper", "googleMaps", "gemini", "smartlead", "googleSheets"],
     },
     {
       id: "approval-safety",
@@ -1291,6 +1301,7 @@ function jarvisCapabilityDefinitions() {
         "arcigy.send_approved_outreach_reply",
         "arcigy.update_client_need_status",
         "arcigy.export_local_memory_snapshot",
+        "arcigy.add_leads_to_smartlead_campaign",
         "arcigy.append_leads_to_google_sheet",
       ],
       evidence: ["approval-gate", "approval-shape-gate", "secret-redaction", "secret-scan", "ai-draft-safety"],
@@ -2222,6 +2233,7 @@ async function checkApprovalGates(baseUrl, token, topLevelApproved) {
     ["arcigy.update_client_need_status", { needSignalId: "smoke-client-need", status: "resolved" }],
     ["arcigy.export_local_memory_snapshot", { outputPath: "generated/local-memory/smoke.json" }],
     ["arcigy.append_leads_to_google_sheet", { rows: [["Smoke", "https://example.com"]] }],
+    ["arcigy.add_leads_to_smartlead_campaign", { campaignId: "123", leads: [{ email: "smoke@example.com" }] }],
   ];
   const bodies = [];
   for (const [tool, payload] of payloads) {
@@ -2380,6 +2392,7 @@ function hasSafeOpenApiExample(toolName, value) {
   if (toolName === "arcigy.identify_email") return typeof value.email === "string" && value.email.includes("@");
   if (toolName === "arcigy.generate_contract_documents") return value.approval?.approved === true && typeof value.intake === "object";
   if (toolName === "arcigy.append_leads_to_google_sheet") return value.approval?.approved === true && Array.isArray(value.rows);
+  if (toolName === "arcigy.add_leads_to_smartlead_campaign") return value.approval?.approved === true && Array.isArray(value.leads);
   return true;
 }
 
@@ -2875,6 +2888,11 @@ function listWebMcpTools() {
     { name: "arcigy.search_serper", requiresApproval: false },
     { name: "arcigy.search_google_places", requiresApproval: false },
     { name: "arcigy.discover_leads", requiresApproval: false },
+    { name: "arcigy.scrape_website_contacts", requiresApproval: false },
+    { name: "arcigy.draft_lead_intro", requiresApproval: false },
+    { name: "arcigy.prepare_smartlead_leads", requiresApproval: false },
+    { name: "arcigy.run_leadgen_research_pipeline", requiresApproval: false },
+    { name: "arcigy.add_leads_to_smartlead_campaign", requiresApproval: true },
     { name: "arcigy.append_leads_to_google_sheet", requiresApproval: true },
   ];
 }

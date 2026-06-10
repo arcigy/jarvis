@@ -98,6 +98,11 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.search_serper`: read-only Serper web search for lead discovery.
 - `arcigy.search_google_places`: read-only Google Places Text Search for company discovery.
 - `arcigy.discover_leads`: combines Serper and Google Places into normalized lead candidates.
+- `arcigy.scrape_website_contacts`: read-only website/contact-page fetcher for emails, phones, links, title, description, and text preview.
+- `arcigy.draft_lead_intro`: Gemini draft of one short personalized cold outreach intro for a lead.
+- `arcigy.prepare_smartlead_leads`: normalizes selected leads into Smartlead `lead_list` payload without writing.
+- `arcigy.run_leadgen_research_pipeline`: read-only discovery + optional website scraping + optional Gemini intro drafts for Smartlead-ready research.
+- `arcigy.add_leads_to_smartlead_campaign`: approval-gated upload of prepared `lead_list` batches to a Smartlead campaign.
 - `arcigy.append_leads_to_google_sheet`: explicit Google Sheets append for prepared lead rows.
 - `arcigy.jarvis_voice_event`: wake-word state handling for the desktop voice layer.
 

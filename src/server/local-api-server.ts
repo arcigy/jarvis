@@ -15,6 +15,7 @@ import { defaultGmailBriefingQuery, defaultGmailSyncQuery, listConfiguredGmailAc
 import { containsWakeWord, extractCommandAfterWakeWord, type JarvisVoiceSession } from "../automation-system/jarvis-voice.ts";
 import { buildJarvisCapabilityAudit, summarizeJarvisCapabilityAuditForVoice } from "../automation-system/jarvis-capability-audit.ts";
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "../automation-system/lead-discovery.ts";
+import { draftLeadIntro, prepareSmartleadLeads, runLeadgenResearchPipeline, scrapeWebsiteContacts } from "../automation-system/lead-automation.ts";
 import { buildContractGenerationCommand, getColdOutreachMcpAnswer, listJarvisMcpTools, localStateWriteToolNames } from "../automation-system/mcp-tools.ts";
 import { buildOperatorBriefing } from "../automation-system/operator-briefing.ts";
 import { buildProactiveAttentionDigest } from "../automation-system/proactive-attention-digest.ts";
@@ -25,7 +26,7 @@ import { buildRemoteMcpOpenApiDocument } from "../automation-system/remote-mcp-o
 import { buildRemoteMcpConnectionPack } from "../automation-system/remote-mcp-pack.ts";
 import { runRemoteMcpSmoke } from "../automation-system/remote-mcp-smoke.ts";
 import { createJarvisMcpServer } from "../automation-system/mcp-server.ts";
-import { getSmartleadCampaignStatus, getSmartleadOutreachBrief } from "../automation-system/smartlead.ts";
+import { addLeadsToSmartleadCampaign, getSmartleadCampaignStatus, getSmartleadOutreachBrief } from "../automation-system/smartlead.ts";
 
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
 const desktopRoot = join(repoRoot, "src", "desktop");
@@ -1137,6 +1138,51 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
     });
     return;
   }
+  if (name === "arcigy.scrape_website_contacts") {
+    writeJson(response, 200, {
+      result: await scrapeWebsiteContacts({
+        url: String(payload.url ?? ""),
+        includePriorityPages: payload.includePriorityPages !== false,
+        maxPages: typeof payload.maxPages === "number" ? payload.maxPages : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.draft_lead_intro") {
+    writeJson(response, 200, {
+      result: await draftLeadIntro({
+        companyName: String(payload.companyName ?? ""),
+        website: optionalString(payload.website),
+        context: optionalString(payload.context),
+        offer: optionalString(payload.offer),
+        language: payload.language === "en" ? "en" : "sk",
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.prepare_smartlead_leads") {
+    writeJson(response, 200, {
+      result: prepareSmartleadLeads({
+        defaultSource: optionalString(payload.defaultSource),
+        leads: (payload.leads ?? []) as Parameters<typeof prepareSmartleadLeads>[0]["leads"],
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.run_leadgen_research_pipeline") {
+    writeJson(response, 200, {
+      result: await runLeadgenResearchPipeline({
+        query: String(payload.query ?? ""),
+        placesQuery: optionalString(payload.placesQuery),
+        maxResults: typeof payload.maxResults === "number" ? payload.maxResults : undefined,
+        scrapeWebsites: payload.scrapeWebsites !== false,
+        draftIntros: payload.draftIntros === true,
+        offer: optionalString(payload.offer),
+        language: payload.language === "en" ? "en" : "sk",
+      }),
+    });
+    return;
+  }
   if (name === "arcigy.search_serper") {
     writeJson(response, 200, {
       result: await searchSerper({
@@ -1157,6 +1203,17 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         regionCode: optionalString(payload.regionCode),
       }),
     });
+    return;
+  }
+  if (name === "arcigy.add_leads_to_smartlead_campaign") {
+    const result = await addLeadsToSmartleadCampaign({
+      campaignId: (payload.campaignId ?? "") as string | number,
+      leads: (payload.leads ?? []) as Parameters<typeof addLeadsToSmartleadCampaign>[0]["leads"],
+      settings: payload.settings as Parameters<typeof addLeadsToSmartleadCampaign>[0]["settings"],
+    });
+    const responseBody = { result };
+    addAuditEvent("arcigy.add_leads_to_smartlead_campaign", "submitted", payload, responseBody, true);
+    writeJson(response, 200, responseBody);
     return;
   }
   if (name === "arcigy.append_leads_to_google_sheet") {

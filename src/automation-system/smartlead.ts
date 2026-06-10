@@ -43,6 +43,31 @@ export type SmartleadOutreachBrief = {
   notes: string[];
 };
 
+export type SmartleadLead = {
+  email: string;
+  first_name?: string;
+  last_name?: string;
+  company_name?: string;
+  website?: string;
+  custom_fields?: Record<string, string | number | boolean>;
+};
+
+export type SmartleadAddLeadsInput = {
+  campaignId: string | number;
+  leads: SmartleadLead[];
+  settings?: {
+    ignore_global_block_list?: boolean;
+    ignore_unsubscribe_list?: boolean;
+  };
+};
+
+export type SmartleadAddLeadsResult = {
+  campaignId: string;
+  submitted: number;
+  batches: number;
+  responses: unknown[];
+};
+
 export async function getSmartleadCampaignStatus(
   input: { campaignId?: string } = {},
   env: RuntimeEnv = process.env,
@@ -112,6 +137,65 @@ export async function getSmartleadOutreachBrief(
     statistics: campaignStats,
     preparedPositiveReplyCount: input.preparedPositiveReplyCount ?? 0,
     pendingApprovalCount: input.pendingApprovalCount ?? 0,
+  });
+}
+
+export async function addLeadsToSmartleadCampaign(
+  input: SmartleadAddLeadsInput,
+  env: RuntimeEnv = process.env,
+  fetchImpl: FetchLike = fetch
+): Promise<SmartleadAddLeadsResult> {
+  const apiKey = requireEnv(env, "SMARTLEAD_API_KEY");
+  const campaignId = String(input.campaignId).trim();
+  if (!campaignId) throw new Error("Smartlead campaignId is required.");
+  if (!input.leads.length) throw new Error("At least one Smartlead lead is required.");
+
+  const responses: unknown[] = [];
+  const batches = chunk(input.leads.map(normalizeSmartleadLead), 100);
+  for (const batch of batches) {
+    const response = await smartleadFetch<unknown>(
+      `/campaigns/${encodeURIComponent(campaignId)}/leads`,
+      apiKey,
+      fetchImpl,
+      {
+        method: "POST",
+        body: {
+          lead_list: batch,
+          settings: {
+            ignore_global_block_list: input.settings?.ignore_global_block_list ?? false,
+            ignore_unsubscribe_list: input.settings?.ignore_unsubscribe_list ?? false,
+          },
+        },
+      }
+    );
+    responses.push(response);
+  }
+  return {
+    campaignId,
+    submitted: input.leads.length,
+    batches: batches.length,
+    responses,
+  };
+}
+
+export function buildSmartleadLead(input: {
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  companyName?: string;
+  website?: string;
+  customFields?: Record<string, string | number | boolean | null | undefined>;
+}): SmartleadLead {
+  const custom_fields = Object.fromEntries(
+    Object.entries(input.customFields ?? {}).filter((entry): entry is [string, string | number | boolean] => entry[1] !== undefined && entry[1] !== null && entry[1] !== "")
+  );
+  return normalizeSmartleadLead({
+    email: input.email,
+    first_name: input.firstName,
+    last_name: input.lastName,
+    company_name: input.companyName,
+    website: input.website,
+    custom_fields: Object.keys(custom_fields).length ? custom_fields : undefined,
   });
 }
 
@@ -203,13 +287,53 @@ function clampMaxCampaigns(value: number | undefined): number {
   return Math.max(1, Math.min(Math.floor(value), 25));
 }
 
-async function smartleadFetch<T>(path: string, apiKey: string, fetchImpl: FetchLike): Promise<T> {
+async function smartleadFetch<T>(
+  path: string,
+  apiKey: string,
+  fetchImpl: FetchLike,
+  init: { method?: "GET" | "POST" | "PATCH"; body?: unknown } = {}
+): Promise<T> {
   const separator = path.includes("?") ? "&" : "?";
-  const response = await fetchImpl(`${smartleadBaseUrl}${path}${separator}api_key=${encodeURIComponent(apiKey)}`);
+  const response = await fetchImpl(`${smartleadBaseUrl}${path}${separator}api_key=${encodeURIComponent(apiKey)}`, {
+    method: init.method ?? "GET",
+    headers: init.body ? { "content-type": "application/json" } : undefined,
+    body: init.body ? JSON.stringify(init.body) : undefined,
+  });
   if (!response.ok) {
     throw new Error(`Smartlead request failed: ${response.status}`);
   }
   return (await response.json()) as T;
+}
+
+function normalizeSmartleadLead(lead: SmartleadLead): SmartleadLead {
+  const email = lead.email.trim().toLowerCase();
+  if (!email || !email.includes("@")) throw new Error("Smartlead lead email is required.");
+  return {
+    email,
+    first_name: cleanOptional(lead.first_name),
+    last_name: cleanOptional(lead.last_name),
+    company_name: cleanOptional(lead.company_name),
+    website: cleanWebsite(lead.website),
+    custom_fields: lead.custom_fields && Object.keys(lead.custom_fields).length ? lead.custom_fields : undefined,
+  };
+}
+
+function cleanOptional(value: string | undefined): string | undefined {
+  const clean = value?.trim();
+  return clean || undefined;
+}
+
+function cleanWebsite(value: string | undefined): string | undefined {
+  const clean = value?.trim().replace(/^https?:\/\//i, "").replace(/\/+$/g, "");
+  return clean || undefined;
+}
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const output: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    output.push(items.slice(index, index + size));
+  }
+  return output;
 }
 
 function rate(part: number, total: number): number {

@@ -14,6 +14,7 @@ import { getIntegrationHealth } from "../src/automation-system/env.ts";
 import { buildClientReplyPrompt, buildPositiveOutreachReplyPrompt, generateGeminiText } from "../src/automation-system/gemini.ts";
 import { defaultGmailSyncQuery, encodeGmailRawMessage, listRecentGmailMessageEvents, parseFromHeader, refreshGoogleAccessToken, sendGmailTextMessage } from "../src/automation-system/gmail.ts";
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "../src/automation-system/lead-discovery.ts";
+import { draftLeadIntro, prepareSmartleadLeads, scrapeWebsiteContacts } from "../src/automation-system/lead-automation.ts";
 import {
   buildContractGenerationCommand,
   getColdOutreachMcpAnswer,
@@ -21,7 +22,7 @@ import {
   listJarvisMcpTools,
   localStateWriteToolNames,
 } from "../src/automation-system/mcp-tools.ts";
-import { buildSmartleadOutreachBrief, getSmartleadCampaignStatus, getSmartleadOutreachBrief } from "../src/automation-system/smartlead.ts";
+import { addLeadsToSmartleadCampaign, buildSmartleadOutreachBrief, getSmartleadCampaignStatus, getSmartleadOutreachBrief } from "../src/automation-system/smartlead.ts";
 import {
   containsWakeWord,
   createJarvisVoiceSession,
@@ -80,6 +81,11 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.search_serper",
     "arcigy.search_google_places",
     "arcigy.discover_leads",
+    "arcigy.scrape_website_contacts",
+    "arcigy.draft_lead_intro",
+    "arcigy.prepare_smartlead_leads",
+    "arcigy.run_leadgen_research_pipeline",
+    "arcigy.add_leads_to_smartlead_campaign",
     "arcigy.append_leads_to_google_sheet",
   ]);
   assert.ok(localStateWriteToolNames.has("arcigy.sync_gmail_recent_messages"));
@@ -327,7 +333,8 @@ test("remote MCP smoke checks every response for bearer token leaks", async () =
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
-      url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
+      url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet") ||
+      url.endsWith("/api/mcp/arcigy.add_leads_to_smartlead_campaign")
     ) {
       return responseJson({ error: `token leaked ${token}` }, 409);
     }
@@ -2513,6 +2520,92 @@ test("lead discovery reports provider status and falls back when Serper credits 
   assert.equal(discovered.providerStatus.find((provider) => provider.source === "serper")?.status, "failed");
   assert.equal(discovered.providerStatus.find((provider) => provider.source === "google_places")?.status, "ready");
   assert.equal(JSON.stringify(discovered).includes("spent-key"), false);
+});
+
+test("website contact scraper extracts emails, phones, and priority page text", async () => {
+  const fetchImpl = async (url: string | URL | Request) => {
+    const target = String(url);
+    if (target === "https://kuchyne-demo.sk/") {
+      return new Response(
+        `<html><head><title>Example Studio</title><meta name="description" content="Kitchen studio"></head><body>
+          <a href="/kontakt">Kontakt</a><p>Call +421 905 123 456</p><a href="mailto:hello@kuchyne-demo.sk">Email</a>
+        </body></html>`,
+        { status: 200, headers: { "content-type": "text/html" } }
+      );
+    }
+    if (target === "https://kuchyne-demo.sk/kontakt") {
+      return new Response(`<html><body>Kontaktujte obchod@kuchyne-demo.sk</body></html>`, { status: 200, headers: { "content-type": "text/html" } });
+    }
+    throw new Error(`Unexpected URL: ${target}`);
+  };
+
+  const scraped = await scrapeWebsiteContacts({ url: "kuchyne-demo.sk", includePriorityPages: true }, fetchImpl as typeof fetch);
+
+  assert.equal(scraped.title, "Example Studio");
+  assert.equal(scraped.description, "Kitchen studio");
+  assert.ok(scraped.emails.includes("hello@kuchyne-demo.sk"));
+  assert.ok(scraped.emails.includes("obchod@kuchyne-demo.sk"));
+  assert.ok(scraped.phones.some((phone) => phone.includes("905")));
+});
+
+test("lead intro drafting and Smartlead preparation stay secret-safe", async () => {
+  const fetchImpl = async (url: string | URL | Request) => {
+    const target = String(url);
+    assert.ok(target.includes("generativelanguage.googleapis.com"));
+    return responseJson({ candidates: [{ content: { parts: [{ text: "Vsimol som si, ze rozsirujete showroom a mate priestor zautomatizovat nove dopyty." }] } }] });
+  };
+
+  const intro = await draftLeadIntro(
+    { companyName: "Example Studio", website: "https://example.com", context: "Kuchynske studio s viacerymi pobockami.", language: "sk" },
+    { GEMINI_API_KEY: "gemini-key" },
+    fetchImpl as typeof fetch
+  );
+  const prepared = prepareSmartleadLeads({
+    defaultSource: "jarvis-test",
+    leads: [
+      {
+        email: "Lead@Example.com",
+        companyName: "Example Studio",
+        website: "https://example.com",
+        personalizedIntro: intro.personalizedIntro,
+      },
+    ],
+  });
+
+  assert.match(intro.personalizedIntro, /showroom/);
+  assert.equal(prepared.leadList[0].email, "lead@example.com");
+  assert.equal(prepared.leadList[0].company_name, "Example Studio");
+  assert.equal(prepared.leadList[0].website, "example.com");
+  assert.equal(prepared.leadList[0].custom_fields?.source, "jarvis-test");
+  assert.equal(prepared.skipped.length, 0);
+});
+
+test("Smartlead lead upload posts approved lead_list batches without leaking API key", async () => {
+  const calls: Array<{ url: string; body: any }> = [];
+  const fetchImpl = async (url: string | URL | Request, init?: RequestInit) => {
+    const target = String(url);
+    calls.push({ url: target, body: JSON.parse(String(init?.body ?? "{}")) });
+    return responseJson({ ok: true, imported: calls.at(-1)?.body.lead_list?.length ?? 0 });
+  };
+
+  const result = await addLeadsToSmartleadCampaign(
+    {
+      campaignId: "123",
+      leads: [
+        { email: "lead1@example.com", company_name: "Lead 1", custom_fields: { personalized_intro: "Intro 1" } },
+        { email: "lead2@example.com", company_name: "Lead 2" },
+      ],
+    },
+    { SMARTLEAD_API_KEY: "smartlead-secret" },
+    fetchImpl as typeof fetch
+  );
+
+  assert.equal(result.submitted, 2);
+  assert.equal(result.batches, 1);
+  assert.equal(calls[0].url, "https://server.smartlead.ai/api/v1/campaigns/123/leads?api_key=smartlead-secret");
+  assert.equal(calls[0].body.lead_list[0].email, "lead1@example.com");
+  assert.equal(calls[0].body.settings.ignore_global_block_list, false);
+  assert.equal(JSON.stringify(result).includes("smartlead-secret"), false);
 });
 
 test("integration diagnostics run live read-only checks with mocked providers", async () => {

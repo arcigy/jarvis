@@ -14,6 +14,7 @@ import { defaultGmailBriefingQuery, defaultGmailSyncQuery, listConfiguredGmailAc
 import { handleJarvisVoiceEvent, type JarvisVoiceSession } from "./jarvis-voice.ts";
 import { buildJarvisCapabilityAudit, summarizeJarvisCapabilityAuditForVoice } from "./jarvis-capability-audit.ts";
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "./lead-discovery.ts";
+import { draftLeadIntro, prepareSmartleadLeads, runLeadgenResearchPipeline, scrapeWebsiteContacts } from "./lead-automation.ts";
 import {
   buildContractGenerationCommand,
   getColdOutreachMcpAnswer,
@@ -26,7 +27,7 @@ import { buildProductionReadinessReport } from "./production-readiness.ts";
 import { getProductionVerificationEvidence } from "./production-verification-evidence.ts";
 import { buildRemoteMcpConnectionPack } from "./remote-mcp-pack.ts";
 import { runRemoteMcpSmoke } from "./remote-mcp-smoke.ts";
-import { getSmartleadCampaignStatus, getSmartleadOutreachBrief } from "./smartlead.ts";
+import { addLeadsToSmartleadCampaign, getSmartleadCampaignStatus, getSmartleadOutreachBrief } from "./smartlead.ts";
 import type { ClientNeedSignal, LocalPerson } from "./types.ts";
 
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
@@ -1050,6 +1051,139 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(await discoverLeads(input))
+  );
+
+  server.registerTool(
+    "arcigy.scrape_website_contacts",
+    {
+      title: "Scrape website contacts",
+      description: "Fetch a website and priority contact/about pages, then extract emails, phones, links, and text preview.",
+      inputSchema: {
+        url: z.string().min(1),
+        includePriorityPages: z.boolean().default(true),
+        maxPages: z.number().int().min(1).max(8).default(4),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (input) => jsonResult(await scrapeWebsiteContacts(input))
+  );
+
+  server.registerTool(
+    "arcigy.draft_lead_intro",
+    {
+      title: "Draft lead intro",
+      description: "Use Gemini to draft one short personalized cold outreach intro for a lead.",
+      inputSchema: {
+        companyName: z.string().min(1),
+        website: z.string().optional(),
+        context: z.string().optional(),
+        offer: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (input) => jsonResult(await draftLeadIntro(input))
+  );
+
+  server.registerTool(
+    "arcigy.prepare_smartlead_leads",
+    {
+      title: "Prepare Smartlead leads",
+      description: "Normalize selected leads into Smartlead lead_list payload without writing to Smartlead.",
+      inputSchema: {
+        defaultSource: z.string().optional(),
+        leads: z.array(
+          z.object({
+            email: z.string().min(1),
+            companyName: z.string().optional(),
+            firstName: z.string().optional(),
+            lastName: z.string().optional(),
+            website: z.string().optional(),
+            phone: z.string().optional(),
+            source: z.string().optional(),
+            personalizedIntro: z.string().optional(),
+            customFields: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
+          })
+        ).min(1),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(prepareSmartleadLeads(input))
+  );
+
+  server.registerTool(
+    "arcigy.run_leadgen_research_pipeline",
+    {
+      title: "Run leadgen research pipeline",
+      description: "Run read-only discovery, optional website scraping, and optional Gemini intro drafts for Smartlead-ready lead research.",
+      inputSchema: {
+        query: z.string().min(1),
+        placesQuery: z.string().optional(),
+        maxResults: z.number().int().min(1).max(15).default(5),
+        scrapeWebsites: z.boolean().default(true),
+        draftIntros: z.boolean().default(false),
+        offer: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (input) => jsonResult(await runLeadgenResearchPipeline(input))
+  );
+
+  server.registerTool(
+    "arcigy.add_leads_to_smartlead_campaign",
+    {
+      title: "Add leads to Smartlead campaign",
+      description: "Upload a prepared Smartlead lead_list to a campaign. This is an explicit external write action.",
+      inputSchema: {
+        campaignId: z.union([z.string(), z.number()]),
+        leads: z.array(
+          z.object({
+            email: z.string().min(1),
+            first_name: z.string().optional(),
+            last_name: z.string().optional(),
+            company_name: z.string().optional(),
+            website: z.string().optional(),
+            custom_fields: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
+          })
+        ).min(1),
+        settings: z.object({
+          ignore_global_block_list: z.boolean().optional(),
+          ignore_unsubscribe_list: z.boolean().optional(),
+        }).optional(),
+        approval: approvalSchema,
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (input) => {
+      requireExplicitApproval("arcigy.add_leads_to_smartlead_campaign", input);
+      return jsonResult(await addLeadsToSmartleadCampaign(input));
+    }
   );
 
   server.registerTool(

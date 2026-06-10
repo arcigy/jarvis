@@ -220,6 +220,22 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
   if (toolName === "arcigy.sync_gmail_recent_messages") return { dryRun: true, maxResults: 5 };
   if (toolName === "arcigy.get_smartlead_outreach_brief") return { periodLabel: "poslednych 7 dni" };
   if (toolName === "arcigy.discover_leads") return { query: "automation agency Bratislava", maxResults: 5 };
+  if (toolName === "arcigy.scrape_website_contacts") return { url: "https://example.com", includePriorityPages: true, maxPages: 4 };
+  if (toolName === "arcigy.draft_lead_intro") return { companyName: "Modelova Firma", website: "https://example.com", context: "Firma riesi B2B obchod.", language: "sk" };
+  if (toolName === "arcigy.prepare_smartlead_leads") {
+    return {
+      defaultSource: "jarvis-mcp",
+      leads: [{ email: "lead@example.com", companyName: "Modelova Firma", website: "https://example.com", personalizedIntro: "Vsimal som si, ze rastiete v B2B segmente." }],
+    };
+  }
+  if (toolName === "arcigy.run_leadgen_research_pipeline") return { query: "kuchynske studio Slovensko", maxResults: 3, scrapeWebsites: true, draftIntros: false };
+  if (toolName === "arcigy.add_leads_to_smartlead_campaign") {
+    return {
+      campaignId: "123456",
+      leads: [{ email: "lead@example.com", company_name: "Modelova Firma", website: "example.com", custom_fields: { personalized_intro: "Kratke AI intro." } }],
+      approval: { approved: true },
+    };
+  }
   if (toolName === "arcigy.prepare_positive_outreach_reply") {
     return {
       leadEmail: "lead@example.com",
