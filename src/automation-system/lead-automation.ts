@@ -350,6 +350,28 @@ export type LeadSourceImportQueuePreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type LeadgenAutopilotBatchPreview = {
+  mode: "leadgen-autopilot-batch-preview";
+  summary: string;
+  status: "ready" | "attention" | "blocked";
+  sourcePreview: LeadSourceImportQueuePreview;
+  introAudit?: AiIntroQualityAuditPreview;
+  totals: {
+    input: number;
+    groups: number;
+    readyForSmartlead: number;
+    manualReview: number;
+    rejected: number;
+    websitesToScrape: number;
+    introsToDraft: number;
+    introsToRedraft: number;
+    approvalCalls: number;
+    readOnlyCalls: number;
+  };
+  runbook: Array<{ order: number; tool: string; purpose: string; approvalRequired: boolean; payload: Record<string, unknown> }>;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type LeadRepairQueueLead = LeadCandidateInput & {
   id?: string | number;
   ico?: string;
@@ -2457,6 +2479,81 @@ export function buildLeadSourceImportQueuePreview(input: {
     unassigned,
     blocked: filtered.blocked,
     nextToolCalls: dedupedCalls,
+  };
+}
+
+export function buildLeadgenAutopilotBatchPreview(input: {
+  sourceName?: string;
+  sourceType?: "google_maps" | "csv" | "serper" | "manual" | "other";
+  leads?: LeadSourceImportQueueLead[];
+  csvText?: string;
+  delimiter?: "," | ";";
+  maxRows?: number;
+  niches?: Array<{ id?: string; slug: string; name: string; campaignId?: string | number | null; aliases?: string[] }>;
+  defaultNiche?: { id?: string; slug: string; name: string; campaignId?: string | number | null };
+  blacklistDomains?: string[];
+  blacklistKeywords?: string[];
+  existingSmartleadLeadsByCampaign?: Record<string, Array<Record<string, unknown>>>;
+  campaignTag?: string;
+  defaultSource?: string;
+  offer?: string;
+  language?: "sk" | "en";
+  minScore?: number;
+  batchSize?: number;
+  auditIntros?: boolean;
+  maxNextCalls?: number;
+}): LeadgenAutopilotBatchPreview {
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 60), 1), 120);
+  const sourcePreview = buildLeadSourceImportQueuePreview({ ...input, maxNextCalls });
+  const auditLeads = sourcePreview.groups.flatMap((group) => group.pipelinePreview.leads);
+  const introAudit = input.auditIntros === false || !auditLeads.length
+    ? undefined
+    : buildAiIntroQualityAuditPreview({
+        leads: auditLeads,
+        offer: input.offer,
+        language: input.language ?? "sk",
+        maxNextCalls: Math.min(maxNextCalls, 80),
+      });
+  const nextToolCalls = dedupeNextToolCalls([
+    ...sourcePreview.nextToolCalls,
+    ...(introAudit?.nextToolCalls ?? []),
+  ]).slice(0, maxNextCalls);
+  const runbook = nextToolCalls.map((call, index) => ({
+    order: index + 1,
+    tool: call.tool,
+    purpose: call.reason,
+    approvalRequired: call.approvalRequired,
+    payload: call.payload,
+  }));
+  const approvalCalls = nextToolCalls.filter((call) => call.approvalRequired).length;
+  const readOnlyCalls = nextToolCalls.length - approvalCalls;
+  const totals = {
+    input: sourcePreview.totals.input,
+    groups: sourcePreview.totals.groups,
+    readyForSmartlead: sourcePreview.totals.readyForSmartlead,
+    manualReview: sourcePreview.totals.manualReview,
+    rejected: sourcePreview.totals.rejected,
+    websitesToScrape: sourcePreview.totals.websitesToScrape,
+    introsToDraft: sourcePreview.totals.introsToDraft,
+    introsToRedraft: introAudit?.totals.redraft ?? 0,
+    approvalCalls,
+    readOnlyCalls,
+  };
+  const status: LeadgenAutopilotBatchPreview["status"] =
+    sourcePreview.totals.groups === 0 || sourcePreview.totals.unassigned > 0
+      ? "blocked"
+      : totals.readyForSmartlead > 0 && totals.websitesToScrape === 0 && totals.introsToDraft === 0 && totals.introsToRedraft === 0
+        ? "ready"
+        : "attention";
+  return {
+    mode: "leadgen-autopilot-batch-preview",
+    status,
+    summary: `Leadgen autopilot batch: ${status}, ${totals.groups} skupin, ${totals.readyForSmartlead} ready do Smartlead, ${totals.websitesToScrape} scrape, ${totals.introsToDraft} intro draft, ${totals.introsToRedraft} intro redraft, ${approvalCalls} approval krokov. Ziadny zapis ani upload neprebehol.`,
+    sourcePreview,
+    introAudit,
+    totals,
+    runbook,
+    nextToolCalls,
   };
 }
 

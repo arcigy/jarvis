@@ -26,6 +26,7 @@ import {
   buildManualReviewQueue,
   buildLeadgenGapReport,
   buildLeadgenCampaignPipelinePreview,
+  buildLeadgenAutopilotBatchPreview,
   buildRegionExpansionQueuePreview,
   buildLeadSourceImportQueuePreview,
   buildUrlIntelligenceQueuePreview,
@@ -183,6 +184,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.build_leadgen_gap_report",
     "arcigy.build_leadgen_campaign_pipeline_preview",
     "arcigy.build_lead_source_import_queue_preview",
+    "arcigy.build_leadgen_autopilot_batch_preview",
     "arcigy.build_lead_repair_queue_preview",
     "arcigy.build_niche_ops_dashboard_preview",
     "arcigy.build_cold_outreach_csv_import_preview",
@@ -1447,7 +1449,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 99 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 100 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -2992,6 +2994,44 @@ test("lead source import queue preview groups Google Maps leads before Smartlead
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_scrape_website_contacts" && !call.approvalRequired));
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.get_smartlead_campaign_leads" && !call.approvalRequired));
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.add_leads_to_smartlead_campaign" && call.approvalRequired));
+  assert.match(preview.summary, /Ziadny zapis ani upload/);
+});
+
+test("leadgen autopilot batch preview chains scrape intro audit and Smartlead approval steps", () => {
+  const preview = buildLeadgenAutopilotBatchPreview({
+    sourceName: "kuchyne_sk_google_maps_2026-04-27.csv",
+    sourceType: "google_maps",
+    defaultNiche: { id: "niche-1", slug: "kuchyne", name: "Kuchynske studia", campaignId: "123456" },
+    leads: [
+      {
+        companyName: "Ready Studio",
+        website: "https://ready.sk",
+        email: "jan@ready.sk",
+        firstName: "Jan",
+        phone: "+421 900 111 222",
+        personalizedIntro: "Vsimol som si vase realizacie kuchyn.",
+        scraped: { textPreview: "Realizacie kuchyn a showroom na mieru." },
+      },
+      { companyName: "Needs Scrape", website: "https://needs-scrape.sk" },
+    ],
+    existingSmartleadLeadsByCampaign: { "123456": [{ email: "old@ready.sk" }] },
+    offer: "AI automatizacie pre dopyty.",
+    language: "sk",
+    minScore: 70,
+  });
+
+  assert.equal(preview.mode, "leadgen-autopilot-batch-preview");
+  assert.equal(preview.status, "attention");
+  assert.equal(preview.totals.input, 2);
+  assert.equal(preview.totals.groups, 1);
+  assert.equal(preview.totals.readyForSmartlead, 1);
+  assert.equal(preview.totals.websitesToScrape, 1);
+  assert.equal(preview.totals.introsToDraft, 1);
+  assert.equal(preview.introAudit?.totals.redraft, 1);
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_scrape_website_contacts" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_draft_lead_intros" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.add_leads_to_smartlead_campaign" && call.approvalRequired));
+  assert.equal(preview.runbook.length, preview.nextToolCalls.length);
   assert.match(preview.summary, /Ziadny zapis ani upload/);
 });
 

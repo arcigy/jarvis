@@ -23,6 +23,7 @@ import {
   buildNicheLeadgenPlan,
   buildLeadgenGapReport,
   buildLeadgenCampaignPipelinePreview,
+  buildLeadgenAutopilotBatchPreview,
   buildRegionExpansionQueuePreview,
   buildLeadSourceImportQueuePreview,
   buildUrlIntelligenceQueuePreview,
@@ -1826,6 +1827,32 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         offer: optionalString(payload.offer),
         language: payload.language === "en" ? "en" : "sk",
         minScore: typeof payload.minScore === "number" ? payload.minScore : undefined,
+        maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_leadgen_autopilot_batch_preview") {
+    writeJson(response, 200, {
+      result: buildLeadgenAutopilotBatchPreview({
+        sourceName: optionalString(payload.sourceName),
+        sourceType: ["google_maps", "csv", "serper", "manual", "other"].includes(String(payload.sourceType)) ? payload.sourceType as Parameters<typeof buildLeadgenAutopilotBatchPreview>[0]["sourceType"] : undefined,
+        leads: Array.isArray(payload.leads) ? payload.leads as Parameters<typeof buildLeadgenAutopilotBatchPreview>[0]["leads"] : undefined,
+        csvText: optionalString(payload.csvText),
+        delimiter: payload.delimiter === ";" ? ";" : payload.delimiter === "," ? "," : undefined,
+        maxRows: typeof payload.maxRows === "number" ? payload.maxRows : undefined,
+        niches: Array.isArray(payload.niches) ? payload.niches as Parameters<typeof buildLeadgenAutopilotBatchPreview>[0]["niches"] : undefined,
+        defaultNiche: payload.defaultNiche as Parameters<typeof buildLeadgenAutopilotBatchPreview>[0]["defaultNiche"],
+        blacklistDomains: Array.isArray(payload.blacklistDomains) ? payload.blacklistDomains.map(String) : undefined,
+        blacklistKeywords: Array.isArray(payload.blacklistKeywords) ? payload.blacklistKeywords.map(String) : undefined,
+        existingSmartleadLeadsByCampaign: payload.existingSmartleadLeadsByCampaign as Parameters<typeof buildLeadgenAutopilotBatchPreview>[0]["existingSmartleadLeadsByCampaign"],
+        campaignTag: optionalString(payload.campaignTag),
+        defaultSource: optionalString(payload.defaultSource),
+        offer: optionalString(payload.offer),
+        language: payload.language === "en" ? "en" : "sk",
+        minScore: typeof payload.minScore === "number" ? payload.minScore : undefined,
+        batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
+        auditIntros: payload.auditIntros !== false,
         maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
       }),
     });

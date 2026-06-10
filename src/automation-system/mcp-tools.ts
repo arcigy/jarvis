@@ -85,6 +85,7 @@ export type JarvisMcpToolName =
   | "arcigy.build_leadgen_gap_report"
   | "arcigy.build_leadgen_campaign_pipeline_preview"
   | "arcigy.build_lead_source_import_queue_preview"
+  | "arcigy.build_leadgen_autopilot_batch_preview"
   | "arcigy.build_lead_repair_queue_preview"
   | "arcigy.build_niche_ops_dashboard_preview"
   | "arcigy.build_cold_outreach_csv_import_preview"
@@ -547,6 +548,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.build_lead_source_import_queue_preview",
       description: "Z Google Maps/CSV/manual lead source pripravi import queue po niche/kampaniach, gapy a Smartlead audit bez zapisu alebo uploadu.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_leadgen_autopilot_batch_preview",
+      description: "Z CSV alebo lead batchu zlozi autopilot runbook: scrape, fetch, AI intro audit, Smartlead import audit a approval upload kroky bez zapisu.",
       requiresApproval: false,
     },
     {

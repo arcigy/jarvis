@@ -601,6 +601,21 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       language: "sk",
     };
   }
+  if (toolName === "arcigy.build_leadgen_autopilot_batch_preview") {
+    return {
+      sourceName: "kuchyne_sk_google_maps_2026-04-27.csv",
+      sourceType: "google_maps",
+      defaultNiche: { slug: "kuchyne", name: "Kuchynske studia", campaignId: "123456" },
+      leads: [
+        { companyName: "Ready Studio", website: "https://ready.sk", email: "jan@ready.sk", personalizedIntro: "Vsimol som si vase realizacie kuchyn.", nicheSlug: "kuchyne" },
+        { companyName: "Needs Scrape", website: "https://needs-scrape.sk", nicheSlug: "kuchyne" },
+      ],
+      existingSmartleadLeadsByCampaign: { "123456": [{ email: "old@ready.sk" }] },
+      offer: "AI automatizacie pre dopyty a follow-up.",
+      language: "sk",
+      auditIntros: true,
+    };
+  }
   if (toolName === "arcigy.build_lead_repair_queue_preview") {
     return {
       leads: [

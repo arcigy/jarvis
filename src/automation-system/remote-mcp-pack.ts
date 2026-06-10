@@ -1220,6 +1220,26 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Build leadgen autopilot batch runbook",
+      tool: "arcigy.build_leadgen_autopilot_batch_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_leadgen_autopilot_batch_preview"),
+      body: {
+        sourceName: "kuchyne_sk_google_maps_2026-04-27.csv",
+        sourceType: "google_maps",
+        defaultNiche: { slug: "kuchyne", name: "Kuchynske studia", campaignId: "123456" },
+        leads: [
+          { companyName: "Ready Studio", website: "https://ready.sk", email: "jan@ready.sk", personalizedIntro: "Vsimol som si vase realizacie kuchyn.", nicheSlug: "kuchyne" },
+          { companyName: "Needs Scrape", website: "https://needs-scrape.sk", nicheSlug: "kuchyne" },
+        ],
+        existingSmartleadLeadsByCampaign: { "123456": [{ email: "old@ready.sk" }] },
+        offer: "AI automatizacie pre dopyty a follow-up.",
+        language: "sk",
+        auditIntros: true,
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Build niche ops dashboard preview",
       tool: "arcigy.build_niche_ops_dashboard_preview",
       method: "POST",
