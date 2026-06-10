@@ -63,6 +63,7 @@ test("web tunnel script orchestrates protected Jarvis MCP exposure", () => {
   assert.match(script, /pack-client-memory-quick-start/);
   assert.match(script, /pack-production-evidence-quick-start/);
   assert.match(script, /production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction/);
+  assert.match(script, /production evidence must be status=ready with release proof, dirty=false, freshness\.fresh=true, and arcigy\.get_production_completion_score quick-start coverage within 24h/);
   assert.match(script, /Authorization: Bearer <JARVIS_WEB_TOKEN>/);
   assert.match(script, /--no-start-web/);
   assert.match(script, /--generate-token/);

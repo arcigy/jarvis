@@ -73,7 +73,7 @@ async function main() {
   runNpm("local-memory-smoke", ["run", "local:memory:smoke"]);
   await ensureWebBridge();
   writeEvidence();
-  runNpm("doctor-live", ["run", "doctor", "--", "--live-integrations"]);
+  runNpm("doctor-live", ["run", "doctor", "--", "--live-integrations", "--json"]);
   writeEvidence();
   const remoteMcpSmokeOutput = runNpm("remote-mcp-smoke", ["run", "remote:mcp:smoke", "--", "--url", webUrl, "--json"]);
   requireRemoteMcpSmokeGates(remoteMcpSmokeOutput);
