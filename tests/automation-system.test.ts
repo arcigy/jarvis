@@ -16,8 +16,11 @@ import { defaultGmailSyncQuery, encodeGmailRawMessage, listRecentGmailMessageEve
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "../src/automation-system/lead-discovery.ts";
 import {
   buildNicheLeadgenPlan,
+  buildManualReviewPickupPlan,
   buildManualReviewQueue,
+  buildSmartleadInjectionPlan,
   dedupeLeadCandidates,
+  draftNicheSmartleadCampaignSetup,
   draftLeadIntro,
   draftSmartleadCampaignSequence,
   enrichSlovakCompanyRegister,
@@ -126,6 +129,9 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.dedupe_lead_candidates",
     "arcigy.build_niche_leadgen_plan",
     "arcigy.draft_smartlead_campaign_sequence",
+    "arcigy.preview_manual_review_pickup",
+    "arcigy.build_smartlead_injection_plan",
+    "arcigy.draft_niche_smartlead_campaign_setup",
     "arcigy.parse_leads_csv",
     "arcigy.filter_blacklisted_leads",
     "arcigy.build_manual_review_queue",
@@ -1383,7 +1389,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 64 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 67 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -2497,6 +2503,52 @@ test("leadgen daily and evening reports summarize outreach without writes", () =
   assert.equal(evening.metrics.positiveRate, 40);
   assert.equal(evening.recentReplies.length, 1);
   assert.match(evening.summary, /pozitivne 2/);
+});
+
+test("manual review pickup builds Smartlead injection and campaign setup drafts", () => {
+  const leads = [
+    {
+      id: "lead-1",
+      email: "Lead@Example.com",
+      decision_maker_name: "Jan Novak",
+      official_company_name: "Modelova Firma s.r.o.",
+      company_name_short: "Modelova Firma",
+      website: "https://example.com",
+      niche_id: "niche-1",
+      niche_slug: "autoservisy",
+      niche_name: "Autoservisy",
+      smartlead_campaign_id: "123456",
+      manually_reviewed: true,
+      sent_to_smartlead: false,
+      icebreaker_sentence: "Kratke AI intro.",
+    },
+    {
+      id: "lead-2",
+      email: "",
+      niche_slug: "autoservisy",
+      manually_reviewed: true,
+      sent_to_smartlead: false,
+    },
+  ];
+
+  const pickup = buildManualReviewPickupPlan({ leads, minScore: 50, batchSize: 1 });
+  const injection = buildSmartleadInjectionPlan({ niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456" }, leads: [leads[0]], batchSize: 1 });
+  const setup = draftNicheSmartleadCampaignSetup({
+    niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy" },
+    offer: "AI asistent na odpovede a follow-up",
+    painPoint: "manualne dopyty",
+    language: "sk",
+  });
+
+  assert.equal(pickup.mode, "manual-review-pickup-preview");
+  assert.equal(pickup.totals.preparedSmartleadLeads, 1);
+  assert.equal(pickup.totals.rejected, 1);
+  assert.equal(pickup.groups[0].injectionPlan.addLeadsApprovalPayload?.campaignId, "123456");
+  assert.equal(injection.batches.length, 1);
+  assert.equal(injection.addLeadsApprovalPayload?.leads[0].email, "lead@example.com");
+  assert.equal(setup.campaignName, "autoservisy_SK");
+  assert.equal(setup.createCampaignApprovalPayload.approval.approved, true);
+  assert.ok(setup.webhook.eventTypes.includes("EMAIL_REPLY"));
 });
 
 test("niche rotation preview selects next active niche and wraps region index", () => {

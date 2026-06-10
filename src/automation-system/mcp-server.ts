@@ -19,8 +19,11 @@ import { buildLeadgenDailyReport, buildLeadgenEveningSummary, selectNextNiche } 
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "./lead-discovery.ts";
 import {
   buildNicheLeadgenPlan,
+  buildManualReviewPickupPlan,
   buildManualReviewQueue,
+  buildSmartleadInjectionPlan,
   dedupeLeadCandidates,
+  draftNicheSmartleadCampaignSetup,
   draftLeadIntro,
   draftSmartleadCampaignSequence,
   enrichSlovakCompanyRegister,
@@ -1569,6 +1572,101 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(draftSmartleadCampaignSequence(input))
+  );
+
+  const manualReviewPickupLeadSchema = z.object({
+    id: z.union([z.string(), z.number()]).optional(),
+    email: z.string().optional(),
+    companyName: z.string().optional(),
+    companyNameShort: z.string().optional(),
+    officialCompanyName: z.string().optional(),
+    firstName: z.string().optional(),
+    lastName: z.string().optional(),
+    decisionMakerName: z.string().optional(),
+    website: z.string().optional(),
+    phone: z.string().optional(),
+    nicheId: z.string().optional(),
+    nicheSlug: z.string().optional(),
+    nicheName: z.string().optional(),
+    smartleadCampaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+    manuallyReviewed: z.boolean().optional(),
+    sentToSmartlead: z.boolean().optional(),
+    personalizedIntro: z.string().optional(),
+    icebreakerSentence: z.string().optional(),
+    verificationStatus: z.enum(["ok", "flagged", "failed"]).optional(),
+    customFields: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
+  }).passthrough();
+
+  server.registerTool(
+    "arcigy.preview_manual_review_pickup",
+    {
+      title: "Preview manual review pickup",
+      description: "Preview the manual-review-pickup workflow: filter reviewed unsent leads, qualify them, group by niche, and prepare Smartlead injection plans without writes.",
+      inputSchema: {
+        leads: z.array(manualReviewPickupLeadSchema).min(1),
+        includeUnreviewed: z.boolean().default(false),
+        minScore: z.number().int().min(0).max(100).default(50),
+        batchSize: z.number().int().min(1).max(100).default(50),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildManualReviewPickupPlan(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_smartlead_injection_plan",
+    {
+      title: "Build Smartlead injection plan",
+      description: "Prepare Smartlead lead_list batches and approval payload for an existing campaign without uploading leads.",
+      inputSchema: {
+        niche: z.object({
+          id: z.string().optional(),
+          slug: z.string().min(1),
+          name: z.string().min(1),
+          campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+        }),
+        leads: z.array(manualReviewPickupLeadSchema).min(1),
+        batchSize: z.number().int().min(1).max(100).default(50),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildSmartleadInjectionPlan(input))
+  );
+
+  server.registerTool(
+    "arcigy.draft_niche_smartlead_campaign_setup",
+    {
+      title: "Draft niche Smartlead campaign setup",
+      description: "Draft a complete Smartlead campaign setup payload for a niche, including sequences, schedule, settings, and webhook, without creating it.",
+      inputSchema: {
+        niche: z.object({ id: z.string().optional(), slug: z.string().min(1), name: z.string().min(1) }),
+        offer: z.string().optional(),
+        painPoint: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        clientId: z.union([z.string(), z.number(), z.null()]).optional(),
+        emailAccountIds: z.array(z.union([z.string(), z.number()])).optional(),
+        webhookUrl: z.string().url().optional(),
+        schedule: smartleadScheduleSchema.optional(),
+        settings: smartleadSettingsSchema.optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(draftNicheSmartleadCampaignSetup(input))
   );
 
   const leadCandidateSchema = z.object({

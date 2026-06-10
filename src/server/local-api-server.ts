@@ -18,8 +18,11 @@ import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerpe
 import { buildLeadgenDailyReport, buildLeadgenEveningSummary, selectNextNiche } from "../automation-system/leadgen-report.ts";
 import {
   buildNicheLeadgenPlan,
+  buildManualReviewPickupPlan,
   buildManualReviewQueue,
+  buildSmartleadInjectionPlan,
   dedupeLeadCandidates,
+  draftNicheSmartleadCampaignSetup,
   draftLeadIntro,
   draftSmartleadCampaignSequence,
   enrichSlovakCompanyRegister,
@@ -1365,6 +1368,43 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         offer: optionalString(payload.offer),
         painPoint: optionalString(payload.painPoint),
         language: payload.language === "en" ? "en" : "sk",
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.preview_manual_review_pickup") {
+    writeJson(response, 200, {
+      result: buildManualReviewPickupPlan({
+        leads: (payload.leads ?? []) as Parameters<typeof buildManualReviewPickupPlan>[0]["leads"],
+        includeUnreviewed: payload.includeUnreviewed === true,
+        minScore: typeof payload.minScore === "number" ? payload.minScore : undefined,
+        batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_smartlead_injection_plan") {
+    writeJson(response, 200, {
+      result: buildSmartleadInjectionPlan({
+        niche: (payload.niche ?? {}) as Parameters<typeof buildSmartleadInjectionPlan>[0]["niche"],
+        leads: (payload.leads ?? []) as Parameters<typeof buildSmartleadInjectionPlan>[0]["leads"],
+        batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.draft_niche_smartlead_campaign_setup") {
+    writeJson(response, 200, {
+      result: draftNicheSmartleadCampaignSetup({
+        niche: (payload.niche ?? {}) as Parameters<typeof draftNicheSmartleadCampaignSetup>[0]["niche"],
+        offer: optionalString(payload.offer),
+        painPoint: optionalString(payload.painPoint),
+        language: payload.language === "en" ? "en" : "sk",
+        clientId: (payload.clientId ?? null) as string | number | null,
+        emailAccountIds: Array.isArray(payload.emailAccountIds) ? (payload.emailAccountIds as Array<string | number>) : undefined,
+        webhookUrl: optionalString(payload.webhookUrl),
+        schedule: payload.schedule as Parameters<typeof draftNicheSmartleadCampaignSetup>[0]["schedule"],
+        settings: payload.settings as Parameters<typeof draftNicheSmartleadCampaignSetup>[0]["settings"],
       }),
     });
     return;

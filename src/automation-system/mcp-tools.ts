@@ -57,6 +57,9 @@ export type JarvisMcpToolName =
   | "arcigy.dedupe_lead_candidates"
   | "arcigy.build_niche_leadgen_plan"
   | "arcigy.draft_smartlead_campaign_sequence"
+  | "arcigy.preview_manual_review_pickup"
+  | "arcigy.build_smartlead_injection_plan"
+  | "arcigy.draft_niche_smartlead_campaign_setup"
   | "arcigy.parse_leads_csv"
   | "arcigy.filter_blacklisted_leads"
   | "arcigy.build_manual_review_queue"
@@ -372,6 +375,21 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.draft_smartlead_campaign_sequence",
       description: "Vytvori draft Smartlead email sequence struktury s variantmi a follow-upom bez zapisu do Smartlead.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.preview_manual_review_pickup",
+      description: "Preview manual-review-pickup workflowu: vyberie opravene nesent leady, kvalifikuje ich a rozdeli podla niche bez zapisu.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_smartlead_injection_plan",
+      description: "Pripravi Smartlead lead_list batche a approval payload pre upload leadov do existujucej kampane bez odoslania.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.draft_niche_smartlead_campaign_setup",
+      description: "Pripravi campaign setup payload pre novu niche Smartlead kampan vratane sekvencii, schedule, settings a webhooku bez zapisu.",
       requiresApproval: false,
     },
     {

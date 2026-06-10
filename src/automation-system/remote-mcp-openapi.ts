@@ -300,6 +300,41 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
   if (toolName === "arcigy.dedupe_lead_candidates") return { leads: [{ email: "lead@example.com", companyName: "Modelova Firma" }, { email: "lead@example.com", companyName: "Duplicita" }] };
   if (toolName === "arcigy.build_niche_leadgen_plan") return { niche: "autoservisy", region: "Bratislava" };
   if (toolName === "arcigy.draft_smartlead_campaign_sequence") return { niche: "autoservisy", painPoint: "manualne riesenie dopytov", offer: "AI asistent na odpovede a follow-up", language: "sk" };
+  if (toolName === "arcigy.preview_manual_review_pickup") {
+    return {
+      minScore: 50,
+      leads: [
+        {
+          id: "lead-1",
+          email: "lead@example.com",
+          decisionMakerName: "Jan Novak",
+          companyName: "Modelova Firma",
+          website: "https://example.com",
+          nicheId: "niche-1",
+          nicheSlug: "autoservisy",
+          nicheName: "Autoservisy",
+          smartleadCampaignId: "123456",
+          manuallyReviewed: true,
+          sentToSmartlead: false,
+          personalizedIntro: "Kratke AI intro.",
+        },
+      ],
+    };
+  }
+  if (toolName === "arcigy.build_smartlead_injection_plan") {
+    return {
+      niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456" },
+      leads: [{ email: "lead@example.com", decisionMakerName: "Jan Novak", companyName: "Modelova Firma", website: "https://example.com", personalizedIntro: "Kratke AI intro." }],
+    };
+  }
+  if (toolName === "arcigy.draft_niche_smartlead_campaign_setup") {
+    return {
+      niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy" },
+      offer: "AI asistent na odpovede a follow-up",
+      painPoint: "manualne spracovanie dopytov",
+      language: "sk",
+    };
+  }
   if (toolName === "arcigy.parse_leads_csv") return { csvText: "company_name,email,website\nModelova Firma,lead@example.com,https://example.com" };
   if (toolName === "arcigy.filter_blacklisted_leads") return { leads: [{ email: "lead@example.com", website: "https://example.com" }], domains: ["competitor.sk"], keywords: ["franchise"] };
   if (toolName === "arcigy.build_manual_review_queue") return { minScore: 70, leads: [{ email: "lead@example.com", companyName: "Modelova Firma", website: "https://example.com", personalizedIntro: "Kratke AI intro." }] };

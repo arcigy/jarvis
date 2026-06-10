@@ -87,6 +87,95 @@ export type ManualReviewItem = {
   recommendation: "ready_for_import" | "manual_review" | "reject";
 };
 
+export type ManualReviewPickupLead = LeadCandidateInput & {
+  id?: string | number;
+  nicheId?: string;
+  nicheSlug?: string;
+  nicheName?: string;
+  manuallyReviewed?: boolean;
+  sentToSmartlead?: boolean;
+  decisionMakerName?: string;
+  officialCompanyName?: string;
+  companyNameShort?: string;
+  icebreakerSentence?: string;
+  verificationStatus?: "ok" | "flagged" | "failed";
+  manually_reviewed?: boolean;
+  sent_to_smartlead?: boolean;
+  decision_maker_name?: string;
+  niche_id?: string;
+  niche_slug?: string;
+  niche_name?: string;
+  official_company_name?: string;
+  company_name_short?: string;
+  icebreaker_sentence?: string;
+  verification_status?: "ok" | "flagged" | "failed";
+};
+
+export type ManualReviewPickupPlan = {
+  mode: "manual-review-pickup-preview";
+  summary: string;
+  totals: {
+    input: number;
+    eligible: number;
+    qualified: number;
+    rejected: number;
+    groups: number;
+    preparedSmartleadLeads: number;
+  };
+  groups: Array<{
+    niche: { id?: string; slug: string; name: string; campaignId?: string | number | null };
+    leads: ManualReviewPickupLead[];
+    prepared: ReturnType<typeof prepareSmartleadLeads>;
+    injectionPlan: SmartleadInjectionPlan;
+  }>;
+  rejected: Array<{ lead: ManualReviewPickupLead; reason: string }>;
+};
+
+export type SmartleadInjectionPlan = {
+  mode: "smartlead-injection-plan";
+  campaignName: string;
+  niche: { id?: string; slug: string; name: string; campaignId?: string | number | null };
+  totals: { input: number; prepared: number; skipped: number; batches: number };
+  batches: Array<{ index: number; size: number; leads: SmartleadLead[] }>;
+  skipped: Array<{ email?: string; reason: string }>;
+  addLeadsApprovalPayload?: {
+    campaignId: string | number;
+    leads: SmartleadLead[];
+    settings: { ignore_global_block_list: boolean; ignore_unsubscribe_list: boolean };
+    approval: { approved: true };
+  };
+  summary: string;
+};
+
+export type NicheSmartleadCampaignSetupDraft = {
+  mode: "niche-smartlead-campaign-setup-draft";
+  campaignName: string;
+  niche: { id?: string; slug: string; name: string };
+  sequences: ReturnType<typeof draftSmartleadCampaignSequence>["sequences"];
+  schedule: {
+    timezone: string;
+    start_hour: string;
+    end_hour: string;
+    days_of_the_week: number[];
+    max_new_leads_per_day: number;
+    min_time_btw_emails: number;
+    schedule_start_time: string | null;
+  };
+  settings: { trackOpen: boolean; stopOnReply: boolean; followUpPercentage: number };
+  webhook: { url: string; name: string; eventTypes: string[] };
+  createCampaignApprovalPayload: {
+    name: string;
+    clientId?: string | number | null;
+    sequences: ReturnType<typeof draftSmartleadCampaignSequence>["sequences"];
+    emailAccountIds?: Array<string | number>;
+    schedule: NicheSmartleadCampaignSetupDraft["schedule"];
+    settings: NicheSmartleadCampaignSetupDraft["settings"];
+    webhook: NicheSmartleadCampaignSetupDraft["webhook"];
+    approval: { approved: true };
+  };
+  summary: string;
+};
+
 const genericEmailPrefixes = new Set(["info", "kontakt", "contact", "office", "admin", "sales", "hello", "support", "recepcia"]);
 
 const nicheTemplates: Record<string, Omit<NicheLeadgenPlan, "niche" | "region" | "notes">> = {
@@ -525,6 +614,198 @@ export async function runLeadgenResearchPipeline(
   };
 }
 
+export function buildManualReviewPickupPlan(input: {
+  leads: ManualReviewPickupLead[];
+  includeUnreviewed?: boolean;
+  minScore?: number;
+  batchSize?: number;
+}): ManualReviewPickupPlan {
+  const includeUnreviewed = input.includeUnreviewed === true;
+  const eligible = input.leads.filter((lead) => {
+    const manuallyReviewed = booleanField(lead, "manuallyReviewed", "manually_reviewed");
+    const sentToSmartlead = booleanField(lead, "sentToSmartlead", "sent_to_smartlead");
+    return (includeUnreviewed || manuallyReviewed === true) && sentToSmartlead !== true;
+  });
+  const rejected: ManualReviewPickupPlan["rejected"] = [];
+  const qualified = eligible.filter((lead) => {
+    const email = stringField(lead, "email");
+    const decisionMaker = decisionMakerForLead(lead);
+    const phone = stringField(lead, "phone");
+    const score = scoreSingleLead({
+      email,
+      companyName: companyNameForLead(lead),
+      website: stringField(lead, "website"),
+      decisionMaker,
+      personalizedIntro: stringField(lead, "personalizedIntro", "icebreakerSentence", "icebreaker_sentence"),
+      verificationStatus: stringField(lead, "verificationStatus", "verification_status") as LeadQualityInput["verificationStatus"],
+    }).score;
+    if (!email || !email.includes("@")) {
+      rejected.push({ lead, reason: "missing valid email" });
+      return false;
+    }
+    if (!decisionMaker && !phone) {
+      rejected.push({ lead, reason: "missing decision maker or phone" });
+      return false;
+    }
+    if (score < (input.minScore ?? 50)) {
+      rejected.push({ lead, reason: `score below ${input.minScore ?? 50}` });
+      return false;
+    }
+    return true;
+  });
+
+  const grouped = new Map<string, ManualReviewPickupLead[]>();
+  for (const lead of qualified) {
+    const slug = stringField(lead, "nicheSlug", "niche_slug") || "default";
+    const id = stringField(lead, "nicheId", "niche_id") || slug;
+    const key = `${id}:${slug}`;
+    grouped.set(key, [...(grouped.get(key) ?? []), lead]);
+  }
+
+  const groups = [...grouped.values()].map((leads) => {
+    const first = leads[0];
+    const niche = {
+      id: stringField(first, "nicheId", "niche_id"),
+      slug: stringField(first, "nicheSlug", "niche_slug") || "default",
+      name: stringField(first, "nicheName", "niche_name") || stringField(first, "nicheSlug", "niche_slug") || "Default",
+      campaignId: stringField(first, "smartleadCampaignId", "smartlead_campaign_id") ?? null,
+    };
+    const injectionPlan = buildSmartleadInjectionPlan({ niche, leads, batchSize: input.batchSize });
+    return { niche, leads, prepared: { leadList: injectionPlan.batches.flatMap((batch) => batch.leads), skipped: injectionPlan.skipped }, injectionPlan };
+  });
+
+  const preparedSmartleadLeads = groups.reduce((sum, group) => sum + group.injectionPlan.totals.prepared, 0);
+  return {
+    mode: "manual-review-pickup-preview",
+    summary: `Manual review pickup preview: ${preparedSmartleadLeads} leadov pripravenych do ${groups.length} Smartlead skupin. Ziadny zapis ani odoslanie neprebehlo.`,
+    totals: {
+      input: input.leads.length,
+      eligible: eligible.length,
+      qualified: qualified.length,
+      rejected: rejected.length,
+      groups: groups.length,
+      preparedSmartleadLeads,
+    },
+    groups,
+    rejected,
+  };
+}
+
+export function buildSmartleadInjectionPlan(input: {
+  niche: { id?: string; slug: string; name: string; campaignId?: string | number | null };
+  leads: ManualReviewPickupLead[];
+  batchSize?: number;
+}): SmartleadInjectionPlan {
+  const prepared = prepareSmartleadLeads({
+    defaultSource: `manual-review:${input.niche.slug}`,
+    leads: input.leads.map((lead) => ({
+      email: stringField(lead, "email") ?? "",
+      companyName: companyNameForLead(lead),
+      firstName: stringField(lead, "firstName") ?? splitDecisionMaker(lead).firstName,
+      lastName: stringField(lead, "lastName") ?? splitDecisionMaker(lead).lastName,
+      website: stringField(lead, "website"),
+      phone: stringField(lead, "phone"),
+      personalizedIntro: stringField(lead, "personalizedIntro", "icebreakerSentence", "icebreaker_sentence"),
+      customFields: {
+        ico: stringField(lead, "ico"),
+        niche_slug: input.niche.slug,
+        lead_id: stringField(lead, "id"),
+        company_name_short: stringField(lead, "companyNameShort", "company_name_short"),
+      },
+    })),
+  });
+  const batchSize = Math.min(Math.max(Math.trunc(input.batchSize ?? 50), 1), 100);
+  const batches = chunk(prepared.leadList, batchSize).map((leads, index) => ({ index: index + 1, size: leads.length, leads }));
+  const campaignName = `${input.niche.slug}_SK`;
+  const campaignId = input.niche.campaignId ?? undefined;
+  return {
+    mode: "smartlead-injection-plan",
+    campaignName,
+    niche: input.niche,
+    totals: { input: input.leads.length, prepared: prepared.leadList.length, skipped: prepared.skipped.length, batches: batches.length },
+    batches,
+    skipped: prepared.skipped,
+    addLeadsApprovalPayload: campaignId
+      ? {
+          campaignId,
+          leads: prepared.leadList,
+          settings: { ignore_global_block_list: false, ignore_unsubscribe_list: false },
+          approval: { approved: true },
+        }
+      : undefined,
+    summary: campaignId
+      ? `Injection plan: ${prepared.leadList.length} leadov do kampane ${campaignId} v ${batches.length} batchoch. Odoslanie vyzaduje schvaleny add_leads payload.`
+      : `Injection plan: ${prepared.leadList.length} leadov pre novu kampan ${campaignName}. Najprv vytvor alebo prirad Smartlead campaignId.`,
+  };
+}
+
+export function draftNicheSmartleadCampaignSetup(input: {
+  niche: { id?: string; slug: string; name: string };
+  offer?: string;
+  painPoint?: string;
+  language?: "sk" | "en";
+  clientId?: string | number | null;
+  emailAccountIds?: Array<string | number>;
+  webhookUrl?: string;
+  schedule?: {
+    timezone?: string;
+    start_hour?: string;
+    end_hour?: string;
+    days_of_the_week?: number[];
+    max_new_leads_per_day?: number;
+    min_time_btw_emails?: number;
+    schedule_start_time?: string | null;
+  };
+  settings?: { trackOpen?: boolean; stopOnReply?: boolean; followUpPercentage?: number };
+}): NicheSmartleadCampaignSetupDraft {
+  const sequenceDraft = draftSmartleadCampaignSequence({
+    niche: input.niche.name,
+    offer: input.offer,
+    painPoint: input.painPoint,
+    language: input.language,
+  });
+  const campaignName = `${input.niche.slug}_SK`;
+  const schedule = {
+    timezone: input.schedule?.timezone ?? "Europe/Bratislava",
+    start_hour: input.schedule?.start_hour ?? "08:00",
+    end_hour: input.schedule?.end_hour ?? "18:00",
+    days_of_the_week: input.schedule?.days_of_the_week ?? [1, 2, 3, 4, 5],
+    max_new_leads_per_day: input.schedule?.max_new_leads_per_day ?? 30,
+    min_time_btw_emails: input.schedule?.min_time_btw_emails ?? 15,
+    schedule_start_time: input.schedule?.schedule_start_time ?? null,
+  };
+  const settings = {
+    trackOpen: input.settings?.trackOpen ?? false,
+    stopOnReply: input.settings?.stopOnReply ?? true,
+    followUpPercentage: input.settings?.followUpPercentage ?? 100,
+  };
+  const webhook = {
+    url: input.webhookUrl ?? "https://automation-arcigy.up.railway.app/webhook/smartlead-ai-reply",
+    name: "AI Reply Webhook",
+    eventTypes: ["LEAD_CATEGORY_UPDATED", "EMAIL_SENT", "EMAIL_OPEN", "EMAIL_LINK_CLICK", "EMAIL_REPLY", "LEAD_UNSUBSCRIBED"],
+  };
+  return {
+    mode: "niche-smartlead-campaign-setup-draft",
+    campaignName,
+    niche: input.niche,
+    sequences: sequenceDraft.sequences,
+    schedule,
+    settings,
+    webhook,
+    createCampaignApprovalPayload: {
+      name: campaignName,
+      clientId: input.clientId ?? null,
+      sequences: sequenceDraft.sequences,
+      emailAccountIds: input.emailAccountIds,
+      schedule,
+      settings,
+      webhook,
+      approval: { approved: true },
+    },
+    summary: `Smartlead campaign setup draft pre ${input.niche.name}: ${campaignName}. Vytvorenie kampane vyzaduje explicitne schvalenie.`,
+  };
+}
+
 async function fetchHtmlPage(url: string, fetchImpl: FetchLike) {
   const response = await fetchImpl(url, {
     headers: {
@@ -588,6 +869,44 @@ function extractPhones(text: string): string[] {
   return unique(text.match(/(?:\+421|\+420|00421|00420)?\s*(?:\d[\s\-/.]?){8,11}\d/g) ?? [])
     .map((phone) => phone.replace(/\s+/g, " ").trim())
     .filter((phone) => phone.replace(/\D/g, "").length >= 9);
+}
+
+function stringField(record: Record<string, unknown>, ...keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  }
+  return undefined;
+}
+
+function booleanField(record: Record<string, unknown>, ...keys: string[]): boolean | undefined {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "boolean") return value;
+    if (typeof value === "number") return value !== 0;
+    if (typeof value === "string" && value.trim()) return ["true", "1", "yes"].includes(value.trim().toLowerCase());
+  }
+  return undefined;
+}
+
+function decisionMakerForLead(lead: ManualReviewPickupLead): string | undefined {
+  return stringField(lead, "decisionMakerName", "decision_maker_name") ?? ([stringField(lead, "firstName"), stringField(lead, "lastName")].filter(Boolean).join(" ") || undefined);
+}
+
+function companyNameForLead(lead: ManualReviewPickupLead): string | undefined {
+  return stringField(lead, "companyName", "officialCompanyName", "official_company_name", "companyNameShort", "company_name_short");
+}
+
+function splitDecisionMaker(lead: ManualReviewPickupLead): { firstName?: string; lastName?: string } {
+  const parts = decisionMakerForLead(lead)?.split(/\s+/).filter(Boolean) ?? [];
+  return { firstName: parts[0], lastName: parts.slice(1).join(" ") || undefined };
+}
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const output: T[][] = [];
+  for (let index = 0; index < items.length; index += size) output.push(items.slice(index, index + size));
+  return output;
 }
 
 function extractInternalLinks(html: string, pageUrl: string): string[] {
