@@ -76,7 +76,7 @@ function assertVisibleStart(name, box, minimum = { width: 24, height: 16 }) {
     fail(`${name} is too small: ${Math.round(box.width)}x${Math.round(box.height)}.`);
   }
   if (box.left < 0 || box.top < 0 || box.left > viewport.width || box.top > viewport.height) {
-    fail(`${name} does not start inside the first viewport.`);
+    fail(`${name} does not start inside the first viewport: top=${Math.round(box.top)}, viewport=${viewport.width}x${viewport.height}.`);
   }
 }
 
@@ -212,6 +212,7 @@ async function run() {
           header: box("header"),
           rail: box("#missionRail"),
           missionControl: box("#missionControl"),
+          opsTicker: box("#opsTicker"),
           cortex: box("#cortexMap"),
           deck: box("#commandDeck"),
           capabilityAuditPanel: box("#capabilityAuditPanel"),
@@ -227,6 +228,13 @@ async function run() {
           missionControlRemoteText: document.querySelector("#missionControlRemote")?.textContent.trim() || "",
           missionControlApprovalsText: document.querySelector("#missionControlApprovals")?.textContent.trim() || "",
           missionControlNextText: document.querySelector("#missionControlNext")?.textContent.trim() || "",
+          opsTickerVerdictText: document.querySelector("#opsTickerVerdict")?.textContent.trim() || "",
+          tickerItems: [...document.querySelectorAll(".tickerItem")].map((node) => ({
+            state: node.getAttribute("data-state") || "",
+            text: node.textContent.trim(),
+            width: node.getBoundingClientRect().width,
+            height: node.getBoundingClientRect().height
+          })),
           readyIntegrationsText: document.querySelector("#readyIntegrations")?.textContent.trim() || "",
           mcpToolCountText: document.querySelector("#mcpToolCount")?.textContent.trim() || "",
           approvalLockCountText: document.querySelector("#approvalLockCount")?.textContent.trim() || "",
@@ -276,6 +284,15 @@ async function run() {
     if (!/MCP|toolov|smoke/i.test(dom.missionControlRemoteText)) fail(`Mission control remote state is not rendered: ${dom.missionControlRemoteText}.`);
     if (!/approval|lock/i.test(dom.missionControlApprovalsText)) fail(`Mission control approval state is not rendered: ${dom.missionControlApprovalsText}.`);
     if (!/proof|smoke|readiness|schvaluj|klientsku/i.test(dom.missionControlNextText)) fail(`Mission control next action is not actionable: ${dom.missionControlNextText}.`);
+    if (!/Jarvis|live|operacne|vrstiev/i.test(dom.opsTickerVerdictText)) fail(`Ops ticker verdict is not rendered: ${dom.opsTickerVerdictText}.`);
+    if (!Array.isArray(dom.tickerItems) || dom.tickerItems.length !== 6) fail(`Ops ticker is incomplete: ${dom.tickerItems?.length || 0}/6 items.`);
+    for (const expected of ["Voice", "Gemini", "Gmail watch", "Remote MCP", "Approvals", "Contracts"]) {
+      const item = dom.tickerItems.find((value) => value.text.includes(expected));
+      if (!item) fail(`Ops ticker is missing ${expected}.`);
+      if (!/ready|attention/.test(item.state) || item.width < 80 || item.height < 40) {
+        fail(`Ops ticker item is not visible or stateful: ${expected} (${item.state}, ${Math.round(item.width)}x${Math.round(item.height)}).`);
+      }
+    }
     if (/undefined|null|\[object Object\]/i.test(dom.bodyText)) fail("UI contains raw undefined/null/object text.");
     if (dom.scrollWidth > dom.clientWidth + 2) fail(`UI has horizontal overflow: ${dom.scrollWidth}px > ${dom.clientWidth}px.`);
     for (const control of [...dom.criticalWorkflowControls, ...dom.criticalFormControls]) {
@@ -405,6 +422,7 @@ async function run() {
     if (isNarrowViewport) {
       assertVisibleStart("mission rail", dom.rail, { width: 300, height: 50 });
       assertSize("mission control", dom.missionControl, { width: 300, height: 110 });
+      assertSize("ops ticker", dom.opsTicker, { width: 300, height: 100 });
       assertSize("cortex map", dom.cortex, { width: 300, height: 80 });
       assertSize("command deck", dom.deck, { width: 300, height: 90 });
       assertSize("capability audit", dom.capabilityAuditPanel, { width: 300, height: 90 });
@@ -415,6 +433,7 @@ async function run() {
     } else {
       assertBox("mission rail", dom.rail, { width: 600, height: 50 });
       assertBox("mission control", dom.missionControl, { width: 600, height: 100 });
+      assertBox("ops ticker", dom.opsTicker, { width: 600, height: 70 });
       assertBox("cortex map", dom.cortex, { width: 600, height: 80 });
       assertBox("command deck", dom.deck, { width: 600, height: 90 });
       assertSize("capability audit", dom.capabilityAuditPanel, { width: 600, height: 90 });

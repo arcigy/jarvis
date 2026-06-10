@@ -148,7 +148,7 @@ textarea:focus-visible,
 }
 
 main {
-  padding: 26px;
+  padding: 22px;
   width: min(100%, 1480px);
 }
 
@@ -157,7 +157,7 @@ header {
   align-items: start;
   justify-content: space-between;
   gap: 20px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 h1,
@@ -197,7 +197,7 @@ h2 {
 .missionSignal {
   position: relative;
   overflow: hidden;
-  min-height: 74px;
+  min-height: 64px;
   border: 1px solid #26302f;
   border-radius: 8px;
   background:
@@ -257,7 +257,7 @@ h2 {
 }
 
 .missionSignal strong {
-  margin-top: 9px;
+  margin-top: 7px;
   color: #eef4f2;
   font-size: 17px;
   line-height: 1.15;
@@ -268,8 +268,8 @@ h2 {
   display: grid;
   grid-template-columns: minmax(230px, 1.2fr) 98px minmax(340px, 2fr);
   gap: 8px;
-  min-height: 88px;
-  margin-bottom: 10px;
+  min-height: 80px;
+  margin-bottom: 8px;
   border: 1px solid #26302f;
   border-radius: 8px;
   background:
@@ -413,7 +413,7 @@ h2 {
 }
 
 .missionControlStrip > div {
-  min-height: 70px;
+  min-height: 62px;
   border: 1px solid #203331;
   border-radius: 8px;
   background:
@@ -451,12 +451,113 @@ h2 {
   margin-bottom: 16px;
 }
 
+.opsTicker {
+  position: relative;
+  display: grid;
+  grid-template-columns: 210px 1fr;
+  gap: 8px;
+  align-items: stretch;
+  margin-bottom: 12px;
+  border: 1px solid #26302f;
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, rgb(67 217 196 / 7%), transparent 44%),
+    linear-gradient(180deg, rgb(9 15 16 / 96%), rgb(6 10 11 / 96%));
+  overflow: hidden;
+}
+
+.opsTicker::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgb(67 217 196 / 12%), transparent);
+  transform: translateX(-110%);
+  animation: tickerSweep 8s ease-in-out infinite;
+}
+
+.opsTicker[data-state="ready"] {
+  border-color: rgb(67 217 196 / 58%);
+  box-shadow: 0 0 30px rgb(67 217 196 / 9%);
+}
+
+.opsTicker[data-state="attention"] {
+  border-color: rgb(240 184 79 / 54%);
+}
+
+.tickerHeader,
+.tickerTrack {
+  position: relative;
+  z-index: 1;
+}
+
+.tickerHeader {
+  display: grid;
+  align-content: center;
+  gap: 6px;
+  padding: 10px;
+  border-right: 1px solid #203331;
+}
+
+.tickerHeader span,
+.tickerItem span {
+  color: #91a19d;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.tickerHeader strong {
+  color: #eef4f2;
+  font-size: 14px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.tickerTrack {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+  padding: 8px;
+}
+
+.tickerItem {
+  min-height: 50px;
+  border: 1px solid #203331;
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgb(67 217 196 / 9%), transparent 52%),
+    rgb(8 14 15 / 88%);
+  padding: 9px;
+  overflow: hidden;
+}
+
+.tickerItem[data-state="ready"] {
+  border-color: rgb(67 217 196 / 44%);
+}
+
+.tickerItem[data-state="attention"] {
+  border-color: rgb(240 184 79 / 46%);
+}
+
+.tickerItem strong {
+  display: block;
+  margin-top: 7px;
+  color: #eef4f2;
+  font-size: 12px;
+  line-height: 1.24;
+  overflow-wrap: anywhere;
+}
+
+.tickerItem[data-state="attention"] strong {
+  color: #ffd893;
+}
+
 .commandDeck {
   display: grid;
   grid-template-columns: 160px repeat(4, minmax(96px, 1fr)) repeat(4, minmax(100px, 0.45fr));
   gap: 12px;
   align-items: stretch;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .deckVisual,
@@ -586,6 +687,13 @@ h2 {
   color: #9cf8ed;
 }
 
+.deckVisual,
+.deckMetric,
+.deckStatus,
+.deckAction {
+  min-height: 82px;
+}
+
 .briefingGrid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -653,18 +761,18 @@ h2 {
   display: grid;
   grid-template-columns: 120px minmax(180px, 1.4fr) minmax(130px, 0.8fr) minmax(190px, 1.1fr) minmax(200px, 1.2fr);
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .launchQueue > div {
   position: relative;
-  min-height: 92px;
+  min-height: 70px;
   border: 1px solid #26302f;
   border-radius: 8px;
   background:
     linear-gradient(135deg, rgb(240 184 79 / 10%), transparent 46%),
     rgb(10 15 16 / 88%);
-  padding: 14px;
+  padding: 10px;
   overflow: hidden;
 }
 
@@ -685,7 +793,7 @@ h2 {
 
 .launchQueue strong {
   display: block;
-  margin-top: 8px;
+  margin-top: 6px;
   color: #eef4f2;
   font-size: 15px;
   line-height: 1.35;
@@ -998,8 +1106,8 @@ h2 {
   display: grid;
   grid-template-columns: repeat(5, minmax(120px, 1fr));
   gap: 8px;
-  margin: 0 0 16px;
-  padding: 10px;
+  margin: 0 0 12px;
+  padding: 8px;
   border: 1px solid #26302f;
   border-radius: 8px;
   background:
@@ -1025,13 +1133,13 @@ h2 {
 .cortexNode {
   position: relative;
   isolation: isolate;
-  min-height: 86px;
+  min-height: 68px;
   border: 1px solid #203331;
   border-radius: 8px;
   background:
     radial-gradient(circle at 50% 18%, rgb(67 217 196 / 22%), transparent 36%),
     linear-gradient(180deg, rgb(9 17 18 / 84%), rgb(6 10 11 / 94%));
-  padding: 12px;
+  padding: 10px;
   cursor: pointer;
   overflow: hidden;
 }
@@ -1067,7 +1175,7 @@ h2 {
 }
 
 .cortexNode strong {
-  margin-top: 28px;
+  margin-top: 16px;
   color: #eef4f2;
   font-size: 14px;
   line-height: 1.2;
@@ -1159,7 +1267,7 @@ h2 {
     linear-gradient(145deg, rgb(67 217 196 / 9%), transparent 32%),
     linear-gradient(180deg, rgb(18 26 26 / 94%), rgb(10 15 16 / 96%));
   border-radius: 8px;
-  padding: 18px;
+  padding: 16px;
   box-shadow: 0 18px 42px rgb(0 0 0 / 24%);
   scroll-margin-top: 18px;
 }
@@ -2081,6 +2189,7 @@ h2 {
   .bridgeCockpit div::before,
   .briefingCard::before,
   .missionSignal::before,
+  .opsTicker::before,
   .cortexMap::before,
   .cortexNode::after,
   .scanFrame span:nth-child(3),
@@ -2324,6 +2433,8 @@ ul {
   .missionRail,
   .missionControl,
   .missionControlStrip,
+  .opsTicker,
+  .tickerTrack,
   .commandDeck,
   .briefingGrid,
   .launchQueue,
@@ -2352,6 +2463,27 @@ ul {
     grid-column: auto;
   }
 
+  .missionRail {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .missionSignal {
+    min-height: 72px;
+  }
+
+  .opsTicker {
+    grid-template-columns: 1fr;
+  }
+
+  .tickerHeader {
+    border-right: 0;
+    border-bottom: 1px solid #203331;
+  }
+
+  .tickerTrack {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   nav {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -2372,5 +2504,11 @@ ul {
 
   .contractForm {
     grid-template-columns: 1fr;
+  }
+}
+
+@keyframes tickerSweep {
+  50% {
+    transform: translateX(110%);
   }
 }

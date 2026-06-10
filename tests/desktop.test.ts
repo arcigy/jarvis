@@ -78,6 +78,15 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(html, /id="missionVoice"/);
   assert.match(html, /id="missionGmail"/);
   assert.match(html, /id="missionRemote"/);
+  assert.match(html, /id="opsTicker"/);
+  assert.match(html, /Jarvis live operations ticker/);
+  assert.match(html, /id="opsTickerVerdict"/);
+  assert.match(html, /id="tickerVoice"/);
+  assert.match(html, /id="tickerGemini"/);
+  assert.match(html, /id="tickerGmail"/);
+  assert.match(html, /id="tickerRemote"/);
+  assert.match(html, /id="tickerApprovals"/);
+  assert.match(html, /id="tickerContracts"/);
   assert.match(html, /id="missionContracts"/);
   assert.match(html, /id="missionControl"/);
   assert.match(html, /Mission verdict/);
@@ -808,6 +817,10 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(styles, /\.missionControlGauge/);
   assert.match(styles, /\.gaugeValue/);
   assert.match(styles, /\.missionControlStrip/);
+  assert.match(styles, /\.opsTicker/);
+  assert.match(styles, /\.tickerTrack/);
+  assert.match(styles, /\.tickerItem\[data-state="ready"\]/);
+  assert.match(styles, /@keyframes tickerSweep/);
   assert.match(styles, /@keyframes tacticalScope/);
   assert.match(styles, /@keyframes statusBreath/);
   assert.match(styles, /\.deckVisual::after/);
@@ -829,7 +842,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(styles, /\.radarNode\[data-state="attention"\]/);
   assert.match(styles, /@keyframes radarSweep/);
   assert.match(styles, /@keyframes radarPanelSweep/);
-  assert.match(styles, /\.missionControl,\s+\.missionControlStrip,/s);
+  assert.match(styles, /\.missionControl,\s+\.missionControlStrip,\s+\.opsTicker,\s+\.tickerTrack,/s);
   assert.match(styles, /\.launchQueue,\s+\.capabilityAuditHead,\s+\.capabilityAuditStats,\s+\.capabilityAuditGrid,\s+\.workflowProofGrid,\s+\.operationsRadar,\s+\.cortexMap/s);
   assert.match(styles, /\.diagnosticsGrid/);
   assert.match(styles, /\.diagnosticCard\[data-state="ready"\]/);
@@ -860,6 +873,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.equal(packageJson.scripts["verify:production"], "node scripts/verify_production.ts");
   assert.match(uiSmoke, /capturePage/);
   assert.match(uiSmoke, /missionControlScoreText/);
+  assert.match(uiSmoke, /opsTickerVerdictText/);
+  assert.match(uiSmoke, /Ops ticker is incomplete/);
+  assert.match(uiSmoke, /Ops ticker item is not visible or stateful/);
   assert.match(uiSmoke, /Mission control score/);
   assert.match(uiSmoke, /assertScreenshotPixels/);
   assert.match(uiSmoke, /image\.toBitmap\(\)/);

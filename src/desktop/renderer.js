@@ -93,6 +93,14 @@ const elements = {
   missionControlRemote: document.querySelector("#missionControlRemote"),
   missionControlApprovals: document.querySelector("#missionControlApprovals"),
   missionControlNext: document.querySelector("#missionControlNext"),
+  opsTicker: document.querySelector("#opsTicker"),
+  opsTickerVerdict: document.querySelector("#opsTickerVerdict"),
+  tickerVoice: document.querySelector("#tickerVoice"),
+  tickerGemini: document.querySelector("#tickerGemini"),
+  tickerGmail: document.querySelector("#tickerGmail"),
+  tickerRemote: document.querySelector("#tickerRemote"),
+  tickerApprovals: document.querySelector("#tickerApprovals"),
+  tickerContracts: document.querySelector("#tickerContracts"),
   cortexVoice: document.querySelector("#cortexVoice"),
   cortexOutreach: document.querySelector("#cortexOutreach"),
   cortexMemory: document.querySelector("#cortexMemory"),
@@ -364,6 +372,7 @@ function setMode(mode) {
   setMissionSignal(elements.missionVoice, mode === "idle" ? "pripraveny" : voiceModeLabel(mode), mode === "idle" ? "ready" : "attention");
   setCortexSignal(elements.cortexVoice, mode === "idle" ? "pripraveny" : voiceModeLabel(mode), mode === "idle" ? "ready" : "attention");
   updateVoiceRuntimeStatus();
+  updateOpsTicker();
 }
 
 function voiceModeLabel(mode) {
@@ -382,6 +391,7 @@ function updateVoiceRuntimeStatus(eventText) {
   elements.voiceInput.textContent = inputReady ? "mikrofon ready" : "text fallback";
   elements.voiceOutput.textContent = speechOutputAvailable ? "hlas ready" : "iba obrazovka";
   if (eventText) elements.voiceLastEvent.textContent = redactSensitiveText(eventText).replace(/\s+/g, " ").trim().slice(0, 96);
+  updateOpsTicker();
 }
 
 function setupNavigation() {
@@ -798,6 +808,59 @@ function updateMissionControl() {
   setMissionControlItem(elements.missionControlRemote, remoteReady ? `${pack?.tools?.count ?? 0} toolov, smoke covered` : "MCP pack/smoke caka", remoteReady);
   setMissionControlItem(elements.missionControlApprovals, approvalReady ? `${approvalLocks.length} approval locks aktivnych` : "approval policy caka", approvalReady);
   setMissionControlItem(elements.missionControlNext, nextAction, stateName === "ready");
+  updateOpsTicker();
+}
+
+function updateOpsTicker() {
+  if (!elements.opsTicker) return;
+  const integrations = state.lastSystemHealth?.integrations ?? [];
+  const integration = (key) => integrations.find((item) => item.key === key);
+  const geminiReady = integration("gemini")?.configured === true;
+  const gmailReady = integration("gmail")?.configured === true;
+  const evidence = state.lastProductionEvidence ?? {};
+  const release = evidence.release && typeof evidence.release === "object" ? evidence.release : {};
+  const freshness = evidence.freshness && typeof evidence.freshness === "object" ? evidence.freshness : {};
+  const gates = Array.isArray(release.requiredRemoteMcpSmokeGates) ? release.requiredRemoteMcpSmokeGates.length : 0;
+  const evidenceReady = evidence.status === "ready" && release.dirty === false && freshness.fresh === true && gates === requiredRemoteSmokeGates.length;
+  const smokeReady = state.lastRemoteMcpSmoke?.status === "ready";
+  const remoteReady = evidenceReady || smokeReady;
+  const approvalLocks = state.lastReadinessReport?.mcp?.approvalRequired ?? state.lastBridgePreflight?.riskyToolsRequiringApproval ?? [];
+  const openClientAlerts = state.lastClientNeedAlerts.length;
+  const voiceReady = state.mode === "idle" && !state.listening;
+  const contractReady = geminiReady && !state.contractFormDirty;
+  const gmailText = gmailReady
+    ? openClientAlerts
+      ? `${openClientAlerts} alertov`
+      : state.clientAlertWatchEnabled
+        ? "watch cisty"
+        : "watch pauznuty"
+    : "chyba auth";
+  const items = [
+    [elements.tickerVoice, voiceReady ? "standby ready" : voiceModeLabel(state.mode), voiceReady],
+    [elements.tickerGemini, geminiReady ? "AI draft ready" : "Gemini chyba", geminiReady],
+    [elements.tickerGmail, gmailText, gmailReady && !openClientAlerts && state.clientAlertWatchEnabled],
+    [elements.tickerRemote, remoteReady ? `${gates || requiredRemoteSmokeGates.length} gates covered` : "proof caka", remoteReady],
+    [elements.tickerApprovals, approvalLocks.length ? `${approvalLocks.length} zamkov aktivnych` : "policy caka", approvalLocks.length > 0],
+    [elements.tickerContracts, contractReady ? "DOCX intake ready" : state.contractFormDirty ? "formular zmeneny" : "intake caka", contractReady],
+  ];
+  const readyCount = items.filter(([, , ready]) => ready).length;
+  const stateName = readyCount === items.length ? "ready" : readyCount >= 3 ? "attention" : "checking";
+  elements.opsTicker.setAttribute("data-state", stateName);
+  elements.opsTickerVerdict.textContent =
+    stateName === "ready"
+      ? "Jarvis live operacie su pripravene"
+      : stateName === "attention"
+        ? `${readyCount}/${items.length} live vrstiev ready`
+        : "Zbieram operacne signaly";
+  for (const [node, text, ready] of items) {
+    setTickerItem(node, text, ready);
+  }
+}
+
+function setTickerItem(node, text, ready) {
+  if (!node) return;
+  node.textContent = text;
+  node.closest(".tickerItem")?.setAttribute("data-state", ready ? "ready" : "attention");
 }
 
 function setMissionControlItem(node, text, ready) {
