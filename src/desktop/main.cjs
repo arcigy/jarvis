@@ -272,6 +272,11 @@ async function handleVoiceEvent(payload) {
     return voiceDone(session, text, summarizeProductionCompletionScoreForVoice(score));
   }
 
+  if (isProactiveAttentionDigestVoiceCommand(lowered)) {
+    const digest = await getProactiveAttentionDigest({ ...payload, text, live: payload?.live === true || lowered.includes("live"), syncGmail: payload?.syncGmail === true });
+    return voiceDone(session, text, digest.speechText);
+  }
+
   if (isProductionReadinessVoiceCommand(lowered)) {
     const report = await getProductionReadiness({ ...payload, live: payload?.live === true || lowered.includes("live") });
     return voiceDone(session, text, summarizeReadinessForVoice(report));
@@ -3174,6 +3179,10 @@ function isProductionCompletionVoiceCommand(text) {
   return ["kolko percent", "na kolko percent", "percent hotove", "production completion", "completion score", "kolko sme ready"].some((term) => text.includes(term));
 }
 
+function isProactiveAttentionDigestVoiceCommand(text) {
+  return ["attention digest", "co si mam vsimnut", "proaktivne", "upozorni ma", "urgentne veci"].some((term) => text.includes(term));
+}
+
 function isRemoteMcpVoiceCommand(text) {
   return ["remote mcp", "mcp", "tunel", "tunnel", "handoff", "claude", "chatgpt", "grok", "xai", "x.ai"].some((term) => text.includes(term));
 }
@@ -3531,6 +3540,90 @@ async function getOperatorBriefing(payload = {}) {
     preparedReplyHighlights: Array.isArray(preparedReplies.replies) ? preparedReplies.replies : [],
     nextActions: readiness.nextActions || [],
   });
+}
+
+async function getProactiveAttentionDigest(payload = {}) {
+  const briefing = await getOperatorBriefing({
+    ...payload,
+    syncGmail: payload?.syncGmail === true,
+  });
+  return buildProactiveAttentionDigest({ briefing });
+}
+
+function buildProactiveAttentionDigest({ briefing }) {
+  const notifications = buildProactiveDigestNotifications(briefing);
+  const urgency = chooseProactiveDigestUrgency(notifications);
+  const recommendedActions = buildProactiveDigestActions(briefing, notifications);
+  const summary =
+    urgency === "clear"
+      ? "Jarvis attention digest je cisty. Ziadne nove klientske poziadavky ani pripravene odpovede necakaju."
+      : `Jarvis attention digest nasiel ${notifications.length} signal(y), ktore si mas vsimnut.`;
+  return {
+    mode: "arcigy-jarvis-proactive-attention-digest",
+    status: "ready",
+    generatedAt: new Date().toISOString(),
+    urgency,
+    summary,
+    speechText: buildProactiveDigestSpeechText(urgency, summary, notifications, recommendedActions),
+    notifications,
+    recommendedActions,
+    briefing,
+    secretPolicy: "Secret-safe: digest only returns briefing summaries, counts, client/lead labels, and approval-safe next actions.",
+  };
+}
+
+function buildProactiveDigestNotifications(briefing) {
+  const sections = briefing?.sections || {};
+  const items = [];
+  const readiness = String(sections.readiness || "");
+  if (/Readiness:\s*blocked/i.test(readiness)) {
+    items.push({ id: "production-blocker", title: "Production blocker", detail: compactDigestText(`${readiness} ${sections.readinessAttention || ""}`), severity: "critical" });
+  } else if (/Readiness:\s*attention/i.test(readiness) || sections.readinessAttention) {
+    items.push({ id: "production-attention", title: "Production attention", detail: compactDigestText(`${readiness} ${sections.readinessAttention || ""}`), severity: "attention" });
+  }
+  const clientNeedCount = extractDigestCount(sections.clientNeeds);
+  if (clientNeedCount > 0) {
+    items.push({ id: "client-needs", title: "Klientske poziadavky", detail: sections.clientNeeds, severity: "attention" });
+  }
+  const preparedReplyCount = extractDigestCount(sections.preparedReplies);
+  if (preparedReplyCount > 0) {
+    items.push({ id: "prepared-replies", title: "Odpovede na schvalenie", detail: sections.preparedReplies, severity: "watch" });
+  }
+  return items;
+}
+
+function chooseProactiveDigestUrgency(notifications) {
+  if (notifications.some((item) => item.severity === "critical")) return "critical";
+  if (notifications.some((item) => item.severity === "attention")) return "attention";
+  if (notifications.length) return "watch";
+  return "clear";
+}
+
+function buildProactiveDigestActions(briefing, notifications) {
+  const actions = notifications.map((item) => {
+    if (item.id === "client-needs") return "Otvor arcigy.get_client_need_alerts a rozhodni, ci poziadavku oznacit ako seen, resolved alebo ignored az po kontrole.";
+    if (item.id === "prepared-replies") return "Otvor arcigy.get_approval_queue a posli pripravene odpovede az po explicitnom approval.approved=true.";
+    return briefing?.sections?.nextAction || "Ziadny urgentny krok.";
+  });
+  return [...new Set((actions.length ? actions : [briefing?.sections?.nextAction || "Ziadny urgentny krok."]).filter((value) => String(value).trim()))];
+}
+
+function buildProactiveDigestSpeechText(urgency, summary, notifications, recommendedActions) {
+  const top = notifications
+    .slice(0, 3)
+    .map((item) => `${item.title}: ${item.detail}`)
+    .join(" ");
+  const next = recommendedActions[0] || "Ziadny urgentny krok.";
+  return [`Jarvis attention digest: ${urgency}.`, summary, top, `Najblizsi krok: ${next}`].filter(Boolean).join(" ");
+}
+
+function extractDigestCount(value) {
+  const match = String(value || "").match(/:\s*([1-9]\d*)\b/);
+  return match ? Number(match[1]) : 0;
+}
+
+function compactDigestText(value) {
+  return String(value).replace(/\s+/g, " ").trim();
 }
 
 function summarizeProviderFallbackForBriefing(checks) {

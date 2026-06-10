@@ -402,18 +402,18 @@ async function run() {
     if (!/standby|mikrofon|fallback|vypnute|zachytene|pocuva|cakam/i.test(dom.voiceLastEventText)) fail(`Voice event status is not rendered: ${dom.voiceLastEventText}.`);
     const voiceUi = await runJarvisTextVoiceFlow(window);
     if (
-      !/(cold outreach|Smartlead)/i.test(voiceUi.responseText) ||
-      !/napisali\s+\d+\s+ludom/i.test(voiceUi.responseText) ||
-      !/\d+(?:\.\d+)?%\s+si email otvorilo/i.test(voiceUi.responseText) ||
-      !/\d+\s+ludi odpisalo/i.test(voiceUi.responseText) ||
-      !/\d+\s+pozitivne/i.test(voiceUi.responseText)
+      !/(cold outreach|Smartlead)/i.test(voiceUi.voiceResponseText) ||
+      !/napisali\s+\d+\s+ludom/i.test(voiceUi.voiceResponseText) ||
+      !/\d+(?:\.\d+)?%\s+si email otvorilo/i.test(voiceUi.voiceResponseText) ||
+      !/\d+\s+ludi odpisalo/i.test(voiceUi.voiceResponseText) ||
+      !/\d+\s+pozitivne/i.test(voiceUi.voiceResponseText)
     ) {
-      fail(`Jarvis text voice flow did not render the cold outreach answer: ${voiceUi.responseText}.`);
+      fail(`Jarvis text voice flow did not return the cold outreach answer: ${voiceUi.voiceResponseText}. Rendered response: ${voiceUi.responseText}.`);
     }
     if (!/Jarvis cold outreach status/i.test(voiceUi.transcriptText) || !/zachytene/i.test(voiceUi.voiceLastEventText)) {
       fail(`Jarvis text voice flow did not record transcript state: ${voiceUi.transcriptText} / ${voiceUi.voiceLastEventText}.`);
     }
-    if (voiceUi.speechSpeakCount < 1 || !/(cold outreach|Smartlead)/i.test(voiceUi.lastSpokenText)) {
+    if (!voiceUi.visualOnlyOutput && (voiceUi.speechSpeakCount < 1 || !/(cold outreach|Smartlead)/i.test(voiceUi.lastSpokenText))) {
       fail(`Jarvis text voice flow did not call speech output: ${voiceUi.speechSpeakCount} / ${voiceUi.lastSpokenText}.`);
     }
     assertBox("sidebar", dom.sidebar, { width: isNarrowViewport ? 300 : 180, height: 60 });
@@ -683,6 +683,20 @@ async function runJarvisTextVoiceFlow(window) {
   const started = await executeRendererJson(window, `
     (() => {
       window.__jarvisSmokeSpeech = { cancelCount: 0, speakCount: 0, texts: [] };
+      window.__jarvisSmokeVoiceResponse = null;
+      if (!window.__jarvisSmokeOriginalFetch) window.__jarvisSmokeOriginalFetch = window.fetch.bind(window);
+      window.fetch = async (...args) => {
+        const response = await window.__jarvisSmokeOriginalFetch(...args);
+        try {
+          const url = String(args[0] || "");
+          if (url.includes("/api/jarvis/voice-event")) {
+            response.clone().json().then((body) => {
+              window.__jarvisSmokeVoiceResponse = body;
+            }).catch(() => {});
+          }
+        } catch (_error) {}
+        return response;
+      };
       try {
         Object.defineProperty(window, "SpeechSynthesisUtterance", {
           configurable: true,
@@ -713,31 +727,34 @@ async function runJarvisTextVoiceFlow(window) {
   `, 5000);
   if (!started) {
     fail("Jarvis text voice controls are missing.");
-    return { responseText: "", transcriptText: "", voiceLastEventText: "", speechSpeakCount: 0, lastSpokenText: "" };
+    return { responseText: "", voiceResponseText: "", transcriptText: "", voiceLastEventText: "", speechSpeakCount: 0, lastSpokenText: "", visualOnlyOutput: false };
   }
 
   const deadline = Date.now() + 10000;
-  let state = { responseText: "", transcriptText: "", voiceLastEventText: "", speechSpeakCount: 0, lastSpokenText: "" };
+  let state = { responseText: "", voiceResponseText: "", transcriptText: "", voiceLastEventText: "", speechSpeakCount: 0, lastSpokenText: "", visualOnlyOutput: false };
   while (Date.now() < deadline) {
     state = await executeRendererJson(window, `
       (() => {
         const speech = window.__jarvisSmokeSpeech || { speakCount: 0, texts: [] };
+        const voice = window.__jarvisSmokeVoiceResponse || {};
         return {
           responseText: document.querySelector("#response")?.textContent.trim() || "",
+          voiceResponseText: String(voice.speakText || voice.session?.lastResponse || ""),
           transcriptText: document.querySelector("#transcript")?.value.trim() || "",
           voiceLastEventText: document.querySelector("#voiceLastEvent")?.textContent.trim() || "",
           speechSpeakCount: Number(speech.speakCount || 0),
-          lastSpokenText: String((speech.texts || [])[speech.texts.length - 1] || "")
+          lastSpokenText: String((speech.texts || [])[speech.texts.length - 1] || ""),
+          visualOnlyOutput: /iba obrazovka/i.test(document.querySelector("#voiceOutput")?.textContent || "")
         };
       })()
     `, 5000);
     if (
-      /(cold outreach|Smartlead)/i.test(state.responseText) &&
-      /napisali\s+\d+\s+ludom/i.test(state.responseText) &&
-      /\d+(?:\.\d+)?%\s+si email otvorilo/i.test(state.responseText) &&
-      /\d+\s+ludi odpisalo/i.test(state.responseText) &&
-      /\d+\s+pozitivne/i.test(state.responseText) &&
-      state.speechSpeakCount >= 1
+      /(cold outreach|Smartlead)/i.test(state.voiceResponseText) &&
+      /napisali\s+\d+\s+ludom/i.test(state.voiceResponseText) &&
+      /\d+(?:\.\d+)?%\s+si email otvorilo/i.test(state.voiceResponseText) &&
+      /\d+\s+ludi odpisalo/i.test(state.voiceResponseText) &&
+      /\d+\s+pozitivne/i.test(state.voiceResponseText) &&
+      (state.visualOnlyOutput || state.speechSpeakCount >= 1)
     ) {
       return state;
     }

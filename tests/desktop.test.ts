@@ -649,6 +649,11 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /overallPercent: percent/);
   assert.match(main, /completionPercent: percent/);
   assert.match(main, /Sme na \$\{Number\(score\?\.percent \?\? 0\)\}% production completion/);
+  assert.match(main, /isProactiveAttentionDigestVoiceCommand/);
+  assert.match(main, /getProactiveAttentionDigest/);
+  assert.match(main, /buildProactiveAttentionDigest/);
+  assert.match(main, /co si mam vsimnut/);
+  assert.match(main, /Jarvis attention digest:/);
   assert.match(renderer, /renderOperatorBriefing/);
   assert.match(renderer, /function renderOperatorBriefingCards/);
   assert.match(renderer, /elements\.briefingGrid\.replaceChildren\(\)/);
