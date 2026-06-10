@@ -50,7 +50,7 @@ const capabilityDefinitions: CapabilityDefinition[] = [
     title: "Universal Arcigy contract automation",
     tools: ["arcigy.draft_contract_intake", "arcigy.generate_contract_documents"],
     approvalRequired: ["arcigy.generate_contract_documents"],
-    evidence: ["contractGeneration", "tests", "ui-smoke"],
+    evidence: ["contractGeneration", "contract-template-safety", "tests", "ui-smoke"],
     envKeys: ["gemini"],
   },
   {

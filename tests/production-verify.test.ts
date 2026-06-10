@@ -23,6 +23,12 @@ test("production verifier wires every live release gate", () => {
   assert.match(script, /Jarvis wake-word voice flow returns a spoken cold outreach briefing/);
   assert.match(script, /buildColdOutreachBrief/);
   assert.match(script, /handleJarvisVoiceEvent/);
+  assert.match(script, /runContractTemplateSafetyInvariants/);
+  assert.match(script, /\[verify\] contract-template-safety/);
+  assert.match(script, /ramcova-zmluva-univerzalna\.docx/);
+  assert.match(script, /projektova-priloha-univerzalna\.docx/);
+  assert.match(script, /doplnkova-priloha-univerzalna\.docx/);
+  assert.match(script, /Universal Arcigy contract templates generated from JSON intake/);
   assert.match(script, /runNpm\("secrets-audit", \["run", "secrets:audit", "--", "--json"\]\)/);
   assert.equal(packageJson.scripts["local:memory:smoke"], "node scripts/local_memory_smoke.ts");
   assert.match(script, /runNpm\("local-memory-smoke", \["run", "local:memory:smoke"\]\)/);

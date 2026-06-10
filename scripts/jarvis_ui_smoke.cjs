@@ -341,10 +341,11 @@ async function run() {
     if (!/standby|mikrofon|fallback|vypnute|zachytene|pocuva|cakam/i.test(dom.voiceLastEventText)) fail(`Voice event status is not rendered: ${dom.voiceLastEventText}.`);
     const voiceUi = await runJarvisTextVoiceFlow(window);
     if (
-      !/cold outreach/i.test(voiceUi.responseText) ||
+      !/(cold outreach|Smartlead)/i.test(voiceUi.responseText) ||
       !/napisali\s+\d+\s+ludom/i.test(voiceUi.responseText) ||
       !/\d+(?:\.\d+)?%\s+si email otvorilo/i.test(voiceUi.responseText) ||
-      !/(potvrdenie|schvalenie|Pripravene odpovede|nic necaka na schvalenie)/i.test(voiceUi.responseText)
+      !/\d+\s+ludi odpisalo/i.test(voiceUi.responseText) ||
+      !/\d+\s+pozitivne/i.test(voiceUi.responseText)
     ) {
       fail(`Jarvis text voice flow did not render the cold outreach answer: ${voiceUi.responseText}.`);
     }
@@ -485,10 +486,11 @@ async function runJarvisTextVoiceFlow(window) {
       }))()
     `, 5000);
     if (
-      /cold outreach/i.test(state.responseText) &&
+      /(cold outreach|Smartlead)/i.test(state.responseText) &&
       /napisali\s+\d+\s+ludom/i.test(state.responseText) &&
       /\d+(?:\.\d+)?%\s+si email otvorilo/i.test(state.responseText) &&
-      /(potvrdenie|schvalenie|Pripravene odpovede|nic necaka na schvalenie)/i.test(state.responseText)
+      /\d+\s+ludi odpisalo/i.test(state.responseText) &&
+      /\d+\s+pozitivne/i.test(state.responseText)
     ) {
       return state;
     }

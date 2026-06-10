@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 
@@ -67,6 +67,7 @@ async function main() {
   runNpm("tests", ["test"]);
   await runAiDraftSafetyInvariants();
   runVoiceOutreachStyleInvariants();
+  runContractTemplateSafetyInvariants();
   runNpm("secrets-audit", ["run", "secrets:audit", "--", "--json"]);
   runNpm("local-memory-smoke", ["run", "local:memory:smoke"]);
   await ensureWebBridge();
@@ -122,6 +123,66 @@ function runVoiceOutreachStyleInvariants() {
     });
   } catch (error) {
     checks.push({ name: "voice-outreach-style", status: "failed", detail: redactSensitiveText(error instanceof Error ? error.message : String(error)) });
+    writeEvidence();
+    process.stdout.write(renderSummary());
+    process.exit(1);
+  }
+}
+
+function runContractTemplateSafetyInvariants() {
+  process.stdout.write(`\n[verify] contract-template-safety\n`);
+  try {
+    const templates = [
+      "docs/contracts/templates/ramcova-zmluva-univerzalna.docx",
+      "docs/contracts/templates/projektova-priloha-univerzalna.docx",
+      "docs/contracts/templates/doplnkova-priloha-univerzalna.docx",
+    ];
+    const missingTemplates = templates.filter((template) => !existsSync(join(repoRoot, template)));
+    if (missingTemplates.length) throw new Error(`Missing universal contract template(s): ${missingTemplates.join(", ")}.`);
+
+    const outputDir = join(repoRoot, "generated", "production-verification", `contract-template-safety-${Date.now()}-${process.pid}`);
+    mkdirSync(outputDir, { recursive: true });
+    const python = process.env.JARVIS_PYTHON || "python";
+    const result = spawnSync(
+      python,
+      [
+        "scripts/generate_contract_documents.py",
+        "--input",
+        "docs/contracts/examples/sample-intake.json",
+        "--output-dir",
+        outputDir,
+      ],
+      {
+        cwd: repoRoot,
+        encoding: "utf-8",
+        env: { ...process.env, PYTHONIOENCODING: "utf-8" },
+      }
+    );
+    if (result.stdout) process.stdout.write(redactSensitiveText(result.stdout));
+    if (result.stderr) process.stderr.write(redactSensitiveText(result.stderr));
+    if (result.status !== 0) throw new Error(result.error ? result.error.message : `Contract generator exited with status ${result.status}.`);
+
+    const manifestPath = join(outputDir, "generation-manifest.json");
+    if (!existsSync(manifestPath)) throw new Error("Contract generation manifest was not created.");
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf-8")) as { input?: unknown; generatedFiles?: unknown };
+    const generatedFiles = Array.isArray(manifest.generatedFiles) ? manifest.generatedFiles.filter((item): item is string => typeof item === "string") : [];
+    const generatedNames = generatedFiles.map((file) => basename(file).toLowerCase());
+    const ok =
+      typeof manifest.input === "string" &&
+      manifest.input.includes("sample-intake.json") &&
+      generatedFiles.length >= 3 &&
+      generatedFiles.every((file) => file.toLowerCase().endsWith(".docx") && existsSync(file)) &&
+      generatedNames.some((name) => name.includes("ramcova-zmluva")) &&
+      generatedNames.some((name) => name.includes("projektova-priloha")) &&
+      generatedNames.some((name) => name.includes("doplnkova-priloha"));
+    if (!ok) throw new Error("Universal contract generation manifest is incomplete.");
+    checks.push({
+      name: "contract-template-safety",
+      status: "ready",
+      detail: "Universal Arcigy contract templates generated from JSON intake into framework agreement, project appendix, extra appendix, and placeholder-free DOCX outputs.",
+    });
+  } catch (error) {
+    checks.push({ name: "contract-template-safety", status: "failed", detail: redactSensitiveText(error instanceof Error ? error.message : String(error)) });
     writeEvidence();
     process.stdout.write(renderSummary());
     process.exit(1);

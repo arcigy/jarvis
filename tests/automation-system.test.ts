@@ -146,6 +146,7 @@ test("Jarvis capability audit maps the full requested production surface to evid
       { name: "ai-draft-safety", status: "ready" },
       { name: "voice-outreach-style", status: "ready" },
       { name: "contractGeneration", status: "ready" },
+      { name: "contract-template-safety", status: "ready" },
       { name: "secret-scan", status: "ready" },
       { name: "remote-mcp-smoke", status: "ready" },
       { name: "remote-mcp-smoke-required-gates", status: "ready" },
