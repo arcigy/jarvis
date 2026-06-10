@@ -1009,6 +1009,23 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Preview Smartlead deliverability guard",
+      tool: "arcigy.build_smartlead_deliverability_guard_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_smartlead_deliverability_guard_preview"),
+      body: {
+        campaignId: "123456",
+        campaignName: "Autoservisy BA",
+        stats: { sent: 240, opened: 112, replied: 14, positiveReplies: 5, bounced: 6, unsubscribed: 2 },
+        senderAccounts: [
+          { id: "acct-1", email: "andrej@arcigy.group", status: "active", warmupStatus: "active", dailyLimit: 40, sentToday: 12, bounceRate: 1.2, reputationScore: 92 },
+        ],
+        leadBacklog: 120,
+        requestedDailyLimit: 40,
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Draft niche Smartlead campaign setup",
       tool: "arcigy.draft_niche_smartlead_campaign_setup",
       method: "POST",

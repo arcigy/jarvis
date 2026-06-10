@@ -469,6 +469,32 @@ export type SmartleadSenderCapacityPreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type SmartleadDeliverabilityGuardPreview = {
+  mode: "smartlead-deliverability-guard-preview";
+  status: "ready" | "attention" | "blocked";
+  recommendation: "continue" | "reduce_daily_limit" | "pause_campaign";
+  summary: string;
+  campaign: { id?: string | number | null; name?: string };
+  metrics: {
+    sent: number;
+    opened: number;
+    replied: number;
+    positiveReplies: number;
+    bounced: number;
+    unsubscribed: number;
+    openRate: number;
+    replyRate: number;
+    positiveReplyRate: number;
+    bounceRate: number;
+    unsubscribeRate: number;
+  };
+  thresholds: { maxBounceRate: number; maxUnsubscribeRate: number; minReplyRate: number; minOpenRate: number };
+  risks: Array<{ key: string; severity: "attention" | "blocked"; message: string }>;
+  senderCapacityPreview?: SmartleadSenderCapacityPreview;
+  safeDailyLimit: number;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type SmartleadCampaignHandoffPackagePreview = {
   mode: "smartlead-campaign-handoff-package-preview";
   status: "ready" | "attention" | "blocked";
@@ -2560,6 +2586,107 @@ export function buildSmartleadSenderCapacityPreview(input: {
     warnings,
     configureCampaignPayload,
     nextToolCalls,
+  };
+}
+
+export function buildSmartleadDeliverabilityGuardPreview(input: {
+  campaignId?: string | number | null;
+  campaignName?: string;
+  stats?: {
+    sent?: number;
+    opened?: number;
+    replied?: number;
+    positiveReplies?: number;
+    bounced?: number;
+    unsubscribed?: number;
+  };
+  senderAccounts?: SmartleadSenderAccountInput[];
+  leadBacklog?: number;
+  requestedDailyLimit?: number;
+  maxBounceRate?: number;
+  maxUnsubscribeRate?: number;
+  minReplyRate?: number;
+  minOpenRate?: number;
+  minTimeBetweenEmailsMinutes?: number;
+}): SmartleadDeliverabilityGuardPreview {
+  const sent = Math.max(Math.trunc(input.stats?.sent ?? 0), 0);
+  const opened = Math.max(Math.trunc(input.stats?.opened ?? 0), 0);
+  const replied = Math.max(Math.trunc(input.stats?.replied ?? 0), 0);
+  const positiveReplies = Math.max(Math.trunc(input.stats?.positiveReplies ?? 0), 0);
+  const bounced = Math.max(Math.trunc(input.stats?.bounced ?? 0), 0);
+  const unsubscribed = Math.max(Math.trunc(input.stats?.unsubscribed ?? 0), 0);
+  const rate = (count: number) => sent > 0 ? Math.round((count / sent) * 1000) / 10 : 0;
+  const thresholds = {
+    maxBounceRate: input.maxBounceRate ?? 4,
+    maxUnsubscribeRate: input.maxUnsubscribeRate ?? 1,
+    minReplyRate: input.minReplyRate ?? 1,
+    minOpenRate: input.minOpenRate ?? 20,
+  };
+  const metrics: SmartleadDeliverabilityGuardPreview["metrics"] = {
+    sent,
+    opened,
+    replied,
+    positiveReplies,
+    bounced,
+    unsubscribed,
+    openRate: rate(opened),
+    replyRate: rate(replied),
+    positiveReplyRate: rate(positiveReplies),
+    bounceRate: rate(bounced),
+    unsubscribeRate: rate(unsubscribed),
+  };
+  const risks: SmartleadDeliverabilityGuardPreview["risks"] = [];
+  if (sent <= 0) risks.push({ key: "missing_campaign_stats", severity: "attention", message: "Campaign stats are missing or empty." });
+  if (metrics.bounceRate >= thresholds.maxBounceRate * 2) risks.push({ key: "critical_bounce_rate", severity: "blocked", message: `Bounce rate ${metrics.bounceRate}% is critically high.` });
+  else if (metrics.bounceRate >= thresholds.maxBounceRate) risks.push({ key: "high_bounce_rate", severity: "attention", message: `Bounce rate ${metrics.bounceRate}% is above ${thresholds.maxBounceRate}%.` });
+  if (metrics.unsubscribeRate >= thresholds.maxUnsubscribeRate * 2) risks.push({ key: "critical_unsubscribe_rate", severity: "blocked", message: `Unsubscribe rate ${metrics.unsubscribeRate}% is critically high.` });
+  else if (metrics.unsubscribeRate >= thresholds.maxUnsubscribeRate) risks.push({ key: "high_unsubscribe_rate", severity: "attention", message: `Unsubscribe rate ${metrics.unsubscribeRate}% is above ${thresholds.maxUnsubscribeRate}%.` });
+  if (sent >= 50 && metrics.replyRate < thresholds.minReplyRate) risks.push({ key: "low_reply_rate", severity: "attention", message: `Reply rate ${metrics.replyRate}% is below ${thresholds.minReplyRate}%.` });
+  if (sent >= 50 && metrics.openRate < thresholds.minOpenRate) risks.push({ key: "low_open_rate", severity: "attention", message: `Open rate ${metrics.openRate}% is below ${thresholds.minOpenRate}%.` });
+  const senderCapacityPreview = input.senderAccounts?.length
+    ? buildSmartleadSenderCapacityPreview({
+        campaignId: input.campaignId,
+        accounts: input.senderAccounts,
+        leadBacklog: input.leadBacklog,
+        requestedDailyLimit: input.requestedDailyLimit,
+        minTimeBetweenEmailsMinutes: input.minTimeBetweenEmailsMinutes,
+      })
+    : undefined;
+  if (senderCapacityPreview?.status === "blocked") risks.push({ key: "sender_capacity_blocked", severity: "blocked", message: "No usable sender capacity is available." });
+  if (senderCapacityPreview?.status === "attention") risks.push({ key: "sender_capacity_attention", severity: "attention", message: "Sender capacity has warnings." });
+  const status: SmartleadDeliverabilityGuardPreview["status"] = risks.some((risk) => risk.severity === "blocked") ? "blocked" : risks.length ? "attention" : "ready";
+  const requestedDailyLimit = Math.min(Math.max(Math.trunc(input.requestedDailyLimit ?? senderCapacityPreview?.totals.recommendedDailyLimit ?? 30), 1), 1000);
+  const capacityLimit = senderCapacityPreview?.totals.recommendedDailyLimit ?? requestedDailyLimit;
+  const safeDailyLimit = status === "blocked" ? 0 : status === "attention" ? Math.max(1, Math.floor(Math.min(requestedDailyLimit, capacityLimit) * 0.5)) : Math.min(requestedDailyLimit, capacityLimit);
+  const recommendation: SmartleadDeliverabilityGuardPreview["recommendation"] = status === "blocked" ? "pause_campaign" : status === "attention" ? "reduce_daily_limit" : "continue";
+  const nextToolCalls: SmartleadDeliverabilityGuardPreview["nextToolCalls"] = [];
+  nextToolCalls.push({
+    tool: "arcigy.get_smartlead_outreach_brief",
+    payload: { campaignId: input.campaignId },
+    reason: "Refresh Smartlead stats before changing send volume.",
+    approvalRequired: false,
+  });
+  if (senderCapacityPreview) nextToolCalls.push(...senderCapacityPreview.nextToolCalls);
+  if (input.campaignId && safeDailyLimit > 0 && safeDailyLimit < requestedDailyLimit) {
+    nextToolCalls.push({
+      tool: "arcigy.configure_smartlead_campaign",
+      payload: { campaignId: input.campaignId, schedule: { max_new_leads_per_day: safeDailyLimit, min_time_btw_emails: Math.max(Math.trunc(input.minTimeBetweenEmailsMinutes ?? 20), 1) }, approval: { approved: true } },
+      reason: "Zniz denny limit kampane az po explicitnom schvaleni operatora.",
+      approvalRequired: true,
+    });
+  }
+  return {
+    mode: "smartlead-deliverability-guard-preview",
+    status,
+    recommendation,
+    summary: `Smartlead deliverability guard: ${status}, bounce ${metrics.bounceRate}%, reply ${metrics.replyRate}%, unsubscribe ${metrics.unsubscribeRate}%, safe daily limit ${safeDailyLimit}. Ziadny zapis ani upload neprebehol.`,
+    campaign: { id: input.campaignId ?? null, name: input.campaignName },
+    metrics,
+    thresholds,
+    risks,
+    senderCapacityPreview,
+    safeDailyLimit,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls),
   };
 }
 

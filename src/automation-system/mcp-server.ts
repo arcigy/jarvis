@@ -38,6 +38,7 @@ import {
   buildSmartleadInjectionPlan,
   buildSmartleadImportAuditPreview,
   buildSmartleadSenderCapacityPreview,
+  buildSmartleadDeliverabilityGuardPreview,
   buildColdOutreachCsvImportPreview,
   dedupeLeadCandidates,
   draftNicheSmartleadCampaignSetup,
@@ -2203,6 +2204,41 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildSmartleadSenderCapacityPreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_smartlead_deliverability_guard_preview",
+    {
+      title: "Build Smartlead deliverability guard preview",
+      description: "Evaluate Smartlead delivery metrics, sender capacity, and recommend continue/reduce/pause before more uploads without writing.",
+      inputSchema: {
+        campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+        campaignName: z.string().optional(),
+        stats: z.object({
+          sent: z.number().int().nonnegative().optional(),
+          opened: z.number().int().nonnegative().optional(),
+          replied: z.number().int().nonnegative().optional(),
+          positiveReplies: z.number().int().nonnegative().optional(),
+          bounced: z.number().int().nonnegative().optional(),
+          unsubscribed: z.number().int().nonnegative().optional(),
+        }).optional(),
+        senderAccounts: z.array(smartleadSenderAccountSchema).optional(),
+        leadBacklog: z.number().int().min(0).optional(),
+        requestedDailyLimit: z.number().int().min(1).max(1000).optional(),
+        maxBounceRate: z.number().min(0).max(100).optional(),
+        maxUnsubscribeRate: z.number().min(0).max(100).optional(),
+        minReplyRate: z.number().min(0).max(100).optional(),
+        minOpenRate: z.number().min(0).max(100).optional(),
+        minTimeBetweenEmailsMinutes: z.number().int().min(1).max(240).optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildSmartleadDeliverabilityGuardPreview(input))
   );
 
   server.registerTool(

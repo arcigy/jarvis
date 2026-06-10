@@ -37,6 +37,7 @@ import {
   buildSmartleadInjectionPlan,
   buildSmartleadImportAuditPreview,
   buildSmartleadSenderCapacityPreview,
+  buildSmartleadDeliverabilityGuardPreview,
   buildColdOutreachCsvImportPreview,
   dedupeLeadCandidates,
   draftNicheSmartleadCampaignSetup,
@@ -1588,6 +1589,24 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         minTimeBetweenEmailsMinutes: typeof payload.minTimeBetweenEmailsMinutes === "number" ? payload.minTimeBetweenEmailsMinutes : undefined,
         maxPerAccountPerDay: typeof payload.maxPerAccountPerDay === "number" ? payload.maxPerAccountPerDay : undefined,
         includePausedAccounts: payload.includePausedAccounts === true,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_smartlead_deliverability_guard_preview") {
+    writeJson(response, 200, {
+      result: buildSmartleadDeliverabilityGuardPreview({
+        campaignId: (payload.campaignId ?? null) as string | number | null,
+        campaignName: optionalString(payload.campaignName),
+        stats: payload.stats as Parameters<typeof buildSmartleadDeliverabilityGuardPreview>[0]["stats"],
+        senderAccounts: Array.isArray(payload.senderAccounts) ? payload.senderAccounts as Parameters<typeof buildSmartleadDeliverabilityGuardPreview>[0]["senderAccounts"] : undefined,
+        leadBacklog: typeof payload.leadBacklog === "number" ? payload.leadBacklog : undefined,
+        requestedDailyLimit: typeof payload.requestedDailyLimit === "number" ? payload.requestedDailyLimit : undefined,
+        maxBounceRate: typeof payload.maxBounceRate === "number" ? payload.maxBounceRate : undefined,
+        maxUnsubscribeRate: typeof payload.maxUnsubscribeRate === "number" ? payload.maxUnsubscribeRate : undefined,
+        minReplyRate: typeof payload.minReplyRate === "number" ? payload.minReplyRate : undefined,
+        minOpenRate: typeof payload.minOpenRate === "number" ? payload.minOpenRate : undefined,
+        minTimeBetweenEmailsMinutes: typeof payload.minTimeBetweenEmailsMinutes === "number" ? payload.minTimeBetweenEmailsMinutes : undefined,
       }),
     });
     return;

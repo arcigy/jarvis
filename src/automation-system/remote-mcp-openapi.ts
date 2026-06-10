@@ -460,6 +460,18 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       ],
     };
   }
+  if (toolName === "arcigy.build_smartlead_deliverability_guard_preview") {
+    return {
+      campaignId: "123456",
+      campaignName: "Autoservisy BA",
+      stats: { sent: 240, opened: 112, replied: 14, positiveReplies: 5, bounced: 6, unsubscribed: 2 },
+      senderAccounts: [
+        { id: "acct-1", email: "andrej@arcigy.group", status: "active", warmupStatus: "active", dailyLimit: 40, sentToday: 12, bounceRate: 1.2, reputationScore: 92 },
+      ],
+      leadBacklog: 120,
+      requestedDailyLimit: 40,
+    };
+  }
   if (toolName === "arcigy.draft_niche_smartlead_campaign_setup") {
     return {
       niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy" },

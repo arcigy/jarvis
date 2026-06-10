@@ -36,6 +36,7 @@ import {
   buildSmartleadInjectionPlan,
   buildSmartleadImportAuditPreview,
   buildSmartleadSenderCapacityPreview,
+  buildSmartleadDeliverabilityGuardPreview,
   buildDailyLeadgenRunbook,
   dedupeLeadCandidates,
   draftNicheSmartleadCampaignSetup,
@@ -168,6 +169,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.build_smartlead_injection_plan",
     "arcigy.build_smartlead_import_audit_preview",
     "arcigy.build_smartlead_sender_capacity_preview",
+    "arcigy.build_smartlead_deliverability_guard_preview",
     "arcigy.draft_niche_smartlead_campaign_setup",
     "arcigy.build_smartlead_campaign_launch_preview",
     "arcigy.build_smartlead_campaign_qa_preview",
@@ -1439,7 +1441,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 95 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 96 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -2685,6 +2687,31 @@ test("Smartlead sender capacity preview calculates safe limits before campaign c
   assert.deepEqual(preview.configureCampaignPayload?.emailAccountIds, ["acct-1", "acct-2"]);
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.configure_smartlead_campaign" && call.approvalRequired));
   assert.match(preview.summary, /Ziadny zapis ani upload/);
+});
+
+test("Smartlead deliverability guard recommends reduced sending before more uploads", () => {
+  const guard = buildSmartleadDeliverabilityGuardPreview({
+    campaignId: "123456",
+    campaignName: "Autoservisy BA",
+    stats: { sent: 200, opened: 70, replied: 1, positiveReplies: 0, bounced: 9, unsubscribed: 3 },
+    senderAccounts: [
+      { id: "acct-1", email: "andrej@arcigy.group", status: "active", warmupStatus: "active", dailyLimit: 40, sentToday: 5, bounceRate: 1.2, reputationScore: 92 },
+    ],
+    leadBacklog: 100,
+    requestedDailyLimit: 40,
+  });
+
+  assert.equal(guard.mode, "smartlead-deliverability-guard-preview");
+  assert.equal(guard.status, "attention");
+  assert.equal(guard.recommendation, "reduce_daily_limit");
+  assert.equal(guard.metrics.bounceRate, 4.5);
+  assert.equal(guard.metrics.replyRate, 0.5);
+  assert.equal(guard.safeDailyLimit, 20);
+  assert.ok(guard.risks.some((risk) => risk.key === "high_bounce_rate"));
+  assert.ok(guard.risks.some((risk) => risk.key === "low_reply_rate"));
+  assert.ok(guard.nextToolCalls.some((call) => call.tool === "arcigy.get_smartlead_outreach_brief" && !call.approvalRequired));
+  assert.ok(guard.nextToolCalls.some((call) => call.tool === "arcigy.configure_smartlead_campaign" && call.approvalRequired));
+  assert.match(guard.summary, /Ziadny zapis ani upload/);
 });
 
 test("Smartlead campaign handoff package combines launch QA capacity and approvals", () => {
