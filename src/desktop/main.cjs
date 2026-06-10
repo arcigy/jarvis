@@ -590,7 +590,7 @@ function buildReadinessLaunchEvidence(status, launchChecklist, nextActions) {
       requiredBeforeExternalAgent: [
         "Spusti npm run web:tunnel:secure alebo pouzi browser tlacidlo Spustit tunel so silnym JARVIS_WEB_TOKEN.",
         "Fetch /.well-known/ai-plugin.json, /api/openapi.json, /.well-known/arcigy-jarvis.json, and /api/remote-mcp-pack?includeReadiness=true&live=true through the external URL.",
-        "Run /api/remote-mcp-smoke and require status=ready with all 37 required remote MCP smoke gates ready, including manifest, tool-count, manifest-tool-registry, manifest-tool-metadata, auth-placeholder, manifest-local-write-policy, action-manifest, openapi-schema, cors-preflight, external-auth-gate, connection-pack, pack-secret-policy, pack-auth-throttle-policy, pack-limits, pack-tunnel-controls, secure-tunnel-status, pack-local-write-policy, pack-tool-registry, pack-quick-start-urls, pack-quick-start-approval-policy, pack-quick-start-exact-mcp-calls, pack-contract-quick-start, pack-contract-draft-quick-start, pack-agent-setup-profiles, pack-agent-launch-bundle, pack-voice-quick-start, pack-handoff-proof, pack-agent-compatibility, pack-client-memory-quick-start, pack-audit-quick-start, voice-tool-call, pack-production-evidence-quick-start, read-only-tool-call, production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction; production evidence must also be status=ready with release proof, dirty=false, and freshness.fresh=true within 24h before any remote agent uses write-capable tools.",
+        "Run /api/remote-mcp-smoke and require status=ready with all 37 required remote MCP smoke gates ready, including manifest, tool-count, manifest-tool-registry, manifest-tool-metadata, auth-placeholder, manifest-local-write-policy, action-manifest, openapi-schema, cors-preflight, external-auth-gate, connection-pack, pack-secret-policy, pack-auth-throttle-policy, pack-limits, pack-tunnel-controls, secure-tunnel-status, pack-local-write-policy, pack-tool-registry, pack-quick-start-urls, pack-quick-start-approval-policy, pack-quick-start-exact-mcp-calls, pack-contract-quick-start, pack-contract-draft-quick-start, pack-agent-setup-profiles, pack-agent-launch-bundle, pack-voice-quick-start, pack-handoff-proof, pack-agent-compatibility, pack-client-memory-quick-start, pack-audit-quick-start, voice-tool-call, pack-production-evidence-quick-start, read-only-tool-call, production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction; production evidence must also be status=ready with release proof, dirty=false, freshness.fresh=true, and arcigy.get_production_completion_score quick-start coverage before any remote agent uses write-capable tools.",
       ],
       smokeCommand: "npm run remote:mcp:smoke -- --url <external-url>",
       tunnelCommand: "npm run web:tunnel:secure",
@@ -701,7 +701,7 @@ const coreWebWorkflowSurfaces = [
     title: "Jarvis voice workflow",
     tools: ["arcigy.jarvis_voice_event", "arcigy.get_operator_briefing", "arcigy.get_production_verification_evidence", "arcigy.get_production_completion_score"],
     approvalRequired: [],
-    proof: "Wake-word command handling, operator briefing, and production evidence voice path are registered.",
+    proof: "Wake-word command handling, operator briefing, production evidence, and completion score voice paths are registered.",
   },
   {
     id: "proactive-digest-workflow",
@@ -729,7 +729,7 @@ const coreWebWorkflowSurfaces = [
       "arcigy.get_jarvis_capability_audit",
     ],
     approvalRequired: [],
-    proof: "Remote MCP pack, smoke proof, readiness, and production evidence tools are registered.",
+    proof: "Remote MCP pack, smoke proof, readiness, production evidence, and completion score tools are registered.",
   },
 ];
 

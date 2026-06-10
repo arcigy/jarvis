@@ -439,7 +439,7 @@ test("local web bridge serves UI and API health", async () => {
       nextActions: string[];
       fixGuide: unknown[];
       attentionQueue: unknown[];
-      launchChecklist: Array<{ id: string; status: string }>;
+      launchChecklist: Array<{ id: string; status: string; proof: string }>;
       launchEvidence: { mode: string; proofGates: Array<{ id: string; validationCommand: string }>; remoteHandoff: { tunnelCommand: string; requiredBeforeExternalAgent: string[] } };
     };
     assert.ok(["ready", "attention", "blocked"].includes(readinessBody.status));
@@ -448,6 +448,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(Array.isArray(readinessBody.fixGuide));
     assert.ok(Array.isArray(readinessBody.attentionQueue));
     assert.ok(readinessBody.launchChecklist.some((item) => item.id === "approval-locks" && item.status === "ready"));
+    assert.ok(readinessBody.launchChecklist.some((item) => item.id === "remote-agent-workflow" && item.proof.includes("completion score")));
     assert.equal(readinessBody.launchEvidence.mode, "production-launch-evidence");
     assert.ok(readinessBody.launchEvidence.proofGates.some((gate) => gate.id === "mcp-registry" && gate.validationCommand === "npm test"));
     assert.equal(readinessBody.launchEvidence.remoteHandoff.tunnelCommand, "npm run web:tunnel:secure");
@@ -463,6 +464,7 @@ test("local web bridge serves UI and API health", async () => {
           step.includes("release proof") &&
           step.includes("dirty=false") &&
           step.includes("freshness.fresh=true") &&
+          step.includes("arcigy.get_production_completion_score") &&
           step.includes("secret-redaction")
       )
     );

@@ -211,6 +211,7 @@ test("production readiness report returns blockers and next actions without secr
   assert.ok(report.launchChecklist.some((item) => item.id === "voice-workflow" && item.proof.includes("completion score")));
   assert.ok(report.launchChecklist.some((item) => item.id === "proactive-digest-workflow" && item.status === "ready"));
   assert.ok(report.launchChecklist.some((item) => item.id === "remote-agent-workflow" && item.status === "ready"));
+  assert.ok(report.launchChecklist.some((item) => item.id === "remote-agent-workflow" && item.proof.includes("completion score")));
   assert.equal(report.launchEvidence.mode, "production-launch-evidence");
   assert.equal(report.launchEvidence.decision, "blocked");
   assert.ok(report.launchEvidence.proofGates.some((gate) => gate.id === "approval-locks" && gate.validationCommand === "npm test"));
@@ -228,6 +229,7 @@ test("production readiness report returns blockers and next actions without secr
         step.includes("release proof") &&
         step.includes("dirty=false") &&
         step.includes("freshness.fresh=true") &&
+        step.includes("arcigy.get_production_completion_score") &&
         step.includes("secret-redaction")
     )
   );
