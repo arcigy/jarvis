@@ -465,6 +465,7 @@ function isApiAuthorized(request: IncomingMessage): boolean {
 }
 
 function isProtectedBridgePath(pathname: string): boolean {
+  if (pathname === "/api/openapi.json") return false;
   return pathname === "/mcp" || pathname.startsWith("/api/") || pathname === "/.well-known/arcigy-jarvis.json" || pathname === "/.well-known/ai-plugin.json" || pathname === "/ai-plugin.json";
 }
 
