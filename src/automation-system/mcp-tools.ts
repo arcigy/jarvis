@@ -36,6 +36,8 @@ export type JarvisMcpToolName =
   | "arcigy.get_proactive_attention_digest"
   | "arcigy.get_leadgen_daily_report"
   | "arcigy.get_leadgen_evening_summary"
+  | "arcigy.build_leadgen_slack_report_preview"
+  | "arcigy.build_leadgen_ops_digest"
   | "arcigy.select_next_niche"
   | "arcigy.generate_ai_reply"
   | "arcigy.sync_gmail_recent_messages"
@@ -275,6 +277,16 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.get_leadgen_evening_summary",
       description: "Vytvori vecerny prehlad odoslanych emailov, odpovedi, pozitivnych reakcii a dnesnych reply signalov.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_leadgen_slack_report_preview",
+      description: "Pripravi Slack Block Kit payload pre denny leadgen report a ovladacie tlacidla bez odoslania do Slacku.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_leadgen_ops_digest",
+      description: "Spoji denny report, vecerny summary, niche rotaciu a stuck leady do ops digestu s dalsimi MCP tool callmi.",
       requiresApproval: false,
     },
     {

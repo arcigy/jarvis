@@ -33,6 +33,24 @@ export type NicheRotationInput = {
   }>;
 };
 
+export type LeadgenSlackReportPreviewInput = LeadgenDailyReportInput & {
+  dateLabel?: string;
+  title?: string;
+};
+
+export type LeadgenOpsDigestInput = {
+  periodLabel?: string;
+  campaigns?: unknown;
+  stuckLeads?: LeadgenDailyReportInput["stuckLeads"];
+  recentReplies?: LeadgenEveningSummaryInput["recentReplies"];
+  settings?: LeadgenDailyReportInput["settings"];
+  niches?: NicheRotationInput["niches"];
+  sentToday?: number;
+  repliesToday?: number;
+  positiveToday?: number;
+  manualReviewLimit?: number;
+};
+
 export function buildLeadgenDailyReport(input: LeadgenDailyReportInput) {
   const periodLabel = input.periodLabel ?? "dnes";
   const outreach = buildSmartleadOutreachBrief({
@@ -73,6 +91,59 @@ export function buildLeadgenDailyReport(input: LeadgenDailyReportInput) {
   };
 }
 
+export function buildLeadgenSlackReportPreview(input: LeadgenSlackReportPreviewInput) {
+  const report = buildLeadgenDailyReport(input);
+  const dateLabel = input.dateLabel ?? new Date().toISOString().slice(0, 10);
+  const stuck = report.stuckPreview.slice(0, 15);
+  const blocks: Array<Record<string, unknown>> = [
+    { type: "header", text: { type: "plain_text", text: input.title ?? `Arcigy Daily Report - ${dateLabel}` } },
+    {
+      type: "section",
+      fields: [
+        { type: "mrkdwn", text: `*Odoslane:* ${report.outreach.metrics.contacted}` },
+        { type: "mrkdwn", text: `*Otvorene:* ${report.outreach.metrics.opened}` },
+        { type: "mrkdwn", text: `*Odpovede:* ${report.outreach.metrics.replied}` },
+        { type: "mrkdwn", text: `*Pozitivne:* ${report.outreach.metrics.positiveReplies}` },
+      ],
+    },
+    { type: "divider" },
+    stuck.length
+      ? {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: [`*Caka na manualnu kontrolu:* ${report.stuckLeadCount} leadov`, ...stuck.map((lead) => `- ${lead.website ?? lead.email ?? "bez kontaktu"} (${lead.nicheName ?? "bez niche"})`)].join("\n"),
+          },
+        }
+      : { type: "section", text: { type: "mrkdwn", text: "*Vsetky leady su spracovane alebo pripravene na dalsi krok.*" } },
+    { type: "divider" },
+    {
+      type: "actions",
+      elements: [
+        {
+          type: "button",
+          text: { type: "plain_text", text: report.controls.leadgen === "active" ? "Pause Leadgen" : "Resume Leadgen" },
+          style: report.controls.leadgen === "active" ? "danger" : "primary",
+          action_id: "toggle_leadgen",
+        },
+        {
+          type: "button",
+          text: { type: "plain_text", text: report.controls.aiReplies === "active" ? "Pause AI Replies" : "Resume AI Replies" },
+          style: report.controls.aiReplies === "active" ? "danger" : "primary",
+          action_id: "toggle_ai_replies",
+        },
+      ],
+    },
+  ];
+  return {
+    mode: "leadgen-slack-report-preview",
+    text: "Arcigy Daily Report",
+    blocks,
+    controls: report.controls,
+    summary: `Slack preview pripraveny: ${report.outreach.metrics.contacted} odoslanych, ${report.stuckLeadCount} stuck leadov. Ziadne odoslanie neprebehlo.`,
+  };
+}
+
 export function buildLeadgenEveningSummary(input: LeadgenEveningSummaryInput) {
   const periodLabel = input.periodLabel ?? "poslednych 24 hodin";
   const sentToday = safeNumber(input.sentToday);
@@ -96,6 +167,76 @@ export function buildLeadgenEveningSummary(input: LeadgenEveningSummaryInput) {
     summary,
     metrics: { sentToday, repliesToday, positiveToday, positiveRate },
     recentReplies,
+  };
+}
+
+export function buildLeadgenOpsDigest(input: LeadgenOpsDigestInput) {
+  const periodLabel = input.periodLabel ?? "dnes";
+  const daily = buildLeadgenDailyReport({
+    periodLabel,
+    campaigns: input.campaigns,
+    stuckLeads: input.stuckLeads,
+    settings: input.settings,
+  });
+  const evening = buildLeadgenEveningSummary({
+    periodLabel,
+    sentToday: input.sentToday ?? daily.outreach.metrics.contacted,
+    repliesToday: input.repliesToday ?? daily.outreach.metrics.replied,
+    positiveToday: input.positiveToday ?? daily.outreach.metrics.positiveReplies ?? 0,
+    recentReplies: input.recentReplies,
+  });
+  const nichePreview = input.niches?.length ? selectNextNiche({ niches: input.niches }) : null;
+  const nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string }> = [];
+  if (nichePreview?.selected && daily.controls.leadgen === "active") {
+    nextToolCalls.push({
+      tool: "arcigy.build_daily_leadgen_runbook",
+      payload: {
+        niche: {
+          id: nichePreview.selected.id,
+          slug: nichePreview.selected.slug ?? nichePreview.selected.name,
+          name: nichePreview.selected.name,
+          keywords: nichePreview.selected.keywords,
+          region: nichePreview.selected.activeRegion,
+          campaignId: nichePreview.selected.smartleadCampaignId,
+        },
+        dailyLimit: nichePreview.selected.dailyTarget,
+      },
+      reason: "Leadgen je aktivny a existuje dalsi niche/region.",
+    });
+  }
+  if (daily.stuckLeadCount > 0) {
+    nextToolCalls.push({
+      tool: "arcigy.preview_manual_review_pickup",
+      payload: { leads: daily.stuckPreview.slice(0, input.manualReviewLimit ?? 15), includeUnreviewed: true, minScore: 50 },
+      reason: "Stuck leady treba skontrolovat alebo opravit pred Smartlead importom.",
+    });
+  }
+  if (evening.metrics.positiveToday > 0 || evening.recentReplies.length > 0) {
+    nextToolCalls.push({
+      tool: "arcigy.get_approval_queue",
+      payload: { limit: 20 },
+      reason: "Skontroluj pripravene odpovede a klientske poziadavky pred odoslanim.",
+    });
+  }
+  return {
+    mode: "leadgen-ops-digest",
+    periodLabel,
+    status: {
+      leadgen: daily.controls.leadgen,
+      aiReplies: daily.controls.aiReplies,
+      hasActiveNiche: Boolean(nichePreview?.selected),
+      stuckLeadCount: daily.stuckLeadCount,
+      positiveReplies: evening.metrics.positiveToday,
+    },
+    daily,
+    evening,
+    nichePreview,
+    nextToolCalls,
+    summary: [
+      daily.summary,
+      nichePreview?.summary,
+      nextToolCalls.length ? `Pripravil som ${nextToolCalls.length} dalsie MCP kroky.` : "Nie je potrebny dalsi automaticky krok.",
+    ].filter(Boolean).join(" "),
   };
 }
 

@@ -62,7 +62,7 @@ import {
 import { answerJarvisIntent, resolveJarvisIntentFromTranscript } from "../src/automation-system/jarvis-intents.ts";
 import { buildProductionReadinessReport } from "../src/automation-system/production-readiness.ts";
 import { buildOperatorBriefing } from "../src/automation-system/operator-briefing.ts";
-import { buildLeadgenDailyReport, buildLeadgenEveningSummary, selectNextNiche } from "../src/automation-system/leadgen-report.ts";
+import { buildLeadgenDailyReport, buildLeadgenEveningSummary, buildLeadgenOpsDigest, buildLeadgenSlackReportPreview, selectNextNiche } from "../src/automation-system/leadgen-report.ts";
 import { draftPriceOfferIntake } from "../src/automation-system/price-offer.ts";
 import { buildProactiveAttentionDigest } from "../src/automation-system/proactive-attention-digest.ts";
 import { classifyOutreachReply, previewGmailAiReply, previewSmartleadAiReply } from "../src/automation-system/reply-decision.ts";
@@ -111,6 +111,8 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.get_proactive_attention_digest",
     "arcigy.get_leadgen_daily_report",
     "arcigy.get_leadgen_evening_summary",
+    "arcigy.build_leadgen_slack_report_preview",
+    "arcigy.build_leadgen_ops_digest",
     "arcigy.select_next_niche",
     "arcigy.generate_ai_reply",
     "arcigy.sync_gmail_recent_messages",
@@ -1397,7 +1399,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 72 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 74 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -2511,6 +2513,30 @@ test("leadgen daily and evening reports summarize outreach without writes", () =
   assert.equal(evening.metrics.positiveRate, 40);
   assert.equal(evening.recentReplies.length, 1);
   assert.match(evening.summary, /pozitivne 2/);
+});
+
+test("leadgen Slack preview and ops digest produce safe next MCP calls", () => {
+  const input = {
+    periodLabel: "dnes",
+    campaigns: [{ stats: { sent_count: 40, open_count: 20, reply_count: 5, positive_reply_count: 2 } }],
+    stuckLeads: [{ website: "https://example.com", email: "lead@example.com", nicheName: "Autoservisy" }],
+    settings: { leadgenActive: true, aiRepliesActive: true },
+  };
+  const slack = buildLeadgenSlackReportPreview({ ...input, dateLabel: "2026-06-10" });
+  const ops = buildLeadgenOpsDigest({
+    ...input,
+    recentReplies: [{ decisionMakerName: "Jan Novak", companyName: "Modelova Firma", replySentiment: "Interested", website: "https://example.com" }],
+    niches: [{ id: "niche-1", slug: "autoservisy", name: "Autoservisy", keywords: ["autoservis"], regions: ["Bratislava"], dailyTarget: 30, smartleadCampaignId: "123456" }],
+  });
+
+  assert.equal(slack.mode, "leadgen-slack-report-preview");
+  assert.equal(slack.text, "Arcigy Daily Report");
+  assert.ok(slack.blocks.some((block) => block.type === "actions"));
+  assert.equal(ops.mode, "leadgen-ops-digest");
+  assert.equal(ops.status.stuckLeadCount, 1);
+  assert.ok(ops.nextToolCalls.some((call) => call.tool === "arcigy.build_daily_leadgen_runbook"));
+  assert.ok(ops.nextToolCalls.some((call) => call.tool === "arcigy.preview_manual_review_pickup"));
+  assert.ok(ops.nextToolCalls.some((call) => call.tool === "arcigy.get_approval_queue"));
 });
 
 test("manual review pickup builds Smartlead injection and campaign setup drafts", () => {

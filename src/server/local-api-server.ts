@@ -15,7 +15,7 @@ import { defaultGmailBriefingQuery, defaultGmailSyncQuery, listConfiguredGmailAc
 import { containsWakeWord, extractCommandAfterWakeWord, type JarvisVoiceSession } from "../automation-system/jarvis-voice.ts";
 import { buildJarvisCapabilityAudit, summarizeJarvisCapabilityAuditForVoice } from "../automation-system/jarvis-capability-audit.ts";
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "../automation-system/lead-discovery.ts";
-import { buildLeadgenDailyReport, buildLeadgenEveningSummary, selectNextNiche } from "../automation-system/leadgen-report.ts";
+import { buildLeadgenDailyReport, buildLeadgenEveningSummary, buildLeadgenOpsDigest, buildLeadgenSlackReportPreview, selectNextNiche } from "../automation-system/leadgen-report.ts";
 import {
   buildNicheLeadgenPlan,
   buildManualReviewPickupPlan,
@@ -1158,6 +1158,36 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         repliesToday: typeof payload.repliesToday === "number" ? payload.repliesToday : undefined,
         positiveToday: typeof payload.positiveToday === "number" ? payload.positiveToday : undefined,
         recentReplies: Array.isArray(payload.recentReplies) ? payload.recentReplies as Parameters<typeof buildLeadgenEveningSummary>[0]["recentReplies"] : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_leadgen_slack_report_preview") {
+    writeJson(response, 200, {
+      result: buildLeadgenSlackReportPreview({
+        periodLabel: optionalString(payload.periodLabel),
+        dateLabel: optionalString(payload.dateLabel),
+        title: optionalString(payload.title),
+        campaigns: payload.campaigns,
+        stuckLeads: Array.isArray(payload.stuckLeads) ? payload.stuckLeads : undefined,
+        settings: payload.settings as Parameters<typeof buildLeadgenSlackReportPreview>[0]["settings"],
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_leadgen_ops_digest") {
+    writeJson(response, 200, {
+      result: buildLeadgenOpsDigest({
+        periodLabel: optionalString(payload.periodLabel),
+        campaigns: payload.campaigns,
+        stuckLeads: Array.isArray(payload.stuckLeads) ? payload.stuckLeads : undefined,
+        recentReplies: Array.isArray(payload.recentReplies) ? payload.recentReplies : undefined,
+        settings: payload.settings as Parameters<typeof buildLeadgenOpsDigest>[0]["settings"],
+        niches: Array.isArray(payload.niches) ? payload.niches as Parameters<typeof buildLeadgenOpsDigest>[0]["niches"] : undefined,
+        sentToday: typeof payload.sentToday === "number" ? payload.sentToday : undefined,
+        repliesToday: typeof payload.repliesToday === "number" ? payload.repliesToday : undefined,
+        positiveToday: typeof payload.positiveToday === "number" ? payload.positiveToday : undefined,
+        manualReviewLimit: typeof payload.manualReviewLimit === "number" ? payload.manualReviewLimit : undefined,
       }),
     });
     return;

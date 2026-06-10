@@ -3011,6 +3011,8 @@ function listWebMcpTools() {
     { name: "arcigy.get_proactive_attention_digest", requiresApproval: false },
     { name: "arcigy.get_leadgen_daily_report", requiresApproval: false },
     { name: "arcigy.get_leadgen_evening_summary", requiresApproval: false },
+    { name: "arcigy.build_leadgen_slack_report_preview", requiresApproval: false },
+    { name: "arcigy.build_leadgen_ops_digest", requiresApproval: false },
     { name: "arcigy.select_next_niche", requiresApproval: false },
     { name: "arcigy.generate_ai_reply", requiresApproval: false },
     { name: "arcigy.sync_gmail_recent_messages", requiresApproval: false },

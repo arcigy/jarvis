@@ -223,6 +223,25 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       recentReplies: [{ decisionMakerName: "Jan Novak", companyName: "Modelova Firma", replySentiment: "Interested", website: "https://example.com" }],
     };
   }
+  if (toolName === "arcigy.build_leadgen_slack_report_preview") {
+    return {
+      periodLabel: "dnes",
+      dateLabel: "2026-06-10",
+      campaigns: [{ stats: { sent_count: 100, open_count: 55, reply_count: 8, positive_reply_count: 2 } }],
+      stuckLeads: [{ website: "https://example.com", email: "lead@example.com", nicheName: "autoservisy" }],
+      settings: { leadgenActive: true, aiRepliesActive: true },
+    };
+  }
+  if (toolName === "arcigy.build_leadgen_ops_digest") {
+    return {
+      periodLabel: "dnes",
+      campaigns: [{ stats: { sent_count: 100, open_count: 55, reply_count: 8, positive_reply_count: 2 } }],
+      stuckLeads: [{ website: "https://example.com", email: "lead@example.com", nicheName: "autoservisy" }],
+      recentReplies: [{ decisionMakerName: "Jan Novak", companyName: "Modelova Firma", replySentiment: "Interested", website: "https://example.com" }],
+      settings: { leadgenActive: true, aiRepliesActive: true },
+      niches: [{ id: "niche-1", slug: "autoservisy", name: "Autoservisy", keywords: ["autoservis"], regions: ["Bratislava"], dailyTarget: 30, smartleadCampaignId: "123456" }],
+    };
+  }
   if (toolName === "arcigy.select_next_niche") {
     return {
       niches: [{ id: "niche-1", slug: "kuchyne", name: "Kuchynske studia", keywords: ["kuchyne na mieru"], regions: ["Bratislava", "Trnava"], currentRegionIndex: 0, dailyTarget: 25 }],

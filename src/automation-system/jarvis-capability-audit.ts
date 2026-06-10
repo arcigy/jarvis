@@ -101,6 +101,8 @@ const capabilityDefinitions: CapabilityDefinition[] = [
       "arcigy.get_operator_briefing",
       "arcigy.get_leadgen_daily_report",
       "arcigy.get_leadgen_evening_summary",
+      "arcigy.build_leadgen_slack_report_preview",
+      "arcigy.build_leadgen_ops_digest",
       "arcigy.sync_gmail_recent_messages",
       "arcigy.get_client_need_alerts",
       "arcigy.get_approval_queue",

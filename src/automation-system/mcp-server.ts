@@ -15,7 +15,7 @@ import { buildClientReplyPrompt, buildPositiveOutreachReplyPrompt, generateGemin
 import { defaultGmailBriefingQuery, defaultGmailSyncQuery, listConfiguredGmailAccounts, listRecentGmailMessageEvents, sendGmailTextMessage } from "./gmail.ts";
 import { handleJarvisVoiceEvent, type JarvisVoiceSession } from "./jarvis-voice.ts";
 import { buildJarvisCapabilityAudit, summarizeJarvisCapabilityAuditForVoice } from "./jarvis-capability-audit.ts";
-import { buildLeadgenDailyReport, buildLeadgenEveningSummary, selectNextNiche } from "./leadgen-report.ts";
+import { buildLeadgenDailyReport, buildLeadgenEveningSummary, buildLeadgenOpsDigest, buildLeadgenSlackReportPreview, selectNextNiche } from "./leadgen-report.ts";
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "./lead-discovery.ts";
 import {
   buildNicheLeadgenPlan,
@@ -1014,6 +1014,87 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildLeadgenEveningSummary(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_leadgen_slack_report_preview",
+    {
+      title: "Build leadgen Slack report preview",
+      description: "Build a Slack Block Kit daily leadgen report with control buttons without sending it.",
+      inputSchema: {
+        periodLabel: z.string().optional(),
+        dateLabel: z.string().optional(),
+        title: z.string().optional(),
+        campaigns: z.unknown().optional(),
+        stuckLeads: z.array(z.object({
+          website: z.string().optional(),
+          email: z.string().optional(),
+          nicheName: z.string().optional(),
+          decisionMakerName: z.string().optional(),
+          phone: z.string().optional(),
+        })).optional(),
+        settings: z.object({ leadgenActive: z.boolean().optional(), aiRepliesActive: z.boolean().optional() }).optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildLeadgenSlackReportPreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_leadgen_ops_digest",
+    {
+      title: "Build leadgen ops digest",
+      description: "Combine daily report, evening summary, niche rotation, stuck leads, and safe next MCP calls for leadgen operations.",
+      inputSchema: {
+        periodLabel: z.string().optional(),
+        campaigns: z.unknown().optional(),
+        stuckLeads: z.array(z.object({
+          website: z.string().optional(),
+          email: z.string().optional(),
+          nicheName: z.string().optional(),
+          decisionMakerName: z.string().optional(),
+          phone: z.string().optional(),
+        })).optional(),
+        recentReplies: z.array(z.object({
+          decisionMakerName: z.string().optional(),
+          companyName: z.string().optional(),
+          replySentiment: z.string().optional(),
+          website: z.string().optional(),
+        })).optional(),
+        settings: z.object({ leadgenActive: z.boolean().optional(), aiRepliesActive: z.boolean().optional() }).optional(),
+        niches: z.array(z.object({
+          id: z.string(),
+          slug: z.string().optional(),
+          name: z.string(),
+          keywords: z.array(z.string()).optional(),
+          regions: z.array(z.string()),
+          currentRegionIndex: z.number().int().optional(),
+          dailyTarget: z.number().int().optional(),
+          smartleadCampaignId: z.string().nullable().optional(),
+          todaySent: z.number().int().optional(),
+          status: z.string().optional(),
+          tier: z.number().int().optional(),
+          lastWorkedAt: z.string().nullable().optional(),
+          createdAt: z.string().nullable().optional(),
+        })).optional(),
+        sentToday: z.number().int().optional(),
+        repliesToday: z.number().int().optional(),
+        positiveToday: z.number().int().optional(),
+        manualReviewLimit: z.number().int().min(1).max(50).default(15),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildLeadgenOpsDigest(input))
   );
 
   server.registerTool(
