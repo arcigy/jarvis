@@ -298,9 +298,9 @@ function buildAgentLaunchBundle(baseUrl: string, status: ProductionReadinessRepo
       freshnessMaxAgeHours: 24,
       beforeAnyWork: [
         "Fetch the connection pack and confirm tokenValueReturned=false.",
-        "Call arcigy.get_jarvis_capability_audit and arcigy.get_production_completion_score, then cite coverage, completion percent, MCP counts, and evidence status.",
+        "Call arcigy.get_jarvis_capability_audit and arcigy.get_production_completion_score, then cite quick-start coverage, completion percent, MCP counts, and evidence status.",
         "Nacitaj productionVerificationEvidenceUrl alebo zavolaj arcigy.get_production_verification_evidence.",
-        "Run smokeTestUrl and require status=ready.",
+        "Run smokeTestUrl and require status=ready with all 37 required remote MCP smoke gates ready.",
       ],
       beforeWrites: [
         "Confirm production evidence status=ready, dirty=false, and freshness.fresh=true.",

@@ -389,7 +389,8 @@ function hasAgentLaunchBundle(value: RemoteConnectionPack["agentLaunchBundle"], 
     ["Claude", "ChatGPT", "Grok", "Generic HTTP agent"].every((agent) => typeof prompts[agent] === "string" && prompts[agent].includes("arcigy.get_operator_briefing")) &&
     value.proofPolicy?.freshnessMaxAgeHours === 24 &&
     beforeAnyWork.some((step) => step.includes("tokenValueReturned=false")) &&
-    beforeAnyWork.some((step) => step.includes("status=ready")) &&
+    beforeAnyWork.some((step) => step.includes("arcigy.get_jarvis_capability_audit") && step.includes("arcigy.get_production_completion_score") && step.includes("quick-start coverage")) &&
+    beforeAnyWork.some((step) => step.includes("status=ready") && step.includes("all 37 required remote MCP smoke gates")) &&
     beforeWrites.some((step) => step.includes("freshness.fresh=true")) &&
     beforeWrites.some((step) => step.includes("approval.approved=true")) &&
     safetyRails.some((rail) => rail.includes("OAuth refresh tokens")) &&

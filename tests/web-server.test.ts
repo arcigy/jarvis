@@ -720,7 +720,8 @@ test("local web bridge serves UI and API health", async () => {
     assert.match(remotePackBody.agentLaunchBundle.firstPrompts.Grok, /arcigy\.get_production_completion_score/);
     assert.match(remotePackBody.agentLaunchBundle.firstPrompts.ChatGPT, /custom action schema/);
     assert.equal(remotePackBody.agentLaunchBundle.proofPolicy.freshnessMaxAgeHours, 24);
-    assert.ok(remotePackBody.agentLaunchBundle.proofPolicy.beforeAnyWork.some((step) => step.includes("arcigy.get_jarvis_capability_audit") && step.includes("arcigy.get_production_completion_score") && step.includes("completion percent")));
+    assert.ok(remotePackBody.agentLaunchBundle.proofPolicy.beforeAnyWork.some((step) => step.includes("arcigy.get_jarvis_capability_audit") && step.includes("arcigy.get_production_completion_score") && step.includes("quick-start coverage") && step.includes("completion percent")));
+    assert.ok(remotePackBody.agentLaunchBundle.proofPolicy.beforeAnyWork.some((step) => step.includes("status=ready") && step.includes("all 37 required remote MCP smoke gates")));
     assert.ok(remotePackBody.agentLaunchBundle.proofPolicy.beforeWrites.some((step) => step.includes("approval.approved=true")));
     assert.ok(remotePackBody.agentLaunchBundle.safetyRails.some((rail) => rail.includes("OAuth refresh tokens")));
     assert.ok(remotePackBody.quickStartCalls.every((call) => call.method === "POST" && call.url.endsWith(`/api/mcp/${call.tool}`)));
@@ -820,6 +821,8 @@ test("local web bridge serves UI and API health", async () => {
     assert.match(launchBundleBody.connectionPackUrl, /\/api\/remote-mcp-pack\?includeReadiness=true&live=true$/);
     assert.match(launchBundleBody.firstPrompts.Grok, /arcigy\.get_operator_briefing/);
     assert.ok(launchBundleBody.proofPolicy.beforeAnyWork.some((step) => step.includes("tokenValueReturned=false")));
+    assert.ok(launchBundleBody.proofPolicy.beforeAnyWork.some((step) => step.includes("arcigy.get_production_completion_score") && step.includes("quick-start coverage")));
+    assert.ok(launchBundleBody.proofPolicy.beforeAnyWork.some((step) => step.includes("status=ready") && step.includes("all 37 required remote MCP smoke gates")));
     assert.ok(launchBundleBody.proofPolicy.beforeWrites.some((step) => step.includes("freshness.fresh=true")));
     assert.equal(JSON.stringify(launchBundleBody.secureTunnelStatus).includes("preflight-secret-token"), false);
     assert.notEqual(launchBundleBody.productionVerificationEvidence.tokenValueReturned, true);

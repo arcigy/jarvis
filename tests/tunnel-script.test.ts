@@ -49,6 +49,8 @@ test("web tunnel script orchestrates protected Jarvis MCP exposure", () => {
   assert.match(script, /pack-agent-setup-profiles/);
   assert.match(script, /pack-agent-launch-bundle/);
   assert.match(script, /hasAgentLaunchBundle/);
+  assert.match(script, /hasAgentLaunchBundle[\s\S]*all 37 required remote MCP smoke gates/);
+  assert.match(script, /hasAgentLaunchBundle[\s\S]*arcigy\.get_production_completion_score[\s\S]*quick-start coverage/);
   assert.match(script, /voice-tool-call/);
   assert.match(script, /pack-production-evidence-quick-start/);
   assert.match(script, /renderTunnelReadySummary/);

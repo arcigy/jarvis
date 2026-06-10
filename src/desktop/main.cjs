@@ -1468,9 +1468,9 @@ function buildRemoteMcpAgentLaunchBundle(baseUrl, status) {
       freshnessMaxAgeHours: 24,
       beforeAnyWork: [
         "Fetch the connection pack and confirm tokenValueReturned=false.",
-        "Call arcigy.get_jarvis_capability_audit and arcigy.get_production_completion_score, then cite coverage, completion percent, MCP counts, and evidence status.",
+        "Call arcigy.get_jarvis_capability_audit and arcigy.get_production_completion_score, then cite quick-start coverage, completion percent, MCP counts, and evidence status.",
         "Nacitaj productionVerificationEvidenceUrl alebo zavolaj arcigy.get_production_verification_evidence.",
-        "Run smokeTestUrl and require status=ready.",
+        "Run smokeTestUrl and require status=ready with all 37 required remote MCP smoke gates ready.",
       ],
       beforeWrites: [
         "Confirm production evidence status=ready, dirty=false, and freshness.fresh=true.",
@@ -2623,8 +2623,8 @@ function hasAgentLaunchBundle(value, baseUrl) {
     ["Claude", "ChatGPT", "Grok", "Generic HTTP agent"].every((agent) => typeof prompts[agent] === "string" && prompts[agent].includes("arcigy.get_operator_briefing") && prompts[agent].includes("arcigy.get_jarvis_capability_audit") && prompts[agent].includes("arcigy.get_production_completion_score")) &&
     value.proofPolicy?.freshnessMaxAgeHours === 24 &&
     beforeAnyWork.some((step) => typeof step === "string" && step.includes("tokenValueReturned=false")) &&
-    beforeAnyWork.some((step) => typeof step === "string" && step.includes("arcigy.get_jarvis_capability_audit") && step.includes("arcigy.get_production_completion_score")) &&
-    beforeAnyWork.some((step) => typeof step === "string" && step.includes("status=ready")) &&
+    beforeAnyWork.some((step) => typeof step === "string" && step.includes("arcigy.get_jarvis_capability_audit") && step.includes("arcigy.get_production_completion_score") && step.includes("quick-start coverage")) &&
+    beforeAnyWork.some((step) => typeof step === "string" && step.includes("status=ready") && step.includes("all 37 required remote MCP smoke gates")) &&
     beforeWrites.some((step) => typeof step === "string" && step.includes("freshness.fresh=true")) &&
     beforeWrites.some((step) => typeof step === "string" && step.includes("approval.approved=true")) &&
     safetyRails.some((rail) => typeof rail === "string" && rail.includes("OAuth refresh tokens")) &&

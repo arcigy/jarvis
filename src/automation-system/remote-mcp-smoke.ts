@@ -842,8 +842,8 @@ function hasAgentLaunchBundle(value: unknown, baseUrl: string): boolean {
     ) &&
     bundle.proofPolicy?.freshnessMaxAgeHours === 24 &&
     beforeAnyWork.some((step) => typeof step === "string" && step.includes("tokenValueReturned=false")) &&
-    beforeAnyWork.some((step) => typeof step === "string" && step.includes("arcigy.get_jarvis_capability_audit") && step.includes("arcigy.get_production_completion_score")) &&
-    beforeAnyWork.some((step) => typeof step === "string" && step.includes("status=ready")) &&
+    beforeAnyWork.some((step) => typeof step === "string" && step.includes("arcigy.get_jarvis_capability_audit") && step.includes("arcigy.get_production_completion_score") && step.includes("quick-start coverage")) &&
+    beforeAnyWork.some((step) => typeof step === "string" && step.includes("status=ready") && step.includes("all 37 required remote MCP smoke gates")) &&
     beforeWrites.some((step) => typeof step === "string" && step.includes("freshness.fresh=true")) &&
     beforeWrites.some((step) => typeof step === "string" && step.includes("approval.approved=true")) &&
     safetyRails.some((rail) => typeof rail === "string" && rail.includes("OAuth refresh tokens")) &&

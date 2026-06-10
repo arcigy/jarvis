@@ -1086,6 +1086,8 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /najnovsi overeny production proof/);
   assert.match(main, /operator nepotvrdi presny payload/);
   assert.match(main, /hasAgentLaunchBundle/);
+  assert.match(main, /hasAgentLaunchBundle[\s\S]*all 37 required remote MCP smoke gates/);
+  assert.match(main, /hasAgentLaunchBundle[\s\S]*arcigy\.get_production_completion_score[\s\S]*quick-start coverage/);
   assert.match(main, /pack-agent-launch-bundle/);
   assert.match(main, /mode: "remote-agent-launch-bundle"/);
   assert.match(main, /OAuth refresh tokens/);

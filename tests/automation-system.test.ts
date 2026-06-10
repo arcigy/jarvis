@@ -1524,7 +1524,8 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.match(pack.agentLaunchBundle.firstPrompts.ChatGPT, /custom action schema/);
   assert.match(pack.agentPromptTemplates.chatgpt, /arcigy\.get_production_completion_score/);
   assert.ok(pack.agentLaunchBundle.proofPolicy.beforeAnyWork.some((step) => step.includes("Nacitaj productionVerificationEvidenceUrl")));
-  assert.ok(pack.agentLaunchBundle.proofPolicy.beforeAnyWork.some((step) => step.includes("arcigy.get_jarvis_capability_audit") && step.includes("arcigy.get_production_completion_score") && step.includes("completion percent")));
+  assert.ok(pack.agentLaunchBundle.proofPolicy.beforeAnyWork.some((step) => step.includes("arcigy.get_jarvis_capability_audit") && step.includes("arcigy.get_production_completion_score") && step.includes("quick-start coverage") && step.includes("completion percent")));
+  assert.ok(pack.agentLaunchBundle.proofPolicy.beforeAnyWork.some((step) => step.includes("status=ready") && step.includes("all 37 required remote MCP smoke gates")));
   assert.ok(pack.agentLaunchBundle.proofPolicy.beforeWrites.some((step) => step.includes("approval.approved=true")));
   assert.ok(pack.agentLaunchBundle.safetyRails.some((rail) => rail.includes("OAuth refresh tokens")));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_production_verification_evidence" && call.approvalRequired === false));
