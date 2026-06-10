@@ -490,6 +490,9 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /arcigyApi\.getClientNeedAlerts/);
   assert.match(renderer, /arcigyApi\.getAuditEvents/);
   assert.match(renderer, /arcigyApi\.generateContracts/);
+  assert.match(renderer, /additionalAttachments/);
+  assert.match(renderer, /doplnkova-priloha-univerzalna\.docx/);
+  assert.match(renderer, /doplnkova-priloha-servisne-pravidla\.docx/);
   assert.match(renderer, /Vygenerovat DOCX zmluvy/);
   assert.match(renderer, /const payload = \{ intake, approval: \{ approved: true \} \}/);
   assert.match(renderer, /Generovanie zmluv bolo zrusene pred zapisom suborov/);
@@ -895,6 +898,11 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(uiSmoke, /executeRendererJson/);
   assert.match(uiSmoke, /Renderer JavaScript timed out/);
   assert.match(uiSmoke, /Remote MCP smoke result was not rendered from the UI button flow/);
+  assert.match(uiSmoke, /runContractFormGenerationFlow/);
+  assert.match(uiSmoke, /Contract form dirty gate did not block generation/);
+  assert.match(uiSmoke, /Contract form UI generation flow did not produce the expected DOCX result/);
+  assert.match(uiSmoke, /Contract form UI generation flow leaked a sensitive pattern/);
+  assert.match(uiSmoke, /Smoke Test Klient s\. r\. o\./);
   assert.match(uiSmoke, /runGeminiDraftReplyFlow/);
   assert.match(uiSmoke, /Gemini draft reply UI flow did not render a usable draft/);
   assert.match(uiSmoke, /Gemini draft reply UI flow leaked a sensitive pattern/);

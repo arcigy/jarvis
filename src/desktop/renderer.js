@@ -2206,6 +2206,15 @@ function sampleContractIntake() {
       projectAppendixDate: "2026-06-08",
       plannedLaunchDate: "2026-07-15",
     },
+    additionalAttachments: [
+      {
+        title: "Servisne pravidla",
+        description: "Doplnkova priloha pre prevadzku, podporu a akceptacne pravidla projektu.",
+        templatePath: "docs/contracts/templates/doplnkova-priloha-univerzalna.docx",
+        outputName: "doplnkova-priloha-servisne-pravidla.docx",
+        items: ["reakcne casy podpory", "akceptacne pravidla", "prevadzkove vynimky"],
+      },
+    ],
   };
 }
 

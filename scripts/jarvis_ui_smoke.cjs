@@ -332,6 +332,23 @@ async function run() {
       fail("Remote MCP smoke result was not rendered from the UI button flow.");
     }
     if (!isNarrowViewport) {
+      const contractFlow = await runContractFormGenerationFlow(window);
+      if (!/Pred generovanim aplikuj zmluvny formular/i.test(contractFlow.dirtyGateText)) {
+        fail(`Contract form dirty gate did not block generation: ${contractFlow.dirtyGateText}.`);
+      }
+      if (
+        !/Zmluvny formular je aplikovany do intake JSON/i.test(contractFlow.appliedText) ||
+        !/Vygenerovane subory:\s*3/i.test(contractFlow.generatedText) ||
+        !/generation-manifest\.json/i.test(contractFlow.generatedText) ||
+        !/ramcova-zmluva\.docx/i.test(contractFlow.generatedText) ||
+        !/projektova-priloha\.docx/i.test(contractFlow.generatedText) ||
+        !/doplnkova-priloha/i.test(contractFlow.generatedText)
+      ) {
+        fail(`Contract form UI generation flow did not produce the expected DOCX result: ${contractFlow.generatedText || contractFlow.appliedText}.`);
+      }
+      if (/AIza|GOCSPX|1\/\/|postgres(?:ql)?:\/\/|redis:\/\//i.test(`${contractFlow.approvalText} ${contractFlow.generatedText}`)) {
+        fail("Contract form UI generation flow leaked a sensitive pattern.");
+      }
       const geminiDraft = await runGeminiDraftReplyFlow(window);
       if (
         geminiDraft.text.length < 30 ||
@@ -485,6 +502,83 @@ async function runRemoteSmokeFromUi(window) {
     await new Promise((resolveDone) => setTimeout(resolveDone, 250));
   }
   fail(`Remote MCP smoke UI flow did not settle: ${state.handoffProofGatesText || state.remoteSmokeResultText || "empty"}.`);
+  return state;
+}
+
+async function runContractFormGenerationFlow(window) {
+  const dirtyStarted = await executeRendererJson(window, `
+    (() => {
+      window.__jarvisSmokeConfirmText = "";
+      window.confirm = (message) => {
+        window.__jarvisSmokeConfirmText = String(message || "");
+        return true;
+      };
+      const business = document.getElementById("contractBusinessName");
+      const project = document.getElementById("contractProjectName");
+      const generate = document.getElementById("generateContracts");
+      if (!business || !project || !generate) return false;
+      business.value = "Smoke Test Klient s. r. o.";
+      business.dispatchEvent(new Event("input", { bubbles: true }));
+      project.value = "Smoke Contract Portal";
+      project.dispatchEvent(new Event("input", { bubbles: true }));
+      window.setTimeout(() => generate.click(), 0);
+      return true;
+    })()
+  `, 5000);
+  if (!dirtyStarted) {
+    fail("Contract form generation controls are missing.");
+    return { dirtyGateText: "", appliedText: "", generatedText: "", approvalText: "" };
+  }
+  const dirtyGate = await waitForContractResult(window, /Pred generovanim aplikuj zmluvny formular/i, 5000);
+  const appliedStarted = await executeRendererJson(window, `
+    (() => {
+      const apply = document.getElementById("applyContractForm");
+      if (!apply) return false;
+      window.setTimeout(() => apply.click(), 0);
+      return true;
+    })()
+  `, 5000);
+  if (!appliedStarted) {
+    fail("Contract form apply control is missing.");
+    return { dirtyGateText: dirtyGate.text, appliedText: "", generatedText: "", approvalText: "" };
+  }
+  const applied = await waitForContractResult(window, /Zmluvny formular je aplikovany do intake JSON/i, 5000);
+  const generateStarted = await executeRendererJson(window, `
+    (() => {
+      const generate = document.getElementById("generateContracts");
+      if (!generate) return false;
+      window.setTimeout(() => generate.click(), 0);
+      return true;
+    })()
+  `, 5000);
+  if (!generateStarted) {
+    fail("Contract generate control is missing.");
+    return { dirtyGateText: dirtyGate.text, appliedText: applied.text, generatedText: "", approvalText: "" };
+  }
+  const generated = await waitForContractResult(window, /Vygenerovane subory:\s*\d+/i, 30000);
+  const approval = await executeRendererJson(window, `
+    (() => ({ text: String(window.__jarvisSmokeConfirmText || "") }))()
+  `, 5000);
+  return {
+    dirtyGateText: dirtyGate.text,
+    appliedText: applied.text,
+    generatedText: generated.text,
+    approvalText: approval.text,
+  };
+}
+
+async function waitForContractResult(window, pattern, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  let state = { text: "" };
+  while (Date.now() < deadline) {
+    state = await executeRendererJson(window, `
+      (() => ({
+        text: document.querySelector("#contractResult")?.textContent.trim() || ""
+      }))()
+    `, 5000);
+    if (pattern.test(state.text)) return state;
+    await new Promise((resolveDone) => setTimeout(resolveDone, 250));
+  }
   return state;
 }
 
