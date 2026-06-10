@@ -1614,7 +1614,7 @@ test("operator briefing combines readiness, outreach, client needs, and approval
     clientNeedHighlights: [
       {
         person: { primaryEmail: "client@example.com", displayName: "Demo Client", companyName: "Demo s.r.o." },
-        needSignal: { summary: "potrebuje upravit onboarding automatizaciu", occurredAt: "2026-06-08T09:00:00Z" },
+        needSignal: { summary: "It&#39;s urgent &amp; needs <b>onboarding</b> update", occurredAt: "2026-06-08T09:00:00Z" },
       },
     ],
     preparedReplyCount: 1,
@@ -1622,7 +1622,7 @@ test("operator briefing combines readiness, outreach, client needs, and approval
       {
         leadEmail: "lead@example.com",
         companyName: "LeadCo",
-        positiveSignal: "chce demo a termin callu",
+        positiveSignal: "chce demo &amp; termin callu",
       },
     ],
     nextActions: ["Replace REDIS_URL."],
@@ -1639,9 +1639,10 @@ test("operator briefing combines readiness, outreach, client needs, and approval
   assert.match(briefing.speechText, /Cold outreach/);
   assert.match(briefing.speechText, /Live sync/);
   assert.match(briefing.speechText, /Klientske poziadavky: 2/);
-  assert.match(briefing.sections.clientNeeds, /Demo Client: potrebuje upravit onboarding automatizaciu/);
+  assert.match(briefing.sections.clientNeeds, /Demo Client: It's urgent & needs onboarding update/);
+  assert.doesNotMatch(briefing.sections.clientNeeds, /&#39;|&amp;|<b>/);
   assert.match(briefing.speechText, /Pripravene odpovede: 1/);
-  assert.match(briefing.sections.preparedReplies, /LeadCo: chce demo a termin callu/);
+  assert.match(briefing.sections.preparedReplies, /LeadCo: chce demo & termin callu/);
   assert.match(briefing.sections.preparedReplies, /Poslem ich az po tvojom schvaleni/);
   assert.equal(briefing.sections.nextAction, "Najblizsi krok: Replace REDIS_URL.");
 });
