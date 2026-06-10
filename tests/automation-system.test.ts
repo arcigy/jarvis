@@ -31,6 +31,7 @@ import {
 import { resolveJarvisIntentFromTranscript } from "../src/automation-system/jarvis-intents.ts";
 import { buildProductionReadinessReport } from "../src/automation-system/production-readiness.ts";
 import { buildOperatorBriefing } from "../src/automation-system/operator-briefing.ts";
+import { buildProactiveAttentionDigest } from "../src/automation-system/proactive-attention-digest.ts";
 import { buildJarvisCapabilityAudit } from "../src/automation-system/jarvis-capability-audit.ts";
 import { buildProductionCompletionScore, summarizeProductionCompletionScoreForVoice } from "../src/automation-system/production-completion-score.ts";
 import { jarvisAutomations } from "../src/automation-system/jarvis-automations.ts";
@@ -71,6 +72,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.get_remote_mcp_pack",
     "arcigy.run_remote_mcp_smoke",
     "arcigy.get_operator_briefing",
+    "arcigy.get_proactive_attention_digest",
     "arcigy.generate_ai_reply",
     "arcigy.sync_gmail_recent_messages",
     "arcigy.get_smartlead_campaign_status",
@@ -247,15 +249,18 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.ok(document["x-arcigy-agent-setup"].proofPolicy.beforeWrites.some((step) => step.includes("approval.approved=true")));
   assert.equal(paths.length, listJarvisMcpTools().length);
   assert.ok(paths.includes("/api/mcp/arcigy.get_operator_briefing"));
+  assert.ok(paths.includes("/api/mcp/arcigy.get_proactive_attention_digest"));
   assert.ok(paths.includes("/api/mcp/arcigy.generate_contract_documents"));
   assert.ok(paths.includes("/api/mcp/arcigy.get_production_verification_evidence"));
   assert.ok(paths.includes("/api/mcp/arcigy.get_production_completion_score"));
   assert.ok(paths.includes("/api/mcp/arcigy.get_jarvis_capability_audit"));
   const operatorBriefing = document.paths["/api/mcp/arcigy.get_operator_briefing"] as OpenApiPathFixture;
+  const attentionDigest = document.paths["/api/mcp/arcigy.get_proactive_attention_digest"] as OpenApiPathFixture;
   const completionScore = document.paths["/api/mcp/arcigy.get_production_completion_score"] as OpenApiPathFixture;
   const gmailSync = document.paths["/api/mcp/arcigy.sync_gmail_recent_messages"] as OpenApiPathFixture;
   const contractGenerate = document.paths["/api/mcp/arcigy.generate_contract_documents"] as OpenApiPathFixture;
   assert.equal(operatorBriefing.post.requestBody.content["application/json"].examples.quickStart.value.live, false);
+  assert.equal(attentionDigest.post.requestBody.content["application/json"].examples.quickStart.value.syncGmail, false);
   assert.equal(completionScore.post.requestBody.content["application/json"].examples.quickStart.value.live, false);
   assert.equal(operatorBriefing.post.requestBody.content["application/json"].examples.quickStart.value.syncGmail, false);
   assert.equal(gmailSync.post.requestBody.content["application/json"].examples.quickStart.value.dryRun, true);
@@ -1284,7 +1289,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 37 toolov, 6 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 38 toolov, 6 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -1392,6 +1397,35 @@ test("production verification evidence marks stale ready artifacts as attention"
   assert.match(evidence.summary, /stale/i);
 });
 
+test("production verification evidence falls back to latest ready artifact after a failed attempt", () => {
+  const repoRoot = mkdtempSync(join(tmpdir(), "jarvis-ready-evidence-"));
+  const evidenceDir = join(repoRoot, "generated", "production-verification");
+  mkdirSync(evidenceDir, { recursive: true });
+  const release = {
+    repository: "arcigy/jarvis",
+    branch: "main",
+    shortCommit: "0123456789ab",
+    dirty: false,
+    requiredRemoteMcpSmokeGates: remoteSmokeRequiredGateFixture(),
+  };
+  writeFileSync(
+    join(evidenceDir, "latest.json"),
+    JSON.stringify({ mode: "arcigy-jarvis-production-verification", status: "failed", generatedAt: new Date().toISOString(), release, checks: [{ name: "doctor-live", status: "failed", detail: "failed" }] }),
+    "utf-8"
+  );
+  writeFileSync(
+    join(evidenceDir, "latest-ready.json"),
+    JSON.stringify({ mode: "arcigy-jarvis-production-verification", status: "ready", generatedAt: new Date().toISOString(), release, checks: [{ name: "tests", status: "ready", detail: "OK" }] }),
+    "utf-8"
+  );
+
+  const evidence = getProductionVerificationEvidence(repoRoot);
+
+  assert.equal(evidence.status, "ready");
+  assert.equal(evidence.evidencePath.endsWith("latest-ready.json"), true);
+  assert.match(evidence.summary, /Production verification ready/);
+});
+
 test("remote MCP connection pack includes secret-safe readiness attention queue", async () => {
   const pack = await buildRemoteMcpConnectionPack(
     { baseUrl: "https://jarvis.example", live: false, includeReadiness: true },
@@ -1482,6 +1516,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_production_verification_evidence" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_production_completion_score" && call.body.live === false && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_jarvis_capability_audit" && call.body.live === false && call.approvalRequired === false));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_proactive_attention_digest" && call.body.syncGmail === false && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.label === "Spustit remote MCP smoke proof"));
   assert.ok(pack.quickStartCalls.some((call) => call.label === "Ziskat najnovsiu production verification evidence"));
   assert.ok(pack.quickStartCalls.some((call) => call.label === "Spytat sa Jarvisa na production evidence"));
@@ -1609,6 +1644,33 @@ test("operator briefing combines readiness, outreach, client needs, and approval
   assert.match(briefing.sections.preparedReplies, /LeadCo: chce demo a termin callu/);
   assert.match(briefing.sections.preparedReplies, /Poslem ich az po tvojom schvaleni/);
   assert.equal(briefing.sections.nextAction, "Najblizsi krok: Replace REDIS_URL.");
+});
+
+test("proactive attention digest surfaces client needs and approval-safe replies", () => {
+  const briefing = buildOperatorBriefing({
+    readinessStatus: "ready",
+    readinessSummary: "Production gates ready.",
+    coldOutreachSummary: "Za dnes sme napisali 4 ludom.",
+    openClientNeedCount: 1,
+    clientNeedHighlights: [
+      {
+        person: { primaryEmail: "client@example.com", displayName: "Demo Client" },
+        needSignal: { summary: "chce zmenu onboarding flow", occurredAt: "2026-06-08T09:00:00Z" },
+      },
+    ],
+    preparedReplyCount: 1,
+    preparedReplyHighlights: [{ leadEmail: "lead@example.com", companyName: "LeadCo", positiveSignal: "chce demo" }],
+    nextActions: ["Skontroluj client need alert."],
+  });
+  const digest = buildProactiveAttentionDigest({ briefing, generatedAt: "2026-06-09T00:00:00.000Z" });
+
+  assert.equal(digest.mode, "arcigy-jarvis-proactive-attention-digest");
+  assert.equal(digest.urgency, "attention");
+  assert.ok(digest.notifications.some((item) => item.id === "client-needs" && item.detail.includes("Demo Client")));
+  assert.ok(digest.notifications.some((item) => item.id === "prepared-replies" && item.detail.includes("Poslem ich az po tvojom schvaleni")));
+  assert.match(digest.speechText, /Jarvis attention digest: attention/);
+  assert.match(digest.recommendedActions.join(" "), /approval\.approved=true|client_need_alerts/);
+  assert.doesNotMatch(JSON.stringify(digest), /AIza|GOCSPX|1\/\/|postgresql:\/\/|redis:\/\//);
 });
 
 test("contract intake draft parses Gemini JSON output", async () => {
@@ -2779,6 +2841,9 @@ test("Jarvis voice resolves production, remote MCP, contracts, Gmail, and client
   const completionIntent = resolveJarvisIntentFromTranscript("Jarvis na kolko percent sme ready");
   assert.equal(completionIntent?.kind, "voice_capability");
   assert.equal(completionIntent?.kind === "voice_capability" ? completionIntent.capability : null, "production_completion_score");
+  const attentionIntent = resolveJarvisIntentFromTranscript("Jarvis co si mam vsimnut");
+  assert.equal(attentionIntent?.kind, "voice_capability");
+  assert.equal(attentionIntent?.kind === "voice_capability" ? attentionIntent.capability : null, "proactive_attention_digest");
   assert.equal(resolveJarvisIntentFromTranscript("Jarvis priprav remote MCP handoff pre Claude")?.kind, "voice_capability");
   assert.equal(resolveJarvisIntentFromTranscript("Jarvis priprav MCP handoff pre Grok")?.kind, "voice_capability");
   assert.equal(resolveJarvisIntentFromTranscript("Jarvis priprav zmluvny intake")?.kind, "voice_capability");
@@ -3624,6 +3689,7 @@ function remoteSmokeQuickStartFixture() {
     call("arcigy.jarvis_voice_event", { text: "Jarvis capability audit", session: { state: "idle", wakeWord: "jarvis" } }),
     call("arcigy.jarvis_voice_event", { text: "Jarvis production evidence", session: { state: "idle", wakeWord: "jarvis" } }),
     call("arcigy.get_operator_briefing", { periodLabel: "poslednych 7 dni", live: false }),
+    call("arcigy.get_proactive_attention_digest", { periodLabel: "poslednych 7 dni", live: false, syncGmail: false }),
     call("arcigy.jarvis_voice_event", { text: "Jarvis integracie", session: { state: "idle", wakeWord: "jarvis" } }),
     call("arcigy.identify_email", { email: "client@example.com" }),
     call("arcigy.get_client_need_alerts", { status: "new", limit: 10 }),

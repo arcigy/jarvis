@@ -289,6 +289,7 @@ const coreWorkflowSurfaces: CoreWorkflowSurface[] = [
     id: "proactive-digest-workflow",
     title: "Proactive Jarvis attention digest workflow",
     tools: [
+      "arcigy.get_proactive_attention_digest",
       "arcigy.get_operator_briefing",
       "arcigy.sync_gmail_recent_messages",
       "arcigy.get_client_need_alerts",

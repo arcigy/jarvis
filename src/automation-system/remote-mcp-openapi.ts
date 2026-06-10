@@ -206,6 +206,7 @@ function operationIdFor(toolName: string): string {
 function examplePayloadForTool(toolName: string): Record<string, unknown> {
   if (toolName === "arcigy.run_remote_mcp_smoke") return {};
   if (toolName === "arcigy.get_operator_briefing") return { periodLabel: "poslednych 7 dni", live: false, syncGmail: false };
+  if (toolName === "arcigy.get_proactive_attention_digest") return { periodLabel: "poslednych 7 dni", live: false, syncGmail: false };
   if (toolName === "arcigy.get_production_readiness") return { live: false };
   if (toolName === "arcigy.get_production_completion_score") return { live: false };
   if (toolName === "arcigy.get_jarvis_capability_audit") return { live: false };

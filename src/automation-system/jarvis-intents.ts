@@ -27,6 +27,7 @@ export type JarvisVoiceCapability =
   | "production_evidence"
   | "production_completion_score"
   | "capability_audit"
+  | "proactive_attention_digest"
   | "remote_mcp"
   | "approval_queue"
   | "contract_generation"
@@ -67,6 +68,7 @@ function resolveVoiceCapability(text: string): JarvisVoiceCapability | null {
   if (hasAny(text, ["cold outreach", "outreach", "smartlead", "pozitivne odpovede"])) return "cold_outreach_brief";
   if (hasAny(text, ["full proof", "launch proof", "full launch", "kompletny dokaz", "uplny dokaz", "dokaz spustenia"])) return "full_launch_proof";
   if (hasAny(text, ["kolko percent", "na kolko percent", "percent hotove", "production completion", "completion score", "kolko sme ready"])) return "production_completion_score";
+  if (hasAny(text, ["attention digest", "co si mam vsimnut", "proaktivne", "upozorni ma", "urgentne veci"])) return "proactive_attention_digest";
   if (hasAny(text, ["briefing", "prehlad", "co sa deje", "co sa dialo", "operator"])) return "operator_briefing";
   if (hasAny(text, ["approval", "schvalenie", "schvalit", "potvrdenie", "potvrdit", "na moje znamenie", "cakaju na mna"])) return "approval_queue";
   if (hasAny(text, ["capability audit", "coverage audit", "jarvis coverage", "pokrytie", "pokryte", "co vsetko funguje", "co vsetko je hotove"])) return "capability_audit";
@@ -98,6 +100,8 @@ function answerVoiceCapability(capability: JarvisVoiceCapability): string {
       "Viem vypocitat production completion score: evidence-based percento z verifiera, capability auditu, readiness checklistu, MCP safety a integracii.",
     capability_audit:
       "Viem precitat Jarvis capability audit: kontrakty, cold outreach, klientsku pamat, hlas, remote MCP, Gemini, lead discovery, approval safety, dokazove gatey a najblizsi krok.",
+    proactive_attention_digest:
+      "Viem precitat proactive attention digest: klientske poziadavky, pripravene odpovede na schvalenie, produkcne upozornenia, urgenciu a najblizsi bezpecny krok.",
     remote_mcp:
       "Viem pripraviť remote MCP handoff pre Claude, ChatGPT alebo Grok: manifest, connection pack, smoke test, bearer auth placeholder, agent prompt a quick-start volania.",
     approval_queue:

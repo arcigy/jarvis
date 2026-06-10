@@ -51,6 +51,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(names.includes("arcigy.get_remote_mcp_pack"));
   assert.ok(names.includes("arcigy.run_remote_mcp_smoke"));
   assert.ok(names.includes("arcigy.get_operator_briefing"));
+  assert.ok(names.includes("arcigy.get_proactive_attention_digest"));
   assert.ok(names.includes("arcigy.generate_ai_reply"));
   assert.ok(names.includes("arcigy.sync_gmail_recent_messages"));
   assert.ok(names.includes("arcigy.get_smartlead_campaign_status"));
@@ -276,6 +277,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.run_remote_mcp_smoke" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_production_verification_evidence" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_production_completion_score" && call.body.live === false && call.approvalRequired === false));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_proactive_attention_digest" && call.body.syncGmail === false && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.every((call) => call.method === "POST" && call.url === `https://jarvis.example.ngrok-free.app/api/mcp/${call.tool}`));
   assert.ok(pack.quickStartCalls.every((call) => call.approvalRequired === pack.tools.approvalRequired.includes(call.tool)));
   assert.ok(pack.quickStartCalls.every((call) => call.exactMcpCall.tool === call.tool && call.exactMcpCall.url === call.url));
@@ -894,6 +896,22 @@ test("Jarvis MCP server summarizes cold outreach from local SQLite events", asyn
   assert.match(operatorBody.sections.coldOutreach, /Cold outreach/);
   assert.match(operatorBody.sections.clientNeeds, /Client Contact/);
   assert.match(operatorBody.sections.clientNeeds, /update onboarding automation/);
+
+  const attentionDigest = await client.callTool({
+    name: "arcigy.get_proactive_attention_digest",
+    arguments: {
+      dbPath,
+      since: "2026-06-01T00:00:00Z",
+      until: "2026-06-08T00:00:00Z",
+      periodLabel: "poslednych 7 dni",
+    },
+  });
+  const digestBody = getStructuredResult(attentionDigest) as { mode: string; urgency: string; speechText: string; notifications: Array<{ id: string; detail: string }> };
+  assert.equal(digestBody.mode, "arcigy-jarvis-proactive-attention-digest");
+  assert.equal(digestBody.urgency, "attention");
+  assert.ok(digestBody.notifications.some((item) => item.id === "client-needs" && item.detail.includes("Client Contact")));
+  assert.match(digestBody.speechText, /Jarvis attention digest/);
+  assert.doesNotMatch(JSON.stringify(digestBody), /AIza|GOCSPX|1\/\/|postgresql:\/\/|redis:\/\//);
   assertToolError(
     await client.callTool({
       name: "arcigy.get_operator_briefing",

@@ -697,6 +697,7 @@ const coreWebWorkflowSurfaces = [
     id: "proactive-digest-workflow",
     title: "Proactive Jarvis attention digest workflow",
     tools: [
+      "arcigy.get_proactive_attention_digest",
       "arcigy.get_operator_briefing",
       "arcigy.sync_gmail_recent_messages",
       "arcigy.get_client_need_alerts",
@@ -1135,9 +1136,10 @@ function jarvisCapabilityDefinitions() {
     {
       id: "proactive-digest",
       title: "Proactive Jarvis attention digest",
-      tools: [
-        "arcigy.get_operator_briefing",
-        "arcigy.sync_gmail_recent_messages",
+    tools: [
+      "arcigy.get_proactive_attention_digest",
+      "arcigy.get_operator_briefing",
+      "arcigy.sync_gmail_recent_messages",
         "arcigy.get_client_need_alerts",
         "arcigy.get_approval_queue",
         "arcigy.get_production_readiness",
@@ -1648,6 +1650,14 @@ function buildRemoteMcpQuickStartCalls(baseUrl) {
       method: "POST",
       url: toolUrl("arcigy.get_operator_briefing"),
       body: { periodLabel: "poslednych 7 dni", live: false },
+      approvalRequired: false,
+    },
+    {
+      label: "Ziskat proactive attention digest",
+      tool: "arcigy.get_proactive_attention_digest",
+      method: "POST",
+      url: toolUrl("arcigy.get_proactive_attention_digest"),
+      body: { periodLabel: "poslednych 7 dni", live: false, syncGmail: false },
       approvalRequired: false,
     },
     {
@@ -2261,6 +2271,7 @@ function hasSafeOpenApiExample(toolName, value) {
   if (!value || typeof value !== "object") return false;
   if (/AIza|GOCSPX|1\/\/|postgres(?:ql)?:\/\/|redis:\/\//i.test(JSON.stringify(value))) return false;
   if (toolName === "arcigy.get_operator_briefing") return value.live === false && value.syncGmail === false;
+  if (toolName === "arcigy.get_proactive_attention_digest") return value.live === false && value.syncGmail === false;
   if (toolName === "arcigy.get_production_completion_score") return value.live === false;
   if (toolName === "arcigy.sync_gmail_recent_messages") return value.dryRun === true;
   if (toolName === "arcigy.identify_email") return typeof value.email === "string" && value.email.includes("@");
@@ -2747,6 +2758,7 @@ function listWebMcpTools() {
     { name: "arcigy.get_remote_mcp_pack", requiresApproval: false },
     { name: "arcigy.run_remote_mcp_smoke", requiresApproval: false },
     { name: "arcigy.get_operator_briefing", requiresApproval: false },
+    { name: "arcigy.get_proactive_attention_digest", requiresApproval: false },
     { name: "arcigy.generate_ai_reply", requiresApproval: false },
     { name: "arcigy.sync_gmail_recent_messages", requiresApproval: false },
     { name: "arcigy.get_smartlead_campaign_status", requiresApproval: false },

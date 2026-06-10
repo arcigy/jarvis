@@ -28,7 +28,9 @@ export type ProductionVerificationEvidence = {
 
 export function getProductionVerificationEvidence(repoRoot: string): ProductionVerificationEvidence {
   const evidencePath = join(repoRoot, "generated", "production-verification", "latest.json");
+  const latestReadyEvidencePath = join(repoRoot, "generated", "production-verification", "latest-ready.json");
   if (!existsSync(evidencePath)) {
+    if (existsSync(latestReadyEvidencePath)) return readProductionVerificationEvidence(latestReadyEvidencePath);
     return {
       mode: "arcigy-jarvis-production-verification",
       status: "missing",
@@ -39,6 +41,13 @@ export function getProductionVerificationEvidence(repoRoot: string): ProductionV
       checks: [],
     };
   }
+  const latest = readProductionVerificationEvidence(evidencePath);
+  if (latest.status === "ready" || !existsSync(latestReadyEvidencePath)) return latest;
+  const latestReady = readProductionVerificationEvidence(latestReadyEvidencePath);
+  return latestReady.status === "ready" ? latestReady : latest;
+}
+
+function readProductionVerificationEvidence(evidencePath: string): ProductionVerificationEvidence {
   try {
     const raw = redactSensitiveText(readFileSync(evidencePath, "utf-8"));
     const evidence = JSON.parse(raw) as Record<string, unknown>;

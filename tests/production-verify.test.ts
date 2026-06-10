@@ -62,6 +62,8 @@ test("production verifier wires every live release gate", () => {
   assert.match(script, /release\.requiredRemoteMcpSmokeGates\.length !== requiredRemoteMcpSmokeGates\.length/);
   assert.match(script, /hasSecretPattern/);
   assert.match(script, /generated", "production-verification", "latest\.json"/);
+  assert.match(script, /latest-ready\.json/);
+  assert.match(script, /release\.dirty === false/);
   assert.match(script, /arcigy-jarvis-production-verification/);
   assert.match(script, /Secret-safe: command output is streamed through redactSensitiveText/);
   assert.match(script, /git", \["ls-files", "-z"\]/);

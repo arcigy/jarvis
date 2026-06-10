@@ -541,6 +541,7 @@ function hasSafeOpenApiExample(toolName: string, value: unknown): boolean {
   const payload = value as Record<string, unknown>;
   if (/AIza|GOCSPX|1\/\/|postgres(?:ql)?:\/\/|redis:\/\//i.test(JSON.stringify(payload))) return false;
   if (toolName === "arcigy.get_operator_briefing") return payload.live === false && payload.syncGmail === false;
+  if (toolName === "arcigy.get_proactive_attention_digest") return payload.live === false && payload.syncGmail === false;
   if (toolName === "arcigy.sync_gmail_recent_messages") return payload.dryRun === true;
   if (toolName === "arcigy.identify_email") return typeof payload.email === "string" && payload.email.includes("@");
   if (toolName === "arcigy.generate_contract_documents") return (payload.approval as { approved?: unknown } | undefined)?.approved === true && typeof payload.intake === "object";

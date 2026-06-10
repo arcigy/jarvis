@@ -15,6 +15,7 @@ import { buildJarvisCapabilityAudit, summarizeJarvisCapabilityAuditForVoice } fr
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "../automation-system/lead-discovery.ts";
 import { buildContractGenerationCommand, getColdOutreachMcpAnswer, listJarvisMcpTools, localStateWriteToolNames } from "../automation-system/mcp-tools.ts";
 import { buildOperatorBriefing } from "../automation-system/operator-briefing.ts";
+import { buildProactiveAttentionDigest } from "../automation-system/proactive-attention-digest.ts";
 import { buildProductionCompletionScore, summarizeProductionCompletionScoreForVoice } from "../automation-system/production-completion-score.ts";
 import { buildProductionReadinessReport } from "../automation-system/production-readiness.ts";
 import { getProductionVerificationEvidence } from "../automation-system/production-verification-evidence.ts";
@@ -168,6 +169,17 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
   if (request.method === "POST" && url.pathname === "/api/operator-briefing") {
     const payload = await readJson(request);
     writeJson(response, 200, await getOperatorBriefing(payload));
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/proactive-attention-digest") {
+    writeJson(response, 200, await getProactiveAttentionDigest(Object.fromEntries(url.searchParams.entries())));
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/proactive-attention-digest") {
+    const payload = await readJson(request);
+    writeJson(response, 200, await getProactiveAttentionDigest(payload));
     return;
   }
 
@@ -892,6 +904,10 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
     writeJson(response, 200, { result: await getOperatorBriefing(payload) });
     return;
   }
+  if (name === "arcigy.get_proactive_attention_digest") {
+    writeJson(response, 200, { result: await getProactiveAttentionDigest(payload) });
+    return;
+  }
   if (name === "arcigy.draft_contract_intake") {
     writeJson(response, 200, {
       result: await draftContractIntake({
@@ -1362,6 +1378,14 @@ async function getOperatorBriefing(payload: Record<string, unknown>) {
   });
 }
 
+async function getProactiveAttentionDigest(payload: Record<string, unknown>) {
+  const briefing = await getOperatorBriefing({
+    ...payload,
+    syncGmail: payload.syncGmail === true,
+  });
+  return buildProactiveAttentionDigest({ briefing });
+}
+
 function summarizeProviderFallbackForBriefing(checks: Array<{ key?: string; status?: string }> | undefined): string | null {
   if (!checks?.length) return null;
   const byKey = new Map(checks.map((check) => [check.key, check.status]));
@@ -1570,6 +1594,11 @@ async function handleWebVoiceEvent(payload: Record<string, unknown>, request?: I
   }
 
   const lowered = normalizeTranscript(text);
+
+  if (isProactiveAttentionDigestVoiceCommand(lowered)) {
+    const digest = await getProactiveAttentionDigest({ ...payload, text });
+    return voiceDone(session, text, digest.speechText);
+  }
 
   if (lowered.includes("briefing") || lowered.includes("prehlad") || lowered.includes("co sa deje")) {
     const briefing = await getOperatorBriefing({ ...payload, text });
@@ -1881,6 +1910,10 @@ function isProductionEvidenceVoiceCommand(text: string) {
 
 function isProductionCompletionVoiceCommand(text: string) {
   return ["kolko percent", "na kolko percent", "percent hotove", "production completion", "completion score", "kolko sme ready"].some((term) => text.includes(term));
+}
+
+function isProactiveAttentionDigestVoiceCommand(text: string) {
+  return ["attention digest", "co si mam vsimnut", "proaktivne", "upozorni ma", "urgentne veci"].some((term) => text.includes(term));
 }
 
 function isCapabilityAuditVoiceCommand(text: string) {

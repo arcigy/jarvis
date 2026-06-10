@@ -31,6 +31,7 @@ export type JarvisMcpToolName =
   | "arcigy.get_remote_mcp_pack"
   | "arcigy.run_remote_mcp_smoke"
   | "arcigy.get_operator_briefing"
+  | "arcigy.get_proactive_attention_digest"
   | "arcigy.generate_ai_reply"
   | "arcigy.sync_gmail_recent_messages"
   | "arcigy.get_smartlead_campaign_status"
@@ -212,6 +213,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.get_operator_briefing",
       description: "Spoji readiness, cold outreach, klientske poziadavky a pripravene odpovede do jedneho Jarvis briefingu.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.get_proactive_attention_digest",
+      description: "Vrati Jarvis attention digest s klientskymi poziadavkami, odpovedami na schvalenie, urgenciou a bezpecnym dalsim krokom.",
       requiresApproval: false,
     },
     {

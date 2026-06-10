@@ -20,6 +20,7 @@ import {
   identifyEmailMcpAnswer,
 } from "./mcp-tools.ts";
 import { buildOperatorBriefing } from "./operator-briefing.ts";
+import { buildProactiveAttentionDigest } from "./proactive-attention-digest.ts";
 import { buildProductionCompletionScore, summarizeProductionCompletionScoreForVoice } from "./production-completion-score.ts";
 import { buildProductionReadinessReport } from "./production-readiness.ts";
 import { getProductionVerificationEvidence } from "./production-verification-evidence.ts";
@@ -615,6 +616,21 @@ export function createJarvisMcpServer(): McpServer {
           speakText,
         });
       }
+      if (result.speakText?.includes("proactive attention digest")) {
+        const safeDbPath = resolveOptionalRepoPath(dbPath, "dbPath");
+        const briefing = await buildOperatorBriefingForMcp({
+          safeDbPath,
+          periodLabel: "poslednych 7 dni",
+          live,
+          syncGmail: false,
+        });
+        const digest = buildProactiveAttentionDigest({ briefing });
+        return jsonResult({
+          ...result,
+          session: { ...result.session, lastResponse: digest.speechText },
+          speakText: digest.speechText,
+        });
+      }
       return jsonResult(result);
     }
   );
@@ -822,37 +838,37 @@ export function createJarvisMcpServer(): McpServer {
     },
     async ({ dbPath, since, until, periodLabel, live, syncGmail, accountEnvKey, gmailQuery, gmailMaxResults }) => {
       const safeDbPath = resolveOptionalRepoPath(dbPath, "dbPath");
-      const now = new Date();
-      const defaultSince = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
-      const liveSyncSummary = await maybeSyncGmailForOperatorBriefing({ live, syncGmail, accountEnvKey, gmailQuery, gmailMaxResults }, safeDbPath);
-      const localCold = runDbCommand("cold-brief", { since: since ?? defaultSince, until: until ?? now.toISOString(), periodLabel }, safeDbPath);
-      const clientNeeds = runDbCommand("list-open-needs", { status: "new", limit: 10 }, safeDbPath);
-      const preparedReplies = runDbCommand("list-prepared-replies", { status: "pending", limit: 10 }, safeDbPath);
-      const readiness = await buildProductionReadinessReport({ live, dbPath: safeDbPath });
-      const productionEvidence = getProductionVerificationEvidence(repoRoot);
-      const preparedReplyCount = Number(preparedReplies.count ?? 0);
-      const preparedPositiveReplyCount = Number(localCold.metrics?.preparedPositiveReplyCount ?? preparedReplyCount);
-      const pendingPositiveApprovalCount = Number(localCold.metrics?.pendingPositiveApprovalCount ?? preparedPositiveReplyCount);
-      const coldOutreachSummary = await getOperatorColdOutreachSummary(live, periodLabel, localCold.summary, {
-        preparedPositiveReplyCount,
-        pendingApprovalCount: pendingPositiveApprovalCount,
-      });
-      return jsonResult(
-        buildOperatorBriefing({
-          readinessStatus: readiness.status,
-          readinessSummary: readiness.summary,
-          readinessAttentionQueue: readiness.attentionQueue,
-          productionEvidenceSummary: productionEvidence.summary,
-          providerFallbackSummary: summarizeProviderFallbackForBriefing(readiness.diagnostics?.checks),
-          coldOutreachSummary,
-          liveSyncSummary,
-          openClientNeedCount: Number(clientNeeds.count ?? 0),
-          clientNeedHighlights: Array.isArray(clientNeeds.alerts) ? clientNeeds.alerts : [],
-          preparedReplyCount,
-          preparedReplyHighlights: Array.isArray(preparedReplies.replies) ? preparedReplies.replies : [],
-          nextActions: readiness.nextActions,
-        })
-      );
+      return jsonResult(await buildOperatorBriefingForMcp({ safeDbPath, since, until, periodLabel, live, syncGmail, accountEnvKey, gmailQuery, gmailMaxResults }));
+    }
+  );
+
+  server.registerTool(
+    "arcigy.get_proactive_attention_digest",
+    {
+      title: "Proactive attention digest",
+      description: "Return a proactive Jarvis digest of client needs, prepared replies, production attention, urgency, and next safe action.",
+      inputSchema: {
+        dbPath: z.string().optional(),
+        since: z.string().optional(),
+        until: z.string().optional(),
+        periodLabel: z.string().default("poslednych 7 dni"),
+        live: z.boolean().default(false),
+        syncGmail: z.boolean().default(false),
+        accountEnvKey: z.string().optional(),
+        gmailQuery: z.string().default(defaultGmailBriefingQuery),
+        gmailMaxResults: z.number().int().min(1).max(25).default(5),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async ({ dbPath, since, until, periodLabel, live, syncGmail, accountEnvKey, gmailQuery, gmailMaxResults }) => {
+      const safeDbPath = resolveOptionalRepoPath(dbPath, "dbPath");
+      const briefing = await buildOperatorBriefingForMcp({ safeDbPath, since, until, periodLabel, live, syncGmail, accountEnvKey, gmailQuery, gmailMaxResults });
+      return jsonResult(buildProactiveAttentionDigest({ briefing }));
     }
   );
 
@@ -1062,6 +1078,61 @@ export function createJarvisMcpServer(): McpServer {
   );
 
   return server;
+}
+
+async function buildOperatorBriefingForMcp(input: {
+  safeDbPath?: string;
+  since?: string;
+  until?: string;
+  periodLabel: string;
+  live: boolean;
+  syncGmail: boolean;
+  accountEnvKey?: string;
+  gmailQuery?: string;
+  gmailMaxResults?: number;
+}) {
+  const now = new Date();
+  const defaultSince = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const liveSyncSummary = await maybeSyncGmailForOperatorBriefing(
+    {
+      live: input.live,
+      syncGmail: input.syncGmail,
+      accountEnvKey: input.accountEnvKey,
+      gmailQuery: input.gmailQuery ?? defaultGmailBriefingQuery,
+      gmailMaxResults: input.gmailMaxResults ?? 5,
+    },
+    input.safeDbPath
+  );
+  const localCold = runDbCommand(
+    "cold-brief",
+    { since: input.since ?? defaultSince, until: input.until ?? now.toISOString(), periodLabel: input.periodLabel },
+    input.safeDbPath
+  );
+  const clientNeeds = runDbCommand("list-open-needs", { status: "new", limit: 10 }, input.safeDbPath);
+  const preparedReplies = runDbCommand("list-prepared-replies", { status: "pending", limit: 10 }, input.safeDbPath);
+  const readiness = await buildProductionReadinessReport({ live: input.live, dbPath: input.safeDbPath });
+  const productionEvidence = getProductionVerificationEvidence(repoRoot);
+  const preparedReplyCount = Number(preparedReplies.count ?? 0);
+  const preparedPositiveReplyCount = Number(localCold.metrics?.preparedPositiveReplyCount ?? preparedReplyCount);
+  const pendingPositiveApprovalCount = Number(localCold.metrics?.pendingPositiveApprovalCount ?? preparedPositiveReplyCount);
+  const coldOutreachSummary = await getOperatorColdOutreachSummary(input.live, input.periodLabel, localCold.summary, {
+    preparedPositiveReplyCount,
+    pendingApprovalCount: pendingPositiveApprovalCount,
+  });
+  return buildOperatorBriefing({
+    readinessStatus: readiness.status,
+    readinessSummary: readiness.summary,
+    readinessAttentionQueue: readiness.attentionQueue,
+    productionEvidenceSummary: productionEvidence.summary,
+    providerFallbackSummary: summarizeProviderFallbackForBriefing(readiness.diagnostics?.checks),
+    coldOutreachSummary,
+    liveSyncSummary,
+    openClientNeedCount: Number(clientNeeds.count ?? 0),
+    clientNeedHighlights: Array.isArray(clientNeeds.alerts) ? clientNeeds.alerts : [],
+    preparedReplyCount,
+    preparedReplyHighlights: Array.isArray(preparedReplies.replies) ? preparedReplies.replies : [],
+    nextActions: readiness.nextActions,
+  });
 }
 
 function summarizeProviderFallbackForBriefing(checks: Array<{ key?: string; status?: string }> | undefined): string | null {

@@ -13,6 +13,7 @@ import { createJarvisVoiceSession, handleJarvisVoiceEvent } from "../src/automat
 const repoRoot = fileURLToPath(new URL("../", import.meta.url));
 const webUrl = process.env.JARVIS_VERIFY_WEB_URL || "http://127.0.0.1:8765";
 const evidencePath = join(repoRoot, "generated", "production-verification", "latest.json");
+const latestReadyEvidencePath = join(repoRoot, "generated", "production-verification", "latest-ready.json");
 const productionEvidenceMaxAgeHours = 24;
 const checks: Array<{ name: string; status: "ready" | "failed"; detail: string }> = [];
 const requiredRemoteMcpSmokeGates = [
@@ -399,7 +400,11 @@ function writeEvidence() {
     })),
   };
   mkdirSync(join(repoRoot, "generated", "production-verification"), { recursive: true });
-  writeFileSync(evidencePath, `${redactSensitiveText(JSON.stringify(payload, null, 2))}\n`, "utf-8");
+  const serialized = `${redactSensitiveText(JSON.stringify(payload, null, 2))}\n`;
+  writeFileSync(evidencePath, serialized, "utf-8");
+  if (!failed && release.dirty === false) {
+    writeFileSync(latestReadyEvidencePath, serialized, "utf-8");
+  }
 }
 
 function validateEvidenceArtifact() {

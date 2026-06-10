@@ -567,6 +567,14 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Ziskat proactive attention digest",
+      tool: "arcigy.get_proactive_attention_digest",
+      method: "POST",
+      url: toolUrl("arcigy.get_proactive_attention_digest"),
+      body: { periodLabel: "poslednych 7 dni", live: false, syncGmail: false },
+      approvalRequired: false,
+    },
+    {
       label: "Test Jarvis voice wake command",
       tool: "arcigy.jarvis_voice_event",
       method: "POST",

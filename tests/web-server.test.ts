@@ -134,6 +134,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.get_production_verification_evidence" && tool.readOnlyOrDraft === true));
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.get_production_completion_score" && tool.readOnlyOrDraft === true));
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.get_jarvis_capability_audit" && tool.readOnlyOrDraft === true));
+    assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.get_proactive_attention_digest" && tool.readOnlyOrDraft === true));
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.sync_gmail_recent_messages" && tool.localStateWrite === true && tool.readOnlyOrDraft === false));
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.prepare_positive_outreach_reply" && tool.localStateWrite === true && tool.readOnlyOrDraft === false));
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.generate_ai_reply" && tool.localStateWrite === false && tool.readOnlyOrDraft === true));
@@ -384,6 +385,26 @@ test("local web bridge serves UI and API health", async () => {
     assert.match(mcpOperatorBriefing.result.sections.preparedReplies, /briefing-lead@example\.com/);
     assert.match(mcpOperatorBriefing.result.sections.preparedReplies, /Poslem ich az po tvojom schvaleni/);
 
+    const attentionDigest = await fetch(`${baseUrl}/api/proactive-attention-digest`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ dbPath: mcpDbPath, since: "2026-06-01T00:00:00Z", until: "2026-06-08T00:00:00Z", periodLabel: "poslednych 7 dni" }),
+    });
+    assert.equal(attentionDigest.status, 200);
+    const attentionDigestBody = (await attentionDigest.json()) as { mode: string; urgency: string; speechText: string; notifications: Array<{ id: string; detail: string }> };
+    assert.equal(attentionDigestBody.mode, "arcigy-jarvis-proactive-attention-digest");
+    assert.equal(attentionDigestBody.urgency, "attention");
+    assert.ok(attentionDigestBody.notifications.some((item) => item.id === "prepared-replies" && item.detail.includes("briefing-lead@example.com")));
+
+    const mcpAttentionDigest = await postJson(`${baseUrl}/api/mcp/arcigy.get_proactive_attention_digest`, {
+      dbPath: mcpDbPath,
+      since: "2026-06-01T00:00:00Z",
+      until: "2026-06-08T00:00:00Z",
+      periodLabel: "poslednych 7 dni",
+    });
+    assert.equal(mcpAttentionDigest.result.mode, "arcigy-jarvis-proactive-attention-digest");
+    assert.match(mcpAttentionDigest.result.speechText, /Jarvis attention digest/);
+
     const readiness = await fetch(`${baseUrl}/api/production-readiness`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -549,14 +570,17 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(openApiBody["x-arcigy-agent-setup"].proofPolicy.beforeWrites.some((step) => step.includes("approval.approved=true")));
     assert.equal(Object.keys(openApiBody.paths).length, listJarvisMcpTools().length);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.get_operator_briefing"]);
+    assert.ok(openApiBody.paths["/api/mcp/arcigy.get_proactive_attention_digest"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.generate_contract_documents"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.get_production_completion_score"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.get_jarvis_capability_audit"]);
     const openApiOperator = openApiBody.paths["/api/mcp/arcigy.get_operator_briefing"] as OpenApiPathFixture;
+    const openApiAttentionDigest = openApiBody.paths["/api/mcp/arcigy.get_proactive_attention_digest"] as OpenApiPathFixture;
     const openApiCompletionScore = openApiBody.paths["/api/mcp/arcigy.get_production_completion_score"] as OpenApiPathFixture;
     const openApiGmailSync = openApiBody.paths["/api/mcp/arcigy.sync_gmail_recent_messages"] as OpenApiPathFixture;
     const openApiContract = openApiBody.paths["/api/mcp/arcigy.generate_contract_documents"] as OpenApiPathFixture;
     assert.equal(openApiCompletionScore.post.requestBody.content["application/json"].examples.quickStart.value.live, false);
+    assert.equal(openApiAttentionDigest.post.requestBody.content["application/json"].examples.quickStart.value.syncGmail, false);
     assert.equal(openApiOperator.post.requestBody.content["application/json"].examples.quickStart.value.syncGmail, false);
     assert.equal(openApiGmailSync.post.requestBody.content["application/json"].examples.quickStart.value.dryRun, true);
     assert.equal(openApiContract.post["x-arcigy-requiresApproval"], true);
@@ -672,6 +696,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_production_verification_evidence" && call.approvalRequired === false));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_production_completion_score" && call.body.live === false && call.approvalRequired === false));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_jarvis_capability_audit" && call.body.live === false && call.approvalRequired === false));
+    assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_proactive_attention_digest" && call.body.syncGmail === false && call.approvalRequired === false));
     assert.ok(
       remotePackBody.quickStartCalls.some(
         (call) =>
@@ -867,6 +892,17 @@ test("local web bridge serves UI and API health", async () => {
     assert.match(voiceCapabilityAuditBody.speakText ?? "", /Coverage:/);
     assert.match(voiceCapabilityAuditBody.speakText ?? "", /MCP: \d+ toolov/);
     assert.doesNotMatch(voiceCapabilityAuditBody.speakText ?? "", /AIza|GOCSPX|1\/\/|postgresql:\/\/|redis:\/\//);
+
+    const voiceAttentionDigest = await fetch(`${baseUrl}/api/jarvis/voice-event`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text: "Jarvis co si mam vsimnut", session: { state: "idle", wakeWord: "jarvis" } }),
+    });
+    assert.equal(voiceAttentionDigest.status, 200);
+    const voiceAttentionDigestBody = (await voiceAttentionDigest.json()) as { session: { state: string }; speakText?: string };
+    assert.equal(voiceAttentionDigestBody.session.state, "idle");
+    assert.match(voiceAttentionDigestBody.speakText ?? "", /Jarvis attention digest/);
+    assert.doesNotMatch(voiceAttentionDigestBody.speakText ?? "", /AIza|GOCSPX|1\/\/|postgresql:\/\/|redis:\/\//);
 
     const voiceCompletionScore = await fetch(`${baseUrl}/api/jarvis/voice-event`, {
       method: "POST",
