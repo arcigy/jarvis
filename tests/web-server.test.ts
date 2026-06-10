@@ -1331,6 +1331,57 @@ test("local web bridge exposes OAuth code flow for ChatGPT MCP connectors", asyn
   }
 });
 
+test("local web bridge exposes Streamable HTTP MCP for ChatGPT action refresh", async () => {
+  const previousToken = process.env.JARVIS_WEB_TOKEN;
+  process.env.JARVIS_WEB_TOKEN = "streamable-mcp-token-with-enough-length";
+  const server = createLocalApiServer();
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  const baseUrl = `http://127.0.0.1:${address.port}`;
+  const headers = {
+    "content-type": "application/json",
+    accept: "application/json, text/event-stream",
+    authorization: "Bearer streamable-mcp-token-with-enough-length",
+    "x-forwarded-host": "jarvis.example",
+  };
+
+  try {
+    const initialize = await fetch(`${baseUrl}/mcp`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: {
+          protocolVersion: "2025-06-18",
+          capabilities: {},
+          clientInfo: { name: "chatgpt-test", version: "0" },
+        },
+      }),
+    });
+    assert.equal(initialize.status, 200);
+    const initializeBody = (await initialize.json()) as { result: { serverInfo: { name: string }; capabilities: Record<string, unknown> } };
+    assert.equal(initializeBody.result.serverInfo.name, "arcigy-jarvis-local");
+    assert.ok(initializeBody.result.capabilities.tools);
+
+    const tools = await fetch(`${baseUrl}/mcp`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }),
+    });
+    assert.equal(tools.status, 200);
+    const toolsBody = (await tools.json()) as { result: { tools: Array<{ name: string }> } };
+    assert.equal(toolsBody.result.tools.length, listJarvisMcpTools().length);
+    assert.equal(toolsBody.result.tools[0]?.name, "arcigy.generate_contract_documents");
+  } finally {
+    if (previousToken === undefined) delete process.env.JARVIS_WEB_TOKEN;
+    else process.env.JARVIS_WEB_TOKEN = previousToken;
+    await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
 test("local web bridge throttles repeated external auth failures", async () => {
   const previousToken = process.env.JARVIS_WEB_TOKEN;
   const previousLimit = process.env.JARVIS_AUTH_FAILURE_LIMIT;

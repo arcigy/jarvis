@@ -4,6 +4,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync } from "node:fs";
 import { dirname, extname, join, normalize, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 
 import { redactSensitiveText } from "../automation-system/ai-safety.ts";
 import { draftContractIntake } from "../automation-system/contract-intake-draft.ts";
@@ -23,6 +24,7 @@ import { getProductionVerificationEvidence } from "../automation-system/producti
 import { buildRemoteMcpOpenApiDocument } from "../automation-system/remote-mcp-openapi.ts";
 import { buildRemoteMcpConnectionPack } from "../automation-system/remote-mcp-pack.ts";
 import { runRemoteMcpSmoke } from "../automation-system/remote-mcp-smoke.ts";
+import { createJarvisMcpServer } from "../automation-system/mcp-server.ts";
 import { getSmartleadCampaignStatus, getSmartleadOutreachBrief } from "../automation-system/smartlead.ts";
 
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
@@ -106,6 +108,11 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
   }
 
   if (protectedBridgePath) clearAuthFailures(request);
+
+  if (url.pathname === "/mcp") {
+    await handleStreamableMcp(request, response);
+    return;
+  }
 
   if (request.method === "GET" && (url.pathname === "/api/mcp" || url.pathname === "/.well-known/arcigy-jarvis.json")) {
     writeJson(response, 200, buildWebBridgeManifest(request));
@@ -457,7 +464,7 @@ function isApiAuthorized(request: IncomingMessage): boolean {
 }
 
 function isProtectedBridgePath(pathname: string): boolean {
-  return pathname.startsWith("/api/") || pathname === "/.well-known/arcigy-jarvis.json" || pathname === "/.well-known/ai-plugin.json" || pathname === "/ai-plugin.json";
+  return pathname === "/mcp" || pathname.startsWith("/api/") || pathname === "/.well-known/arcigy-jarvis.json" || pathname === "/.well-known/ai-plugin.json" || pathname === "/ai-plugin.json";
 }
 
 function isOAuthPath(pathname: string): boolean {
@@ -490,6 +497,28 @@ function getBearerToken(request: IncomingMessage): string | null {
   if (!header) return null;
   const match = /^Bearer\s+(.+)$/i.exec(Array.isArray(header) ? header[0] : header);
   return match?.[1]?.trim() || null;
+}
+
+async function handleStreamableMcp(request: IncomingMessage, response: ServerResponse) {
+  if (!["GET", "POST", "DELETE"].includes(request.method || "")) {
+    writeJson(response, 405, { error: "Method not allowed" });
+    return;
+  }
+  const server = createJarvisMcpServer();
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: undefined,
+    enableJsonResponse: true,
+  });
+  try {
+    await server.connect(transport);
+    await transport.handleRequest(request, response);
+  } catch (error) {
+    if (!response.headersSent) {
+      writeJson(response, 500, { error: safeErrorMessage(error) });
+    }
+  } finally {
+    await transport.close().catch(() => undefined);
+  }
 }
 
 function buildOAuthAuthorizationServerMetadata(request: IncomingMessage) {
