@@ -183,7 +183,7 @@ function buildOpenApiAgentSetup(baseUrl: string): RemoteMcpOpenApiDocument["x-ar
         "Load connectionPackUrl and require auth.tokenValueReturned=false.",
         "Run smokeTestUrl and require status=ready with all remote MCP smoke gates ready.",
         "Call arcigy.get_jarvis_capability_audit and require status=ready or explicit operator attention.",
-        "Call productionVerificationEvidenceUrl and require status=ready, dirty=false, freshness.fresh=true.",
+        "Call arcigy.get_production_completion_score and require quick-start coverage, then call productionVerificationEvidenceUrl and require status=ready, dirty=false, freshness.fresh=true.",
       ],
       beforeWrites: [
         "Show the exact approval-required payload to the operator.",
