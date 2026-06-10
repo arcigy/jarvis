@@ -1270,6 +1270,67 @@ test("local web bridge requires bearer auth on external hosts", async () => {
   }
 });
 
+test("local web bridge exposes OAuth code flow for ChatGPT MCP connectors", async () => {
+  const previousToken = process.env.JARVIS_WEB_TOKEN;
+  const previousSecret = process.env.JARVIS_OAUTH_CLIENT_SECRET;
+  process.env.JARVIS_WEB_TOKEN = "oauth-chatgpt-token-with-enough-length";
+  delete process.env.JARVIS_OAUTH_CLIENT_SECRET;
+  const server = createLocalApiServer();
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  const baseUrl = `http://127.0.0.1:${address.port}`;
+
+  try {
+    const metadata = await fetch(`${baseUrl}/.well-known/oauth-authorization-server`);
+    assert.equal(metadata.status, 200);
+    const metadataBody = (await metadata.json()) as { authorization_endpoint: string; token_endpoint: string };
+    assert.equal(metadataBody.authorization_endpoint, `${baseUrl}/oauth/authorize`);
+    assert.equal(metadataBody.token_endpoint, `${baseUrl}/oauth/token`);
+
+    const redirectUri = "https://chatgpt.com/connector/oauth/test";
+    const authorize = await fetch(
+      `${baseUrl}/oauth/authorize?response_type=code&client_id=arcigy-chatgpt&redirect_uri=${encodeURIComponent(redirectUri)}&state=abc`,
+      { redirect: "manual" }
+    );
+    assert.equal(authorize.status, 302);
+    const redirected = new URL(authorize.headers.get("location") ?? "");
+    assert.equal(`${redirected.origin}${redirected.pathname}`, redirectUri);
+    assert.equal(redirected.searchParams.get("state"), "abc");
+    const code = redirected.searchParams.get("code");
+    assert.ok(code);
+
+    const token = await fetch(`${baseUrl}/oauth/token`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        code,
+        client_id: "arcigy-chatgpt",
+        redirect_uri: redirectUri,
+      }),
+    });
+    assert.equal(token.status, 200);
+    const tokenBody = (await token.json()) as { access_token: string; token_type: string };
+    assert.equal(tokenBody.token_type, "Bearer");
+    assert.equal(tokenBody.access_token, "oauth-chatgpt-token-with-enough-length");
+
+    const manifest = await fetch(`${baseUrl}/.well-known/arcigy-jarvis.json`, {
+      headers: {
+        "x-forwarded-host": "jarvis.example",
+        authorization: `Bearer ${tokenBody.access_token}`,
+      },
+    });
+    assert.equal(manifest.status, 200);
+  } finally {
+    if (previousToken === undefined) delete process.env.JARVIS_WEB_TOKEN;
+    else process.env.JARVIS_WEB_TOKEN = previousToken;
+    if (previousSecret === undefined) delete process.env.JARVIS_OAUTH_CLIENT_SECRET;
+    else process.env.JARVIS_OAUTH_CLIENT_SECRET = previousSecret;
+    await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+});
+
 test("local web bridge throttles repeated external auth failures", async () => {
   const previousToken = process.env.JARVIS_WEB_TOKEN;
   const previousLimit = process.env.JARVIS_AUTH_FAILURE_LIMIT;

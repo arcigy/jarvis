@@ -1,4 +1,5 @@
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync } from "node:fs";
 import { dirname, extname, join, normalize, resolve, sep } from "node:path";
@@ -32,6 +33,7 @@ const defaultAuthFailureLimit = 20;
 const defaultAuthFailureWindowMs = 60_000;
 let webTunnelProcess: ChildProcess | null = null;
 const authFailureBuckets = new Map<string, { count: number; resetAt: number }>();
+const oauthCodes = new Map<string, { clientId: string; redirectUri: string; expiresAt: number }>();
 
 loadLocalEnv(repoRoot);
 
@@ -55,6 +57,31 @@ export function createLocalApiServer() {
 async function routeRequest(request: IncomingMessage, response: ServerResponse) {
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
   const protectedBridgePath = isProtectedBridgePath(url.pathname);
+
+  if (request.method === "OPTIONS" && isOAuthPath(url.pathname)) {
+    writeNoContent(response, 204);
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === "/.well-known/oauth-authorization-server") {
+    writeJson(response, 200, buildOAuthAuthorizationServerMetadata(request));
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === "/.well-known/oauth-protected-resource") {
+    writeJson(response, 200, buildOAuthProtectedResourceMetadata(request));
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === "/oauth/authorize") {
+    handleOAuthAuthorize(request, response, url);
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/oauth/token") {
+    await handleOAuthToken(request, response);
+    return;
+  }
 
   if (request.method === "OPTIONS" && protectedBridgePath) {
     writeNoContent(response, 204);
@@ -433,6 +460,10 @@ function isProtectedBridgePath(pathname: string): boolean {
   return pathname.startsWith("/api/") || pathname === "/.well-known/arcigy-jarvis.json" || pathname === "/.well-known/ai-plugin.json" || pathname === "/ai-plugin.json";
 }
 
+function isOAuthPath(pathname: string): boolean {
+  return pathname === "/oauth/authorize" || pathname === "/oauth/token" || pathname === "/.well-known/oauth-authorization-server" || pathname === "/.well-known/oauth-protected-resource";
+}
+
 function isLocalRequest(request: IncomingMessage): boolean {
   const host = getRequestHost(request);
   return host === "127.0.0.1" || host === "localhost" || host === "::1";
@@ -459,6 +490,118 @@ function getBearerToken(request: IncomingMessage): string | null {
   if (!header) return null;
   const match = /^Bearer\s+(.+)$/i.exec(Array.isArray(header) ? header[0] : header);
   return match?.[1]?.trim() || null;
+}
+
+function buildOAuthAuthorizationServerMetadata(request: IncomingMessage) {
+  const origin = getRequestOrigin(request);
+  return {
+    issuer: origin,
+    authorization_endpoint: `${origin}/oauth/authorize`,
+    token_endpoint: `${origin}/oauth/token`,
+    response_types_supported: ["code"],
+    grant_types_supported: ["authorization_code"],
+    token_endpoint_auth_methods_supported: ["none", "client_secret_post", "client_secret_basic"],
+    code_challenge_methods_supported: ["S256", "plain"],
+    scopes_supported: ["jarvis"],
+    service_documentation: `${origin}/api/remote-mcp-pack?includeReadiness=true&live=true`,
+  };
+}
+
+function buildOAuthProtectedResourceMetadata(request: IncomingMessage) {
+  const origin = getRequestOrigin(request);
+  return {
+    resource: origin,
+    authorization_servers: [origin],
+    bearer_methods_supported: ["header"],
+    scopes_supported: ["jarvis"],
+  };
+}
+
+function handleOAuthAuthorize(_request: IncomingMessage, response: ServerResponse, url: URL) {
+  const redirectUri = url.searchParams.get("redirect_uri");
+  const clientId = url.searchParams.get("client_id") || "arcigy-chatgpt";
+  const state = url.searchParams.get("state");
+  if (!redirectUri) {
+    writeJson(response, 400, { error: "invalid_request", error_description: "Missing redirect_uri." });
+    return;
+  }
+  const code = randomBytes(32).toString("base64url");
+  oauthCodes.set(code, { clientId, redirectUri, expiresAt: Date.now() + 5 * 60_000 });
+  const redirect = new URL(redirectUri);
+  redirect.searchParams.set("code", code);
+  if (state) redirect.searchParams.set("state", state);
+  response.writeHead(302, {
+    ...jsonResponseHeaders(),
+    location: redirect.toString(),
+  });
+  response.end();
+}
+
+async function handleOAuthToken(request: IncomingMessage, response: ServerResponse) {
+  const body = await readFormBody(request);
+  const grantType = body.get("grant_type");
+  const code = body.get("code");
+  const redirectUri = body.get("redirect_uri");
+  const clientId = getOAuthClientId(request, body);
+  const clientSecret = getOAuthClientSecret(request, body);
+  const expectedClientSecret = process.env.JARVIS_OAUTH_CLIENT_SECRET?.trim();
+  const token = getWebToken();
+  if (!token) {
+    writeJson(response, 503, { error: "temporarily_unavailable", error_description: "Jarvis web token is not configured." });
+    return;
+  }
+  if (expectedClientSecret && clientSecret !== expectedClientSecret) {
+    writeJson(response, 401, { error: "invalid_client" });
+    return;
+  }
+  if (grantType !== "authorization_code" || !code) {
+    writeJson(response, 400, { error: "unsupported_grant_type" });
+    return;
+  }
+  const record = oauthCodes.get(code);
+  oauthCodes.delete(code);
+  if (!record || record.expiresAt < Date.now()) {
+    writeJson(response, 400, { error: "invalid_grant" });
+    return;
+  }
+  if (redirectUri && redirectUri !== record.redirectUri) {
+    writeJson(response, 400, { error: "invalid_grant" });
+    return;
+  }
+  if (clientId && clientId !== record.clientId) {
+    writeJson(response, 400, { error: "invalid_client" });
+    return;
+  }
+  writeJson(response, 200, {
+    access_token: token,
+    token_type: "Bearer",
+    expires_in: 3600,
+    scope: "jarvis",
+  });
+}
+
+function getOAuthClientId(request: IncomingMessage, body: URLSearchParams): string | null {
+  const basic = getBasicAuth(request);
+  return basic?.username || body.get("client_id");
+}
+
+function getOAuthClientSecret(request: IncomingMessage, body: URLSearchParams): string | null {
+  const basic = getBasicAuth(request);
+  return basic?.password || body.get("client_secret");
+}
+
+function getBasicAuth(request: IncomingMessage): { username: string; password: string } | null {
+  const header = request.headers.authorization;
+  const value = Array.isArray(header) ? header[0] : header;
+  const match = /^Basic\s+(.+)$/i.exec(value || "");
+  if (!match) return null;
+  try {
+    const decoded = Buffer.from(match[1], "base64").toString("utf-8");
+    const index = decoded.indexOf(":");
+    return index >= 0 ? { username: decoded.slice(0, index), password: decoded.slice(index + 1) } : null;
+  } catch {
+    return null;
+  }
 }
 
 function registerAuthFailure(request: IncomingMessage): { throttled: boolean; retryAfterSeconds: number } {
@@ -1513,6 +1656,25 @@ async function readJson(request: IncomingMessage): Promise<Record<string, unknow
   } catch {
     throw httpError(400, "Request body must be valid JSON.");
   }
+}
+
+async function readFormBody(request: IncomingMessage): Promise<URLSearchParams> {
+  const chunks: Buffer[] = [];
+  const maxBytes = getMaxJsonBytes();
+  let size = 0;
+  const contentLength = Number(request.headers["content-length"] ?? 0);
+  if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+    throw httpError(413, `Form body exceeds ${maxBytes} bytes.`);
+  }
+  for await (const chunk of request) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    size += buffer.length;
+    if (size > maxBytes) {
+      throw httpError(413, `Form body exceeds ${maxBytes} bytes.`);
+    }
+    chunks.push(buffer);
+  }
+  return new URLSearchParams(Buffer.concat(chunks).toString("utf-8"));
 }
 
 function writeNoContent(response: ServerResponse, statusCode: number) {
