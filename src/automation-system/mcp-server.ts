@@ -25,6 +25,7 @@ import {
   buildLeadgenCampaignPipelinePreview,
   buildLeadSourceImportQueuePreview,
   buildLeadRepairQueuePreview,
+  buildNicheOpsDashboardPreview,
   batchScrapeWebsiteContacts,
   batchDraftLeadIntros,
   buildManualReviewPickupPlan,
@@ -1988,6 +1989,31 @@ export function createJarvisMcpServer(): McpServer {
     campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
     aliases: z.array(z.string()).optional(),
   });
+  const nicheOpsInputSchema = z.object({
+    id: z.string().optional(),
+    slug: z.string().min(1),
+    name: z.string().min(1),
+    status: z.enum(["active", "paused", "archived"]).optional(),
+    tier: z.number().int().optional(),
+    regions: z.array(z.string()).optional(),
+    currentRegionIndex: z.number().int().nonnegative().optional(),
+    dailyTarget: z.number().int().nonnegative().optional(),
+    todaySent: z.number().int().nonnegative().optional(),
+    smartleadCampaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+    lastWorkedAt: z.string().optional(),
+    stats: z.object({
+      discovered: z.number().int().nonnegative().optional(),
+      enriched: z.number().int().nonnegative().optional(),
+      qualified: z.number().int().nonnegative().optional(),
+      sentToSmartlead: z.number().int().nonnegative().optional(),
+      failed: z.number().int().nonnegative().optional(),
+      opened: z.number().int().nonnegative().optional(),
+      replied: z.number().int().nonnegative().optional(),
+    }).optional(),
+    stuckLeads: z.array(leadRepairQueueLeadSchema).optional(),
+    readyLeads: z.array(leadRepairQueueLeadSchema).optional(),
+    failedLeads: z.array(leadRepairQueueLeadSchema).optional(),
+  });
 
   server.registerTool(
     "arcigy.preview_smartlead_email_rendering",
@@ -2328,6 +2354,28 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildLeadRepairQueuePreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_niche_ops_dashboard_preview",
+    {
+      title: "Build niche ops dashboard preview",
+      description: "Summarize niche/campaign health, daily targets, stuck/failed/ready leads, and propose exact next MCP calls without writes.",
+      inputSchema: {
+        niches: z.array(nicheOpsInputSchema).min(1).max(100),
+        offer: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        defaultDailyTarget: z.number().int().min(0).max(1000).default(30),
+        maxNextCalls: z.number().int().min(1).max(100).default(40),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildNicheOpsDashboardPreview(input))
   );
 
   server.registerTool(

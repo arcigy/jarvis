@@ -1096,6 +1096,33 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Build niche ops dashboard preview",
+      tool: "arcigy.build_niche_ops_dashboard_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_niche_ops_dashboard_preview"),
+      body: {
+        niches: [
+          {
+            id: "niche-1",
+            slug: "kuchyne",
+            name: "Kuchynske studia",
+            status: "active",
+            regions: ["Bratislava", "Trnava"],
+            currentRegionIndex: 0,
+            dailyTarget: 30,
+            todaySent: 12,
+            smartleadCampaignId: "123456",
+            stuckLeads: [{ companyName: "Needs Email", website: "https://needs-email.sk", personalizedIntro: "Kratke intro." }],
+            readyLeads: [{ companyName: "Ready Studio", website: "https://ready.sk", email: "jan@ready.sk", firstName: "Jan", personalizedIntro: "Vsimol som si vase realizacie." }],
+          },
+        ],
+        offer: "AI automatizacie pre dopyty a follow-up.",
+        language: "sk",
+        defaultDailyTarget: 30,
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Build cold outreach CSV import preview",
       tool: "arcigy.build_cold_outreach_csv_import_preview",
       method: "POST",

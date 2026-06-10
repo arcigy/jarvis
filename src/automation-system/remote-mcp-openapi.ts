@@ -524,6 +524,28 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       minScore: 70,
     };
   }
+  if (toolName === "arcigy.build_niche_ops_dashboard_preview") {
+    return {
+      niches: [
+        {
+          id: "niche-1",
+          slug: "kuchyne",
+          name: "Kuchynske studia",
+          status: "active",
+          regions: ["Bratislava", "Trnava"],
+          currentRegionIndex: 0,
+          dailyTarget: 30,
+          todaySent: 12,
+          smartleadCampaignId: "123456",
+          stuckLeads: [{ companyName: "Needs Email", website: "https://needs-email.sk", personalizedIntro: "Kratke intro." }],
+          readyLeads: [{ companyName: "Ready Studio", website: "https://ready.sk", email: "jan@ready.sk", firstName: "Jan", personalizedIntro: "Vsimol som si vase realizacie." }],
+        },
+      ],
+      offer: "AI automatizacie pre dopyty a follow-up.",
+      language: "sk",
+      defaultDailyTarget: 30,
+    };
+  }
   if (toolName === "arcigy.build_cold_outreach_csv_import_preview") {
     return {
       csvText: "company_name,email,website,personalized_intro\nModelova Firma,jan.novak@example.com,https://example.com,Vsimol som si vas servis.\nBlocked Firma,lead@competitor.sk,https://competitor.sk,",

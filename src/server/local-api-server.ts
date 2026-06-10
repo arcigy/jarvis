@@ -24,6 +24,7 @@ import {
   buildLeadgenCampaignPipelinePreview,
   buildLeadSourceImportQueuePreview,
   buildLeadRepairQueuePreview,
+  buildNicheOpsDashboardPreview,
   batchScrapeWebsiteContacts,
   batchDraftLeadIntros,
   buildManualReviewPickupPlan,
@@ -1681,6 +1682,18 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         offer: optionalString(payload.offer),
         language: payload.language === "en" ? "en" : "sk",
         minScore: typeof payload.minScore === "number" ? payload.minScore : undefined,
+        maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_niche_ops_dashboard_preview") {
+    writeJson(response, 200, {
+      result: buildNicheOpsDashboardPreview({
+        niches: Array.isArray(payload.niches) ? payload.niches as Parameters<typeof buildNicheOpsDashboardPreview>[0]["niches"] : [],
+        offer: optionalString(payload.offer),
+        language: payload.language === "en" ? "en" : "sk",
+        defaultDailyTarget: typeof payload.defaultDailyTarget === "number" ? payload.defaultDailyTarget : undefined,
         maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
       }),
     });

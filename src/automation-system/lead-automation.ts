@@ -370,6 +370,39 @@ export type LeadRepairQueuePreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type NicheOpsDashboardInput = {
+  id?: string;
+  slug: string;
+  name: string;
+  status?: "active" | "paused" | "archived";
+  tier?: number;
+  regions?: string[];
+  currentRegionIndex?: number;
+  dailyTarget?: number;
+  todaySent?: number;
+  smartleadCampaignId?: string | number | null;
+  lastWorkedAt?: string;
+  stats?: { discovered?: number; enriched?: number; qualified?: number; sentToSmartlead?: number; failed?: number; opened?: number; replied?: number };
+  stuckLeads?: LeadRepairQueueLead[];
+  readyLeads?: LeadRepairQueueLead[];
+  failedLeads?: LeadRepairQueueLead[];
+};
+
+export type NicheOpsDashboardPreview = {
+  mode: "niche-ops-dashboard-preview";
+  summary: string;
+  totals: { niches: number; active: number; paused: number; healthy: number; attention: number; blocked: number; dailyTarget: number; todaySent: number; readyLeads: number; stuckLeads: number; failedLeads: number };
+  niches: Array<{
+    niche: NicheOpsDashboardInput;
+    activeRegion?: string;
+    status: "healthy" | "attention" | "blocked";
+    progressPercent: number;
+    issues: string[];
+    nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+  }>;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type LeadEnrichmentBatchPreview = {
   mode: "lead-enrichment-batch-preview";
   summary: string;
@@ -2121,6 +2154,85 @@ export function buildLeadRepairQueuePreview(input: {
     duplicates: deduped.duplicates,
     repairBatches: { websitesToScrape, introsToDraft, registerLookups },
     nextToolCalls: dedupeNextToolCalls(nextToolCalls).slice(0, maxNextCalls),
+  };
+}
+
+export function buildNicheOpsDashboardPreview(input: {
+  niches: NicheOpsDashboardInput[];
+  offer?: string;
+  language?: "sk" | "en";
+  defaultDailyTarget?: number;
+  maxNextCalls?: number;
+}): NicheOpsDashboardPreview {
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 40), 1), 100);
+  const niches = input.niches.map((niche) => {
+    const dailyTarget = Math.max(0, Math.trunc(niche.dailyTarget ?? input.defaultDailyTarget ?? 30));
+    const todaySent = Math.max(0, Math.trunc(niche.todaySent ?? niche.stats?.sentToSmartlead ?? 0));
+    const progressPercent = dailyTarget > 0 ? Math.min(100, Math.round((todaySent / dailyTarget) * 100)) : 100;
+    const stuckCount = niche.stuckLeads?.length ?? 0;
+    const readyCount = niche.readyLeads?.length ?? 0;
+    const failedCount = niche.failedLeads?.length ?? niche.stats?.failed ?? 0;
+    const issues: string[] = [];
+    if (niche.status === "paused") issues.push("paused");
+    if (!niche.smartleadCampaignId && readyCount > 0) issues.push("missing_campaign");
+    if (stuckCount > 0) issues.push("stuck_leads");
+    if (failedCount > 0) issues.push("failed_leads");
+    if (dailyTarget > 0 && todaySent < dailyTarget) issues.push("below_daily_target");
+    const status: "healthy" | "attention" | "blocked" = issues.includes("missing_campaign") || issues.includes("paused") ? "blocked" : issues.length ? "attention" : "healthy";
+    const activeRegion = niche.regions?.length ? niche.regions[(niche.currentRegionIndex ?? 0) % niche.regions.length] : undefined;
+    const calls: NicheOpsDashboardPreview["nextToolCalls"] = [];
+    if (issues.includes("below_daily_target")) {
+      calls.push({
+        tool: "arcigy.build_daily_leadgen_runbook",
+        payload: {
+          niche: { id: niche.id, slug: niche.slug, name: niche.name, keywords: [], region: activeRegion, campaignId: niche.smartleadCampaignId },
+          dailyLimit: dailyTarget,
+          targetCount: Math.max(dailyTarget * 2, dailyTarget + stuckCount + readyCount),
+        },
+        reason: "Niche je pod dennym targetom; priprav presny discovery/enrichment/runbook.",
+        approvalRequired: false,
+      });
+    }
+    if (stuckCount || failedCount) {
+      calls.push({
+        tool: "arcigy.build_lead_repair_queue_preview",
+        payload: { leads: [...(niche.stuckLeads ?? []), ...(niche.failedLeads ?? [])], offer: input.offer, language: input.language ?? "sk" },
+        reason: "Oprav stuck alebo failed leady pred dalsim uploadom.",
+        approvalRequired: false,
+      });
+    }
+    if (readyCount) {
+      calls.push({
+        tool: niche.smartleadCampaignId ? "arcigy.build_smartlead_injection_plan" : "arcigy.draft_niche_smartlead_campaign_setup",
+        payload: niche.smartleadCampaignId
+          ? { niche: { id: niche.id, slug: niche.slug, name: niche.name, campaignId: niche.smartleadCampaignId }, leads: niche.readyLeads, batchSize: 50 }
+          : { niche: { id: niche.id, slug: niche.slug, name: niche.name }, offer: input.offer, language: input.language ?? "sk" },
+        reason: niche.smartleadCampaignId ? "Ready leady priprav do Smartlead batchov bez uploadu." : "Ready leady existuju, ale niche nema Smartlead campaignId.",
+        approvalRequired: false,
+      });
+    }
+    return { niche, activeRegion, status, progressPercent, issues, nextToolCalls: calls };
+  });
+  const allCalls = dedupeNextToolCalls(niches.flatMap((item) => item.nextToolCalls)).slice(0, maxNextCalls);
+  const totals = {
+    niches: niches.length,
+    active: niches.filter((item) => item.niche.status !== "paused" && item.niche.status !== "archived").length,
+    paused: niches.filter((item) => item.niche.status === "paused").length,
+    healthy: niches.filter((item) => item.status === "healthy").length,
+    attention: niches.filter((item) => item.status === "attention").length,
+    blocked: niches.filter((item) => item.status === "blocked").length,
+    dailyTarget: niches.reduce((sum, item) => sum + (item.niche.dailyTarget ?? input.defaultDailyTarget ?? 30), 0),
+    todaySent: niches.reduce((sum, item) => sum + (item.niche.todaySent ?? item.niche.stats?.sentToSmartlead ?? 0), 0),
+    readyLeads: niches.reduce((sum, item) => sum + (item.niche.readyLeads?.length ?? 0), 0),
+    stuckLeads: niches.reduce((sum, item) => sum + (item.niche.stuckLeads?.length ?? 0), 0),
+    failedLeads: niches.reduce((sum, item) => sum + (item.niche.failedLeads?.length ?? item.niche.stats?.failed ?? 0), 0),
+  };
+  return {
+    mode: "niche-ops-dashboard-preview",
+    summary: `Niche ops dashboard: ${totals.healthy} healthy, ${totals.attention} attention, ${totals.blocked} blocked, ${totals.todaySent}/${totals.dailyTarget} dnes odoslanych. Ziadny zapis ani upload neprebehol.`,
+    totals,
+    niches,
+    nextToolCalls: allCalls,
   };
 }
 

@@ -3054,6 +3054,7 @@ function listWebMcpTools() {
     { name: "arcigy.build_leadgen_campaign_pipeline_preview", requiresApproval: false },
     { name: "arcigy.build_lead_source_import_queue_preview", requiresApproval: false },
     { name: "arcigy.build_lead_repair_queue_preview", requiresApproval: false },
+    { name: "arcigy.build_niche_ops_dashboard_preview", requiresApproval: false },
     { name: "arcigy.build_cold_outreach_csv_import_preview", requiresApproval: false },
     { name: "arcigy.build_daily_leadgen_runbook", requiresApproval: false },
     { name: "arcigy.parse_leads_csv", requiresApproval: false },
