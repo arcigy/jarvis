@@ -546,6 +546,26 @@ export type SmartleadHistorySuppressionPreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type SmartleadNonreplyCallListPreview = {
+  mode: "smartlead-nonreply-call-list-preview";
+  summary: string;
+  source: { name?: string; type?: "smartlead" | "csv" | "manual" | "other"; campaignId?: string | number | null };
+  totals: {
+    input: number;
+    nonRepliers: number;
+    replied: number;
+    blockedOrUnsubscribed: number;
+    callable: number;
+    needsPhoneScrape: number;
+    belowSentThreshold: number;
+  };
+  callableRows: Array<LeadCandidateInput & { customFields?: Record<string, string | number | boolean | null | undefined> }>;
+  needsPhoneScrape: LeadCandidateInput[];
+  excluded: Array<{ lead: LeadCandidateInput; reason: string; evidence: Record<string, string> }>;
+  exportPreview: ReturnType<typeof serializeLeadsCsv>;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type NicheOpsDashboardInput = {
   id?: string;
   slug: string;
@@ -1513,6 +1533,120 @@ export function buildSmartleadHistorySuppressionPreview(input: {
     },
     allowedLeads,
     suppressed,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls).slice(0, maxNextCalls),
+  };
+}
+
+export function buildSmartleadNonreplyCallListPreview(input: {
+  leads?: LeadCandidateInput[];
+  csvText?: string;
+  delimiter?: "," | ";";
+  maxRows?: number;
+  sourceName?: string;
+  sourceType?: "smartlead" | "csv" | "manual" | "other";
+  campaignId?: string | number | null;
+  minSentMessages?: number;
+  excludeBlockedOrUnsubscribed?: boolean;
+  includeWithoutPhone?: boolean;
+  maxNextCalls?: number;
+}): SmartleadNonreplyCallListPreview {
+  const parsed = input.csvText ? parseLeadsCsv({ csvText: input.csvText, delimiter: input.delimiter, maxRows: input.maxRows }) : { leads: [] as LeadCsvRow[] };
+  const leads = [...(input.leads ?? []), ...parsed.leads];
+  const minSentMessages = Math.min(Math.max(Math.trunc(input.minSentMessages ?? 1), 0), 20);
+  const excludeBlockedOrUnsubscribed = input.excludeBlockedOrUnsubscribed !== false;
+  const includeWithoutPhone = input.includeWithoutPhone === true;
+  const callableRows: SmartleadNonreplyCallListPreview["callableRows"] = [];
+  const needsPhoneScrape: LeadCandidateInput[] = [];
+  const excluded: SmartleadNonreplyCallListPreview["excluded"] = [];
+  let nonRepliers = 0;
+  let replied = 0;
+  let blockedOrUnsubscribed = 0;
+  let belowSentThreshold = 0;
+
+  for (const lead of leads) {
+    const evidence = smartleadHistoryEvidence(lead);
+    const sentMessages = numericEvidence(evidence.smartlead_sent_messages || stringField(lead.customFields ?? {}, "sent_messages"));
+    const hasReply = truthyEvidence(evidence.smartlead_replied);
+    const blocked = smartleadBlockedEvidence(lead, evidence);
+    if (hasReply) {
+      replied += 1;
+      excluded.push({ lead, reason: "already_replied", evidence });
+      continue;
+    }
+    if (blocked && excludeBlockedOrUnsubscribed) {
+      blockedOrUnsubscribed += 1;
+      excluded.push({ lead, reason: "blocked_or_unsubscribed", evidence });
+      continue;
+    }
+    if (sentMessages < minSentMessages) {
+      belowSentThreshold += 1;
+      excluded.push({ lead, reason: "below_sent_threshold", evidence });
+      continue;
+    }
+    nonRepliers += 1;
+    const phone = lead.phone ?? stringField(lead.customFields ?? {}, "phone", "phones", "phone_number", "international_phone");
+    const row = {
+      ...lead,
+      phone,
+      customFields: {
+        ...lead.customFields,
+        campaign_id: input.campaignId ?? stringField(lead.customFields ?? {}, "campaign_id", "smartlead_campaign_id"),
+        smartlead_status: evidence.smartlead_statuses || stringField(lead.customFields ?? {}, "smartlead_status"),
+        sent_messages: sentMessages,
+        blocked_or_unsubscribed: blocked,
+      },
+    };
+    if (phone || includeWithoutPhone) callableRows.push(row);
+    if (!phone && lead.website) needsPhoneScrape.push(lead);
+  }
+
+  const exportPreview = serializeLeadsCsv({
+    leads: callableRows,
+    columns: ["companyName", "email", "firstName", "lastName", "website", "phone", "source", "smartlead_status", "sent_messages", "blocked_or_unsubscribed"],
+  });
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 30), 1), 100);
+  const nextToolCalls: SmartleadNonreplyCallListPreview["nextToolCalls"] = [];
+  if (input.campaignId) {
+    nextToolCalls.push({
+      tool: "arcigy.get_smartlead_campaign_leads",
+      payload: { campaignId: input.campaignId, offset: 0, limit: 500 },
+      reason: "Nacitaj aktualny Smartlead lead list pred finalnym non-replier exportom.",
+      approvalRequired: false,
+    });
+  }
+  if (needsPhoneScrape.length) {
+    nextToolCalls.push({
+      tool: "arcigy.batch_scrape_website_contacts",
+      payload: { urls: unique(needsPhoneScrape.map((lead) => lead.website).filter((url): url is string => Boolean(url))).slice(0, 50), includePriorityPages: true, maxPages: 4, maxSites: Math.min(needsPhoneScrape.length, 50) },
+      reason: "Dohladat telefonne cisla pre non-replierov bez telefonu pred cold calling exportom.",
+      approvalRequired: false,
+    });
+  }
+  if (callableRows.length) {
+    nextToolCalls.push({
+      tool: "arcigy.export_leads_csv",
+      payload: { leads: callableRows, columns: exportPreview.columns, approval: { approved: true } },
+      reason: "Exportuj call list az po kontrole riadkov operatorom.",
+      approvalRequired: true,
+    });
+  }
+  return {
+    mode: "smartlead-nonreply-call-list-preview",
+    summary: `Smartlead non-reply call list: ${callableRows.length} callable, ${needsPhoneScrape.length} potrebuje phone scrape, ${replied} replied, ${blockedOrUnsubscribed} blocked/unsubscribed. Ziadny zapis ani export neprebehol.`,
+    source: { name: input.sourceName, type: input.sourceType ?? (input.csvText ? "csv" : "manual"), campaignId: input.campaignId },
+    totals: {
+      input: leads.length,
+      nonRepliers,
+      replied,
+      blockedOrUnsubscribed,
+      callable: callableRows.length,
+      needsPhoneScrape: needsPhoneScrape.length,
+      belowSentThreshold,
+    },
+    callableRows,
+    needsPhoneScrape,
+    excluded,
+    exportPreview,
     nextToolCalls: dedupeNextToolCalls(nextToolCalls).slice(0, maxNextCalls),
   };
 }
@@ -4889,11 +5023,16 @@ const csvCustomFieldKeys = new Set([
   "google_domain",
   "google_maps_url",
   "ico",
+  "lead_category_id",
   "matched_queries",
+  "phone_source_urls",
   "priority_score",
   "rating",
   "reviews",
+  "sent_messages",
   "size_signal",
+  "blocked_or_unsubscribed",
+  "smartlead_status",
   "smartlead_campaigns",
   "smartlead_match",
   "smartlead_replied",
@@ -4938,8 +5077,8 @@ function smartleadHistoryEvidence(lead: LeadCandidateInput): Record<string, stri
     smartlead_replied: field("smartlead_replied"),
     smartlead_match: field("smartlead_match"),
     smartlead_campaigns: field("smartlead_campaigns"),
-    smartlead_statuses: field("smartlead_statuses"),
-    smartlead_sent_messages: field("smartlead_sent_messages"),
+    smartlead_statuses: field("smartlead_statuses", "smartlead_status", "status"),
+    smartlead_sent_messages: field("smartlead_sent_messages", "sent_messages"),
     smartlead_emails: field("smartlead_emails"),
   };
 }
@@ -4957,6 +5096,24 @@ function smartleadHistorySuppressionReason(
 
 function truthyHistoryFlag(value?: string): boolean {
   return /^(1|true|yes|ano|y|sent|replied|domain|email|match)$/i.test(String(value ?? "").trim());
+}
+
+function truthyEvidence(value?: string): boolean {
+  return /^(1|true|yes|ano|y|replied|reply)$/i.test(String(value ?? "").trim());
+}
+
+function numericEvidence(value?: string): number {
+  const normalized = String(value ?? "").replace(",", ".").trim();
+  const match = normalized.match(/\d+(?:\.\d+)?/);
+  return match ? Number(match[0]) : 0;
+}
+
+function smartleadBlockedEvidence(lead: LeadCandidateInput, evidence: Record<string, string>): boolean {
+  const custom = lead.customFields ?? {};
+  const blocked = stringField(custom, "blocked_or_unsubscribed", "is_unsubscribed", "unsubscribed");
+  return truthyEvidence(blocked)
+    || /(blocked|bounced|unsubscribed|stopped|paused)/i.test(evidence.smartlead_statuses)
+    || /(blocked|bounced|unsubscribed|stopped|paused)/i.test(stringField(custom, "smartlead_status", "status") ?? "");
 }
 
 function csvEscape(value: unknown): string {

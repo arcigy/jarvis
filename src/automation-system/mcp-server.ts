@@ -34,6 +34,7 @@ import {
   buildNicheOpsDashboardPreview,
   buildSuppressionListPreview,
   buildSmartleadHistorySuppressionPreview,
+  buildSmartleadNonreplyCallListPreview,
   batchScrapeWebsiteContacts,
   batchDraftLeadIntros,
   buildAiIntroQualityAuditPreview,
@@ -1918,6 +1919,34 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildSmartleadHistorySuppressionPreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_smartlead_nonreply_call_list_preview",
+    {
+      title: "Build Smartlead non-reply call list preview",
+      description: "Create a read-only call/follow-up list from Smartlead or CSV leads that were sent but did not reply, including phone scrape and CSV export next steps.",
+      inputSchema: {
+        leads: z.array(suppressionLeadSchema).optional(),
+        csvText: z.string().optional(),
+        delimiter: z.enum([",", ";"]).optional(),
+        maxRows: z.number().int().min(1).max(10_000).default(1000),
+        sourceName: z.string().optional(),
+        sourceType: z.enum(["smartlead", "csv", "manual", "other"]).default("csv"),
+        campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+        minSentMessages: z.number().int().min(0).max(20).default(1),
+        excludeBlockedOrUnsubscribed: z.boolean().default(true),
+        includeWithoutPhone: z.boolean().default(false),
+        maxNextCalls: z.number().int().min(1).max(100).default(30),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildSmartleadNonreplyCallListPreview(input))
   );
 
   server.registerTool(

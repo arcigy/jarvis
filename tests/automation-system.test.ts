@@ -37,6 +37,7 @@ import {
   buildColdOutreachCsvImportPreview,
   buildSuppressionListPreview,
   buildSmartleadHistorySuppressionPreview,
+  buildSmartleadNonreplyCallListPreview,
   buildSmartleadCampaignLaunchPreview,
   buildSmartleadCampaignQaPreview,
   buildSmartleadCampaignHandoffPackagePreview,
@@ -171,6 +172,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.dedupe_lead_candidates",
     "arcigy.build_suppression_list_preview",
     "arcigy.build_smartlead_history_suppression_preview",
+    "arcigy.build_smartlead_nonreply_call_list_preview",
     "arcigy.build_niche_leadgen_plan",
     "arcigy.build_batch_niche_discovery_plan",
     "arcigy.build_leadgen_execution_queue_preview",
@@ -1459,7 +1461,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 105 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 106 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -4057,6 +4059,38 @@ test("Smartlead history suppression preview filters already contacted CSV leads"
   assert.ok(preview.suppressed.some((item) => item.reason === "already_replied"));
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_leadgen_autopilot_batch_preview" && !call.approvalRequired));
   assert.match(preview.summary, /Ziadny zapis ani upload/);
+});
+
+test("Smartlead nonreply call list preview prepares phone scrape and export steps", () => {
+  const preview = buildSmartleadNonreplyCallListPreview({
+    sourceName: "kuchyne_sk_nonrepliers.csv",
+    sourceType: "smartlead",
+    campaignId: "123456",
+    csvText: [
+      "company,email,website,phone,smartlead_status,sent_messages,smartlead_replied,blocked_or_unsubscribed",
+      "Ready Studio,jan@ready.sk,https://ready.sk,+421 900 111 222,SENT,2,no,no",
+      "Needs Phone,info@needs-phone.sk,https://needs-phone.sk,,SENT,2,no,no",
+      "Replied Studio,reply@ready.sk,https://reply.sk,+421 900 222 333,REPLIED,2,yes,no",
+      "Blocked Studio,block@ready.sk,https://blocked.sk,+421 900 333 444,BLOCKED,2,no,yes",
+      "Not Sent Yet,new@ready.sk,https://new.sk,+421 900 444 555,CREATED,0,no,no",
+    ].join("\n"),
+    minSentMessages: 1,
+  });
+
+  assert.equal(preview.mode, "smartlead-nonreply-call-list-preview");
+  assert.equal(preview.totals.input, 5);
+  assert.equal(preview.totals.nonRepliers, 2);
+  assert.equal(preview.totals.callable, 1);
+  assert.equal(preview.totals.needsPhoneScrape, 1);
+  assert.equal(preview.totals.replied, 1);
+  assert.equal(preview.totals.blockedOrUnsubscribed, 1);
+  assert.equal(preview.totals.belowSentThreshold, 1);
+  assert.equal(preview.callableRows[0].email, "jan@ready.sk");
+  assert.equal(preview.exportPreview.rowCount, 1);
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.get_smartlead_campaign_leads" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_scrape_website_contacts" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.export_leads_csv" && call.approvalRequired));
+  assert.match(preview.summary, /Ziadny zapis ani export/);
 });
 
 test("niche plan and Smartlead sequence drafts follow leadgen conventions", () => {

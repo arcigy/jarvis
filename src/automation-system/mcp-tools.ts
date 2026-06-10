@@ -67,6 +67,7 @@ export type JarvisMcpToolName =
   | "arcigy.dedupe_lead_candidates"
   | "arcigy.build_suppression_list_preview"
   | "arcigy.build_smartlead_history_suppression_preview"
+  | "arcigy.build_smartlead_nonreply_call_list_preview"
   | "arcigy.build_niche_leadgen_plan"
   | "arcigy.build_batch_niche_discovery_plan"
   | "arcigy.build_leadgen_execution_queue_preview"
@@ -463,6 +464,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.build_smartlead_history_suppression_preview",
       description: "Z CSV/manual leadov vyradi uz odoslane, odpovedane, blokovane alebo v Smartlead najdene leady pred autopilotom a uploadom.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_smartlead_nonreply_call_list_preview",
+      description: "Pripravi call/follow-up list zo Smartlead alebo CSV leadov, ktorym sa pisalo a neodpovedali, vratane phone scrape a CSV export krokov.",
       requiresApproval: false,
     },
     {

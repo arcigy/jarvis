@@ -941,6 +941,20 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Build Smartlead non-replier call list",
+      tool: "arcigy.build_smartlead_nonreply_call_list_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_smartlead_nonreply_call_list_preview"),
+      body: {
+        sourceName: "kuchyne_sk_nonrepliers.csv",
+        sourceType: "smartlead",
+        campaignId: "123456",
+        csvText: "company,email,website,phone,smartlead_status,sent_messages,smartlead_replied,blocked_or_unsubscribed\nReady Studio,jan@ready.sk,https://ready.sk,+421 900 111 222,SENT,2,no,no\nNeeds Phone,info@needs-phone.sk,https://needs-phone.sk,,SENT,2,no,no\nReplied Studio,reply@ready.sk,https://reply.sk,+421 900 222 333,REPLIED,2,yes,no",
+        minSentMessages: 1,
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Draft a Smartlead sequence without writing",
       tool: "arcigy.draft_smartlead_campaign_sequence",
       method: "POST",

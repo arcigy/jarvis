@@ -33,6 +33,7 @@ import {
   buildNicheOpsDashboardPreview,
   buildSuppressionListPreview,
   buildSmartleadHistorySuppressionPreview,
+  buildSmartleadNonreplyCallListPreview,
   batchScrapeWebsiteContacts,
   batchDraftLeadIntros,
   buildAiIntroQualityAuditPreview,
@@ -1520,6 +1521,24 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         suppressReplies: payload.suppressReplies !== false,
         suppressBlockedStatuses: payload.suppressBlockedStatuses !== false,
         suppressExistingSmartleadMatch: payload.suppressExistingSmartleadMatch !== false,
+        maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_smartlead_nonreply_call_list_preview") {
+    writeJson(response, 200, {
+      result: buildSmartleadNonreplyCallListPreview({
+        leads: Array.isArray(payload.leads) ? payload.leads as Parameters<typeof buildSmartleadNonreplyCallListPreview>[0]["leads"] : undefined,
+        csvText: optionalString(payload.csvText),
+        delimiter: payload.delimiter === ";" ? ";" : payload.delimiter === "," ? "," : undefined,
+        maxRows: typeof payload.maxRows === "number" ? payload.maxRows : undefined,
+        sourceName: optionalString(payload.sourceName),
+        sourceType: ["smartlead", "csv", "manual", "other"].includes(String(payload.sourceType)) ? payload.sourceType as Parameters<typeof buildSmartleadNonreplyCallListPreview>[0]["sourceType"] : undefined,
+        campaignId: (payload.campaignId ?? null) as string | number | null,
+        minSentMessages: typeof payload.minSentMessages === "number" ? payload.minSentMessages : undefined,
+        excludeBlockedOrUnsubscribed: payload.excludeBlockedOrUnsubscribed !== false,
+        includeWithoutPhone: payload.includeWithoutPhone === true,
         maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
       }),
     });

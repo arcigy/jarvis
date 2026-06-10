@@ -431,6 +431,15 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       csvText: "company,website,smartlead_match,smartlead_statuses,smartlead_sent_messages,cold_email_sent,smartlead_replied\nReady Studio,https://ready.sk,,,,no,no\nAlready Sent,https://sent.sk,domain,SENT,1,yes,no\nReplied Studio,https://reply.sk,domain,REPLIED,1,yes,yes",
     };
   }
+  if (toolName === "arcigy.build_smartlead_nonreply_call_list_preview") {
+    return {
+      sourceName: "kuchyne_sk_nonrepliers.csv",
+      sourceType: "smartlead",
+      campaignId: "123456",
+      csvText: "company,email,website,phone,smartlead_status,sent_messages,smartlead_replied,blocked_or_unsubscribed\nReady Studio,jan@ready.sk,https://ready.sk,+421 900 111 222,SENT,2,no,no\nNeeds Phone,info@needs-phone.sk,https://needs-phone.sk,,SENT,2,no,no\nReplied Studio,reply@ready.sk,https://reply.sk,+421 900 222 333,REPLIED,2,yes,no",
+      minSentMessages: 1,
+    };
+  }
   if (toolName === "arcigy.build_niche_leadgen_plan") return { niche: "autoservisy", region: "Bratislava" };
   if (toolName === "arcigy.build_batch_niche_discovery_plan") {
     return {
