@@ -32,6 +32,7 @@ import { resolveJarvisIntentFromTranscript } from "../src/automation-system/jarv
 import { buildProductionReadinessReport } from "../src/automation-system/production-readiness.ts";
 import { buildOperatorBriefing } from "../src/automation-system/operator-briefing.ts";
 import { buildJarvisCapabilityAudit } from "../src/automation-system/jarvis-capability-audit.ts";
+import { buildProductionCompletionScore, summarizeProductionCompletionScoreForVoice } from "../src/automation-system/production-completion-score.ts";
 import { jarvisAutomations } from "../src/automation-system/jarvis-automations.ts";
 import { buildRemoteMcpOpenApiDocument } from "../src/automation-system/remote-mcp-openapi.ts";
 import { buildRemoteMcpConnectionPack } from "../src/automation-system/remote-mcp-pack.ts";
@@ -65,6 +66,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.run_integration_diagnostics",
     "arcigy.get_production_readiness",
     "arcigy.get_production_verification_evidence",
+    "arcigy.get_production_completion_score",
     "arcigy.get_jarvis_capability_audit",
     "arcigy.get_remote_mcp_pack",
     "arcigy.run_remote_mcp_smoke",
@@ -114,6 +116,7 @@ test("Jarvis capability audit maps the full requested production surface to evid
     GEMINI_API_KEY: "gemini-key",
     SMARTLEAD_API_KEY: "smartlead-key",
     DATABASE_URL: "postgres://example.com:5432/db",
+    REDIS_URL: "redis://default:password@example.com:6379",
     GOOGLE_CLIENT_ID: "client",
     GOOGLE_CLIENT_SECRET: "secret",
     GOOGLE_SHEET_ID: "sheet",
@@ -168,6 +171,15 @@ test("Jarvis capability audit maps the full requested production surface to evid
   assert.ok(audit.capabilities.some((item) => item.id === "proactive-digest" && item.status === "ready" && item.tools.includes("arcigy.sync_gmail_recent_messages")));
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.append_leads_to_google_sheet")));
   assert.doesNotMatch(JSON.stringify(audit), /AIza|GOCSPX|1\/\/|postgresql:\/\/|redis:\/\//);
+
+  const score = buildProductionCompletionScore({ readiness, productionEvidence, capabilityAudit: audit, env, generatedAt: "2026-06-09T00:00:00.000Z" });
+  assert.equal(score.mode, "arcigy-jarvis-production-completion-score");
+  assert.equal(score.status, "ready");
+  assert.equal(score.percent, 100);
+  assert.equal(score.components.length, 5);
+  assert.equal(score.components.every((item) => item.status === "ready"), true);
+  assert.match(summarizeProductionCompletionScoreForVoice(score), /Sme na 100% production completion/);
+  assert.doesNotMatch(JSON.stringify(score), /AIza|GOCSPX|1\/\/|postgresql:\/\/|redis:\/\//);
 });
 
 test("production readiness report returns blockers and next actions without secrets", async () => {
@@ -230,17 +242,21 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.equal(document["x-arcigy-agent-setup"].recommendedImports.connectionPackUrl, "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true");
   assert.equal(document["x-arcigy-agent-setup"].proofPolicy.freshnessMaxAgeHours, 24);
   assert.ok(document["x-arcigy-agent-setup"].firstTools.includes("arcigy.get_jarvis_capability_audit"));
+  assert.ok(document["x-arcigy-agent-setup"].firstTools.includes("arcigy.get_production_completion_score"));
   assert.ok(document["x-arcigy-agent-setup"].proofPolicy.beforeAnyWork.some((step) => step.includes("smokeTestUrl") && step.includes("status=ready")));
   assert.ok(document["x-arcigy-agent-setup"].proofPolicy.beforeWrites.some((step) => step.includes("approval.approved=true")));
   assert.equal(paths.length, listJarvisMcpTools().length);
   assert.ok(paths.includes("/api/mcp/arcigy.get_operator_briefing"));
   assert.ok(paths.includes("/api/mcp/arcigy.generate_contract_documents"));
   assert.ok(paths.includes("/api/mcp/arcigy.get_production_verification_evidence"));
+  assert.ok(paths.includes("/api/mcp/arcigy.get_production_completion_score"));
   assert.ok(paths.includes("/api/mcp/arcigy.get_jarvis_capability_audit"));
   const operatorBriefing = document.paths["/api/mcp/arcigy.get_operator_briefing"] as OpenApiPathFixture;
+  const completionScore = document.paths["/api/mcp/arcigy.get_production_completion_score"] as OpenApiPathFixture;
   const gmailSync = document.paths["/api/mcp/arcigy.sync_gmail_recent_messages"] as OpenApiPathFixture;
   const contractGenerate = document.paths["/api/mcp/arcigy.generate_contract_documents"] as OpenApiPathFixture;
   assert.equal(operatorBriefing.post.requestBody.content["application/json"].examples.quickStart.value.live, false);
+  assert.equal(completionScore.post.requestBody.content["application/json"].examples.quickStart.value.live, false);
   assert.equal(operatorBriefing.post.requestBody.content["application/json"].examples.quickStart.value.syncGmail, false);
   assert.equal(gmailSync.post.requestBody.content["application/json"].examples.quickStart.value.dryRun, true);
   assert.equal(contractGenerate.post["x-arcigy-requiresApproval"], true);
@@ -1268,7 +1284,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 36 toolov, 6 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 37 toolov, 6 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -1464,6 +1480,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.agentLaunchBundle.proofPolicy.beforeWrites.some((step) => step.includes("approval.approved=true")));
   assert.ok(pack.agentLaunchBundle.safetyRails.some((rail) => rail.includes("OAuth refresh tokens")));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_production_verification_evidence" && call.approvalRequired === false));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_production_completion_score" && call.body.live === false && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_jarvis_capability_audit" && call.body.live === false && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.label === "Spustit remote MCP smoke proof"));
   assert.ok(pack.quickStartCalls.some((call) => call.label === "Ziskat najnovsiu production verification evidence"));
@@ -2759,6 +2776,9 @@ test("Jarvis voice resolves production, remote MCP, contracts, Gmail, and client
   const capabilityAuditIntent = resolveJarvisIntentFromTranscript("Jarvis capability audit co vsetko je pokryte");
   assert.equal(capabilityAuditIntent?.kind, "voice_capability");
   assert.equal(capabilityAuditIntent?.kind === "voice_capability" ? capabilityAuditIntent.capability : null, "capability_audit");
+  const completionIntent = resolveJarvisIntentFromTranscript("Jarvis na kolko percent sme ready");
+  assert.equal(completionIntent?.kind, "voice_capability");
+  assert.equal(completionIntent?.kind === "voice_capability" ? completionIntent.capability : null, "production_completion_score");
   assert.equal(resolveJarvisIntentFromTranscript("Jarvis priprav remote MCP handoff pre Claude")?.kind, "voice_capability");
   assert.equal(resolveJarvisIntentFromTranscript("Jarvis priprav MCP handoff pre Grok")?.kind, "voice_capability");
   assert.equal(resolveJarvisIntentFromTranscript("Jarvis priprav zmluvny intake")?.kind, "voice_capability");
@@ -2788,6 +2808,13 @@ test("Jarvis voice resolves production, remote MCP, contracts, Gmail, and client
   assert.equal(auditResponse.session.state, "idle");
   assert.match(auditResponse.speakText ?? "", /Jarvis capability audit/);
   assert.match(auditResponse.speakText ?? "", /approval safety/);
+
+  const completionResponse = handleJarvisVoiceEvent(createJarvisVoiceSession(), {
+    type: "transcript",
+    text: "Jarvis na kolko percent sme ready",
+  });
+  assert.equal(completionResponse.session.state, "idle");
+  assert.match(completionResponse.speakText ?? "", /production completion score/);
 });
 
 test("local SQLite CLI persists people and need signals", () => {

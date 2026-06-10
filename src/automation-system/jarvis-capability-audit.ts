@@ -50,7 +50,7 @@ const capabilityDefinitions: CapabilityDefinition[] = [
     title: "Universal Arcigy contract automation",
     tools: ["arcigy.draft_contract_intake", "arcigy.generate_contract_documents"],
     approvalRequired: ["arcigy.generate_contract_documents"],
-    evidence: ["contractGeneration", "contract-template-safety", "tests", "ui-smoke"],
+    evidence: ["contract-template-safety", "tests", "ui-smoke"],
     envKeys: ["gemini"],
   },
   {
@@ -87,7 +87,7 @@ const capabilityDefinitions: CapabilityDefinition[] = [
   {
     id: "voice-jarvis",
     title: "Jarvis wake-word desktop voice loop",
-    tools: ["arcigy.jarvis_voice_event", "arcigy.get_operator_briefing", "arcigy.get_production_verification_evidence"],
+    tools: ["arcigy.jarvis_voice_event", "arcigy.get_operator_briefing", "arcigy.get_production_verification_evidence", "arcigy.get_production_completion_score"],
     approvalRequired: [],
     evidence: ["ui-smoke", "ui-smoke-narrow", "voice-tool-call", "pack-voice-quick-start", "voice-outreach-style"],
   },
@@ -113,6 +113,7 @@ const capabilityDefinitions: CapabilityDefinition[] = [
       "arcigy.run_remote_mcp_smoke",
       "arcigy.get_production_readiness",
       "arcigy.get_production_verification_evidence",
+      "arcigy.get_production_completion_score",
       "arcigy.get_jarvis_capability_audit",
       "arcigy.get_operator_briefing",
     ],

@@ -36,7 +36,7 @@ export type RemoteMcpOpenApiDocument = {
       productionVerificationEvidenceUrl: string;
       mcpToolCallPattern: string;
     };
-    firstTools: Array<"arcigy.get_operator_briefing" | "arcigy.get_jarvis_capability_audit" | "arcigy.get_production_verification_evidence">;
+    firstTools: Array<"arcigy.get_operator_briefing" | "arcigy.get_jarvis_capability_audit" | "arcigy.get_production_completion_score" | "arcigy.get_production_verification_evidence">;
     proofPolicy: {
       freshnessMaxAgeHours: 24;
       beforeAnyWork: string[];
@@ -176,7 +176,7 @@ function buildOpenApiAgentSetup(baseUrl: string): RemoteMcpOpenApiDocument["x-ar
       productionVerificationEvidenceUrl: `${baseUrl}/api/production-verification-evidence`,
       mcpToolCallPattern: `${baseUrl}/api/mcp/{toolName}`,
     },
-    firstTools: ["arcigy.get_operator_briefing", "arcigy.get_jarvis_capability_audit", "arcigy.get_production_verification_evidence"],
+    firstTools: ["arcigy.get_operator_briefing", "arcigy.get_jarvis_capability_audit", "arcigy.get_production_completion_score", "arcigy.get_production_verification_evidence"],
     proofPolicy: {
       freshnessMaxAgeHours: 24,
       beforeAnyWork: [
@@ -207,6 +207,7 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
   if (toolName === "arcigy.run_remote_mcp_smoke") return {};
   if (toolName === "arcigy.get_operator_briefing") return { periodLabel: "poslednych 7 dni", live: false, syncGmail: false };
   if (toolName === "arcigy.get_production_readiness") return { live: false };
+  if (toolName === "arcigy.get_production_completion_score") return { live: false };
   if (toolName === "arcigy.get_jarvis_capability_audit") return { live: false };
   if (toolName === "arcigy.get_approval_queue") return { limit: 20 };
   if (toolName === "arcigy.identify_email") return { email: "client@example.com" };

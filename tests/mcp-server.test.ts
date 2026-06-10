@@ -46,6 +46,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(names.includes("arcigy.run_integration_diagnostics"));
   assert.ok(names.includes("arcigy.get_production_readiness"));
   assert.ok(names.includes("arcigy.get_production_verification_evidence"));
+  assert.ok(names.includes("arcigy.get_production_completion_score"));
   assert.ok(names.includes("arcigy.get_jarvis_capability_audit"));
   assert.ok(names.includes("arcigy.get_remote_mcp_pack"));
   assert.ok(names.includes("arcigy.run_remote_mcp_smoke"));
@@ -159,6 +160,18 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(Array.isArray(evidence.checks));
   assert.doesNotMatch(JSON.stringify(evidence), /AIza|GOCSPX|1\/\/|postgresql:\/\/|redis:\/\//);
 
+  const completionResult = await client.callTool({
+    name: "arcigy.get_production_completion_score",
+    arguments: { live: false },
+  });
+  const completion = getStructuredResult(completionResult) as { mode: string; status: string; percent: number; components: unknown[] };
+  assert.equal(completion.mode, "arcigy-jarvis-production-completion-score");
+  assert.ok(["ready", "attention", "blocked"].includes(completion.status));
+  assert.equal(typeof completion.percent, "number");
+  assert.equal(completion.percent >= 0 && completion.percent <= 100, true);
+  assert.equal(Array.isArray(completion.components), true);
+  assert.doesNotMatch(JSON.stringify(completion), /AIza|GOCSPX|1\/\/|postgresql:\/\/|redis:\/\//);
+
   const auditResult = await client.callTool({
     name: "arcigy.get_jarvis_capability_audit",
     arguments: { live: false },
@@ -185,6 +198,16 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.match(voiceAudit.speakText ?? "", /MCP: \d+ toolov/);
   assert.equal(voiceAudit.session.lastResponse, voiceAudit.speakText);
   assert.doesNotMatch(JSON.stringify(voiceAudit), /AIza|GOCSPX|1\/\/|postgresql:\/\/|redis:\/\//);
+
+  const voiceCompletionResult = await client.callTool({
+    name: "arcigy.jarvis_voice_event",
+    arguments: { text: "Jarvis na kolko percent sme ready", session: { state: "idle", wakeWord: "jarvis" }, live: false },
+  });
+  const voiceCompletion = getStructuredResult(voiceCompletionResult) as { session: { state: string; lastResponse?: string }; speakText?: string };
+  assert.equal(voiceCompletion.session.state, "idle");
+  assert.match(voiceCompletion.speakText ?? "", /Sme na \d+% production completion/);
+  assert.equal(voiceCompletion.session.lastResponse, voiceCompletion.speakText);
+  assert.doesNotMatch(JSON.stringify(voiceCompletion), /AIza|GOCSPX|1\/\/|postgresql:\/\/|redis:\/\//);
   assertToolError(
     await client.callTool({
       name: "arcigy.jarvis_voice_event",
@@ -252,6 +275,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.equal(pack.tools.readOnlyOrDraft.includes("arcigy.upsert_local_person"), false);
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.run_remote_mcp_smoke" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_production_verification_evidence" && call.approvalRequired === false));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_production_completion_score" && call.body.live === false && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.every((call) => call.method === "POST" && call.url === `https://jarvis.example.ngrok-free.app/api/mcp/${call.tool}`));
   assert.ok(pack.quickStartCalls.every((call) => call.approvalRequired === pack.tools.approvalRequired.includes(call.tool)));
   assert.ok(pack.quickStartCalls.every((call) => call.exactMcpCall.tool === call.tool && call.exactMcpCall.url === call.url));

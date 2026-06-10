@@ -689,7 +689,7 @@ const coreWebWorkflowSurfaces = [
   {
     id: "voice-workflow",
     title: "Jarvis voice workflow",
-    tools: ["arcigy.jarvis_voice_event", "arcigy.get_operator_briefing", "arcigy.get_production_verification_evidence"],
+    tools: ["arcigy.jarvis_voice_event", "arcigy.get_operator_briefing", "arcigy.get_production_verification_evidence", "arcigy.get_production_completion_score"],
     approvalRequired: [],
     proof: "Wake-word command handling, operator briefing, and production evidence voice path are registered.",
   },
@@ -714,6 +714,7 @@ const coreWebWorkflowSurfaces = [
       "arcigy.run_remote_mcp_smoke",
       "arcigy.get_production_readiness",
       "arcigy.get_production_verification_evidence",
+      "arcigy.get_production_completion_score",
       "arcigy.get_jarvis_capability_audit",
     ],
     approvalRequired: [],
@@ -1090,7 +1091,7 @@ function jarvisCapabilityDefinitions() {
       title: "Universal Arcigy contract automation",
       tools: ["arcigy.draft_contract_intake", "arcigy.generate_contract_documents"],
       approvalRequired: ["arcigy.generate_contract_documents"],
-      evidence: ["contractGeneration", "contract-template-safety", "tests", "ui-smoke"],
+      evidence: ["contract-template-safety", "tests", "ui-smoke"],
       envKeys: ["gemini"],
     },
     {
@@ -1354,16 +1355,16 @@ function buildRemoteMcpAgentLaunchBundle(baseUrl, status) {
       stopTunnelUrl: `${baseUrl}/api/stop-secure-tunnel`,
     },
     firstPrompts: {
-      Claude: `${sharedPrompt} In Claude, use the external HTTP MCP bridge and start with arcigy.get_operator_briefing plus arcigy.get_jarvis_capability_audit.`,
-      ChatGPT: `${sharedPrompt} In ChatGPT, import ${shareWithAgent.openApiSchemaUrl} as a custom action schema and start with arcigy.get_operator_briefing plus arcigy.get_jarvis_capability_audit.`,
-      Grok: `${sharedPrompt} In Grok, import ${shareWithAgent.openApiSchemaUrl} when actions are available, otherwise call POST ${shareWithAgent.mcpToolCallPattern}. Start with arcigy.get_operator_briefing plus arcigy.get_jarvis_capability_audit.`,
-      "Generic HTTP agent": `${sharedPrompt} Use POST JSON calls against ${shareWithAgent.mcpToolCallPattern} and start with arcigy.get_operator_briefing plus arcigy.get_jarvis_capability_audit.`,
+      Claude: `${sharedPrompt} In Claude, use the external HTTP MCP bridge and start with arcigy.get_operator_briefing plus arcigy.get_jarvis_capability_audit and arcigy.get_production_completion_score.`,
+      ChatGPT: `${sharedPrompt} In ChatGPT, import ${shareWithAgent.openApiSchemaUrl} as a custom action schema and start with arcigy.get_operator_briefing plus arcigy.get_jarvis_capability_audit and arcigy.get_production_completion_score.`,
+      Grok: `${sharedPrompt} In Grok, import ${shareWithAgent.openApiSchemaUrl} when actions are available, otherwise call POST ${shareWithAgent.mcpToolCallPattern}. Start with arcigy.get_operator_briefing plus arcigy.get_jarvis_capability_audit and arcigy.get_production_completion_score.`,
+      "Generic HTTP agent": `${sharedPrompt} Use POST JSON calls against ${shareWithAgent.mcpToolCallPattern} and start with arcigy.get_operator_briefing plus arcigy.get_jarvis_capability_audit and arcigy.get_production_completion_score.`,
     },
     proofPolicy: {
       freshnessMaxAgeHours: 24,
       beforeAnyWork: [
         "Fetch the connection pack and confirm tokenValueReturned=false.",
-        "Call arcigy.get_jarvis_capability_audit or the Jarvis capability audit voice quick-start and cite coverage, MCP counts, and evidence status.",
+        "Call arcigy.get_jarvis_capability_audit and arcigy.get_production_completion_score, then cite coverage, completion percent, MCP counts, and evidence status.",
         "Nacitaj productionVerificationEvidenceUrl alebo zavolaj arcigy.get_production_verification_evidence.",
         "Run smokeTestUrl and require status=ready.",
       ],
@@ -1465,7 +1466,7 @@ function buildRemoteMcpAgentPromptTemplates(baseUrl) {
   const shared =
     `Use Arcigy Jarvis remote MCP at ${baseUrl}. ` +
     "First fetch the connection pack, action manifest, manifest, and OpenAPI schema with Authorization: Bearer <JARVIS_WEB_TOKEN>, then run remote smoke. " +
-    "Do not ask for or reveal secrets. Start with arcigy.get_operator_briefing and arcigy.get_jarvis_capability_audit. Use read-only/draft tools first. " +
+    "Do not ask for or reveal secrets. Start with arcigy.get_operator_briefing, arcigy.get_jarvis_capability_audit, and arcigy.get_production_completion_score. Use read-only/draft tools first. " +
     "Nikdy nevolaj approvalRequired tooly, kym operator nepotvrdi presny payload.";
   return {
     claude: `${shared} In Claude, treat this as an external HTTP MCP bridge and cite the smoke status before any write proposal.`,
@@ -1485,7 +1486,7 @@ function buildRemoteMcpAgentCompatibility() {
       "Nacitaj actionManifestUrl, ak agent podporuje ai-plugin/action manifests.",
       "Import openApiSchemaUrl if the agent supports OpenAPI or custom actions.",
       "Nacitaj productionVerificationEvidenceUrl alebo zavolaj arcigy.get_production_verification_evidence a cituj status.",
-      "Zavolaj arcigy.get_jarvis_capability_audit alebo voice quick-start Jarvis capability audit a cituj coverage, MCP counts a evidence status.",
+      "Zavolaj arcigy.get_jarvis_capability_audit a arcigy.get_production_completion_score a cituj coverage, completion percento, MCP counts a evidence status.",
       "Fetch handoff.connectionPackUrl and confirm tokenValueReturned=false plus repo-only limits.",
       "Run smokeTestUrl and require status=ready with all 37 required remote MCP smoke gates ready, including manifest, tool-count, manifest-tool-registry, manifest-tool-metadata, auth-placeholder, manifest-local-write-policy, action-manifest, openapi-schema, cors-preflight, external-auth-gate, connection-pack, pack-secret-policy, pack-auth-throttle-policy, pack-limits, pack-tunnel-controls, secure-tunnel-status, pack-local-write-policy, pack-tool-registry, pack-quick-start-urls, pack-quick-start-approval-policy, pack-quick-start-exact-mcp-calls, pack-contract-quick-start, pack-contract-draft-quick-start, pack-agent-setup-profiles, pack-agent-launch-bundle, pack-voice-quick-start, pack-handoff-proof, pack-agent-compatibility, pack-client-memory-quick-start, pack-audit-quick-start, voice-tool-call, pack-production-evidence-quick-start, read-only-tool-call, production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction. Production evidence must include release proof, dirty=false, and freshness.fresh=true within 24h.",
       "Inspect tunnel.statusUrl after any tunnel start and never ask for the real bearer token.",
@@ -1516,7 +1517,7 @@ function buildRemoteMcpHandoffRunbook(baseUrl) {
       "Nacitaj actionManifestUrl, ak agent podporuje ai-plugin/action manifests.",
       "Nacitaj openApiSchemaUrl, ak agent podporuje OpenAPI/custom actions.",
       "Nacitaj productionVerificationEvidenceUrl alebo zavolaj arcigy.get_production_verification_evidence a cituj status.",
-      "Zavolaj arcigy.get_jarvis_capability_audit alebo voice quick-start Jarvis capability audit a cituj coverage, MCP counts a evidence status.",
+      "Zavolaj arcigy.get_jarvis_capability_audit a arcigy.get_production_completion_score a cituj coverage, completion percento, MCP counts a evidence status.",
       "Run smokeTestUrl and require status=ready with all 37 required remote MCP smoke gates ready, including manifest, tool-count, manifest-tool-registry, manifest-tool-metadata, auth-placeholder, manifest-local-write-policy, action-manifest, openapi-schema, cors-preflight, external-auth-gate, connection-pack, pack-secret-policy, pack-auth-throttle-policy, pack-limits, pack-tunnel-controls, secure-tunnel-status, pack-local-write-policy, pack-tool-registry, pack-quick-start-urls, pack-quick-start-approval-policy, pack-quick-start-exact-mcp-calls, pack-contract-quick-start, pack-contract-draft-quick-start, pack-agent-setup-profiles, pack-agent-launch-bundle, pack-voice-quick-start, pack-handoff-proof, pack-agent-compatibility, pack-client-memory-quick-start, pack-audit-quick-start, voice-tool-call, pack-production-evidence-quick-start, read-only-tool-call, production-evidence-tool-call, approval-gate, approval-shape-gate, and secret-redaction before using MCP tools. Production evidence must include release proof, dirty=false, and freshness.fresh=true within 24h.",
       "Nacitaj tunnel.statusUrl, ak operator potrebuje aktualne public tunnel URL; token values musia ostat redigovane.",
       "Pred navrhom prace zavolaj arcigy.get_operator_briefing.",
@@ -1598,6 +1599,14 @@ function buildRemoteMcpQuickStartCalls(baseUrl) {
       tool: "arcigy.get_jarvis_capability_audit",
       method: "POST",
       url: toolUrl("arcigy.get_jarvis_capability_audit"),
+      body: { live: false },
+      approvalRequired: false,
+    },
+    {
+      label: "Zistit production completion percento",
+      tool: "arcigy.get_production_completion_score",
+      method: "POST",
+      url: toolUrl("arcigy.get_production_completion_score"),
       body: { live: false },
       approvalRequired: false,
     },
@@ -2237,6 +2246,7 @@ function hasValidOpenApiAgentSetup(value, baseUrl) {
     value.recommendedImports?.mcpToolCallPattern === `${baseUrl}/api/mcp/{toolName}` &&
     firstTools.includes("arcigy.get_operator_briefing") &&
     firstTools.includes("arcigy.get_jarvis_capability_audit") &&
+    firstTools.includes("arcigy.get_production_completion_score") &&
     firstTools.includes("arcigy.get_production_verification_evidence") &&
     value.proofPolicy?.freshnessMaxAgeHours === 24 &&
     beforeAnyWork.some((step) => typeof step === "string" && step.includes("smokeTestUrl") && step.includes("status=ready")) &&
@@ -2251,6 +2261,7 @@ function hasSafeOpenApiExample(toolName, value) {
   if (!value || typeof value !== "object") return false;
   if (/AIza|GOCSPX|1\/\/|postgres(?:ql)?:\/\/|redis:\/\//i.test(JSON.stringify(value))) return false;
   if (toolName === "arcigy.get_operator_briefing") return value.live === false && value.syncGmail === false;
+  if (toolName === "arcigy.get_production_completion_score") return value.live === false;
   if (toolName === "arcigy.sync_gmail_recent_messages") return value.dryRun === true;
   if (toolName === "arcigy.identify_email") return typeof value.email === "string" && value.email.includes("@");
   if (toolName === "arcigy.generate_contract_documents") return value.approval?.approved === true && typeof value.intake === "object";
@@ -2731,6 +2742,7 @@ function listWebMcpTools() {
     { name: "arcigy.run_integration_diagnostics", requiresApproval: false },
     { name: "arcigy.get_production_readiness", requiresApproval: false },
     { name: "arcigy.get_production_verification_evidence", requiresApproval: false },
+    { name: "arcigy.get_production_completion_score", requiresApproval: false },
     { name: "arcigy.get_jarvis_capability_audit", requiresApproval: false },
     { name: "arcigy.get_remote_mcp_pack", requiresApproval: false },
     { name: "arcigy.run_remote_mcp_smoke", requiresApproval: false },

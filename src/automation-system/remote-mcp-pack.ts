@@ -527,6 +527,14 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Zistit production completion percento",
+      tool: "arcigy.get_production_completion_score",
+      method: "POST",
+      url: toolUrl("arcigy.get_production_completion_score"),
+      body: { live: false },
+      approvalRequired: false,
+    },
+    {
       label: "Spytat sa Jarvisa na capability audit",
       tool: "arcigy.jarvis_voice_event",
       method: "POST",

@@ -132,6 +132,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.send_approved_outreach_reply" && tool.approval.required === true && tool.approval.field === "approval.approved"));
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.get_smartlead_outreach_brief" && tool.method === "POST"));
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.get_production_verification_evidence" && tool.readOnlyOrDraft === true));
+    assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.get_production_completion_score" && tool.readOnlyOrDraft === true));
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.get_jarvis_capability_audit" && tool.readOnlyOrDraft === true));
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.sync_gmail_recent_messages" && tool.localStateWrite === true && tool.readOnlyOrDraft === false));
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.prepare_positive_outreach_reply" && tool.localStateWrite === true && tool.readOnlyOrDraft === false));
@@ -470,6 +471,20 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(mcpEvidence.result.release.shortCommit, "0123456789ab");
     assert.equal(JSON.stringify(mcpEvidence).includes(syntheticGoogleKey), false);
 
+    const completionScore = await fetch(`${baseUrl}/api/production-completion-score`);
+    assert.equal(completionScore.status, 200);
+    const completionScoreBody = (await completionScore.json()) as { mode: string; status: string; percent: number; components: unknown[] };
+    assert.equal(completionScoreBody.mode, "arcigy-jarvis-production-completion-score");
+    assert.ok(["ready", "attention", "blocked"].includes(completionScoreBody.status));
+    assert.equal(typeof completionScoreBody.percent, "number");
+    assert.equal(Array.isArray(completionScoreBody.components), true);
+    assert.equal(JSON.stringify(completionScoreBody).includes(syntheticGoogleKey), false);
+
+    const mcpCompletionScore = await postJson(`${baseUrl}/api/mcp/arcigy.get_production_completion_score`, { live: false });
+    assert.equal(mcpCompletionScore.result.mode, "arcigy-jarvis-production-completion-score");
+    assert.equal(typeof mcpCompletionScore.result.percent, "number");
+    assert.equal(JSON.stringify(mcpCompletionScore).includes(syntheticGoogleKey), false);
+
     const capabilityAudit = await fetch(`${baseUrl}/api/jarvis-capability-audit`);
     assert.equal(capabilityAudit.status, 200);
     const capabilityAuditBody = (await capabilityAudit.json()) as {
@@ -535,10 +550,13 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(Object.keys(openApiBody.paths).length, listJarvisMcpTools().length);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.get_operator_briefing"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.generate_contract_documents"]);
+    assert.ok(openApiBody.paths["/api/mcp/arcigy.get_production_completion_score"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.get_jarvis_capability_audit"]);
     const openApiOperator = openApiBody.paths["/api/mcp/arcigy.get_operator_briefing"] as OpenApiPathFixture;
+    const openApiCompletionScore = openApiBody.paths["/api/mcp/arcigy.get_production_completion_score"] as OpenApiPathFixture;
     const openApiGmailSync = openApiBody.paths["/api/mcp/arcigy.sync_gmail_recent_messages"] as OpenApiPathFixture;
     const openApiContract = openApiBody.paths["/api/mcp/arcigy.generate_contract_documents"] as OpenApiPathFixture;
+    assert.equal(openApiCompletionScore.post.requestBody.content["application/json"].examples.quickStart.value.live, false);
     assert.equal(openApiOperator.post.requestBody.content["application/json"].examples.quickStart.value.syncGmail, false);
     assert.equal(openApiGmailSync.post.requestBody.content["application/json"].examples.quickStart.value.dryRun, true);
     assert.equal(openApiContract.post["x-arcigy-requiresApproval"], true);
@@ -652,6 +670,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(remotePackBody.quickStartCalls.every((call) => call.exactMcpCall.method === call.method && call.exactMcpCall.approvalRequired === call.approvalRequired));
     assert.ok(remotePackBody.quickStartCalls.every((call) => JSON.stringify(call.exactMcpCall.body) === JSON.stringify(call.body)));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_production_verification_evidence" && call.approvalRequired === false));
+    assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_production_completion_score" && call.body.live === false && call.approvalRequired === false));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_jarvis_capability_audit" && call.body.live === false && call.approvalRequired === false));
     assert.ok(
       remotePackBody.quickStartCalls.some(
@@ -848,6 +867,17 @@ test("local web bridge serves UI and API health", async () => {
     assert.match(voiceCapabilityAuditBody.speakText ?? "", /Coverage:/);
     assert.match(voiceCapabilityAuditBody.speakText ?? "", /MCP: \d+ toolov/);
     assert.doesNotMatch(voiceCapabilityAuditBody.speakText ?? "", /AIza|GOCSPX|1\/\/|postgresql:\/\/|redis:\/\//);
+
+    const voiceCompletionScore = await fetch(`${baseUrl}/api/jarvis/voice-event`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text: "Jarvis na kolko percent sme ready", session: { state: "idle", wakeWord: "jarvis" } }),
+    });
+    assert.equal(voiceCompletionScore.status, 200);
+    const voiceCompletionScoreBody = (await voiceCompletionScore.json()) as { session: { state: string }; speakText?: string };
+    assert.equal(voiceCompletionScoreBody.session.state, "idle");
+    assert.match(voiceCompletionScoreBody.speakText ?? "", /Sme na \d+% production completion/);
+    assert.doesNotMatch(voiceCompletionScoreBody.speakText ?? "", /AIza|GOCSPX|1\/\/|postgresql:\/\/|redis:\/\//);
 
     const voiceRemoteMcp = await fetch(`${baseUrl}/api/jarvis/voice-event`, {
       method: "POST",

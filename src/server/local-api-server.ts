@@ -15,6 +15,7 @@ import { buildJarvisCapabilityAudit, summarizeJarvisCapabilityAuditForVoice } fr
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "../automation-system/lead-discovery.ts";
 import { buildContractGenerationCommand, getColdOutreachMcpAnswer, listJarvisMcpTools, localStateWriteToolNames } from "../automation-system/mcp-tools.ts";
 import { buildOperatorBriefing } from "../automation-system/operator-briefing.ts";
+import { buildProductionCompletionScore, summarizeProductionCompletionScoreForVoice } from "../automation-system/production-completion-score.ts";
 import { buildProductionReadinessReport } from "../automation-system/production-readiness.ts";
 import { getProductionVerificationEvidence } from "../automation-system/production-verification-evidence.ts";
 import { buildRemoteMcpOpenApiDocument } from "../automation-system/remote-mcp-openapi.ts";
@@ -151,6 +152,11 @@ async function routeRequest(request: IncomingMessage, response: ServerResponse) 
 
   if (request.method === "GET" && url.pathname === "/api/production-verification-evidence") {
     writeJson(response, 200, getProductionVerificationEvidence(repoRoot));
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/production-completion-score") {
+    writeJson(response, 200, await getProductionCompletionScore({ live: url.searchParams.get("live") === "true" }));
     return;
   }
 
@@ -861,6 +867,10 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
     writeJson(response, 200, { result: getProductionVerificationEvidence(repoRoot) });
     return;
   }
+  if (name === "arcigy.get_production_completion_score") {
+    writeJson(response, 200, { result: await getProductionCompletionScore({ live: payload.live === true, dbPath: payload.dbPath }) });
+    return;
+  }
   if (name === "arcigy.get_jarvis_capability_audit") {
     writeJson(response, 200, { result: await getJarvisCapabilityAudit({ live: payload.live === true, dbPath: payload.dbPath }) });
     return;
@@ -1297,6 +1307,16 @@ async function getJarvisCapabilityAudit(payload: Record<string, unknown>) {
   });
 }
 
+async function getProductionCompletionScore(payload: Record<string, unknown>) {
+  const readiness = await buildProductionReadinessReport({
+    live: payload.live === true,
+    dbPath: resolveRepoPath(payload.dbPath, defaultDbPath, "dbPath"),
+  });
+  const productionEvidence = getProductionVerificationEvidence(repoRoot);
+  const capabilityAudit = buildJarvisCapabilityAudit({ readiness, productionEvidence });
+  return buildProductionCompletionScore({ readiness, productionEvidence, capabilityAudit });
+}
+
 async function getOperatorBriefing(payload: Record<string, unknown>) {
   const period = resolveColdOutreachPeriod(String(payload.text ?? payload.periodLabel ?? ""));
   const dbPath = resolveRepoPath(payload.dbPath, defaultDbPath, "dbPath");
@@ -1566,6 +1586,11 @@ async function handleWebVoiceEvent(payload: Record<string, unknown>, request?: I
   if (isProductionEvidenceVoiceCommand(lowered)) {
     const evidence = getProductionVerificationEvidence(repoRoot);
     return voiceDone(session, text, summarizeProductionEvidenceForVoice(evidence));
+  }
+
+  if (isProductionCompletionVoiceCommand(lowered)) {
+    const score = await getProductionCompletionScore({ ...payload, live: payload.live === true || lowered.includes("live") });
+    return voiceDone(session, text, summarizeProductionCompletionScoreForVoice(score));
   }
 
   if (isCapabilityAuditVoiceCommand(lowered)) {
@@ -1852,6 +1877,10 @@ function isFullLaunchProofVoiceCommand(text: string) {
 
 function isProductionEvidenceVoiceCommand(text: string) {
   return ["production evidence", "verification evidence", "release proof", "evidence", "verifier", "overenie", "dokaz"].some((term) => text.includes(term));
+}
+
+function isProductionCompletionVoiceCommand(text: string) {
+  return ["kolko percent", "na kolko percent", "percent hotove", "production completion", "completion score", "kolko sme ready"].some((term) => text.includes(term));
 }
 
 function isCapabilityAuditVoiceCommand(text: string) {

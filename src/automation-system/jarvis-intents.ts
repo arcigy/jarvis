@@ -25,6 +25,7 @@ export type JarvisVoiceCapability =
   | "full_launch_proof"
   | "production_readiness"
   | "production_evidence"
+  | "production_completion_score"
   | "capability_audit"
   | "remote_mcp"
   | "approval_queue"
@@ -65,6 +66,7 @@ export function resolveJarvisIntentFromTranscript(transcript: string): JarvisInt
 function resolveVoiceCapability(text: string): JarvisVoiceCapability | null {
   if (hasAny(text, ["cold outreach", "outreach", "smartlead", "pozitivne odpovede"])) return "cold_outreach_brief";
   if (hasAny(text, ["full proof", "launch proof", "full launch", "kompletny dokaz", "uplny dokaz", "dokaz spustenia"])) return "full_launch_proof";
+  if (hasAny(text, ["kolko percent", "na kolko percent", "percent hotove", "production completion", "completion score", "kolko sme ready"])) return "production_completion_score";
   if (hasAny(text, ["briefing", "prehlad", "co sa deje", "co sa dialo", "operator"])) return "operator_briefing";
   if (hasAny(text, ["approval", "schvalenie", "schvalit", "potvrdenie", "potvrdit", "na moje znamenie", "cakaju na mna"])) return "approval_queue";
   if (hasAny(text, ["capability audit", "coverage audit", "jarvis coverage", "pokrytie", "pokryte", "co vsetko funguje", "co vsetko je hotove"])) return "capability_audit";
@@ -92,6 +94,8 @@ function answerVoiceCapability(capability: JarvisVoiceCapability): string {
       "Viem skontrolovať produkčný stav: integrácie, live diagnostiku, MCP registry, approval locks a launch checklist.",
     production_evidence:
       "Viem precitat najnovsi produkcny dokaz z npm run verify:production: status, release commit, clean alebo dirty tree, cerstvost evidence a pocet ready checks.",
+    production_completion_score:
+      "Viem vypocitat production completion score: evidence-based percento z verifiera, capability auditu, readiness checklistu, MCP safety a integracii.",
     capability_audit:
       "Viem precitat Jarvis capability audit: kontrakty, cold outreach, klientsku pamat, hlas, remote MCP, Gemini, lead discovery, approval safety, dokazove gatey a najblizsi krok.",
     remote_mcp:

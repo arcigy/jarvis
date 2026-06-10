@@ -20,6 +20,7 @@ import {
   identifyEmailMcpAnswer,
 } from "./mcp-tools.ts";
 import { buildOperatorBriefing } from "./operator-briefing.ts";
+import { buildProductionCompletionScore, summarizeProductionCompletionScoreForVoice } from "./production-completion-score.ts";
 import { buildProductionReadinessReport } from "./production-readiness.ts";
 import { getProductionVerificationEvidence } from "./production-verification-evidence.ts";
 import { buildRemoteMcpConnectionPack } from "./remote-mcp-pack.ts";
@@ -601,6 +602,19 @@ export function createJarvisMcpServer(): McpServer {
           speakText,
         });
       }
+      if (result.speakText?.includes("production completion score")) {
+        const safeDbPath = resolveOptionalRepoPath(dbPath, "dbPath");
+        const readiness = await buildProductionReadinessReport({ live, dbPath: safeDbPath });
+        const productionEvidence = getProductionVerificationEvidence(repoRoot);
+        const capabilityAudit = buildJarvisCapabilityAudit({ readiness, productionEvidence });
+        const completion = buildProductionCompletionScore({ readiness, productionEvidence, capabilityAudit });
+        const speakText = summarizeProductionCompletionScoreForVoice(completion);
+        return jsonResult({
+          ...result,
+          session: { ...result.session, lastResponse: speakText },
+          speakText,
+        });
+      }
       return jsonResult(result);
     }
   );
@@ -678,6 +692,31 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async () => jsonResult(getProductionVerificationEvidence(repoRoot))
+  );
+
+  server.registerTool(
+    "arcigy.get_production_completion_score",
+    {
+      title: "Production completion score",
+      description: "Return an evidence-based production completion percentage with weighted proof components and next actions.",
+      inputSchema: {
+        live: z.boolean().default(false),
+        dbPath: z.string().optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async ({ live, dbPath }) => {
+      const safeDbPath = resolveOptionalRepoPath(dbPath, "dbPath");
+      const readiness = await buildProductionReadinessReport({ live, dbPath: safeDbPath });
+      const productionEvidence = getProductionVerificationEvidence(repoRoot);
+      const capabilityAudit = buildJarvisCapabilityAudit({ readiness, productionEvidence });
+      return jsonResult(buildProductionCompletionScore({ readiness, productionEvidence, capabilityAudit }));
+    }
   );
 
   server.registerTool(
