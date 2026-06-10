@@ -81,3 +81,16 @@ test("production verifier wires every live release gate", () => {
   assert.match(localMemorySmoke, /contains mojibake text/);
   assert.doesNotMatch(script, /API_SECRET_KEY=dummy/);
 });
+
+test("remote handoff docs require production completion proof", () => {
+  const readme = readFileSync("README.md", "utf-8");
+  const mcpDocs = readFileSync("docs/automations/mcp-server.md", "utf-8");
+
+  for (const body of [readme, mcpDocs]) {
+    assert.match(body, /all 37 required remote MCP smoke gates/);
+    assert.match(body, /completion score quick-start/);
+    assert.match(body, /dirty=false/);
+    assert.match(body, /freshness\.fresh=true/);
+    assert.match(body, /approval-shape-gate/);
+  }
+});
