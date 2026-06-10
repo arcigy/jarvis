@@ -23,6 +23,7 @@ import {
   buildNicheLeadgenPlan,
   buildLeadgenGapReport,
   buildLeadgenCampaignPipelinePreview,
+  buildRegionExpansionQueuePreview,
   buildLeadSourceImportQueuePreview,
   buildUrlIntelligenceQueuePreview,
   buildLeadRepairQueuePreview,
@@ -1534,6 +1535,26 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         date: optionalString(payload.date),
         defaultRegions: Array.isArray(payload.defaultRegions) ? payload.defaultRegions.map(String) : undefined,
         maxQueue: typeof payload.maxQueue === "number" ? payload.maxQueue : undefined,
+        dailyLimit: typeof payload.dailyLimit === "number" ? payload.dailyLimit : undefined,
+        targetCount: typeof payload.targetCount === "number" ? payload.targetCount : undefined,
+        batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
+        offer: optionalString(payload.offer),
+        painPoint: optionalString(payload.painPoint),
+        language: payload.language === "en" ? "en" : "sk",
+        includeSmartleadSetup: payload.includeSmartleadSetup === true,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_region_expansion_queue_preview") {
+    writeJson(response, 200, {
+      result: buildRegionExpansionQueuePreview({
+        niches: (payload.niches ?? []) as Parameters<typeof buildRegionExpansionQueuePreview>[0]["niches"],
+        regionPreset: ["capitals", "all_slovakia", "custom"].includes(String(payload.regionPreset)) ? payload.regionPreset as Parameters<typeof buildRegionExpansionQueuePreview>[0]["regionPreset"] : undefined,
+        customRegions: Array.isArray(payload.customRegions) ? payload.customRegions.map(String) : undefined,
+        excludedRegions: Array.isArray(payload.excludedRegions) ? payload.excludedRegions.map(String) : undefined,
+        maxNiches: typeof payload.maxNiches === "number" ? payload.maxNiches : undefined,
+        maxRegionsPerNiche: typeof payload.maxRegionsPerNiche === "number" ? payload.maxRegionsPerNiche : undefined,
         dailyLimit: typeof payload.dailyLimit === "number" ? payload.dailyLimit : undefined,
         targetCount: typeof payload.targetCount === "number" ? payload.targetCount : undefined,
         batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,

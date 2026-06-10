@@ -669,7 +669,37 @@ export type LeadgenExecutionQueuePreview = {
   warnings: string[];
 };
 
+export type RegionExpansionQueuePreview = {
+  mode: "region-expansion-queue-preview";
+  summary: string;
+  preset: "capitals" | "all_slovakia" | "custom";
+  totals: { niches: number; regions: number; queuedRegions: number; skippedRegions: number; runbooks: number; estimatedDailyLimit: number };
+  regions: string[];
+  niches: Array<{
+    niche: { id?: string; slug: string; name: string; campaignId?: string | number | null };
+    queuedRegions: string[];
+    skippedRegions: string[];
+    batchPlan: BatchNicheDiscoveryPlan;
+  }>;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+  warnings: string[];
+};
+
 const genericEmailPrefixes = new Set(["info", "kontakt", "contact", "office", "admin", "sales", "hello", "support", "recepcia"]);
+
+const slovakiaCapitalRegions = ["Bratislava", "Trnava", "Trencin", "Nitra", "Zilina", "Banska Bystrica", "Presov", "Kosice"];
+const slovakiaExpansionRegions = unique([
+  ...slovakiaCapitalRegions,
+  "Malacky", "Pezinok", "Senec", "Dunajska Streda", "Galanta", "Hlohovec", "Senica", "Skalica",
+  "Povazska Bystrica", "Puchov", "Komarno", "Levice", "Nove Zamky", "Sala", "Topolcany",
+  "Zvolen", "Liptovsky Mikulas", "Martin", "Ruzomberok", "Cadca", "Poprad", "Spisska Nova Ves",
+  "Michalovce", "Humenne", "Bardejov", "Stara Lubovna", "Roznava", "Rimavska Sobota", "Lucenec",
+  "Ziar nad Hronom", "Trebisov", "Vranov nad Toplou", "Svidnik", "Stropkov", "Kezmarok",
+  "Sabinov", "Levoca", "Gelnica", "Snina", "Sobrance", "Medzilaborce", "Revuca", "Poltar",
+  "Detva", "Krupina", "Velky Krtis", "Banska Stiavnica", "Zarnovica", "Zlate Moravce",
+  "Turcianske Teplice", "Bytca", "Kysucke Nove Mesto", "Namestovo", "Tvrdosin", "Dolny Kubin",
+  "Myjava", "Nove Mesto nad Vahom", "Banovce nad Bebravou", "Ilava",
+]);
 
 const nicheTemplates: Record<string, Omit<NicheLeadgenPlan, "niche" | "region" | "notes">> = {
   stavebniny: {
@@ -3252,6 +3282,120 @@ export function buildLeadgenExecutionQueuePreview(input: {
   };
 }
 
+export function buildRegionExpansionQueuePreview(input: {
+  niches: Array<{
+    id?: string;
+    slug?: string;
+    name: string;
+    keywords?: string[];
+    regions?: string[];
+    visitedRegions?: string[];
+    dailyTarget?: number;
+    campaignId?: string | number | null;
+    smartleadCampaignId?: string | number | null;
+  }>;
+  regionPreset?: "capitals" | "all_slovakia" | "custom";
+  customRegions?: string[];
+  excludedRegions?: string[];
+  maxNiches?: number;
+  maxRegionsPerNiche?: number;
+  dailyLimit?: number;
+  targetCount?: number;
+  batchSize?: number;
+  offer?: string;
+  painPoint?: string;
+  language?: "sk" | "en";
+  includeSmartleadSetup?: boolean;
+}): RegionExpansionQueuePreview {
+  const preset = input.regionPreset ?? (input.customRegions?.length ? "custom" : "capitals");
+  const baseRegions = unique((preset === "custom" ? input.customRegions : preset === "all_slovakia" ? slovakiaExpansionRegions : slovakiaCapitalRegions) ?? []).filter(Boolean);
+  const excluded = new Set((input.excludedRegions ?? []).map(regionKey));
+  const maxNiches = Math.min(Math.max(Math.trunc(input.maxNiches ?? 10), 1), 50);
+  const maxRegionsPerNiche = Math.min(Math.max(Math.trunc(input.maxRegionsPerNiche ?? 8), 1), 80);
+  const warnings: string[] = [];
+  const selectedNiches = input.niches.slice(0, maxNiches);
+  const results: RegionExpansionQueuePreview["niches"] = [];
+  for (const source of selectedNiches) {
+    const slug = source.slug?.trim() || slugify(source.name);
+    if (!slug || !source.name.trim()) {
+      warnings.push(`Skipped niche with missing name/slug: ${JSON.stringify(source).slice(0, 120)}`);
+      continue;
+    }
+    const sourceRegions = source.regions?.length ? source.regions : baseRegions;
+    const visited = new Set((source.visitedRegions ?? []).map(regionKey));
+    const skippedRegions = sourceRegions.filter((region) => visited.has(regionKey(region)) || excluded.has(regionKey(region)));
+    const queuedRegions = sourceRegions.filter((region) => !visited.has(regionKey(region)) && !excluded.has(regionKey(region))).slice(0, maxRegionsPerNiche);
+    const niche = { id: source.id, slug, name: source.name, campaignId: source.campaignId ?? source.smartleadCampaignId ?? null };
+    const batchPlan = buildBatchNicheDiscoveryPlan({
+      niches: [{ ...niche, keywords: source.keywords, regions: queuedRegions, dailyTarget: source.dailyTarget }],
+      maxNiches: 1,
+      maxRegionsPerNiche,
+      dailyLimit: input.dailyLimit ?? source.dailyTarget,
+      targetCount: input.targetCount,
+      batchSize: input.batchSize,
+      offer: input.offer,
+      painPoint: input.painPoint,
+      language: input.language,
+      includeSmartleadSetup: input.includeSmartleadSetup,
+    });
+    results.push({ niche, queuedRegions, skippedRegions, batchPlan });
+  }
+  const nextToolCalls = dedupeNextToolCalls([
+    {
+      tool: "arcigy.build_batch_niche_discovery_plan",
+      payload: {
+        niches: results.map((item) => ({
+          ...item.niche,
+          regions: item.queuedRegions,
+          dailyTarget: input.dailyLimit,
+        })),
+        maxNiches,
+        maxRegionsPerNiche,
+        dailyLimit: input.dailyLimit,
+        targetCount: input.targetCount,
+        batchSize: input.batchSize,
+        offer: input.offer,
+        painPoint: input.painPoint,
+        language: input.language ?? "sk",
+        includeSmartleadSetup: input.includeSmartleadSetup === true,
+      },
+      reason: "Priprav discovery runbooky pre vsetky zostavajuce regiony.",
+      approvalRequired: false,
+    },
+    {
+      tool: "arcigy.build_leadgen_execution_queue_preview",
+      payload: {
+        niches: results.map((item) => ({
+          ...item.niche,
+          regions: item.queuedRegions,
+          dailyTarget: input.dailyLimit,
+        })),
+        maxQueue: Math.min(results.length, 30),
+        batchSize: input.batchSize,
+        offer: input.offer,
+        painPoint: input.painPoint,
+        language: input.language ?? "sk",
+        includeSmartleadSetup: input.includeSmartleadSetup === true,
+      },
+      reason: "Zorad najblizsi denny execution queue z region expansion planu.",
+      approvalRequired: false,
+    },
+  ]);
+  const queuedRegions = results.reduce((sum, item) => sum + item.queuedRegions.length, 0);
+  const skippedRegions = results.reduce((sum, item) => sum + item.skippedRegions.length, 0);
+  const estimatedDailyLimit = results.reduce((sum, item) => sum + item.batchPlan.totals.estimatedDailyLimit, 0);
+  return {
+    mode: "region-expansion-queue-preview",
+    summary: `Region expansion queue: ${queuedRegions} regionov pre ${results.length} niche, ${skippedRegions} preskocenych, odhad denny limit ${estimatedDailyLimit}. Ziadny scraping ani upload neprebehol.`,
+    preset,
+    totals: { niches: results.length, regions: baseRegions.length, queuedRegions, skippedRegions, runbooks: results.reduce((sum, item) => sum + item.batchPlan.totals.runbooks, 0), estimatedDailyLimit },
+    regions: baseRegions,
+    niches: results,
+    nextToolCalls,
+    warnings,
+  };
+}
+
 async function fetchHtmlPage(url: string, fetchImpl: FetchLike) {
   const response = await fetchImpl(url, {
     headers: {
@@ -3291,6 +3435,10 @@ function titleFromHostname(hostname: string): string {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ") || hostname;
+}
+
+function regionKey(value: string): string {
+  return slugify(value.trim());
 }
 
 function extractTag(html: string, tag: string): string {

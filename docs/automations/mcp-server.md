@@ -128,6 +128,7 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.build_niche_leadgen_plan`: returns niche-specific Google Maps and Serper query plans with blacklist keywords.
 - `arcigy.build_batch_niche_discovery_plan`: plans read-only discovery, scraping, AI intros, runbooks, and Smartlead prep across multiple niches/regions without executing.
 - `arcigy.build_leadgen_execution_queue_preview`: prioritizes today's leadgen work across niches, regions, quotas, discovery, enrichment, and Smartlead handoff without executing.
+- `arcigy.build_region_expansion_queue_preview`: expands niches across capital/all-Slovakia/custom regions, skips visited regions, and prepares discovery/execution queues without executing.
 - `arcigy.draft_smartlead_campaign_sequence`: drafts a Smartlead-compatible email sequence with variants and empty-subject follow-up without writing to Smartlead.
 - `arcigy.preview_smartlead_email_rendering`: renders Smartlead sequence variants for selected leads, substitutes variables, and reports unresolved placeholders without sending.
 - `arcigy.preview_manual_review_pickup`: previews manual-review-pickup by filtering reviewed unsent leads, qualifying them, grouping by niche, and preparing injection plans without writes.

@@ -24,6 +24,7 @@ import {
   buildNicheLeadgenPlan,
   buildLeadgenGapReport,
   buildLeadgenCampaignPipelinePreview,
+  buildRegionExpansionQueuePreview,
   buildLeadSourceImportQueuePreview,
   buildUrlIntelligenceQueuePreview,
   buildLeadRepairQueuePreview,
@@ -1977,6 +1978,38 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildLeadgenExecutionQueuePreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_region_expansion_queue_preview",
+    {
+      title: "Build region expansion queue preview",
+      description: "Expand niches across capitals/all-Slovakia/custom regions, skip visited regions, and prepare discovery/execution queues without writes.",
+      inputSchema: {
+        niches: z.array(executionQueueNicheSchema.extend({
+          visitedRegions: z.array(z.string()).optional(),
+        })).min(1).max(50),
+        regionPreset: z.enum(["capitals", "all_slovakia", "custom"]).default("capitals"),
+        customRegions: z.array(z.string()).optional(),
+        excludedRegions: z.array(z.string()).optional(),
+        maxNiches: z.number().int().min(1).max(50).default(10),
+        maxRegionsPerNiche: z.number().int().min(1).max(80).default(8),
+        dailyLimit: z.number().int().min(1).max(250).optional(),
+        targetCount: z.number().int().min(1).max(500).optional(),
+        batchSize: z.number().int().min(1).max(100).optional(),
+        offer: z.string().optional(),
+        painPoint: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        includeSmartleadSetup: z.boolean().default(false),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildRegionExpansionQueuePreview(input))
   );
 
   server.registerTool(

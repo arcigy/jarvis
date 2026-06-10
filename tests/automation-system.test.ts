@@ -25,6 +25,7 @@ import {
   buildManualReviewQueue,
   buildLeadgenGapReport,
   buildLeadgenCampaignPipelinePreview,
+  buildRegionExpansionQueuePreview,
   buildLeadSourceImportQueuePreview,
   buildUrlIntelligenceQueuePreview,
   buildLeadRepairQueuePreview,
@@ -165,6 +166,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.build_niche_leadgen_plan",
     "arcigy.build_batch_niche_discovery_plan",
     "arcigy.build_leadgen_execution_queue_preview",
+    "arcigy.build_region_expansion_queue_preview",
     "arcigy.draft_smartlead_campaign_sequence",
     "arcigy.preview_smartlead_email_rendering",
     "arcigy.preview_manual_review_pickup",
@@ -1443,7 +1445,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 97 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 98 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -2854,6 +2856,29 @@ test("leadgen execution queue preview prioritizes daily niche work without write
   assert.ok(queue.nextToolCalls.some((call) => call.tool === "arcigy.run_leadgen_research_pipeline" && !call.approvalRequired));
   assert.ok(queue.nextToolCalls.some((call) => call.tool === "arcigy.build_smartlead_campaign_handoff_package_preview" && !call.approvalRequired));
   assert.match(queue.summary, /Ziadny scraping ani upload neprebehol/);
+});
+
+test("region expansion queue preview skips visited regions and prepares discovery queues", () => {
+  const preview = buildRegionExpansionQueuePreview({
+    regionPreset: "capitals",
+    niches: [
+      { id: "niche-1", slug: "autoservisy", name: "Autoservisy", keywords: ["autoservis"], visitedRegions: ["Bratislava"], dailyTarget: 30, campaignId: "123456" },
+      { id: "niche-2", slug: "kuchyne", name: "Kuchynske studia", keywords: ["kuchynske studio"], dailyTarget: 20 },
+    ],
+    maxRegionsPerNiche: 3,
+    offer: "AI asistent na dopyty",
+  });
+
+  assert.equal(preview.mode, "region-expansion-queue-preview");
+  assert.equal(preview.preset, "capitals");
+  assert.equal(preview.totals.niches, 2);
+  assert.equal(preview.totals.skippedRegions, 1);
+  assert.equal(preview.niches[0].skippedRegions.includes("Bratislava"), true);
+  assert.equal(preview.niches[0].queuedRegions.includes("Bratislava"), false);
+  assert.equal(preview.niches[0].queuedRegions.length, 3);
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_batch_niche_discovery_plan" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_leadgen_execution_queue_preview" && !call.approvalRequired));
+  assert.match(preview.summary, /Ziadny scraping ani upload/);
 });
 
 test("leadgen gap report audits missing fields and proposes safe next calls", () => {

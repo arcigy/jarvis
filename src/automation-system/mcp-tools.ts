@@ -69,6 +69,7 @@ export type JarvisMcpToolName =
   | "arcigy.build_niche_leadgen_plan"
   | "arcigy.build_batch_niche_discovery_plan"
   | "arcigy.build_leadgen_execution_queue_preview"
+  | "arcigy.build_region_expansion_queue_preview"
   | "arcigy.draft_smartlead_campaign_sequence"
   | "arcigy.preview_smartlead_email_rendering"
   | "arcigy.preview_manual_review_pickup"
@@ -465,6 +466,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.build_leadgen_execution_queue_preview",
       description: "Zoradi denny leadgen execution queue cez niche, regiony, kvoty, discovery, enrichment a Smartlead handoff bez zapisu.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_region_expansion_queue_preview",
+      description: "Rozbali niche cez capitals/all-Slovakia/custom regiony, preskoci uz prejdene a pripravi discovery/execution queue bez zapisu.",
       requiresApproval: false,
     },
     {

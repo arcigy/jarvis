@@ -412,6 +412,18 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       includeSmartleadSetup: true,
     };
   }
+  if (toolName === "arcigy.build_region_expansion_queue_preview") {
+    return {
+      regionPreset: "capitals",
+      niches: [
+        { id: "niche-1", slug: "autoservisy", name: "Autoservisy", keywords: ["autoservis"], visitedRegions: ["Bratislava"], dailyTarget: 30, campaignId: "123456" },
+        { id: "niche-2", slug: "kuchyne", name: "Kuchynske studia", keywords: ["kuchynske studio"], dailyTarget: 20 },
+      ],
+      maxRegionsPerNiche: 3,
+      offer: "AI asistent na odpovede a follow-up",
+      language: "sk",
+    };
+  }
   if (toolName === "arcigy.draft_smartlead_campaign_sequence") return { niche: "autoservisy", painPoint: "manualne riesenie dopytov", offer: "AI asistent na odpovede a follow-up", language: "sk" };
   if (toolName === "arcigy.preview_smartlead_email_rendering") {
     return {
