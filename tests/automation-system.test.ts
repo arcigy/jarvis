@@ -169,7 +169,12 @@ test("Jarvis capability audit maps the full requested production surface to evid
   assert.equal(audit.status, "ready");
   assert.equal(audit.toolCount, listJarvisMcpTools().length);
   assert.equal(audit.productionEvidence.requiredRemoteMcpSmokeGates, 37);
-  assert.ok(audit.capabilities.some((item) => item.id === "remote-mcp" && item.status === "ready" && item.tools.includes("arcigy.get_jarvis_capability_audit")));
+  const remoteMcpCapability = audit.capabilities.find((item) => item.id === "remote-mcp");
+  assert.equal(remoteMcpCapability?.status, "ready");
+  assert.ok(remoteMcpCapability?.tools.includes("arcigy.get_jarvis_capability_audit"));
+  assert.ok(remoteMcpCapability?.tools.includes("arcigy.get_production_completion_score"));
+  assert.ok(remoteMcpCapability?.evidence.includes("pack-production-evidence-quick-start"));
+  assert.ok(remoteMcpCapability?.evidence.includes("production-evidence-tool-call"));
   assert.ok(audit.capabilities.some((item) => item.id === "proactive-digest" && item.status === "ready" && item.tools.includes("arcigy.sync_gmail_recent_messages")));
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.append_leads_to_google_sheet")));
   assert.doesNotMatch(JSON.stringify(audit), /AIza|GOCSPX|1\/\/|postgresql:\/\/|redis:\/\//);

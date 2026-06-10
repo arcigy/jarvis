@@ -119,7 +119,16 @@ const capabilityDefinitions: CapabilityDefinition[] = [
       "arcigy.get_operator_briefing",
     ],
     approvalRequired: [],
-    evidence: ["remote-mcp-smoke", "remote-mcp-smoke-required-gates", "pack-agent-setup-profiles", "pack-agent-launch-bundle"],
+    evidence: [
+      "remote-mcp-smoke",
+      "remote-mcp-smoke-required-gates",
+      "pack-agent-setup-profiles",
+      "pack-agent-launch-bundle",
+      "pack-handoff-proof",
+      "pack-agent-compatibility",
+      "pack-production-evidence-quick-start",
+      "production-evidence-tool-call",
+    ],
     envKeys: ["remoteMcp"],
   },
   {

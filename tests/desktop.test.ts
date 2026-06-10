@@ -1049,6 +1049,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /voice-jarvis[\s\S]*arcigy\.get_production_completion_score/);
   assert.match(main, /proactive-digest-workflow/);
   assert.match(main, /remote-agent-workflow/);
+  assert.match(main, /remote-mcp[\s\S]*arcigy\.get_production_completion_score/);
   assert.match(main, /Proactive Jarvis attention digest/);
   assert.match(main, /npm test && npm run doctor/);
   assert.match(main, /readOnlyOrDraftToolNames/);
@@ -1075,6 +1076,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(main, /pack-audit-quick-start/);
   assert.match(main, /pack-production-evidence-quick-start/);
   assert.match(main, /production-evidence-tool-call/);
+  assert.match(main, /pack-agent-compatibility/);
   assert.match(main, /buildRemoteMcpAgentLaunchBundle/);
   assert.match(main, /agentLaunchBundle: buildRemoteMcpAgentLaunchBundle/);
   assert.match(main, /Nacitaj actionManifestUrl, ked remote agent podporuje/);
