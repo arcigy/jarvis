@@ -44,6 +44,9 @@ export type JarvisMcpToolName =
   | "arcigy.get_smartlead_campaign_leads"
   | "arcigy.preview_smartlead_lead_sync"
   | "arcigy.get_smartlead_message_history"
+  | "arcigy.classify_outreach_reply"
+  | "arcigy.preview_smartlead_ai_reply"
+  | "arcigy.preview_gmail_ai_reply"
   | "arcigy.draft_smartlead_thread_reply"
   | "arcigy.send_smartlead_thread_reply"
   | "arcigy.create_smartlead_campaign"
@@ -310,6 +313,21 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.get_smartlead_message_history",
       description: "Read-only nacita Smartlead message history pre lead email a pripravi metadata posledneho odoslaneho emailu pre reply flow.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.classify_outreach_reply",
+      description: "Read-only klasifikuje odpoved leada na POSITIVE, NEGATIVE, ALREADY_SENT alebo NEUTRAL pred akymkolvek draftom.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.preview_smartlead_ai_reply",
+      description: "Preview Smartlead AI reply webhooku: skontroluje event, prazdne telo, duplicitu, human-in-loop a vrati dalsi bezpecny krok.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.preview_gmail_ai_reply",
+      description: "Preview Gmail AI reply workflowu: overi znameho leada, thread, human-in-loop a pozitivny signal bez odoslania.",
       requiresApproval: false,
     },
     {

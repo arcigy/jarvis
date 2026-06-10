@@ -63,6 +63,7 @@ import { buildOperatorBriefing } from "../src/automation-system/operator-briefin
 import { buildLeadgenDailyReport, buildLeadgenEveningSummary, selectNextNiche } from "../src/automation-system/leadgen-report.ts";
 import { draftPriceOfferIntake } from "../src/automation-system/price-offer.ts";
 import { buildProactiveAttentionDigest } from "../src/automation-system/proactive-attention-digest.ts";
+import { classifyOutreachReply, previewGmailAiReply, previewSmartleadAiReply } from "../src/automation-system/reply-decision.ts";
 import { buildJarvisCapabilityAudit } from "../src/automation-system/jarvis-capability-audit.ts";
 import { buildProductionCompletionScore, summarizeProductionCompletionScoreForVoice } from "../src/automation-system/production-completion-score.ts";
 import { jarvisAutomations } from "../src/automation-system/jarvis-automations.ts";
@@ -116,6 +117,9 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.get_smartlead_campaign_leads",
     "arcigy.preview_smartlead_lead_sync",
     "arcigy.get_smartlead_message_history",
+    "arcigy.classify_outreach_reply",
+    "arcigy.preview_smartlead_ai_reply",
+    "arcigy.preview_gmail_ai_reply",
     "arcigy.draft_smartlead_thread_reply",
     "arcigy.send_smartlead_thread_reply",
     "arcigy.create_smartlead_campaign",
@@ -1389,7 +1393,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 67 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 70 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -2595,6 +2599,50 @@ test("Smartlead lead sync preview maps remote leads to local update candidates",
   assert.equal(preview.updates[0].localUpdate.reply_sentiment, "Interested");
   assert.ok(calls[0].includes("limit=50"));
   assert.equal(JSON.stringify(preview).includes("smartlead-secret"), false);
+});
+
+test("outreach reply decision previews Smartlead and Gmail sends without writing", async () => {
+  const positive = await classifyOutreachReply({ replyBody: "Dobry den, poslite mi prosim ukazku.", useAi: false });
+  const negative = await classifyOutreachReply({ replyBody: "Nie dakujem, nemame zaujem.", useAi: false });
+  const smartlead = await previewSmartleadAiReply({
+    toEmail: "lead@example.com",
+    campaignId: "123",
+    eventType: "EMAIL_REPLY",
+    emailBody: "Dobry den, poslite mi prosim ukazku.",
+    fromEmail: "andrej@arcigy.group",
+    leadName: "Jan Novak",
+    history: [{ type: "EMAIL_SENT", email_body: "Chcete ukazku?", from_email: "andrej@arcigy.group" }, { type: "EMAIL_REPLY", email_body: "Poslite mi ukazku.", from_email: "lead@example.com" }],
+  });
+  const gmail = await previewGmailAiReply({
+    senderEmail: "andrej@arcigy.group",
+    fromEmail: "lead@example.com",
+    body: "Nemame zaujem.",
+    threadId: "thread-1",
+    messageId: "msg-1",
+    leadKnown: true,
+    threadStartedByUs: true,
+  });
+  const humanHandled = await previewSmartleadAiReply({
+    toEmail: "lead@example.com",
+    campaignId: "123",
+    eventType: "EMAIL_REPLY",
+    emailBody: "Poslite mi ukazku.",
+    fromEmail: "andrej@arcigy.group",
+    history: [
+      { type: "EMAIL_SENT", email_body: "Chcete ukazku?", from_email: "andrej@arcigy.group" },
+      { type: "EMAIL_REPLY", email_body: "Ano.", from_email: "lead@example.com" },
+      { type: "EMAIL_SENT", email_body: "Posielam manualnu odpoved.", from_email: "andrej@arcigy.group" },
+    ],
+  });
+
+  assert.equal(positive.category, "POSITIVE");
+  assert.equal(negative.category, "NEGATIVE");
+  assert.equal(smartlead.action, "draft_reply");
+  assert.equal(smartlead.draftToolPayload?.email, "lead@example.com");
+  assert.equal(gmail.action, "skip");
+  assert.match(gmail.reason, /NEGATIVE/);
+  assert.equal(humanHandled.action, "skip");
+  assert.match(humanHandled.reason, /Human-in-the-loop/);
 });
 
 test("lead discovery helpers call Serper, Google Places, and Google Sheets", async () => {

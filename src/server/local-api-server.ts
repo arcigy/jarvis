@@ -41,6 +41,7 @@ import { buildProactiveAttentionDigest } from "../automation-system/proactive-at
 import { buildProductionCompletionScore, summarizeProductionCompletionScoreForVoice } from "../automation-system/production-completion-score.ts";
 import { buildProductionReadinessReport } from "../automation-system/production-readiness.ts";
 import { getProductionVerificationEvidence } from "../automation-system/production-verification-evidence.ts";
+import { classifyOutreachReply, previewGmailAiReply, previewSmartleadAiReply } from "../automation-system/reply-decision.ts";
 import { buildRemoteMcpOpenApiDocument } from "../automation-system/remote-mcp-openapi.ts";
 import { buildRemoteMcpConnectionPack } from "../automation-system/remote-mcp-pack.ts";
 import { runRemoteMcpSmoke } from "../automation-system/remote-mcp-smoke.ts";
@@ -1239,6 +1240,59 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
       result: await getSmartleadMessageHistory({
         campaignId: (payload.campaignId ?? "") as string | number,
         email: String(payload.email ?? ""),
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.classify_outreach_reply") {
+    writeJson(response, 200, {
+      result: await classifyOutreachReply({
+        replyBody: String(payload.replyBody ?? ""),
+        history: Array.isArray(payload.history) ? payload.history as Parameters<typeof classifyOutreachReply>[0]["history"] : undefined,
+        senderName: optionalString(payload.senderName),
+        useAi: payload.useAi === true,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.preview_smartlead_ai_reply") {
+    writeJson(response, 200, {
+      result: await previewSmartleadAiReply({
+        toEmail: String(payload.toEmail ?? payload.to_email ?? ""),
+        campaignId: (payload.campaignId ?? payload.campaign_id ?? "") as string | number,
+        emailBody: optionalString(payload.emailBody) ?? optionalString(payload.email_body),
+        eventType: optionalString(payload.eventType) ?? optionalString(payload.type),
+        fromEmail: optionalString(payload.fromEmail) ?? optionalString(payload.from_email),
+        leadName: optionalString(payload.leadName) ?? optionalString(payload.lead_name),
+        companyName: optionalString(payload.companyName),
+        categoryName: optionalString(payload.categoryName) ?? optionalString(payload.category_name),
+        history: Array.isArray(payload.history) ? payload.history as Parameters<typeof previewSmartleadAiReply>[0]["history"] : undefined,
+        aiRepliesActive: typeof payload.aiRepliesActive === "boolean" ? payload.aiRepliesActive : undefined,
+        alreadySent: typeof payload.alreadySent === "boolean" ? payload.alreadySent : undefined,
+        generateDraft: payload.generateDraft === true,
+        useAiClassification: payload.useAiClassification === true,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.preview_gmail_ai_reply") {
+    writeJson(response, 200, {
+      result: await previewGmailAiReply({
+        senderEmail: String(payload.senderEmail ?? ""),
+        fromEmail: String(payload.fromEmail ?? payload.from_email ?? ""),
+        subject: optionalString(payload.subject),
+        body: String(payload.body ?? ""),
+        threadId: String(payload.threadId ?? ""),
+        messageId: String(payload.messageId ?? ""),
+        leadName: optionalString(payload.leadName),
+        history: Array.isArray(payload.history) ? payload.history as Parameters<typeof previewGmailAiReply>[0]["history"] : undefined,
+        leadKnown: typeof payload.leadKnown === "boolean" ? payload.leadKnown : undefined,
+        threadStartedByUs: typeof payload.threadStartedByUs === "boolean" ? payload.threadStartedByUs : undefined,
+        aiRepliesActive: typeof payload.aiRepliesActive === "boolean" ? payload.aiRepliesActive : undefined,
+        alreadyProcessed: typeof payload.alreadyProcessed === "boolean" ? payload.alreadyProcessed : undefined,
+        alreadySent: typeof payload.alreadySent === "boolean" ? payload.alreadySent : undefined,
+        generateDraft: payload.generateDraft === true,
+        useAiClassification: payload.useAiClassification === true,
       }),
     });
     return;

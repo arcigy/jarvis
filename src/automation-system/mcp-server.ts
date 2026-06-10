@@ -46,6 +46,7 @@ import { buildProactiveAttentionDigest } from "./proactive-attention-digest.ts";
 import { buildProductionCompletionScore, summarizeProductionCompletionScoreForVoice } from "./production-completion-score.ts";
 import { buildProductionReadinessReport } from "./production-readiness.ts";
 import { getProductionVerificationEvidence } from "./production-verification-evidence.ts";
+import { classifyOutreachReply, previewGmailAiReply, previewSmartleadAiReply } from "./reply-decision.ts";
 import { buildRemoteMcpConnectionPack } from "./remote-mcp-pack.ts";
 import { runRemoteMcpSmoke } from "./remote-mcp-smoke.ts";
 import {
@@ -1220,6 +1221,100 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(await getSmartleadMessageHistory(input))
+  );
+
+  const replyHistoryItemSchema = z.object({
+    type: z.string().optional(),
+    body: z.string().optional(),
+    email_body: z.string().optional(),
+    fromEmail: z.string().optional(),
+    from_email: z.string().optional(),
+    isMe: z.boolean().optional(),
+    send_time: z.string().optional(),
+    created_at: z.string().optional(),
+  }).passthrough();
+
+  server.registerTool(
+    "arcigy.classify_outreach_reply",
+    {
+      title: "Classify outreach reply",
+      description: "Classify a lead reply as POSITIVE, NEGATIVE, ALREADY_SENT, or NEUTRAL before any draft or send action.",
+      inputSchema: {
+        replyBody: z.string().min(1),
+        history: z.array(replyHistoryItemSchema).optional(),
+        senderName: z.string().optional(),
+        useAi: z.boolean().default(false),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+    },
+    async (input) => jsonResult(await classifyOutreachReply(input))
+  );
+
+  server.registerTool(
+    "arcigy.preview_smartlead_ai_reply",
+    {
+      title: "Preview Smartlead AI reply",
+      description: "Preview the Smartlead AI reply webhook decision without sending: event/body guards, classification, duplicate and human-in-loop checks.",
+      inputSchema: {
+        toEmail: z.string().email(),
+        campaignId: z.union([z.string(), z.number()]),
+        emailBody: z.string().optional(),
+        eventType: z.string().optional(),
+        fromEmail: z.string().email().optional(),
+        leadName: z.string().optional(),
+        companyName: z.string().optional(),
+        categoryName: z.string().optional(),
+        history: z.array(replyHistoryItemSchema).optional(),
+        aiRepliesActive: z.boolean().optional(),
+        alreadySent: z.boolean().optional(),
+        generateDraft: z.boolean().default(false),
+        useAiClassification: z.boolean().default(false),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (input) => jsonResult(await previewSmartleadAiReply(input))
+  );
+
+  server.registerTool(
+    "arcigy.preview_gmail_ai_reply",
+    {
+      title: "Preview Gmail AI reply",
+      description: "Preview the Gmail AI reply decision without sending: known lead, thread origin, duplicate, human-in-loop and classification checks.",
+      inputSchema: {
+        senderEmail: z.string().email(),
+        fromEmail: z.string().email(),
+        subject: z.string().optional(),
+        body: z.string().min(1),
+        threadId: z.string().min(1),
+        messageId: z.string().min(1),
+        leadName: z.string().optional(),
+        history: z.array(replyHistoryItemSchema).optional(),
+        leadKnown: z.boolean().optional(),
+        threadStartedByUs: z.boolean().optional(),
+        aiRepliesActive: z.boolean().optional(),
+        alreadyProcessed: z.boolean().optional(),
+        alreadySent: z.boolean().optional(),
+        generateDraft: z.boolean().default(false),
+        useAiClassification: z.boolean().default(false),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (input) => jsonResult(await previewGmailAiReply(input))
   );
 
   server.registerTool(

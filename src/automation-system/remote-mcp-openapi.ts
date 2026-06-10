@@ -259,6 +259,32 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
   if (toolName === "arcigy.get_smartlead_campaign_leads") return { campaignId: "123456", offset: 0, limit: 100 };
   if (toolName === "arcigy.preview_smartlead_lead_sync") return { campaignIds: ["123456"], limitPerCampaign: 100 };
   if (toolName === "arcigy.get_smartlead_message_history") return { campaignId: "123456", email: "lead@example.com" };
+  if (toolName === "arcigy.classify_outreach_reply") return { replyBody: "Dobry den, poslite mi prosim ukazku.", useAi: false };
+  if (toolName === "arcigy.preview_smartlead_ai_reply") {
+    return {
+      toEmail: "lead@example.com",
+      campaignId: "123456",
+      eventType: "EMAIL_REPLY",
+      emailBody: "Dobry den, poslite mi prosim ukazku.",
+      fromEmail: "andrej@arcigy.group",
+      leadName: "Jan Novak",
+      categoryName: "Interested",
+      generateDraft: false,
+    };
+  }
+  if (toolName === "arcigy.preview_gmail_ai_reply") {
+    return {
+      senderEmail: "andrej@arcigy.group",
+      fromEmail: "lead@example.com",
+      subject: "Re: Otazka",
+      body: "Dobry den, poslite mi prosim ukazku.",
+      threadId: "thread-123",
+      messageId: "msg-123",
+      leadKnown: true,
+      threadStartedByUs: true,
+      generateDraft: false,
+    };
+  }
   if (toolName === "arcigy.draft_smartlead_thread_reply") {
     return {
       campaignId: "123456",
