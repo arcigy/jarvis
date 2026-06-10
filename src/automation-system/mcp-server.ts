@@ -32,6 +32,7 @@ import {
   buildManualReviewQueue,
   buildSmartleadCampaignLaunchPreview,
   buildSmartleadCampaignQaPreview,
+  buildSmartleadCampaignHandoffPackagePreview,
   buildSmartleadInjectionPlan,
   buildSmartleadImportAuditPreview,
   buildSmartleadSenderCapacityPreview,
@@ -2026,6 +2027,11 @@ export function createJarvisMcpServer(): McpServer {
     replyRate: z.number().min(0).optional(),
     reputationScore: z.number().min(0).max(100).optional(),
   });
+  const handoffLeadSchema = manualReviewPickupLeadSchema.extend({
+    scraped: enrichmentLeadSchema.shape.scraped.optional(),
+    intro: pipelineLeadSchema.shape.intro.optional(),
+    context: z.string().optional(),
+  });
 
   server.registerTool(
     "arcigy.preview_smartlead_email_rendering",
@@ -2244,6 +2250,42 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildSmartleadCampaignQaPreview(input as Parameters<typeof buildSmartleadCampaignQaPreview>[0]))
+  );
+
+  server.registerTool(
+    "arcigy.build_smartlead_campaign_handoff_package_preview",
+    {
+      title: "Build Smartlead campaign handoff package preview",
+      description: "Combine launch preview, QA, sender capacity, and approval checklist into one read-only Smartlead campaign handoff package.",
+      inputSchema: {
+        niche: z.object({
+          id: z.string().optional(),
+          slug: z.string().min(1),
+          name: z.string().min(1),
+          campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+        }),
+        leads: z.array(handoffLeadSchema).min(1).max(1000),
+        offer: z.string().optional(),
+        painPoint: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        clientId: z.union([z.string(), z.number(), z.null()]).optional(),
+        emailAccountIds: z.array(z.union([z.string(), z.number()])).optional(),
+        webhookUrl: z.string().url().optional(),
+        schedule: smartleadScheduleSchema.optional(),
+        settings: smartleadSettingsSchema.optional(),
+        batchSize: z.number().int().min(1).max(100).default(50),
+        senderAccounts: z.array(smartleadSenderAccountSchema).optional(),
+        requestedDailyLimit: z.number().int().min(1).max(1000).optional(),
+        minTimeBetweenEmailsMinutes: z.number().int().min(1).max(240).optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildSmartleadCampaignHandoffPackagePreview(input))
   );
 
   server.registerTool(

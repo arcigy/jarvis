@@ -1022,6 +1022,23 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Build Smartlead campaign handoff package",
+      tool: "arcigy.build_smartlead_campaign_handoff_package_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_smartlead_campaign_handoff_package_preview"),
+      body: {
+        niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456" },
+        offer: "AI asistent na odpovede a follow-up",
+        painPoint: "manualne spracovanie dopytov",
+        language: "sk",
+        leads: [{ email: "jan.novak@example.com", companyName: "Modelova Firma", website: "https://example.com", firstName: "Jan", personalizedIntro: "Vsimol som si, ze riesite servis pre firemnych klientov.", phone: "+421 900 111 222" }],
+        senderAccounts: [{ id: "acct-1", email: "andrej@arcigy.group", status: "active", warmupStatus: "active", dailyLimit: 40, sentToday: 8, reputationScore: 92 }],
+        requestedDailyLimit: 30,
+        batchSize: 50,
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Preview enriched lead batch before Smartlead",
       tool: "arcigy.preview_lead_enrichment_batch",
       method: "POST",

@@ -440,6 +440,23 @@ export type SmartleadSenderCapacityPreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type SmartleadCampaignHandoffPackagePreview = {
+  mode: "smartlead-campaign-handoff-package-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  launchPreview: SmartleadCampaignLaunchPreview;
+  qaPreview: SmartleadCampaignQaPreview;
+  senderCapacityPreview?: SmartleadSenderCapacityPreview;
+  approvals: {
+    required: number;
+    ready: number;
+    blocked: number;
+    calls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean; status: "ready" | "blocked" }>;
+  };
+  operatorChecklist: Array<{ item: string; status: "ready" | "attention" | "blocked"; detail: string }>;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type LeadEnrichmentBatchPreview = {
   mode: "lead-enrichment-batch-preview";
   summary: string;
@@ -2356,6 +2373,85 @@ export function buildSmartleadSenderCapacityPreview(input: {
     warnings,
     configureCampaignPayload,
     nextToolCalls,
+  };
+}
+
+export function buildSmartleadCampaignHandoffPackagePreview(input: {
+  niche: { id?: string; slug: string; name: string; campaignId?: string | number | null };
+  leads: ManualReviewPickupLead[];
+  offer?: string;
+  painPoint?: string;
+  language?: "sk" | "en";
+  clientId?: string | number | null;
+  emailAccountIds?: Array<string | number>;
+  webhookUrl?: string;
+  schedule?: Parameters<typeof draftNicheSmartleadCampaignSetup>[0]["schedule"];
+  settings?: Parameters<typeof draftNicheSmartleadCampaignSetup>[0]["settings"];
+  batchSize?: number;
+  senderAccounts?: SmartleadSenderAccountInput[];
+  requestedDailyLimit?: number;
+  minTimeBetweenEmailsMinutes?: number;
+}): SmartleadCampaignHandoffPackagePreview {
+  const senderCapacityPreview = input.senderAccounts?.length
+    ? buildSmartleadSenderCapacityPreview({
+        campaignId: input.niche.campaignId,
+        accounts: input.senderAccounts,
+        leadBacklog: input.leads.length,
+        requestedDailyLimit: input.requestedDailyLimit ?? input.schedule?.max_new_leads_per_day,
+        minTimeBetweenEmailsMinutes: input.minTimeBetweenEmailsMinutes ?? input.schedule?.min_time_btw_emails,
+      })
+    : undefined;
+  const launchPreview = buildSmartleadCampaignLaunchPreview({
+    niche: input.niche,
+    leads: input.leads,
+    offer: input.offer,
+    painPoint: input.painPoint,
+    language: input.language,
+    clientId: input.clientId,
+    emailAccountIds: input.emailAccountIds ?? senderCapacityPreview?.configureCampaignPayload?.emailAccountIds,
+    webhookUrl: input.webhookUrl,
+    schedule: input.schedule,
+    settings: input.settings,
+    batchSize: input.batchSize,
+  });
+  const qaPreview = buildSmartleadCampaignQaPreview({
+    launchPreview,
+    maxNewLeadsPerDay: senderCapacityPreview?.totals.recommendedDailyLimit,
+  });
+  const allCalls = dedupeNextToolCalls([...(senderCapacityPreview?.nextToolCalls ?? []), ...launchPreview.nextToolCalls, ...qaPreview.nextToolCalls]);
+  const status: SmartleadCampaignHandoffPackagePreview["status"] =
+    qaPreview.status === "blocked" || senderCapacityPreview?.status === "blocked"
+      ? "blocked"
+      : qaPreview.status === "attention" || senderCapacityPreview?.status === "attention"
+        ? "attention"
+        : "ready";
+  const approvalCalls = allCalls.filter((call) => call.approvalRequired).map((call) => ({
+    ...call,
+    status: status === "blocked" ? "blocked" as const : "ready" as const,
+  }));
+  const checklist: SmartleadCampaignHandoffPackagePreview["operatorChecklist"] = [
+    { item: "Campaign target", status: qaPreview.checks.find((check) => check.key === "campaign-target")?.status ?? "blocked", detail: qaPreview.checks.find((check) => check.key === "campaign-target")?.message ?? "Campaign target missing." },
+    { item: "Leads", status: qaPreview.checks.find((check) => check.key === "lead-count")?.status ?? "blocked", detail: `${launchPreview.injectionPlan.totals.prepared} prepared, ${launchPreview.injectionPlan.totals.skipped} skipped.` },
+    { item: "Sequence QA", status: qaPreview.checks.some((check) => ["sequences", "sequence-variables"].includes(check.key) && check.status === "blocked") ? "blocked" : "ready", detail: `${qaPreview.totals.sequenceCount} sequence step(s), ${qaPreview.totals.variants} variant(s).` },
+    { item: "Sender capacity", status: senderCapacityPreview?.status ?? "attention", detail: senderCapacityPreview ? `${senderCapacityPreview.totals.usableAccounts}/${senderCapacityPreview.totals.accounts} usable, daily limit ${senderCapacityPreview.totals.recommendedDailyLimit}.` : "Sender accounts were not provided." },
+    { item: "Approvals", status: approvalCalls.length && status !== "blocked" ? "ready" : status === "blocked" ? "blocked" : "attention", detail: `${approvalCalls.length} approval-gated call(s) prepared.` },
+  ];
+  const approvals = {
+    required: approvalCalls.length,
+    ready: approvalCalls.filter((call) => call.status === "ready").length,
+    blocked: approvalCalls.filter((call) => call.status === "blocked").length,
+    calls: approvalCalls,
+  };
+  return {
+    mode: "smartlead-campaign-handoff-package-preview",
+    status,
+    summary: `Smartlead handoff package: ${status}, ${launchPreview.injectionPlan.totals.prepared} leadov, ${approvals.required} approval krokov, QA ${qaPreview.status}${senderCapacityPreview ? `, sender capacity ${senderCapacityPreview.status}` : ""}. Ziadny zapis ani upload neprebehol.`,
+    launchPreview,
+    qaPreview,
+    senderCapacityPreview,
+    approvals,
+    operatorChecklist: checklist,
+    nextToolCalls: allCalls,
   };
 }
 

@@ -31,6 +31,7 @@ import {
   buildManualReviewQueue,
   buildSmartleadCampaignLaunchPreview,
   buildSmartleadCampaignQaPreview,
+  buildSmartleadCampaignHandoffPackagePreview,
   buildSmartleadInjectionPlan,
   buildSmartleadImportAuditPreview,
   buildSmartleadSenderCapacityPreview,
@@ -1617,6 +1618,27 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         settings: payload.settings as Parameters<typeof buildSmartleadCampaignQaPreview>[0]["settings"],
         nextToolCalls: Array.isArray(payload.nextToolCalls) ? payload.nextToolCalls as Parameters<typeof buildSmartleadCampaignQaPreview>[0]["nextToolCalls"] : undefined,
         maxNewLeadsPerDay: typeof payload.maxNewLeadsPerDay === "number" ? payload.maxNewLeadsPerDay : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_smartlead_campaign_handoff_package_preview") {
+    writeJson(response, 200, {
+      result: buildSmartleadCampaignHandoffPackagePreview({
+        niche: (payload.niche ?? {}) as Parameters<typeof buildSmartleadCampaignHandoffPackagePreview>[0]["niche"],
+        leads: Array.isArray(payload.leads) ? payload.leads as Parameters<typeof buildSmartleadCampaignHandoffPackagePreview>[0]["leads"] : [],
+        offer: optionalString(payload.offer),
+        painPoint: optionalString(payload.painPoint),
+        language: payload.language === "en" ? "en" : "sk",
+        clientId: (payload.clientId ?? null) as string | number | null,
+        emailAccountIds: Array.isArray(payload.emailAccountIds) ? (payload.emailAccountIds as Array<string | number>) : undefined,
+        webhookUrl: optionalString(payload.webhookUrl),
+        schedule: payload.schedule as Parameters<typeof buildSmartleadCampaignHandoffPackagePreview>[0]["schedule"],
+        settings: payload.settings as Parameters<typeof buildSmartleadCampaignHandoffPackagePreview>[0]["settings"],
+        batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
+        senderAccounts: Array.isArray(payload.senderAccounts) ? payload.senderAccounts as Parameters<typeof buildSmartleadCampaignHandoffPackagePreview>[0]["senderAccounts"] : undefined,
+        requestedDailyLimit: typeof payload.requestedDailyLimit === "number" ? payload.requestedDailyLimit : undefined,
+        minTimeBetweenEmailsMinutes: typeof payload.minTimeBetweenEmailsMinutes === "number" ? payload.minTimeBetweenEmailsMinutes : undefined,
       }),
     });
     return;

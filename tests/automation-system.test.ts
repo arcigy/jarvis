@@ -30,6 +30,7 @@ import {
   buildColdOutreachCsvImportPreview,
   buildSmartleadCampaignLaunchPreview,
   buildSmartleadCampaignQaPreview,
+  buildSmartleadCampaignHandoffPackagePreview,
   buildSmartleadInjectionPlan,
   buildSmartleadImportAuditPreview,
   buildSmartleadSenderCapacityPreview,
@@ -166,6 +167,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.draft_niche_smartlead_campaign_setup",
     "arcigy.build_smartlead_campaign_launch_preview",
     "arcigy.build_smartlead_campaign_qa_preview",
+    "arcigy.build_smartlead_campaign_handoff_package_preview",
     "arcigy.preview_lead_enrichment_batch",
     "arcigy.build_leadgen_gap_report",
     "arcigy.build_leadgen_campaign_pipeline_preview",
@@ -1433,7 +1435,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 92 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 93 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -2679,6 +2681,32 @@ test("Smartlead sender capacity preview calculates safe limits before campaign c
   assert.deepEqual(preview.configureCampaignPayload?.emailAccountIds, ["acct-1", "acct-2"]);
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.configure_smartlead_campaign" && call.approvalRequired));
   assert.match(preview.summary, /Ziadny zapis ani upload/);
+});
+
+test("Smartlead campaign handoff package combines launch QA capacity and approvals", () => {
+  const handoff = buildSmartleadCampaignHandoffPackagePreview({
+    niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456" },
+    offer: "AI asistent na odpovede",
+    leads: [
+      { email: "jan@ready.sk", companyName: "Ready Firma", website: "https://ready.sk", firstName: "Jan", phone: "+421 900 111 222", personalizedIntro: "Vsimol som si vase servisne sluzby." },
+    ],
+    senderAccounts: [
+      { id: "acct-1", email: "andrej@arcigy.group", status: "active", warmupStatus: "active", dailyLimit: 40, sentToday: 5, reputationScore: 95 },
+    ],
+    requestedDailyLimit: 30,
+    batchSize: 50,
+  });
+
+  assert.equal(handoff.mode, "smartlead-campaign-handoff-package-preview");
+  assert.equal(handoff.status, "ready");
+  assert.equal(handoff.launchPreview.injectionPlan.totals.prepared, 1);
+  assert.equal(handoff.qaPreview.status, "ready");
+  assert.equal(handoff.senderCapacityPreview?.totals.usableAccounts, 1);
+  assert.equal(handoff.approvals.required >= 2, true);
+  assert.ok(handoff.operatorChecklist.some((item) => item.item === "Sender capacity" && item.status === "ready"));
+  assert.ok(handoff.nextToolCalls.some((call) => call.tool === "arcigy.configure_smartlead_campaign" && call.approvalRequired));
+  assert.ok(handoff.nextToolCalls.some((call) => call.tool === "arcigy.add_leads_to_smartlead_campaign" && call.approvalRequired));
+  assert.match(handoff.summary, /Ziadny zapis ani upload/);
 });
 
 test("Smartlead campaign QA preview flags launch payload risks before approval", () => {
