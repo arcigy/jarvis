@@ -22,6 +22,7 @@ import {
   buildManualReviewPickupPlan,
   buildManualReviewQueue,
   buildLeadgenCampaignPipelinePreview,
+  buildColdOutreachCsvImportPreview,
   buildSmartleadCampaignLaunchPreview,
   buildSmartleadInjectionPlan,
   buildDailyLeadgenRunbook,
@@ -150,6 +151,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.build_smartlead_campaign_launch_preview",
     "arcigy.preview_lead_enrichment_batch",
     "arcigy.build_leadgen_campaign_pipeline_preview",
+    "arcigy.build_cold_outreach_csv_import_preview",
     "arcigy.build_daily_leadgen_runbook",
     "arcigy.parse_leads_csv",
     "arcigy.filter_blacklisted_leads",
@@ -1409,7 +1411,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 79 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 80 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -2687,6 +2689,34 @@ test("leadgen campaign pipeline preview chains scrape intro enrichment and Smart
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_scrape_website_contacts"));
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_draft_lead_intros"));
   assert.equal(preview.smartleadPlan?.addLeadsApprovalPayload?.campaignId, "123456");
+  assert.match(preview.summary, /Ziadny zapis ani upload/);
+});
+
+test("cold outreach CSV import preview parses filters and prepares Smartlead launch safely", () => {
+  const preview = buildColdOutreachCsvImportPreview({
+    csvText: [
+      "company_name,email,website,phone,personalized_intro",
+      "Ready Firma,jan@ready.sk,https://ready.sk,+421 900 111 222,Kratke AI intro.",
+      "Blocked Firma,lead@competitor.sk,https://competitor.sk,+421 900 333 444,",
+      "Needs Scrape,,https://needs-scrape.sk,,",
+    ].join("\n"),
+    blacklistDomains: ["competitor.sk"],
+    niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456" },
+    campaignTag: "autoservisy-ba",
+    offer: "AI asistent na dopyty",
+    minScore: 70,
+    batchSize: 50,
+  });
+
+  assert.equal(preview.mode, "cold-outreach-csv-import-preview");
+  assert.equal(preview.totals.parsed, 3);
+  assert.equal(preview.totals.blocked, 1);
+  assert.equal(preview.totals.allowed, 2);
+  assert.equal(preview.totals.readyForSmartlead, 1);
+  assert.equal(preview.filtered.blocked[0].reason, "blacklisted domain: competitor.sk");
+  assert.equal(preview.launchPreview?.approvalPayloads.addLeads?.campaignId, "123456");
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_scrape_website_contacts"));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.add_leads_to_smartlead_campaign" && call.approvalRequired));
   assert.match(preview.summary, /Ziadny zapis ani upload/);
 });
 

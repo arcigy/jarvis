@@ -26,6 +26,7 @@ import {
   buildManualReviewQueue,
   buildSmartleadCampaignLaunchPreview,
   buildSmartleadInjectionPlan,
+  buildColdOutreachCsvImportPreview,
   dedupeLeadCandidates,
   draftNicheSmartleadCampaignSetup,
   draftLeadIntro,
@@ -1554,6 +1555,31 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         minScore: typeof payload.minScore === "number" ? payload.minScore : undefined,
         batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
         maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_cold_outreach_csv_import_preview") {
+    writeJson(response, 200, {
+      result: buildColdOutreachCsvImportPreview({
+        csvText: String(payload.csvText ?? ""),
+        delimiter: payload.delimiter === ";" ? ";" : payload.delimiter === "," ? "," : undefined,
+        maxRows: typeof payload.maxRows === "number" ? payload.maxRows : undefined,
+        blacklistDomains: Array.isArray(payload.blacklistDomains) ? payload.blacklistDomains.map(String) : undefined,
+        blacklistKeywords: Array.isArray(payload.blacklistKeywords) ? payload.blacklistKeywords.map(String) : undefined,
+        niche: payload.niche as Parameters<typeof buildColdOutreachCsvImportPreview>[0]["niche"],
+        campaignTag: optionalString(payload.campaignTag),
+        defaultSource: optionalString(payload.defaultSource),
+        offer: optionalString(payload.offer),
+        painPoint: optionalString(payload.painPoint),
+        language: payload.language === "en" ? "en" : "sk",
+        clientId: (payload.clientId ?? null) as string | number | null,
+        emailAccountIds: Array.isArray(payload.emailAccountIds) ? (payload.emailAccountIds as Array<string | number>) : undefined,
+        webhookUrl: optionalString(payload.webhookUrl),
+        schedule: payload.schedule as Parameters<typeof buildColdOutreachCsvImportPreview>[0]["schedule"],
+        settings: payload.settings as Parameters<typeof buildColdOutreachCsvImportPreview>[0]["settings"],
+        minScore: typeof payload.minScore === "number" ? payload.minScore : undefined,
+        batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
       }),
     });
     return;

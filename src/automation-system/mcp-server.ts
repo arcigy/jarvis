@@ -27,6 +27,7 @@ import {
   buildManualReviewQueue,
   buildSmartleadCampaignLaunchPreview,
   buildSmartleadInjectionPlan,
+  buildColdOutreachCsvImportPreview,
   dedupeLeadCandidates,
   draftNicheSmartleadCampaignSetup,
   draftLeadIntro,
@@ -2019,6 +2020,46 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildLeadgenCampaignPipelinePreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_cold_outreach_csv_import_preview",
+    {
+      title: "Build cold outreach CSV import preview",
+      description: "Parse pasted/exported lead CSV, apply blacklist filters, build leadgen pipeline preview, and prepare Smartlead launch payloads without writes.",
+      inputSchema: {
+        csvText: z.string().min(1),
+        delimiter: z.enum([",", ";"]).optional(),
+        maxRows: z.number().int().min(1).max(10_000).default(1000),
+        blacklistDomains: z.array(z.string()).optional(),
+        blacklistKeywords: z.array(z.string()).optional(),
+        niche: z.object({
+          id: z.string().optional(),
+          slug: z.string().min(1),
+          name: z.string().min(1),
+          campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+        }).optional(),
+        campaignTag: z.string().optional(),
+        defaultSource: z.string().optional(),
+        offer: z.string().optional(),
+        painPoint: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        clientId: z.union([z.string(), z.number(), z.null()]).optional(),
+        emailAccountIds: z.array(z.union([z.string(), z.number()])).optional(),
+        webhookUrl: z.string().url().optional(),
+        schedule: smartleadScheduleSchema.optional(),
+        settings: smartleadSettingsSchema.optional(),
+        minScore: z.number().int().min(0).max(100).default(70),
+        batchSize: z.number().int().min(1).max(100).default(50),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildColdOutreachCsvImportPreview(input))
   );
 
   server.registerTool(

@@ -424,6 +424,19 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       batchSize: 50,
     };
   }
+  if (toolName === "arcigy.build_cold_outreach_csv_import_preview") {
+    return {
+      csvText: "company_name,email,website,personalized_intro\nModelova Firma,jan.novak@example.com,https://example.com,Vsimol som si vas servis.\nBlocked Firma,lead@competitor.sk,https://competitor.sk,",
+      delimiter: ",",
+      blacklistDomains: ["competitor.sk"],
+      niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456" },
+      campaignTag: "autoservisy-ba",
+      offer: "AI asistent na odpovede a follow-up",
+      language: "sk",
+      minScore: 70,
+      batchSize: 50,
+    };
+  }
   if (toolName === "arcigy.build_daily_leadgen_runbook") {
     return {
       niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", keywords: ["autoservis", "pneuservis"], region: "Bratislava", campaignId: "123456" },

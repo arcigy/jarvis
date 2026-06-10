@@ -216,6 +216,25 @@ export type SmartleadCampaignLaunchPreview = {
   };
 };
 
+export type ColdOutreachCsvImportPreview = {
+  mode: "cold-outreach-csv-import-preview";
+  summary: string;
+  totals: {
+    parsed: number;
+    skippedRows: number;
+    blocked: number;
+    allowed: number;
+    readyForSmartlead: number;
+    manualReview: number;
+    rejected: number;
+  };
+  parsed: ReturnType<typeof parseLeadsCsv>;
+  filtered: ReturnType<typeof filterBlacklistedLeads>;
+  pipelinePreview: LeadgenCampaignPipelinePreview;
+  launchPreview?: SmartleadCampaignLaunchPreview;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type LeadEnrichmentBatchPreview = {
   mode: "lead-enrichment-batch-preview";
   summary: string;
@@ -1207,6 +1226,85 @@ export function buildLeadgenCampaignPipelinePreview(input: {
     introInputs,
     enrichmentPreview,
     smartleadPlan: enrichmentPreview.smartleadPlan,
+    nextToolCalls,
+  };
+}
+
+export function buildColdOutreachCsvImportPreview(input: {
+  csvText: string;
+  delimiter?: "," | ";";
+  maxRows?: number;
+  blacklistDomains?: string[];
+  blacklistKeywords?: string[];
+  niche?: { id?: string; slug: string; name: string; campaignId?: string | number | null };
+  campaignTag?: string;
+  defaultSource?: string;
+  offer?: string;
+  painPoint?: string;
+  language?: "sk" | "en";
+  clientId?: string | number | null;
+  emailAccountIds?: Array<string | number>;
+  webhookUrl?: string;
+  schedule?: Parameters<typeof draftNicheSmartleadCampaignSetup>[0]["schedule"];
+  settings?: Parameters<typeof draftNicheSmartleadCampaignSetup>[0]["settings"];
+  minScore?: number;
+  batchSize?: number;
+}): ColdOutreachCsvImportPreview {
+  const parsed = parseLeadsCsv({ csvText: input.csvText, delimiter: input.delimiter, maxRows: input.maxRows });
+  const filtered = filterBlacklistedLeads({
+    leads: parsed.leads,
+    domains: input.blacklistDomains,
+    keywords: input.blacklistKeywords,
+  });
+  const pipelinePreview = buildLeadgenCampaignPipelinePreview({
+    leads: filtered.allowed,
+    niche: input.niche,
+    campaignTag: input.campaignTag,
+    defaultSource: input.defaultSource ?? "csv-import",
+    offer: input.offer,
+    language: input.language,
+    minScore: input.minScore,
+    batchSize: input.batchSize,
+  });
+  const readyLeads = pipelinePreview.enrichmentPreview.reviewQueue.ready.map((item) => item.lead);
+  const launchPreview = input.niche && readyLeads.length
+    ? buildSmartleadCampaignLaunchPreview({
+        niche: input.niche,
+        leads: readyLeads,
+        offer: input.offer,
+        painPoint: input.painPoint,
+        language: input.language,
+        clientId: input.clientId,
+        emailAccountIds: input.emailAccountIds,
+        webhookUrl: input.webhookUrl,
+        schedule: input.schedule,
+        settings: input.settings,
+        batchSize: input.batchSize,
+      })
+    : undefined;
+  const nextToolCalls: ColdOutreachCsvImportPreview["nextToolCalls"] = [
+    ...pipelinePreview.nextToolCalls.map((call) => ({
+      ...call,
+      approvalRequired: call.tool === "arcigy.add_leads_to_smartlead_campaign",
+    })),
+  ];
+  if (launchPreview) nextToolCalls.push(...launchPreview.nextToolCalls);
+  return {
+    mode: "cold-outreach-csv-import-preview",
+    summary: `CSV import preview: ${parsed.leads.length} parsed, ${filtered.blocked.length} blocked, ${pipelinePreview.totals.readyForSmartlead} ready do Smartlead, ${pipelinePreview.totals.manualReview} manual review. Ziadny zapis ani upload neprebehol.`,
+    totals: {
+      parsed: parsed.leads.length,
+      skippedRows: parsed.skipped.length,
+      blocked: filtered.blocked.length,
+      allowed: filtered.allowed.length,
+      readyForSmartlead: pipelinePreview.totals.readyForSmartlead,
+      manualReview: pipelinePreview.totals.manualReview,
+      rejected: pipelinePreview.totals.rejected,
+    },
+    parsed,
+    filtered,
+    pipelinePreview,
+    launchPreview,
     nextToolCalls,
   };
 }
