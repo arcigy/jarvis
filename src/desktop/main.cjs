@@ -2144,7 +2144,7 @@ async function runRemoteMcpSmoke(payload = {}) {
     smokeCheck(
       hasProductionEvidenceQuickStart(pack.body, baseUrl),
       "pack-production-evidence-quick-start",
-      "Connection pack includes the production verification evidence URL, read-only evidence MCP quick-start, and Jarvis production evidence voice quick-start."
+      "Connection pack includes production evidence direct + voice quick-starts and a production completion score quick-start."
     )
   );
   const health = await fetchJson(`${baseUrl}/api/mcp/arcigy.get_system_health`, token, { format: "json" });
@@ -2179,7 +2179,7 @@ async function runRemoteMcpSmoke(payload = {}) {
     baseUrl,
     summary:
       status === "ready"
-        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, action manifest, OpenAPI action schema, CORS preflight, external auth gate, auth throttle policy, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, voice quick-start, voice tool call, client memory quick-start, audit quick-start, production evidence direct + voice quick-start, production evidence tool call, agent compatibility, structured agent setup profiles, remote agent launch bundle, handoff proof, read-only call, approval gates, and secret policy passed.`
+        ? `Remote MCP smoke ready: manifest, ${expectedToolCount} tools, action manifest, OpenAPI action schema, CORS preflight, external auth gate, auth throttle policy, manifest metadata, local write policy, tunnel controls, secure tunnel status, quick-start URLs, quick-start approval policy, contract draft, contract quick-start, voice quick-start, voice tool call, client memory quick-start, audit quick-start, production evidence direct + voice quick-start, completion score quick-start, production evidence tool call, agent compatibility, structured agent setup profiles, remote agent launch bundle, handoff proof, read-only call, approval gates, and secret policy passed.`
         : `Remote MCP smoke blocked: ${checks.filter((check) => check.status === "blocked").length} check(s) failed.`,
     tokenValueReturned: false,
     expectedToolCount,
@@ -2526,7 +2526,7 @@ function hasHandoffProof(value, baseUrl) {
       "dirty=false",
       "freshness.fresh=true",
     ].every((key) => remoteSmokeExpected.includes(key)) &&
-    agentFirstSteps.some((step) => typeof step === "string" && step.includes("arcigy.get_jarvis_capability_audit")) &&
+    agentFirstSteps.some((step) => typeof step === "string" && step.includes("arcigy.get_jarvis_capability_audit") && step.includes("arcigy.get_production_completion_score")) &&
     agentFirstSteps.some((step) => typeof step === "string" && step.includes("arcigy.get_operator_briefing")) &&
     agentFirstSteps.some((step) => typeof step === "string" && step.includes("status=ready"))
   );
@@ -2539,7 +2539,7 @@ function hasAgentCompatibility(value) {
   const safetyRules = Array.isArray(value.safetyRules) ? value.safetyRules : [];
   return (
     ["Claude", "ChatGPT", "Grok"].every((agent) => agents.includes(agent)) &&
-    requiredBeforeWork.some((step) => typeof step === "string" && step.includes("arcigy.get_jarvis_capability_audit")) &&
+    requiredBeforeWork.some((step) => typeof step === "string" && step.includes("arcigy.get_jarvis_capability_audit") && step.includes("arcigy.get_production_completion_score")) &&
     requiredBeforeWork.some((step) => typeof step === "string" && step.includes("status=ready")) &&
     safetyRules.some((rule) => typeof rule === "string" && rule.includes("approvalRequired")) &&
     safetyRules.some((rule) => typeof rule === "string" && rule.includes("family-friendly"))
@@ -2609,10 +2609,10 @@ function hasAgentLaunchBundle(value, baseUrl) {
     controls.tunnelStatusUrl === `${baseUrl}/api/secure-tunnel-status` &&
     controls.startTunnelUrl === `${baseUrl}/api/start-secure-tunnel` &&
     controls.stopTunnelUrl === `${baseUrl}/api/stop-secure-tunnel` &&
-    ["Claude", "ChatGPT", "Grok", "Generic HTTP agent"].every((agent) => typeof prompts[agent] === "string" && prompts[agent].includes("arcigy.get_operator_briefing") && prompts[agent].includes("arcigy.get_jarvis_capability_audit")) &&
+    ["Claude", "ChatGPT", "Grok", "Generic HTTP agent"].every((agent) => typeof prompts[agent] === "string" && prompts[agent].includes("arcigy.get_operator_briefing") && prompts[agent].includes("arcigy.get_jarvis_capability_audit") && prompts[agent].includes("arcigy.get_production_completion_score")) &&
     value.proofPolicy?.freshnessMaxAgeHours === 24 &&
     beforeAnyWork.some((step) => typeof step === "string" && step.includes("tokenValueReturned=false")) &&
-    beforeAnyWork.some((step) => typeof step === "string" && step.includes("arcigy.get_jarvis_capability_audit")) &&
+    beforeAnyWork.some((step) => typeof step === "string" && step.includes("arcigy.get_jarvis_capability_audit") && step.includes("arcigy.get_production_completion_score")) &&
     beforeAnyWork.some((step) => typeof step === "string" && step.includes("status=ready")) &&
     beforeWrites.some((step) => typeof step === "string" && step.includes("freshness.fresh=true")) &&
     beforeWrites.some((step) => typeof step === "string" && step.includes("approval.approved=true")) &&
@@ -2645,12 +2645,18 @@ function hasProductionEvidenceQuickStart(value, baseUrl) {
   if (value.productionVerificationEvidenceUrl !== `${baseUrl}/api/production-verification-evidence`) return false;
   if (!Array.isArray(value.quickStartCalls)) return false;
   const evidenceCall = value.quickStartCalls.find((item) => item?.tool === "arcigy.get_production_verification_evidence");
+  const completionCall = value.quickStartCalls.find((item) => item?.tool === "arcigy.get_production_completion_score");
   const voiceCall = value.quickStartCalls.find((item) => item?.tool === "arcigy.jarvis_voice_event" && item?.body?.text === "Jarvis production evidence");
   return (
     evidenceCall?.approvalRequired === false &&
     evidenceCall?.method === "POST" &&
     evidenceCall?.url === `${baseUrl}/api/mcp/arcigy.get_production_verification_evidence` &&
     isEmptyRecord(evidenceCall.body) &&
+    completionCall?.approvalRequired === false &&
+    completionCall?.method === "POST" &&
+    completionCall?.url === `${baseUrl}/api/mcp/arcigy.get_production_completion_score` &&
+    completionCall?.body?.live === false &&
+    !("approval" in (completionCall.body ?? {})) &&
     voiceCall?.approvalRequired === false &&
     voiceCall?.method === "POST" &&
     voiceCall?.url === `${baseUrl}/api/mcp/arcigy.jarvis_voice_event` &&

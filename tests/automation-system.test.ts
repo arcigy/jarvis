@@ -299,7 +299,7 @@ test("remote MCP smoke checks every response for bearer token leaks", async () =
         handoff: {
           connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
           requiredProof: [{ key: "manifest" }, { key: "connection-pack" }, { key: "remote-smoke" }],
-          agentFirstSteps: ["Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
+          agentFirstSteps: ["Zavolaj arcigy.get_jarvis_capability_audit a arcigy.get_production_completion_score a cituj coverage, completion percento, MCP counts a evidence status.", "Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
         },
         tools: {
           localStateWrite: ["arcigy.sync_gmail_recent_messages"],
@@ -357,7 +357,7 @@ test("remote MCP smoke requires valid quick-start URLs", async () => {
         handoff: {
           connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
           requiredProof: [{ key: "manifest" }, { key: "connection-pack" }, { key: "remote-smoke" }],
-          agentFirstSteps: ["Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
+          agentFirstSteps: ["Zavolaj arcigy.get_jarvis_capability_audit a arcigy.get_production_completion_score a cituj coverage, completion percento, MCP counts a evidence status.", "Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
         },
         tools: {
           names: expectedNames,
@@ -414,7 +414,7 @@ test("remote MCP smoke requires quick-start approval policy parity", async () =>
         handoff: {
           connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
           requiredProof: [{ key: "manifest" }, { key: "connection-pack" }, { key: "remote-smoke" }],
-          agentFirstSteps: ["Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
+          agentFirstSteps: ["Zavolaj arcigy.get_jarvis_capability_audit a arcigy.get_production_completion_score a cituj coverage, completion percento, MCP counts a evidence status.", "Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
         },
         tools: {
           names: expectedNames,
@@ -471,7 +471,7 @@ test("remote MCP smoke requires exact MCP call parity in quick-starts", async ()
         handoff: {
           connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
           requiredProof: [{ key: "manifest" }, { key: "connection-pack" }, { key: "remote-smoke" }],
-          agentFirstSteps: ["Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
+          agentFirstSteps: ["Zavolaj arcigy.get_jarvis_capability_audit a arcigy.get_production_completion_score a cituj coverage, completion percento, MCP counts a evidence status.", "Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
         },
         tools: {
           names: expectedNames,
@@ -551,7 +551,7 @@ test("remote MCP smoke blocks generic secret patterns in response bodies", async
         handoff: {
           connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
           requiredProof: [{ key: "manifest" }, { key: "connection-pack" }, { key: "remote-smoke" }],
-          agentFirstSteps: ["Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
+          agentFirstSteps: ["Zavolaj arcigy.get_jarvis_capability_audit a arcigy.get_production_completion_score a cituj coverage, completion percento, MCP counts a evidence status.", "Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
         },
         tools: {
           localStateWrite: ["arcigy.sync_gmail_recent_messages"],
@@ -606,7 +606,7 @@ test("remote MCP smoke requires exact manifest and pack tool registries", async 
         handoff: {
           connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
           requiredProof: [{ key: "manifest" }, { key: "connection-pack" }, { key: "remote-smoke" }],
-          agentFirstSteps: ["Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
+          agentFirstSteps: ["Zavolaj arcigy.get_jarvis_capability_audit a arcigy.get_production_completion_score a cituj coverage, completion percento, MCP counts a evidence status.", "Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
         },
         tools: {
           names: expectedNames,
@@ -664,7 +664,7 @@ test("remote MCP smoke requires valid manifest tool metadata", async () => {
         handoff: {
           connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
           requiredProof: [{ key: "manifest" }, { key: "connection-pack" }, { key: "remote-smoke" }],
-          agentFirstSteps: ["Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
+          agentFirstSteps: ["Zavolaj arcigy.get_jarvis_capability_audit a arcigy.get_production_completion_score a cituj coverage, completion percento, MCP counts a evidence status.", "Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
         },
         tools: {
           names: expectedNames,
@@ -718,7 +718,7 @@ test("remote MCP smoke requires exact manifest and pack tool policies", async ()
         handoff: {
           connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
           requiredProof: [{ key: "manifest" }, { key: "connection-pack" }, { key: "remote-smoke" }],
-          agentFirstSteps: ["Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
+          agentFirstSteps: ["Zavolaj arcigy.get_jarvis_capability_audit a arcigy.get_production_completion_score a cituj coverage, completion percento, MCP counts a evidence status.", "Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
         },
         tools: {
           names: expectedNames,
@@ -774,7 +774,7 @@ test("remote MCP smoke requires guarded connection pack limits", async () => {
         handoff: {
           connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
           requiredProof: [{ key: "manifest" }, { key: "connection-pack" }, { key: "remote-smoke" }],
-          agentFirstSteps: ["Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
+          agentFirstSteps: ["Zavolaj arcigy.get_jarvis_capability_audit a arcigy.get_production_completion_score a cituj coverage, completion percento, MCP counts a evidence status.", "Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
         },
         tools: {
           names: expectedNames,
@@ -895,7 +895,7 @@ test("remote MCP smoke requires the contract draft quick-start", async () => {
         handoff: {
           connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
           requiredProof: [{ key: "manifest" }, { key: "connection-pack" }, { key: "remote-smoke" }],
-          agentFirstSteps: ["Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
+          agentFirstSteps: ["Zavolaj arcigy.get_jarvis_capability_audit a arcigy.get_production_completion_score a cituj coverage, completion percento, MCP counts a evidence status.", "Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
         },
         tools: {
           localStateWrite: ["arcigy.sync_gmail_recent_messages"],
@@ -961,7 +961,7 @@ test("remote MCP smoke requires the Jarvis voice quick-start", async () => {
         handoff: {
           connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
           requiredProof: [{ key: "manifest" }, { key: "connection-pack" }, { key: "remote-smoke" }],
-          agentFirstSteps: ["Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
+          agentFirstSteps: ["Zavolaj arcigy.get_jarvis_capability_audit a arcigy.get_production_completion_score a cituj coverage, completion percento, MCP counts a evidence status.", "Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
         },
         tools: {
           localStateWrite: ["arcigy.sync_gmail_recent_messages"],
@@ -1004,7 +1004,7 @@ test("remote MCP smoke requires the Jarvis capability audit voice quick-start", 
         handoff: {
           connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
           requiredProof: [{ key: "manifest" }, { key: "connection-pack" }, { key: "remote-smoke" }],
-          agentFirstSteps: ["Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
+          agentFirstSteps: ["Zavolaj arcigy.get_jarvis_capability_audit a arcigy.get_production_completion_score a cituj coverage, completion percento, MCP counts a evidence status.", "Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
         },
         tools: {
           localStateWrite: ["arcigy.sync_gmail_recent_messages"],
@@ -1048,7 +1048,7 @@ test("remote MCP smoke requires the audit trail quick-start", async () => {
         handoff: {
           connectionPackUrl: "https://jarvis.example/api/remote-mcp-pack?includeReadiness=true&live=true",
           requiredProof: [{ key: "manifest" }, { key: "connection-pack" }, { key: "remote-smoke" }],
-          agentFirstSteps: ["Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
+          agentFirstSteps: ["Zavolaj arcigy.get_jarvis_capability_audit a arcigy.get_production_completion_score a cituj coverage, completion percento, MCP counts a evidence status.", "Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
         },
         tools: {
           names: expectedNames,
@@ -1112,7 +1112,7 @@ test("remote MCP smoke requires the production evidence quick-start", async () =
             { key: "production-verification-evidence" },
             { key: "remote-smoke", expected: "action-manifest openapi-schema cors-preflight external-auth-gate pack-auth-throttle-policy pack-limits pack-agent-setup-profiles pack-agent-launch-bundle pack-voice-quick-start voice-tool-call pack-production-evidence-quick-start production-evidence-tool-call approval-shape-gate secret-redaction dirty=false freshness.fresh=true" },
           ],
-          agentFirstSteps: ["Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
+          agentFirstSteps: ["Zavolaj arcigy.get_jarvis_capability_audit a arcigy.get_production_completion_score a cituj coverage, completion percento, MCP counts a evidence status.", "Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
         },
         tools: {
           names: expectedNames,
@@ -1177,7 +1177,7 @@ test("remote MCP smoke requires the production evidence voice quick-start", asyn
             { key: "production-verification-evidence" },
             { key: "remote-smoke", expected: "action-manifest openapi-schema cors-preflight external-auth-gate pack-auth-throttle-policy pack-limits pack-agent-setup-profiles pack-agent-launch-bundle pack-voice-quick-start voice-tool-call pack-production-evidence-quick-start production-evidence-tool-call approval-shape-gate secret-redaction dirty=false freshness.fresh=true" },
           ],
-          agentFirstSteps: ["Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
+          agentFirstSteps: ["Zavolaj arcigy.get_jarvis_capability_audit a arcigy.get_production_completion_score a cituj coverage, completion percento, MCP counts a evidence status.", "Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
         },
         tools: {
           names: expectedNames,
@@ -1278,7 +1278,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
             { key: "production-verification-evidence" },
             { key: "remote-smoke", expected: "action-manifest openapi-schema cors-preflight external-auth-gate pack-auth-throttle-policy pack-limits pack-agent-setup-profiles pack-agent-launch-bundle pack-voice-quick-start voice-tool-call pack-production-evidence-quick-start production-evidence-tool-call approval-shape-gate secret-redaction dirty=false freshness.fresh=true" },
           ],
-          agentFirstSteps: ["Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
+          agentFirstSteps: ["Zavolaj arcigy.get_jarvis_capability_audit a arcigy.get_production_completion_score a cituj coverage, completion percento, MCP counts a evidence status.", "Run smokeTestUrl and require status=ready before using MCP tools.", "Call arcigy.get_operator_briefing before proposing work."],
         },
         tools: {
           names: expectedNames,
@@ -1338,7 +1338,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
   assert.equal(report.status, "blocked");
   assert.ok(report.checks.some((check) => check.key === "production-evidence-tool-call" && check.status === "blocked"));
   assert.ok(report.checks.some((check) => check.key === "pack-production-evidence-quick-start" && check.status === "ready"));
-  assert.ok(report.checks.some((check) => check.key === "pack-production-evidence-quick-start" && check.message.includes("Jarvis production evidence voice quick-start")));
+  assert.ok(report.checks.some((check) => check.key === "pack-production-evidence-quick-start" && check.message.includes("production completion score quick-start")));
   assert.ok(report.checks.some((check) => check.key === "secret-redaction" && check.status === "ready"));
 });
 
@@ -3598,7 +3598,10 @@ function remoteSmokeRequiredGateFixture() {
 function remoteAgentCompatibilityFixture() {
   return {
     supportedAgents: ["Claude", "ChatGPT", "Grok"],
-    requiredBeforeWork: ["Run smokeTestUrl and require status=ready before using MCP tools."],
+    requiredBeforeWork: [
+      "Zavolaj arcigy.get_jarvis_capability_audit a arcigy.get_production_completion_score a cituj coverage, completion percento, MCP counts a evidence status.",
+      "Run smokeTestUrl and require status=ready before using MCP tools.",
+    ],
     safetyRules: ["Do not call approvalRequired tools without approval.", "Keep outputs family-friendly and secret-redacted."],
   };
 }
@@ -3702,6 +3705,7 @@ function remoteSmokeQuickStartFixture() {
   return [
     call("arcigy.run_remote_mcp_smoke", {}),
     call("arcigy.get_production_verification_evidence", {}),
+    call("arcigy.get_production_completion_score", { live: false }),
     call("arcigy.jarvis_voice_event", { text: "Jarvis capability audit", session: { state: "idle", wakeWord: "jarvis" } }),
     call("arcigy.jarvis_voice_event", { text: "Jarvis production evidence", session: { state: "idle", wakeWord: "jarvis" } }),
     call("arcigy.get_operator_briefing", { periodLabel: "poslednych 7 dni", live: false }),
