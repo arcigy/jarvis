@@ -1,7 +1,7 @@
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync } from "node:fs";
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, extname, join, normalize, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -17,13 +17,17 @@ import { buildJarvisCapabilityAudit, summarizeJarvisCapabilityAuditForVoice } fr
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "../automation-system/lead-discovery.ts";
 import {
   buildNicheLeadgenPlan,
+  buildManualReviewQueue,
   dedupeLeadCandidates,
   draftLeadIntro,
   draftSmartleadCampaignSequence,
   enrichSlovakCompanyRegister,
+  filterBlacklistedLeads,
+  parseLeadsCsv,
   prepareSmartleadLeads,
   runLeadgenResearchPipeline,
   scoreLeadQuality,
+  serializeLeadsCsv,
   scrapeWebsiteContacts,
 } from "../automation-system/lead-automation.ts";
 import { buildContractGenerationCommand, getColdOutreachMcpAnswer, listJarvisMcpTools, localStateWriteToolNames } from "../automation-system/mcp-tools.ts";
@@ -1261,6 +1265,48 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         language: payload.language === "en" ? "en" : "sk",
       }),
     });
+    return;
+  }
+  if (name === "arcigy.parse_leads_csv") {
+    writeJson(response, 200, {
+      result: parseLeadsCsv({
+        csvText: String(payload.csvText ?? ""),
+        delimiter: payload.delimiter === ";" ? ";" : payload.delimiter === "," ? "," : undefined,
+        maxRows: typeof payload.maxRows === "number" ? payload.maxRows : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.filter_blacklisted_leads") {
+    writeJson(response, 200, {
+      result: filterBlacklistedLeads({
+        leads: (payload.leads ?? []) as Parameters<typeof filterBlacklistedLeads>[0]["leads"],
+        domains: Array.isArray(payload.domains) ? payload.domains.map(String) : undefined,
+        keywords: Array.isArray(payload.keywords) ? payload.keywords.map(String) : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_manual_review_queue") {
+    writeJson(response, 200, {
+      result: buildManualReviewQueue({
+        leads: (payload.leads ?? []) as Parameters<typeof buildManualReviewQueue>[0]["leads"],
+        minScore: typeof payload.minScore === "number" ? payload.minScore : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.export_leads_csv") {
+    const safeOutputPath = resolveRepoPath(payload.outputPath, join(repoRoot, "generated", "leads", "manual-review.csv"), "outputPath");
+    const serialized = serializeLeadsCsv({
+      leads: (payload.leads ?? []) as Parameters<typeof serializeLeadsCsv>[0]["leads"],
+      columns: Array.isArray(payload.columns) ? payload.columns.map(String) : undefined,
+    });
+    mkdirSync(dirname(safeOutputPath), { recursive: true });
+    writeFileSync(safeOutputPath, serialized.csvText, "utf-8");
+    const responseBody = { result: { ...serialized, outputPath: safeOutputPath } };
+    addAuditEvent("arcigy.export_leads_csv", "exported", payload, responseBody, true);
+    writeJson(response, 200, responseBody);
     return;
   }
   if (name === "arcigy.draft_lead_intro") {

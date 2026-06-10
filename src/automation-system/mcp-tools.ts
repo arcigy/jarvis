@@ -49,6 +49,10 @@ export type JarvisMcpToolName =
   | "arcigy.dedupe_lead_candidates"
   | "arcigy.build_niche_leadgen_plan"
   | "arcigy.draft_smartlead_campaign_sequence"
+  | "arcigy.parse_leads_csv"
+  | "arcigy.filter_blacklisted_leads"
+  | "arcigy.build_manual_review_queue"
+  | "arcigy.export_leads_csv"
   | "arcigy.draft_lead_intro"
   | "arcigy.prepare_smartlead_leads"
   | "arcigy.run_leadgen_research_pipeline"
@@ -71,6 +75,7 @@ export const localStateWriteToolNames = new Set<JarvisMcpToolName>([
   "arcigy.ingest_client_message",
   "arcigy.update_client_need_status",
   "arcigy.export_local_memory_snapshot",
+  "arcigy.export_leads_csv",
   "arcigy.sync_gmail_recent_messages",
 ]);
 
@@ -318,6 +323,26 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
       name: "arcigy.draft_smartlead_campaign_sequence",
       description: "Vytvori draft Smartlead email sequence struktury s variantmi a follow-upom bez zapisu do Smartlead.",
       requiresApproval: false,
+    },
+    {
+      name: "arcigy.parse_leads_csv",
+      description: "Sparsuje CSV text leadov do normalizovanych lead candidates pre review, scoring a Smartlead pripravu.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.filter_blacklisted_leads",
+      description: "Odstrani alebo oznaci leady podla blacklist domen a keywordov pred importom do Smartlead.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_manual_review_queue",
+      description: "Rozdeli leady na ready, manual_review a reject podla emailu, webu, decision maker/phone, AI intra a skore.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.export_leads_csv",
+      description: "Zapise vybrane leady do CSV suboru v repozitari pre manual review po explicitnom schvaleni.",
+      requiresApproval: true,
     },
     {
       name: "arcigy.draft_lead_intro",

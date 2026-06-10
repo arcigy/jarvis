@@ -326,6 +326,7 @@ async function checkApprovalGates(fetchImpl: typeof fetch, baseUrl: string, bear
     ["arcigy.send_approved_outreach_reply", { preparedEventId: "smoke-prepared-reply" }],
     ["arcigy.update_client_need_status", { needSignalId: "smoke-client-need", status: "resolved" }],
     ["arcigy.export_local_memory_snapshot", { outputPath: "generated/local-memory/smoke.json" }],
+    ["arcigy.export_leads_csv", { outputPath: "generated/leads/smoke.csv", leads: [{ email: "smoke@example.com" }] }],
     ["arcigy.append_leads_to_google_sheet", { rows: [["Smoke", "https://example.com"]] }],
     ["arcigy.add_leads_to_smartlead_campaign", { campaignId: "123", leads: [{ email: "smoke@example.com" }] }],
     ["arcigy.create_smartlead_campaign", { name: "SMOKE CAMPAIGN" }],
@@ -550,6 +551,7 @@ function hasSafeOpenApiExample(toolName: string, value: unknown): boolean {
   if (toolName === "arcigy.sync_gmail_recent_messages") return payload.dryRun === true;
   if (toolName === "arcigy.identify_email") return typeof payload.email === "string" && payload.email.includes("@");
   if (toolName === "arcigy.generate_contract_documents") return (payload.approval as { approved?: unknown } | undefined)?.approved === true && typeof payload.intake === "object";
+  if (toolName === "arcigy.export_leads_csv") return (payload.approval as { approved?: unknown } | undefined)?.approved === true && Array.isArray(payload.leads);
   if (toolName === "arcigy.append_leads_to_google_sheet") return (payload.approval as { approved?: unknown } | undefined)?.approved === true && Array.isArray(payload.rows);
   if (toolName === "arcigy.add_leads_to_smartlead_campaign") return (payload.approval as { approved?: unknown } | undefined)?.approved === true && Array.isArray(payload.leads);
   if (toolName === "arcigy.create_smartlead_campaign") return (payload.approval as { approved?: unknown } | undefined)?.approved === true && typeof payload.name === "string";

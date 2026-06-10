@@ -1,4 +1,6 @@
 import { spawnSync } from "node:child_process";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 import { resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -16,13 +18,17 @@ import { buildJarvisCapabilityAudit, summarizeJarvisCapabilityAuditForVoice } fr
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "./lead-discovery.ts";
 import {
   buildNicheLeadgenPlan,
+  buildManualReviewQueue,
   dedupeLeadCandidates,
   draftLeadIntro,
   draftSmartleadCampaignSequence,
   enrichSlovakCompanyRegister,
+  filterBlacklistedLeads,
+  parseLeadsCsv,
   prepareSmartleadLeads,
   runLeadgenResearchPipeline,
   scoreLeadQuality,
+  serializeLeadsCsv,
   scrapeWebsiteContacts,
 } from "./lead-automation.ts";
 import {
@@ -1343,6 +1349,105 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(draftSmartleadCampaignSequence(input))
+  );
+
+  const leadCandidateSchema = z.object({
+    email: z.string().optional(),
+    companyName: z.string().optional(),
+    firstName: z.string().optional(),
+    lastName: z.string().optional(),
+    website: z.string().optional(),
+    phone: z.string().optional(),
+    source: z.string().optional(),
+    personalizedIntro: z.string().optional(),
+    customFields: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
+  });
+
+  server.registerTool(
+    "arcigy.parse_leads_csv",
+    {
+      title: "Parse leads CSV",
+      description: "Parse CSV text into normalized lead candidates for review, scoring, and Smartlead preparation.",
+      inputSchema: {
+        csvText: z.string().min(1),
+        delimiter: z.enum([",", ";"]).optional(),
+        maxRows: z.number().int().min(1).max(10_000).default(1000),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(parseLeadsCsv(input))
+  );
+
+  server.registerTool(
+    "arcigy.filter_blacklisted_leads",
+    {
+      title: "Filter blacklisted leads",
+      description: "Filter lead candidates by blacklisted domains and keywords before import.",
+      inputSchema: {
+        leads: z.array(leadCandidateSchema).min(1),
+        domains: z.array(z.string()).optional(),
+        keywords: z.array(z.string()).optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(filterBlacklistedLeads(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_manual_review_queue",
+    {
+      title: "Build manual review queue",
+      description: "Split leads into ready, manual_review, and rejected groups using email, website, decision-maker/phone, AI intro, and score.",
+      inputSchema: {
+        leads: z.array(leadCandidateSchema).min(1),
+        minScore: z.number().int().min(0).max(100).default(70),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildManualReviewQueue(input))
+  );
+
+  server.registerTool(
+    "arcigy.export_leads_csv",
+    {
+      title: "Export leads CSV",
+      description: "Write selected lead candidates to a CSV file inside the repository after explicit approval.",
+      inputSchema: {
+        leads: z.array(leadCandidateSchema).min(1),
+        columns: z.array(z.string()).optional(),
+        outputPath: z.string().default("generated/leads/manual-review.csv"),
+        approval: approvalSchema,
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+    },
+    async (input) => {
+      requireExplicitApproval("arcigy.export_leads_csv", input);
+      const safeOutputPath = resolveRepoPath(input.outputPath, "generated/leads/manual-review.csv", "outputPath");
+      const serialized = serializeLeadsCsv({ leads: input.leads, columns: input.columns });
+      mkdirSync(dirname(safeOutputPath), { recursive: true });
+      writeFileSync(safeOutputPath, serialized.csvText, "utf-8");
+      return jsonResult({ ...serialized, outputPath: safeOutputPath });
+    }
   );
 
   server.registerTool(

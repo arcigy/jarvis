@@ -16,12 +16,16 @@ import { defaultGmailSyncQuery, encodeGmailRawMessage, listRecentGmailMessageEve
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "../src/automation-system/lead-discovery.ts";
 import {
   buildNicheLeadgenPlan,
+  buildManualReviewQueue,
   dedupeLeadCandidates,
   draftLeadIntro,
   draftSmartleadCampaignSequence,
   enrichSlovakCompanyRegister,
+  filterBlacklistedLeads,
+  parseLeadsCsv,
   prepareSmartleadLeads,
   scoreLeadQuality,
+  serializeLeadsCsv,
   scrapeWebsiteContacts,
 } from "../src/automation-system/lead-automation.ts";
 import {
@@ -109,6 +113,10 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.dedupe_lead_candidates",
     "arcigy.build_niche_leadgen_plan",
     "arcigy.draft_smartlead_campaign_sequence",
+    "arcigy.parse_leads_csv",
+    "arcigy.filter_blacklisted_leads",
+    "arcigy.build_manual_review_queue",
+    "arcigy.export_leads_csv",
     "arcigy.draft_lead_intro",
     "arcigy.prepare_smartlead_leads",
     "arcigy.run_leadgen_research_pipeline",
@@ -360,6 +368,7 @@ test("remote MCP smoke checks every response for bearer token leaks", async () =
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
+      url.endsWith("/api/mcp/arcigy.export_leads_csv") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet") ||
       url.endsWith("/api/mcp/arcigy.add_leads_to_smartlead_campaign") ||
       url.endsWith("/api/mcp/arcigy.create_smartlead_campaign") ||
@@ -2745,6 +2754,28 @@ test("niche plan and Smartlead sequence drafts follow leadgen conventions", () =
   assert.equal(sequence.sequences[1].seq_variants[0].subject, "");
   assert.ok(sequence.requiredVariables.includes("{{personalized_intro}}"));
   assert.ok(sequence.sequences[0].seq_variants[0].email_body.includes("%signature%"));
+});
+
+test("lead CSV parsing, blacklist filtering, manual review, and export are deterministic", () => {
+  const parsed = parseLeadsCsv({
+    csvText: "company_name,email,website,phone,icebreaker_sentence\nGood Co,owner@good.sk,https://good.sk,+421 900 111 222,Kratke intro\nBad Co,info@competitor.sk,https://competitor.sk,,",
+  });
+  assert.equal(parsed.leads.length, 2);
+  assert.equal(parsed.leads[0].companyName, "Good Co");
+  assert.equal(parsed.leads[0].personalizedIntro, "Kratke intro");
+
+  const filtered = filterBlacklistedLeads({ leads: parsed.leads, domains: ["competitor.sk"] });
+  assert.equal(filtered.allowed.length, 1);
+  assert.equal(filtered.blocked[0].reason, "blacklisted domain: competitor.sk");
+
+  const queue = buildManualReviewQueue({ leads: parsed.leads, minScore: 70 });
+  assert.equal(queue.summary.total, 2);
+  assert.equal(queue.ready.length, 1);
+  assert.equal(queue.review.length, 1);
+
+  const exported = serializeLeadsCsv({ leads: filtered.allowed, columns: ["companyName", "email", "website", "personalizedIntro"] });
+  assert.equal(exported.rowCount, 1);
+  assert.ok(exported.csvText.includes("Good Co,owner@good.sk,https://good.sk,Kratke intro"));
 });
 
 test("Slovak register enrichment parses ORSR detail without live network", async () => {

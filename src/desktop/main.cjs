@@ -1435,7 +1435,7 @@ async function getRemoteMcpPack(payload = {}) {
       "Call MCP tools with POST JSON to mcpToolCallPattern.",
       "Use the bearer auth header placeholder; the real token must be supplied by the operator and is never returned by this pack.",
       "Use tunnel.statusUrl to inspect public tunnel URLs from the redacted secure-tunnel log. Browser-launched tunnel start requires a strong JARVIS_WEB_TOKEN.",
-      "Treat generate_contract_documents, approve_prepared_outreach_reply, send_approved_outreach_reply, update_client_need_status, create_smartlead_campaign, configure_smartlead_campaign, add_leads_to_smartlead_campaign, and append_leads_to_google_sheet as approval-gated actions.",
+      "Treat generate_contract_documents, approve_prepared_outreach_reply, send_approved_outreach_reply, update_client_need_status, export_leads_csv, create_smartlead_campaign, configure_smartlead_campaign, add_leads_to_smartlead_campaign, and append_leads_to_google_sheet as approval-gated actions.",
       "Treat localStateWrite tools as local memory writes. Prefer dryRun: true for sync_gmail_recent_messages before ingesting messages.",
       "Use get_operator_briefing for a Jarvis-style daily status before making recommendations.",
     ],
@@ -2232,6 +2232,7 @@ async function checkApprovalGates(baseUrl, token, topLevelApproved) {
     ["arcigy.send_approved_outreach_reply", { preparedEventId: "smoke-prepared-reply" }],
     ["arcigy.update_client_need_status", { needSignalId: "smoke-client-need", status: "resolved" }],
     ["arcigy.export_local_memory_snapshot", { outputPath: "generated/local-memory/smoke.json" }],
+    ["arcigy.export_leads_csv", { outputPath: "generated/leads/smoke.csv", leads: [{ email: "smoke@example.com" }] }],
     ["arcigy.append_leads_to_google_sheet", { rows: [["Smoke", "https://example.com"]] }],
     ["arcigy.add_leads_to_smartlead_campaign", { campaignId: "123", leads: [{ email: "smoke@example.com" }] }],
     ["arcigy.create_smartlead_campaign", { name: "SMOKE CAMPAIGN" }],
@@ -2393,6 +2394,7 @@ function hasSafeOpenApiExample(toolName, value) {
   if (toolName === "arcigy.sync_gmail_recent_messages") return value.dryRun === true;
   if (toolName === "arcigy.identify_email") return typeof value.email === "string" && value.email.includes("@");
   if (toolName === "arcigy.generate_contract_documents") return value.approval?.approved === true && typeof value.intake === "object";
+  if (toolName === "arcigy.export_leads_csv") return value.approval?.approved === true && Array.isArray(value.leads);
   if (toolName === "arcigy.append_leads_to_google_sheet") return value.approval?.approved === true && Array.isArray(value.rows);
   if (toolName === "arcigy.add_leads_to_smartlead_campaign") return value.approval?.approved === true && Array.isArray(value.leads);
   if (toolName === "arcigy.create_smartlead_campaign") return value.approval?.approved === true && typeof value.name === "string";
@@ -2902,6 +2904,10 @@ function listWebMcpTools() {
     { name: "arcigy.dedupe_lead_candidates", requiresApproval: false },
     { name: "arcigy.build_niche_leadgen_plan", requiresApproval: false },
     { name: "arcigy.draft_smartlead_campaign_sequence", requiresApproval: false },
+    { name: "arcigy.parse_leads_csv", requiresApproval: false },
+    { name: "arcigy.filter_blacklisted_leads", requiresApproval: false },
+    { name: "arcigy.build_manual_review_queue", requiresApproval: false },
+    { name: "arcigy.export_leads_csv", requiresApproval: true },
     { name: "arcigy.draft_lead_intro", requiresApproval: false },
     { name: "arcigy.prepare_smartlead_leads", requiresApproval: false },
     { name: "arcigy.run_leadgen_research_pipeline", requiresApproval: false },

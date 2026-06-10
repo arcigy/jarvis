@@ -108,6 +108,10 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.dedupe_lead_candidates`: deduplicates lead candidates by email, website, phone, or company name before import.
 - `arcigy.build_niche_leadgen_plan`: returns niche-specific Google Maps and Serper query plans with blacklist keywords.
 - `arcigy.draft_smartlead_campaign_sequence`: drafts a Smartlead-compatible email sequence with variants and empty-subject follow-up without writing to Smartlead.
+- `arcigy.parse_leads_csv`: parses pasted CSV lead data into normalized lead candidates.
+- `arcigy.filter_blacklisted_leads`: filters lead candidates by blacklisted domains or keywords before import.
+- `arcigy.build_manual_review_queue`: splits leads into ready, manual review, and rejected groups.
+- `arcigy.export_leads_csv`: approval-gated CSV export into the repository for manual review.
 - `arcigy.draft_lead_intro`: Gemini draft of one short personalized cold outreach intro for a lead.
 - `arcigy.prepare_smartlead_leads`: normalizes selected leads into Smartlead `lead_list` payload without writing.
 - `arcigy.run_leadgen_research_pipeline`: read-only discovery + optional website scraping + optional Gemini intro drafts for Smartlead-ready research.

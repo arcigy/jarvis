@@ -75,6 +75,18 @@ export type SlovakRegisterLookup = {
   fetchedAt: string;
 };
 
+export type LeadCsvRow = LeadCandidateInput & {
+  raw: Record<string, string>;
+};
+
+export type ManualReviewItem = {
+  lead: LeadCandidateInput;
+  score: number;
+  reasons: string[];
+  reviewReasons: string[];
+  recommendation: "ready_for_import" | "manual_review" | "reject";
+};
+
 const genericEmailPrefixes = new Set(["info", "kontakt", "contact", "office", "admin", "sales", "hello", "support", "recepcia"]);
 
 const nicheTemplates: Record<string, Omit<NicheLeadgenPlan, "niche" | "region" | "notes">> = {
@@ -203,6 +215,101 @@ export function prepareSmartleadLeads(input: {
     ];
   });
   return { leadList: dedupeSmartleadLeads(leadList), skipped };
+}
+
+export function parseLeadsCsv(input: { csvText: string; delimiter?: "," | ";"; maxRows?: number }): {
+  headers: string[];
+  leads: LeadCsvRow[];
+  skipped: Array<{ rowNumber: number; reason: string }>;
+} {
+  const rows = parseCsv(input.csvText, input.delimiter);
+  if (!rows.length) return { headers: [], leads: [], skipped: [{ rowNumber: 0, reason: "empty csv" }] };
+  const headers = rows[0].map((header) => header.trim());
+  const maxRows = Math.min(Math.max(Math.trunc(input.maxRows ?? 1000), 1), 10_000);
+  const skipped: Array<{ rowNumber: number; reason: string }> = [];
+  const leads = rows.slice(1, maxRows + 1).flatMap((row, index) => {
+    const raw = Object.fromEntries(headers.map((header, headerIndex) => [header, row[headerIndex]?.trim() ?? ""]));
+    if (Object.values(raw).every((value) => !value)) {
+      skipped.push({ rowNumber: index + 2, reason: "empty row" });
+      return [];
+    }
+    return [mapCsvLead(raw)];
+  });
+  return { headers, leads, skipped };
+}
+
+export function serializeLeadsCsv(input: { leads: LeadCandidateInput[]; columns?: string[] }): {
+  csvText: string;
+  columns: string[];
+  rowCount: number;
+} {
+  const columns = input.columns?.length
+    ? input.columns
+    : ["companyName", "email", "firstName", "lastName", "website", "phone", "source", "personalizedIntro"];
+  const lines = [
+    columns.map(csvEscape).join(","),
+    ...input.leads.map((lead) => columns.map((column) => csvEscape(readLeadColumn(lead, column))).join(",")),
+  ];
+  return { csvText: lines.join("\n"), columns, rowCount: input.leads.length };
+}
+
+export function filterBlacklistedLeads(input: {
+  leads: LeadCandidateInput[];
+  domains?: string[];
+  keywords?: string[];
+}): {
+  allowed: LeadCandidateInput[];
+  blocked: Array<{ lead: LeadCandidateInput; reason: string }>;
+} {
+  const domains = new Set((input.domains ?? []).map(normalizeDomain).filter(Boolean));
+  const keywords = (input.keywords ?? []).map((keyword) => keyword.trim().toLowerCase()).filter(Boolean);
+  const allowed: LeadCandidateInput[] = [];
+  const blocked: Array<{ lead: LeadCandidateInput; reason: string }> = [];
+  for (const lead of input.leads) {
+    const domain = normalizeDomain(lead.website || lead.email?.split("@")[1] || "");
+    const haystack = [lead.companyName, lead.website, lead.email, lead.source].filter(Boolean).join(" ").toLowerCase();
+    if (domain && domains.has(domain)) {
+      blocked.push({ lead, reason: `blacklisted domain: ${domain}` });
+      continue;
+    }
+    const keyword = keywords.find((item) => haystack.includes(item));
+    if (keyword) {
+      blocked.push({ lead, reason: `blacklisted keyword: ${keyword}` });
+      continue;
+    }
+    allowed.push(lead);
+  }
+  return { allowed, blocked };
+}
+
+export function buildManualReviewQueue(input: { leads: LeadCandidateInput[]; minScore?: number }): {
+  ready: ManualReviewItem[];
+  review: ManualReviewItem[];
+  rejected: ManualReviewItem[];
+  summary: { ready: number; review: number; rejected: number; total: number };
+} {
+  const minScore = Math.min(Math.max(Math.trunc(input.minScore ?? 70), 0), 100);
+  const items = input.leads.map((lead): ManualReviewItem => {
+    const scoringInput: LeadQualityInput = {
+      email: lead.email,
+      companyName: lead.companyName,
+      website: lead.website,
+      decisionMaker: [lead.firstName, lead.lastName].filter(Boolean).join(" ") || undefined,
+      personalizedIntro: lead.personalizedIntro,
+    };
+    const { score, reasons } = scoreSingleLead(scoringInput);
+    const reviewReasons = manualReviewReasons(lead, score, minScore);
+    const recommendation: ManualReviewItem["recommendation"] = !lead.email || lead.email && !lead.email.includes("@")
+      ? "reject"
+      : reviewReasons.length
+        ? "manual_review"
+        : "ready_for_import";
+    return { lead, score, reasons, reviewReasons, recommendation };
+  });
+  const ready = items.filter((item) => item.recommendation === "ready_for_import");
+  const review = items.filter((item) => item.recommendation === "manual_review");
+  const rejected = items.filter((item) => item.recommendation === "reject");
+  return { ready, review, rejected, summary: { ready: ready.length, review: review.length, rejected: rejected.length, total: items.length } };
 }
 
 export function scoreLeadQuality(input: { leads: LeadQualityInput[]; minScore?: number }): {
@@ -600,6 +707,97 @@ function scoreSingleLead(lead: LeadQualityInput): { score: number; reasons: stri
   }
 }
 
+function parseCsv(csvText: string, delimiter?: "," | ";"): string[][] {
+  const selectedDelimiter = delimiter ?? guessDelimiter(csvText);
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+  let quoted = false;
+  for (let index = 0; index < csvText.length; index += 1) {
+    const char = csvText[index];
+    const next = csvText[index + 1];
+    if (quoted && char === '"' && next === '"') {
+      field += '"';
+      index += 1;
+      continue;
+    }
+    if (char === '"') {
+      quoted = !quoted;
+      continue;
+    }
+    if (!quoted && char === selectedDelimiter) {
+      row.push(field);
+      field = "";
+      continue;
+    }
+    if (!quoted && (char === "\n" || char === "\r")) {
+      if (char === "\r" && next === "\n") index += 1;
+      row.push(field);
+      if (row.some((value) => value.trim())) rows.push(row);
+      row = [];
+      field = "";
+      continue;
+    }
+    field += char;
+  }
+  row.push(field);
+  if (row.some((value) => value.trim())) rows.push(row);
+  return rows;
+}
+
+function guessDelimiter(csvText: string): "," | ";" {
+  const firstLine = csvText.split(/\r?\n/, 1)[0] ?? "";
+  return (firstLine.match(/;/g)?.length ?? 0) > (firstLine.match(/,/g)?.length ?? 0) ? ";" : ",";
+}
+
+function mapCsvLead(raw: Record<string, string>): LeadCsvRow {
+  const value = (...aliases: string[]) => {
+    const normalized = new Map(Object.entries(raw).map(([key, item]) => [slugify(key), item]));
+    return aliases.map(slugify).map((alias) => normalized.get(alias)).find((item) => item && item.trim())?.trim();
+  };
+  return {
+    raw,
+    email: value("email", "primary_email", "mail"),
+    companyName: value("companyName", "company_name", "official_company_name", "original_name", "name", "firma"),
+    firstName: value("firstName", "first_name", "meno"),
+    lastName: value("lastName", "last_name", "priezvisko", "decision_maker_last_name"),
+    website: value("website", "web", "url"),
+    phone: value("phone", "telefon", "tel"),
+    source: value("source", "niche", "campaign_tag"),
+    personalizedIntro: value("personalizedIntro", "personalized_intro", "icebreaker", "icebreaker_sentence"),
+    customFields: Object.fromEntries(
+      Object.entries(raw)
+        .filter(([key, item]) => item && ["ico", "address", "verification_status", "decision_maker_name"].includes(slugify(key).replace(/-/g, "_")))
+        .map(([key, item]) => [slugify(key).replace(/-/g, "_"), item])
+    ),
+  };
+}
+
+function csvEscape(value: unknown): string {
+  if (value === undefined || value === null) return "";
+  const text = String(value);
+  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function readLeadColumn(lead: LeadCandidateInput, column: string): unknown {
+  const key = column as keyof LeadCandidateInput;
+  if (key in lead) return lead[key];
+  return lead.customFields?.[column];
+}
+
+function manualReviewReasons(lead: LeadCandidateInput, score: number, minScore: number): string[] {
+  const reasons: string[] = [];
+  const email = lead.email?.trim().toLowerCase();
+  if (!email) reasons.push("missing email");
+  else if (!email.includes("@")) reasons.push("invalid email");
+  else if (isGenericEmail(email)) reasons.push("generic email");
+  if (!lead.website) reasons.push("missing website");
+  if (!lead.firstName && !lead.lastName && !lead.phone) reasons.push("missing decision maker or phone");
+  if (!lead.personalizedIntro) reasons.push("missing personalized intro");
+  if (score < minScore) reasons.push(`score below ${minScore}`);
+  return reasons;
+}
+
 function buildScoreBuckets(scores: number[]): Record<string, number> {
   return {
     "0-29": scores.filter((score) => score <= 29).length,
@@ -630,6 +828,17 @@ function normalizeWebsiteIdentity(value: string): string {
     return url.hostname.replace(/^www\./i, "").toLowerCase();
   } catch {
     return value.trim().toLowerCase();
+  }
+}
+
+function normalizeDomain(value: string): string {
+  const clean = value.trim().toLowerCase();
+  if (!clean) return "";
+  try {
+    const url = new URL(/^https?:\/\//i.test(clean) ? clean : `https://${clean}`);
+    return url.hostname.replace(/^www\./i, "");
+  } catch {
+    return clean.replace(/^www\./i, "").split("/")[0];
   }
 }
 
