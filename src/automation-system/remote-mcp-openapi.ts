@@ -672,6 +672,17 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       maxLeads: 10,
     };
   }
+  if (toolName === "arcigy.build_ai_intro_quality_audit_preview") {
+    return {
+      leads: [
+        { companyName: "Ready Studio", website: "https://ready.sk", email: "jan@ready.sk", personalizedIntro: "Vsimol som si vase realizacie kuchyn.", scraped: { textPreview: "Realizacie kuchyn, showroom a navrhy interierov." } },
+        { companyName: "Generic Firma", website: "https://generic.sk", email: "info@generic.sk", personalizedIntro: "Kratke AI intro." },
+      ],
+      offer: "AI asistent na dopyty a follow-up",
+      language: "sk",
+      minEvidenceTerms: 1,
+    };
+  }
   if (toolName === "arcigy.enrich_website_leads_preview") {
     return {
       leads: [

@@ -1443,6 +1443,22 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Audit AI intro quality before Smartlead",
+      tool: "arcigy.build_ai_intro_quality_audit_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_ai_intro_quality_audit_preview"),
+      body: {
+        leads: [
+          { companyName: "Ready Studio", website: "https://ready.sk", email: "jan@ready.sk", personalizedIntro: "Vsimol som si vase realizacie kuchyn.", scraped: { textPreview: "Realizacie kuchyn, showroom a navrhy interierov." } },
+          { companyName: "Generic Firma", website: "https://generic.sk", email: "info@generic.sk", personalizedIntro: "Kratke AI intro." },
+        ],
+        offer: "AI asistent na dopyty a follow-up",
+        language: "sk",
+        minEvidenceTerms: 1,
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Live enrich website leads before Smartlead",
       tool: "arcigy.enrich_website_leads_preview",
       method: "POST",

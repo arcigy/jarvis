@@ -95,6 +95,7 @@ export type JarvisMcpToolName =
   | "arcigy.export_leads_csv"
   | "arcigy.draft_lead_intro"
   | "arcigy.batch_draft_lead_intros"
+  | "arcigy.build_ai_intro_quality_audit_preview"
   | "arcigy.enrich_website_leads_preview"
   | "arcigy.prepare_smartlead_leads"
   | "arcigy.run_leadgen_research_pipeline"
@@ -596,6 +597,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.batch_draft_lead_intros",
       description: "Pouzije Gemini na batch pripravu kratkych personalizovanych cold outreach intr pre viac leadov bez odoslania alebo zapisu.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_ai_intro_quality_audit_preview",
+      description: "Skontroluje AI intra pred Smartlead importom, najde chybajuce/genericke/kratke/slabo podlozene texty a pripravi redraft kroky.",
       requiresApproval: false,
     },
     {

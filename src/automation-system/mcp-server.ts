@@ -32,6 +32,7 @@ import {
   buildSuppressionListPreview,
   batchScrapeWebsiteContacts,
   batchDraftLeadIntros,
+  buildAiIntroQualityAuditPreview,
   buildManualReviewPickupPlan,
   buildManualReviewQueue,
   buildSmartleadCampaignLaunchPreview,
@@ -2866,6 +2867,50 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(await batchDraftLeadIntros(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_ai_intro_quality_audit_preview",
+    {
+      title: "Build AI intro quality audit preview",
+      description: "Audit personalized cold outreach intros for missing, generic, placeholder, greeting, short, or weakly grounded text and prepare safe redraft next steps.",
+      inputSchema: {
+        leads: z.array(leadCandidateSchema.extend({
+          context: z.string().optional(),
+          evidenceText: z.string().optional(),
+          scraped: z.object({
+            url: z.string().optional(),
+            finalUrl: z.string().optional(),
+            title: z.string().optional(),
+            description: z.string().optional(),
+            textPreview: z.string().optional(),
+            emails: z.array(z.string()).optional(),
+            phones: z.array(z.string()).optional(),
+          }).optional(),
+          intro: z.object({
+            companyName: z.string().optional(),
+            website: z.string().optional(),
+            context: z.string().optional(),
+            offer: z.string().optional(),
+            language: z.enum(["sk", "en"]).optional(),
+            personalizedIntro: z.string().optional(),
+            model: z.string().optional(),
+          }).optional(),
+        })).min(1).max(1000),
+        offer: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        minEvidenceTerms: z.number().int().min(0).max(10).default(1),
+        maxRedrafts: z.number().int().min(1).max(200).default(50),
+        maxNextCalls: z.number().int().min(1).max(100).default(40),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildAiIntroQualityAuditPreview(input))
   );
 
   server.registerTool(

@@ -45,6 +45,32 @@ export type BatchLeadIntroDraft = {
   summary: string;
 };
 
+export type AiIntroQualityAuditPreview = {
+  mode: "ai-intro-quality-audit-preview";
+  summary: string;
+  totals: {
+    input: number;
+    ready: number;
+    redraft: number;
+    manualReview: number;
+    missingIntro: number;
+    genericIntro: number;
+    placeholderIntro: number;
+    greetingIntro: number;
+    tooShort: number;
+    weakEvidence: number;
+  };
+  items: Array<{
+    lead: LeadCandidateInput & { scraped?: Partial<ScrapedWebsiteContacts>; intro?: Partial<LeadIntroDraft>; context?: string; evidenceText?: string };
+    status: "ready" | "redraft" | "manual_review";
+    intro?: string;
+    issues: string[];
+    evidenceTerms: string[];
+  }>;
+  redraftInputs: LeadIntroInput[];
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type PreparedSmartleadLeadInput = {
   email: string;
   companyName?: string;
@@ -860,6 +886,88 @@ export async function batchDraftLeadIntros(
     drafts,
     failures,
     summary: `Batch AI intro draft hotovy: ${drafts.length}/${leads.length} leadov, ${failures.length} chyb. Ziadny email ani zapis neprebehol.`,
+  };
+}
+
+export function buildAiIntroQualityAuditPreview(input: {
+  leads: Array<LeadCandidateInput & { scraped?: Partial<ScrapedWebsiteContacts>; intro?: Partial<LeadIntroDraft>; context?: string; evidenceText?: string }>;
+  offer?: string;
+  language?: "sk" | "en";
+  minEvidenceTerms?: number;
+  maxRedrafts?: number;
+  maxNextCalls?: number;
+}): AiIntroQualityAuditPreview {
+  const minEvidenceTerms = Math.min(Math.max(Math.trunc(input.minEvidenceTerms ?? 1), 0), 10);
+  const maxRedrafts = Math.min(Math.max(Math.trunc(input.maxRedrafts ?? 50), 1), 200);
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 40), 1), 100);
+  const items = input.leads.map((lead) => {
+    const intro = extractLeadIntro(lead);
+    const evidence = introEvidenceText(lead);
+    const evidenceTerms = importantIntroTerms(evidence);
+    const issues = introQualityIssues(intro, evidenceTerms, minEvidenceTerms, lead);
+    const status = issues.some((issue) => ["missing_intro", "intro_too_short", "intro_contains_greeting", "intro_has_placeholder", "generic_intro"].includes(issue))
+      ? "redraft" as const
+      : issues.length
+        ? "manual_review" as const
+        : "ready" as const;
+    return { lead, status, intro, issues, evidenceTerms };
+  });
+  const redraftInputs = items
+    .filter((item) => item.status === "redraft" && item.lead.companyName)
+    .slice(0, maxRedrafts)
+    .map((item) => ({
+      companyName: String(item.lead.companyName),
+      website: item.lead.website,
+      context: introEvidenceText(item.lead).slice(0, 1200) || item.lead.context,
+      offer: input.offer,
+      language: input.language ?? "sk",
+    }));
+  const missingEvidenceUrls = unique(items
+    .filter((item) => item.lead.website && item.issues.includes("missing_evidence"))
+    .map((item) => String(item.lead.website)))
+    .slice(0, maxNextCalls);
+  const nextToolCalls: AiIntroQualityAuditPreview["nextToolCalls"] = [];
+  if (missingEvidenceUrls.length) {
+    nextToolCalls.push({
+      tool: "arcigy.batch_scrape_website_contacts",
+      payload: { urls: missingEvidenceUrls, includePriorityPages: true, maxPages: 4, maxSites: missingEvidenceUrls.length },
+      reason: "Intro nema podklad z webu; najprv vytiahni overeny kontext.",
+      approvalRequired: false,
+    });
+  }
+  if (redraftInputs.length) {
+    nextToolCalls.push({
+      tool: "arcigy.batch_draft_lead_intros",
+      payload: { leads: redraftInputs, offer: input.offer, language: input.language ?? "sk", maxLeads: Math.min(redraftInputs.length, 50) },
+      reason: "Tieto intra su chybajuce, genericke, kratke alebo obsahuju pozdrav/placeholders.",
+      approvalRequired: false,
+    });
+  }
+  nextToolCalls.push({
+    tool: "arcigy.build_lead_repair_queue_preview",
+    payload: { leads: input.leads.slice(0, maxNextCalls), offer: input.offer, language: input.language ?? "sk", maxNextCalls },
+    reason: "Po oprave intr znovu skontroluj leady pred Smartlead importom.",
+    approvalRequired: false,
+  });
+  const totals = {
+    input: input.leads.length,
+    ready: items.filter((item) => item.status === "ready").length,
+    redraft: items.filter((item) => item.status === "redraft").length,
+    manualReview: items.filter((item) => item.status === "manual_review").length,
+    missingIntro: items.filter((item) => item.issues.includes("missing_intro")).length,
+    genericIntro: items.filter((item) => item.issues.includes("generic_intro")).length,
+    placeholderIntro: items.filter((item) => item.issues.includes("intro_has_placeholder")).length,
+    greetingIntro: items.filter((item) => item.issues.includes("intro_contains_greeting")).length,
+    tooShort: items.filter((item) => item.issues.includes("intro_too_short")).length,
+    weakEvidence: items.filter((item) => item.issues.includes("weak_evidence_grounding") || item.issues.includes("missing_evidence")).length,
+  };
+  return {
+    mode: "ai-intro-quality-audit-preview",
+    summary: `AI intro audit: ${totals.ready} ready, ${totals.redraft} na redraft, ${totals.manualReview} manual review; chyba ${totals.missingIntro}, genericke ${totals.genericIntro}, slaby podklad ${totals.weakEvidence}. Ziadny email ani zapis neprebehol.`,
+    totals,
+    items,
+    redraftInputs,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls),
   };
 }
 
@@ -3640,6 +3748,72 @@ function dedupeNextToolCalls<T extends { tool: string; payload: Record<string, u
     result.push(call);
   }
   return result;
+}
+
+function extractLeadIntro(lead: LeadCandidateInput & { intro?: Partial<LeadIntroDraft>; icebreakerSentence?: string; icebreaker_sentence?: string }): string | undefined {
+  return stringField(lead, "personalizedIntro", "icebreakerSentence", "icebreaker_sentence")
+    ?? lead.intro?.personalizedIntro
+    ?? stringField(lead.customFields ?? {}, "personalized_intro", "icebreaker_sentence");
+}
+
+function introEvidenceText(lead: LeadCandidateInput & { scraped?: Partial<ScrapedWebsiteContacts>; context?: string; evidenceText?: string }): string {
+  return [
+    lead.evidenceText,
+    lead.context,
+    lead.scraped?.title,
+    lead.scraped?.description,
+    lead.scraped?.textPreview,
+    stringField(lead.customFields ?? {}, "context_preview", "source_context"),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function importantIntroTerms(text: string): string[] {
+  const stopwords = new Set([
+    "a", "aj", "ale", "alebo", "and", "are", "bez", "by", "do", "for", "ich", "je", "na", "ne", "of", "pre", "sa", "si", "sme", "som",
+    "su", "the", "to", "vas", "vase", "vasi", "vo", "we", "with", "ze", "you", "your",
+  ]);
+  return unique(text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .split(/\s+/)
+    .filter((word) => word.length > 3 && !stopwords.has(word)))
+    .slice(0, 20);
+}
+
+function introQualityIssues(
+  intro: string | undefined,
+  evidenceTerms: string[],
+  minEvidenceTerms: number,
+  lead: LeadCandidateInput & { scraped?: Partial<ScrapedWebsiteContacts>; context?: string; evidenceText?: string }
+): string[] {
+  const issues: string[] = [];
+  const trimmed = intro?.trim();
+  if (!trimmed) return ["missing_intro"];
+  const normalized = trimmed
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  if (trimmed.length < 18 || trimmed.split(/\s+/).length < 4) issues.push("intro_too_short");
+  if (/^(ahoj|dobry den|hello|hi|dear)\b/i.test(normalized)) issues.push("intro_contains_greeting");
+  if (/[{}[\]]/.test(trimmed) || /%signature%|personalized_intro|companyname/i.test(trimmed)) issues.push("intro_has_placeholder");
+  if (/kratke ai intro|vsimol som si vas web|zaujala ma vasa spolocnost|narazil som na vas web|mate zaujimavy web|modelova firma|example/i.test(normalized)) {
+    issues.push("generic_intro");
+  }
+  const evidence = introEvidenceText(lead);
+  if (!evidence && lead.website) {
+    issues.push("missing_evidence");
+  } else if (minEvidenceTerms > 0 && evidenceTerms.length) {
+    const introTerms = importantIntroTerms(trimmed);
+    const matches = introTerms.filter((term) => evidenceTerms.includes(term)).length;
+    if (matches < minEvidenceTerms) issues.push("weak_evidence_grounding");
+  }
+  return issues;
 }
 
 function leadRepairIssues(lead: LeadRepairQueueLead, duplicateKeys: Set<string>): string[] {
