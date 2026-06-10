@@ -32,6 +32,7 @@ import {
   draftNicheSmartleadCampaignSetup,
   draftLeadIntro,
   draftSmartleadCampaignSequence,
+  enrichWebsiteLeadsPreview,
   enrichSlovakCompanyRegister,
   filterBlacklistedLeads,
   buildDailyLeadgenRunbook,
@@ -2240,6 +2241,47 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(await batchDraftLeadIntros(input))
+  );
+
+  server.registerTool(
+    "arcigy.enrich_website_leads_preview",
+    {
+      title: "Enrich website leads preview",
+      description: "Read-only live enrichment: scrape lead websites, optionally draft AI intros, and prepare pipeline plus Smartlead launch previews without writes.",
+      inputSchema: {
+        leads: z.array(leadCandidateSchema).min(1).max(50),
+        niche: z.object({
+          id: z.string().optional(),
+          slug: z.string().min(1),
+          name: z.string().min(1),
+          campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+        }).optional(),
+        campaignTag: z.string().optional(),
+        defaultSource: z.string().optional(),
+        offer: z.string().optional(),
+        painPoint: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        scrapeWebsites: z.boolean().default(true),
+        draftIntros: z.boolean().default(true),
+        includePriorityPages: z.boolean().default(true),
+        maxPages: z.number().int().min(1).max(8).default(4),
+        maxLeads: z.number().int().min(1).max(50).default(20),
+        minScore: z.number().int().min(0).max(100).default(70),
+        batchSize: z.number().int().min(1).max(100).default(50),
+        clientId: z.union([z.string(), z.number(), z.null()]).optional(),
+        emailAccountIds: z.array(z.union([z.string(), z.number()])).optional(),
+        webhookUrl: z.string().url().optional(),
+        schedule: smartleadScheduleSchema.optional(),
+        settings: smartleadSettingsSchema.optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (input) => jsonResult(await enrichWebsiteLeadsPreview(input))
   );
 
   server.registerTool(

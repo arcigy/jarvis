@@ -1147,6 +1147,26 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Live enrich website leads before Smartlead",
+      tool: "arcigy.enrich_website_leads_preview",
+      method: "POST",
+      url: toolUrl("arcigy.enrich_website_leads_preview"),
+      body: {
+        leads: [
+          { companyName: "Modelova Firma", website: "https://example.com" },
+          { companyName: "Druha Firma", website: "https://example.org", email: "lead@example.org" },
+        ],
+        niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456" },
+        offer: "AI asistent na odpovede a follow-up",
+        language: "sk",
+        scrapeWebsites: true,
+        draftIntros: true,
+        maxLeads: 10,
+        minScore: 70,
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Prepare Smartlead lead_list without writing",
       tool: "arcigy.prepare_smartlead_leads",
       method: "POST",

@@ -30,6 +30,7 @@ import {
   draftNicheSmartleadCampaignSetup,
   draftLeadIntro,
   draftSmartleadCampaignSequence,
+  enrichWebsiteLeadsPreview,
   enrichSlovakCompanyRegister,
   filterBlacklistedLeads,
   parseLeadsCsv,
@@ -159,6 +160,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.export_leads_csv",
     "arcigy.draft_lead_intro",
     "arcigy.batch_draft_lead_intros",
+    "arcigy.enrich_website_leads_preview",
     "arcigy.prepare_smartlead_leads",
     "arcigy.run_leadgen_research_pipeline",
     "arcigy.add_leads_to_smartlead_campaign",
@@ -1411,7 +1413,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 80 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 81 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -3137,6 +3139,42 @@ test("batch lead intro drafting dedupes leads and reports failures", async () =>
   assert.equal(batch.drafts[0].personalizedIntro, "Intro 1");
   assert.equal(JSON.stringify(batch).includes("AIza" + "A".repeat(32)), false);
   assert.match(batch.failures[0].error, /\[redacted-google-api-key\]/);
+});
+
+test("website lead enrichment preview scrapes drafts intros and prepares Smartlead safely", async () => {
+  const fetchImpl = async (url: string | URL | Request, init?: RequestInit) => {
+    const target = String(url);
+    if (target === "https://ready.sk/") {
+      return new Response(`<html><head><title>Ready</title></head><body><a href="mailto:jan@ready.sk">Email</a><p>+421 900 111 222</p><p>Servis pre firmy.</p></body></html>`, { status: 200 });
+    }
+    if (target.includes("generativelanguage.googleapis.com")) {
+      const body = JSON.parse(String(init?.body ?? "{}"));
+      assert.match(String(body.contents?.[0]?.parts?.[0]?.text ?? ""), /Ready Firma/);
+      return responseJson({ candidates: [{ content: { parts: [{ text: "Vsimol som si, ze servisujete firemnych klientov." }] } }] });
+    }
+    throw new Error(`Unexpected URL: ${target}`);
+  };
+
+  const preview = await enrichWebsiteLeadsPreview(
+    {
+      leads: [{ companyName: "Ready Firma", website: "https://ready.sk" }],
+      niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456" },
+      offer: "AI asistent na dopyty",
+      maxLeads: 5,
+      minScore: 70,
+    },
+    { GEMINI_API_KEY: "gemini-key" },
+    fetchImpl as typeof fetch
+  );
+
+  assert.equal(preview.mode, "website-lead-enrichment-preview");
+  assert.equal(preview.totals.scraped, 1);
+  assert.equal(preview.totals.introsDrafted, 1);
+  assert.equal(preview.leads[0].email, "jan@ready.sk");
+  assert.match(preview.leads[0].personalizedIntro ?? "", /firemnych klientov/);
+  assert.equal(preview.launchPreview?.approvalPayloads.addLeads?.campaignId, "123456");
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.add_leads_to_smartlead_campaign" && call.approvalRequired));
+  assert.match(preview.summary, /Ziadny zapis ani upload/);
 });
 
 test("Smartlead lead upload posts approved lead_list batches without leaking API key", async () => {

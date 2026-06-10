@@ -461,6 +461,21 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       maxLeads: 10,
     };
   }
+  if (toolName === "arcigy.enrich_website_leads_preview") {
+    return {
+      leads: [
+        { companyName: "Modelova Firma", website: "https://example.com" },
+        { companyName: "Druha Firma", website: "https://example.org", email: "lead@example.org" },
+      ],
+      niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456" },
+      offer: "AI asistent na odpovede a follow-up",
+      language: "sk",
+      scrapeWebsites: true,
+      draftIntros: true,
+      maxLeads: 10,
+      minScore: 70,
+    };
+  }
   if (toolName === "arcigy.prepare_smartlead_leads") {
     return {
       defaultSource: "jarvis-mcp",

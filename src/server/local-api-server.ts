@@ -31,6 +31,7 @@ import {
   draftNicheSmartleadCampaignSetup,
   draftLeadIntro,
   draftSmartleadCampaignSequence,
+  enrichWebsiteLeadsPreview,
   enrichSlovakCompanyRegister,
   filterBlacklistedLeads,
   buildDailyLeadgenRunbook,
@@ -1660,6 +1661,32 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         offer: optionalString(payload.offer),
         language: payload.language === "en" ? "en" : "sk",
         maxLeads: typeof payload.maxLeads === "number" ? payload.maxLeads : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.enrich_website_leads_preview") {
+    writeJson(response, 200, {
+      result: await enrichWebsiteLeadsPreview({
+        leads: (payload.leads ?? []) as Parameters<typeof enrichWebsiteLeadsPreview>[0]["leads"],
+        niche: payload.niche as Parameters<typeof enrichWebsiteLeadsPreview>[0]["niche"],
+        campaignTag: optionalString(payload.campaignTag),
+        defaultSource: optionalString(payload.defaultSource),
+        offer: optionalString(payload.offer),
+        painPoint: optionalString(payload.painPoint),
+        language: payload.language === "en" ? "en" : "sk",
+        scrapeWebsites: payload.scrapeWebsites !== false,
+        draftIntros: payload.draftIntros !== false,
+        includePriorityPages: payload.includePriorityPages !== false,
+        maxPages: typeof payload.maxPages === "number" ? payload.maxPages : undefined,
+        maxLeads: typeof payload.maxLeads === "number" ? payload.maxLeads : undefined,
+        minScore: typeof payload.minScore === "number" ? payload.minScore : undefined,
+        batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
+        clientId: (payload.clientId ?? null) as string | number | null,
+        emailAccountIds: Array.isArray(payload.emailAccountIds) ? (payload.emailAccountIds as Array<string | number>) : undefined,
+        webhookUrl: optionalString(payload.webhookUrl),
+        schedule: payload.schedule as Parameters<typeof enrichWebsiteLeadsPreview>[0]["schedule"],
+        settings: payload.settings as Parameters<typeof enrichWebsiteLeadsPreview>[0]["settings"],
       }),
     });
     return;

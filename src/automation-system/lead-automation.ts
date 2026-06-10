@@ -277,6 +277,27 @@ export type LeadgenCampaignPipelinePreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string }>;
 };
 
+export type WebsiteLeadEnrichmentPreview = {
+  mode: "website-lead-enrichment-preview";
+  summary: string;
+  totals: {
+    input: number;
+    enriched: number;
+    scraped: number;
+    scrapeFailed: number;
+    introsDrafted: number;
+    introFailed: number;
+    readyForSmartlead: number;
+    manualReview: number;
+  };
+  leads: Array<LeadCandidateInput & { scraped?: ScrapedWebsiteContacts; intro?: LeadIntroDraft }>;
+  scrape: BatchScrapedWebsiteContacts;
+  intros?: BatchLeadIntroDraft;
+  pipelinePreview: LeadgenCampaignPipelinePreview;
+  launchPreview?: SmartleadCampaignLaunchPreview;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type DailyLeadgenRunbook = {
   mode: "daily-leadgen-runbook";
   summary: string;
@@ -448,6 +469,129 @@ export async function batchDraftLeadIntros(
     drafts,
     failures,
     summary: `Batch AI intro draft hotovy: ${drafts.length}/${leads.length} leadov, ${failures.length} chyb. Ziadny email ani zapis neprebehol.`,
+  };
+}
+
+export async function enrichWebsiteLeadsPreview(
+  input: {
+    leads: LeadCandidateInput[];
+    niche?: { id?: string; slug: string; name: string; campaignId?: string | number | null };
+    campaignTag?: string;
+    defaultSource?: string;
+    offer?: string;
+    painPoint?: string;
+    language?: "sk" | "en";
+    scrapeWebsites?: boolean;
+    draftIntros?: boolean;
+    includePriorityPages?: boolean;
+    maxPages?: number;
+    maxLeads?: number;
+    minScore?: number;
+    batchSize?: number;
+    clientId?: string | number | null;
+    emailAccountIds?: Array<string | number>;
+    webhookUrl?: string;
+    schedule?: Parameters<typeof draftNicheSmartleadCampaignSetup>[0]["schedule"];
+    settings?: Parameters<typeof draftNicheSmartleadCampaignSetup>[0]["settings"];
+  },
+  env: RuntimeEnv = process.env,
+  fetchImpl: FetchLike = fetch
+): Promise<WebsiteLeadEnrichmentPreview> {
+  const maxLeads = Math.min(Math.max(Math.trunc(input.maxLeads ?? 20), 1), 50);
+  const leads = input.leads.slice(0, maxLeads);
+  const urls = unique(leads.map((lead) => lead.website?.trim() ?? "").filter(Boolean));
+  const scrape = input.scrapeWebsites === false || !urls.length
+    ? emptyBatchScrape(urls)
+    : await batchScrapeWebsiteContacts(
+        { urls, includePriorityPages: input.includePriorityPages, maxPages: input.maxPages, maxSites: maxLeads },
+        fetchImpl
+      );
+  const scrapeByDomain = new Map(scrape.results.flatMap((result) => {
+    const keys = unique([normalizeDomain(result.url), normalizeDomain(result.finalUrl)].filter(Boolean));
+    return keys.map((key) => [key, result] as const);
+  }));
+  const withScrape = leads.map((lead) => {
+    const scraped = lead.website ? scrapeByDomain.get(normalizeDomain(lead.website)) : undefined;
+    return {
+      ...lead,
+      email: lead.email ?? selectBestEmail(scraped?.emails ?? []),
+      phone: lead.phone ?? scraped?.phones[0],
+      source: lead.source ?? input.defaultSource,
+      scraped,
+      context: scraped?.textPreview,
+    };
+  });
+  const introInputs: LeadIntroInput[] = withScrape
+    .filter((lead) => input.draftIntros !== false && lead.companyName && !lead.personalizedIntro)
+    .map((lead) => ({
+      companyName: lead.companyName as string,
+      website: lead.website,
+      context: lead.context,
+      offer: input.offer,
+      language: input.language ?? "sk",
+    }));
+  const intros = introInputs.length
+    ? await batchDraftLeadIntros({ leads: introInputs, offer: input.offer, language: input.language ?? "sk", maxLeads }, env, fetchImpl)
+    : undefined;
+  const introByKey = new Map((intros?.drafts ?? []).map((intro) => [leadIntroKey(intro), intro]));
+  const enriched = withScrape.map((lead) => {
+    const intro = lead.companyName ? introByKey.get(leadIntroKey({ companyName: lead.companyName, website: lead.website })) : undefined;
+    return {
+      ...lead,
+      personalizedIntro: lead.personalizedIntro ?? intro?.personalizedIntro,
+      intro,
+    };
+  });
+  const pipelinePreview = buildLeadgenCampaignPipelinePreview({
+    leads: enriched,
+    niche: input.niche,
+    campaignTag: input.campaignTag,
+    defaultSource: input.defaultSource ?? "website-enrichment",
+    offer: input.offer,
+    language: input.language,
+    minScore: input.minScore,
+    batchSize: input.batchSize,
+  });
+  const readyLeads = pipelinePreview.enrichmentPreview.reviewQueue.ready.map((item) => item.lead);
+  const launchPreview = input.niche && readyLeads.length
+    ? buildSmartleadCampaignLaunchPreview({
+        niche: input.niche,
+        leads: readyLeads,
+        offer: input.offer,
+        painPoint: input.painPoint,
+        language: input.language,
+        clientId: input.clientId,
+        emailAccountIds: input.emailAccountIds,
+        webhookUrl: input.webhookUrl,
+        schedule: input.schedule,
+        settings: input.settings,
+        batchSize: input.batchSize,
+      })
+    : undefined;
+  const nextToolCalls: WebsiteLeadEnrichmentPreview["nextToolCalls"] = pipelinePreview.nextToolCalls.map((call) => ({
+    ...call,
+    approvalRequired: call.tool === "arcigy.add_leads_to_smartlead_campaign",
+  }));
+  if (launchPreview) nextToolCalls.push(...launchPreview.nextToolCalls);
+  return {
+    mode: "website-lead-enrichment-preview",
+    summary: `Website enrichment preview: ${enriched.length} leadov, ${scrape.totals.scraped} webov scraped, ${intros?.totals.drafted ?? 0} intro draftov, ${pipelinePreview.totals.readyForSmartlead} ready do Smartlead. Ziadny zapis ani upload neprebehol.`,
+    totals: {
+      input: leads.length,
+      enriched: enriched.length,
+      scraped: scrape.totals.scraped,
+      scrapeFailed: scrape.totals.failed,
+      introsDrafted: intros?.totals.drafted ?? 0,
+      introFailed: intros?.totals.failed ?? 0,
+      readyForSmartlead: pipelinePreview.totals.readyForSmartlead,
+      manualReview: pipelinePreview.totals.manualReview,
+    },
+    leads: enriched,
+    scrape,
+    intros,
+    pipelinePreview,
+    launchPreview,
+    nextToolCalls,
   };
 }
 
@@ -1566,6 +1710,20 @@ function normalizePipelineLead(
       context_preview: contextPreview ? redactSensitiveText(contextPreview).slice(0, 1200) : undefined,
     },
   };
+}
+
+function emptyBatchScrape(urls: string[]): BatchScrapedWebsiteContacts {
+  return {
+    mode: "batch-website-contact-scrape",
+    totals: { input: urls.length, scraped: 0, failed: 0, emailsFound: 0, phonesFound: 0 },
+    results: [],
+    failures: [],
+    summary: "Batch scrape preskoceny. Ziadny zapis neprebehol.",
+  };
+}
+
+function leadIntroKey(input: { companyName: string; website?: string }): string {
+  return `${input.companyName.trim().toLowerCase()}|${input.website?.trim().toLowerCase() ?? ""}`;
 }
 
 function splitName(value?: string): { firstName?: string; lastName?: string } {
