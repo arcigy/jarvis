@@ -27,6 +27,7 @@ import {
   buildRegionExpansionQueuePreview,
   buildLeadSourceImportQueuePreview,
   buildLeadSourceBundlePreview,
+  buildLeadSourceBundleCampaignLaunchPreview,
   buildUrlIntelligenceQueuePreview,
   buildLeadRepairQueuePreview,
   buildNicheOpsDashboardPreview,
@@ -1850,6 +1851,38 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
         auditIntros: payload.auditIntros !== false,
         maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_lead_source_bundle_campaign_launch_preview") {
+    writeJson(response, 200, {
+      result: buildLeadSourceBundleCampaignLaunchPreview({
+        bundleName: optionalString(payload.bundleName),
+        sources: Array.isArray(payload.sources) ? payload.sources as Parameters<typeof buildLeadSourceBundleCampaignLaunchPreview>[0]["sources"] : [],
+        niches: Array.isArray(payload.niches) ? payload.niches as Parameters<typeof buildLeadSourceBundleCampaignLaunchPreview>[0]["niches"] : undefined,
+        defaultNiche: payload.defaultNiche as Parameters<typeof buildLeadSourceBundleCampaignLaunchPreview>[0]["defaultNiche"],
+        blacklistDomains: Array.isArray(payload.blacklistDomains) ? payload.blacklistDomains.map(String) : undefined,
+        blacklistKeywords: Array.isArray(payload.blacklistKeywords) ? payload.blacklistKeywords.map(String) : undefined,
+        existingSmartleadLeadsByCampaign: payload.existingSmartleadLeadsByCampaign as Parameters<typeof buildLeadSourceBundleCampaignLaunchPreview>[0]["existingSmartleadLeadsByCampaign"],
+        campaignTag: optionalString(payload.campaignTag),
+        defaultSource: optionalString(payload.defaultSource),
+        offer: optionalString(payload.offer),
+        painPoint: optionalString(payload.painPoint),
+        language: payload.language === "en" ? "en" : "sk",
+        minScore: typeof payload.minScore === "number" ? payload.minScore : undefined,
+        batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
+        auditIntros: payload.auditIntros !== false,
+        maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
+        maxLaunchGroups: typeof payload.maxLaunchGroups === "number" ? payload.maxLaunchGroups : undefined,
+        clientId: (payload.clientId ?? null) as string | number | null,
+        emailAccountIds: Array.isArray(payload.emailAccountIds) ? payload.emailAccountIds as Array<string | number> : undefined,
+        webhookUrl: optionalString(payload.webhookUrl),
+        schedule: payload.schedule as Parameters<typeof buildLeadSourceBundleCampaignLaunchPreview>[0]["schedule"],
+        settings: payload.settings as Parameters<typeof buildLeadSourceBundleCampaignLaunchPreview>[0]["settings"],
+        senderAccounts: Array.isArray(payload.senderAccounts) ? payload.senderAccounts as Parameters<typeof buildLeadSourceBundleCampaignLaunchPreview>[0]["senderAccounts"] : undefined,
+        requestedDailyLimit: typeof payload.requestedDailyLimit === "number" ? payload.requestedDailyLimit : undefined,
+        minTimeBetweenEmailsMinutes: typeof payload.minTimeBetweenEmailsMinutes === "number" ? payload.minTimeBetweenEmailsMinutes : undefined,
       }),
     });
     return;

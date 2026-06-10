@@ -384,6 +384,24 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       minScore: 70,
     };
   }
+  if (toolName === "arcigy.build_lead_source_bundle_campaign_launch_preview") {
+    return {
+      bundleName: "kuchyne-sk-launch",
+      sources: [
+        {
+          sourceName: "kuchyne_ready.csv",
+          sourceType: "csv",
+          csvText: "company,website,email,first_name,phone,personalized_intro\nReady Studio,https://ready.sk,jan@ready.sk,Jan,+421 900 111 222,Vsimol som si vase kuchynske realizacie.",
+          defaultNiche: { id: "niche-1", slug: "kuchyne", name: "Kuchynske studia", campaignId: "123456" },
+        },
+      ],
+      offer: "AI asistent na odpovede a follow-up",
+      painPoint: "manualne odpovedanie na dopyty",
+      language: "sk",
+      emailAccountIds: ["98765"],
+      maxLaunchGroups: 3,
+    };
+  }
   if (toolName === "arcigy.discover_leads") return { query: "automation agency Bratislava", maxResults: 5 };
   if (toolName === "arcigy.scrape_website_contacts") return { url: "https://example.com", includePriorityPages: true, maxPages: 4 };
   if (toolName === "arcigy.batch_scrape_website_contacts") return { urls: ["https://example.com", "https://example.org"], includePriorityPages: true, maxPages: 4, maxSites: 10 };

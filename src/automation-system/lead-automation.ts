@@ -393,6 +393,30 @@ export type LeadSourceBundlePreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type LeadSourceBundleCampaignLaunchPreview = {
+  mode: "lead-source-bundle-campaign-launch-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  bundlePreview: LeadSourceBundlePreview;
+  handoffPackages: Array<{
+    niche: { id?: string; slug: string; name: string; campaignId?: string | number | null };
+    readyLeads: number;
+    handoffPackage: SmartleadCampaignHandoffPackagePreview;
+  }>;
+  skippedGroups: Array<{ niche: { id?: string; slug: string; name: string; campaignId?: string | number | null }; reason: string }>;
+  totals: {
+    groups: number;
+    launchGroups: number;
+    skippedGroups: number;
+    readyLeads: number;
+    approvalCalls: number;
+    readOnlyCalls: number;
+    blockedPackages: number;
+    attentionPackages: number;
+  };
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type LeadgenAutopilotBatchPreview = {
   mode: "leadgen-autopilot-batch-preview";
   summary: string;
@@ -2866,6 +2890,116 @@ export function buildLeadSourceBundlePreview(input: {
     totals,
     sourcePreview,
     autopilotPreview,
+    nextToolCalls,
+  };
+}
+
+export function buildLeadSourceBundleCampaignLaunchPreview(input: {
+  bundleName?: string;
+  sources: Parameters<typeof buildLeadSourceBundlePreview>[0]["sources"];
+  niches?: Parameters<typeof buildLeadSourceBundlePreview>[0]["niches"];
+  defaultNiche?: Parameters<typeof buildLeadSourceBundlePreview>[0]["defaultNiche"];
+  blacklistDomains?: string[];
+  blacklistKeywords?: string[];
+  existingSmartleadLeadsByCampaign?: Record<string, Array<Record<string, unknown>>>;
+  campaignTag?: string;
+  defaultSource?: string;
+  offer?: string;
+  painPoint?: string;
+  language?: "sk" | "en";
+  minScore?: number;
+  batchSize?: number;
+  auditIntros?: boolean;
+  maxNextCalls?: number;
+  maxLaunchGroups?: number;
+  clientId?: string | number | null;
+  emailAccountIds?: Array<string | number>;
+  webhookUrl?: string;
+  schedule?: Parameters<typeof draftNicheSmartleadCampaignSetup>[0]["schedule"];
+  settings?: Parameters<typeof draftNicheSmartleadCampaignSetup>[0]["settings"];
+  senderAccounts?: SmartleadSenderAccountInput[];
+  requestedDailyLimit?: number;
+  minTimeBetweenEmailsMinutes?: number;
+}): LeadSourceBundleCampaignLaunchPreview {
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 120), 1), 180);
+  const maxLaunchGroups = Math.min(Math.max(Math.trunc(input.maxLaunchGroups ?? 5), 1), 20);
+  const bundlePreview = buildLeadSourceBundlePreview({
+    bundleName: input.bundleName,
+    sources: input.sources,
+    niches: input.niches,
+    defaultNiche: input.defaultNiche,
+    blacklistDomains: input.blacklistDomains,
+    blacklistKeywords: input.blacklistKeywords,
+    existingSmartleadLeadsByCampaign: input.existingSmartleadLeadsByCampaign,
+    campaignTag: input.campaignTag,
+    defaultSource: input.defaultSource,
+    offer: input.offer,
+    language: input.language,
+    minScore: input.minScore,
+    batchSize: input.batchSize,
+    auditIntros: input.auditIntros,
+    maxNextCalls,
+  });
+  const handoffPackages: LeadSourceBundleCampaignLaunchPreview["handoffPackages"] = [];
+  const skippedGroups: LeadSourceBundleCampaignLaunchPreview["skippedGroups"] = [];
+  for (const group of bundlePreview.sourcePreview.groups.slice(0, maxLaunchGroups)) {
+    const readyLeads = group.pipelinePreview.enrichmentPreview.reviewQueue.ready.map((item) => item.lead);
+    if (!readyLeads.length) {
+      skippedGroups.push({ niche: group.niche, reason: "No ready leads after enrichment/review; run scrape/AI intro/manual review first." });
+      continue;
+    }
+    const handoffPackage = buildSmartleadCampaignHandoffPackagePreview({
+      niche: group.niche,
+      leads: readyLeads,
+      offer: input.offer,
+      painPoint: input.painPoint,
+      language: input.language,
+      clientId: input.clientId,
+      emailAccountIds: input.emailAccountIds,
+      webhookUrl: input.webhookUrl,
+      schedule: input.schedule,
+      settings: input.settings,
+      batchSize: input.batchSize,
+      senderAccounts: input.senderAccounts,
+      requestedDailyLimit: input.requestedDailyLimit,
+      minTimeBetweenEmailsMinutes: input.minTimeBetweenEmailsMinutes,
+    });
+    handoffPackages.push({ niche: group.niche, readyLeads: readyLeads.length, handoffPackage });
+  }
+  for (const group of bundlePreview.sourcePreview.groups.slice(maxLaunchGroups)) {
+    skippedGroups.push({ niche: group.niche, reason: `Skipped by maxLaunchGroups=${maxLaunchGroups}; run this niche in a separate launch preview.` });
+  }
+  const nextToolCalls = dedupeNextToolCalls([
+    ...bundlePreview.nextToolCalls,
+    ...handoffPackages.flatMap((item) => item.handoffPackage.nextToolCalls),
+  ]).slice(0, maxNextCalls);
+  const approvalCalls = nextToolCalls.filter((call) => call.approvalRequired).length;
+  const blockedPackages = handoffPackages.filter((item) => item.handoffPackage.status === "blocked").length;
+  const attentionPackages = handoffPackages.filter((item) => item.handoffPackage.status === "attention").length;
+  const readyLeads = handoffPackages.reduce((sum, item) => sum + item.readyLeads, 0);
+  const status: LeadSourceBundleCampaignLaunchPreview["status"] =
+    bundlePreview.status === "blocked" || !handoffPackages.length || blockedPackages > 0
+      ? "blocked"
+      : bundlePreview.status === "attention" || attentionPackages > 0 || skippedGroups.length > 0
+        ? "attention"
+        : "ready";
+  return {
+    mode: "lead-source-bundle-campaign-launch-preview",
+    status,
+    summary: `Bundle campaign launch preview: ${status}, ${handoffPackages.length}/${bundlePreview.sourcePreview.totals.groups} launch skupin, ${readyLeads} ready leadov, ${approvalCalls} approval krokov. Ziadny zapis ani upload neprebehol.`,
+    bundlePreview,
+    handoffPackages,
+    skippedGroups,
+    totals: {
+      groups: bundlePreview.sourcePreview.totals.groups,
+      launchGroups: handoffPackages.length,
+      skippedGroups: skippedGroups.length,
+      readyLeads,
+      approvalCalls,
+      readOnlyCalls: nextToolCalls.length - approvalCalls,
+      blockedPackages,
+      attentionPackages,
+    },
     nextToolCalls,
   };
 }

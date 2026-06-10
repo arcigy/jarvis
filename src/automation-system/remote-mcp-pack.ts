@@ -1257,6 +1257,29 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Build Smartlead launch from lead bundle",
+      tool: "arcigy.build_lead_source_bundle_campaign_launch_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_lead_source_bundle_campaign_launch_preview"),
+      body: {
+        bundleName: "kuchyne-sk-launch",
+        sources: [
+          {
+            sourceName: "kuchyne_ready.csv",
+            sourceType: "csv",
+            csvText: "company,website,email,first_name,phone,personalized_intro\nReady Studio,https://ready.sk,jan@ready.sk,Jan,+421 900 111 222,Vsimol som si vase kuchynske realizacie.",
+            defaultNiche: { slug: "kuchyne", name: "Kuchynske studia", campaignId: "123456" },
+          },
+        ],
+        offer: "AI automatizacie pre dopyty a follow-up.",
+        painPoint: "manualne odpovedanie na dopyty",
+        language: "sk",
+        emailAccountIds: ["98765"],
+        maxLaunchGroups: 3,
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Build lead repair queue preview",
       tool: "arcigy.build_lead_repair_queue_preview",
       method: "POST",
