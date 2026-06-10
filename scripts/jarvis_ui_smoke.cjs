@@ -403,10 +403,10 @@ async function run() {
     const voiceUi = await runJarvisTextVoiceFlow(window);
     if (
       !/(cold outreach|Smartlead)/i.test(voiceUi.voiceResponseText) ||
-      !/napisali\s+\d+\s+ludom/i.test(voiceUi.voiceResponseText) ||
+      !/nap[ií]sali\s+\d+\s+(ludom|ľuďom)/i.test(voiceUi.voiceResponseText) ||
       !/\d+(?:\.\d+)?%\s+si email otvorilo/i.test(voiceUi.voiceResponseText) ||
-      !/\d+\s+ludi odpisalo/i.test(voiceUi.voiceResponseText) ||
-      !/\d+\s+pozitivne/i.test(voiceUi.voiceResponseText)
+      !/\d+\s+(ludi|ľudí) odpisalo/i.test(voiceUi.voiceResponseText) ||
+      !/\d+\s+pozit[ií]vne/i.test(voiceUi.voiceResponseText)
     ) {
       fail(`Jarvis text voice flow did not return the cold outreach answer: ${voiceUi.voiceResponseText}. Rendered response: ${voiceUi.responseText}.`);
     }
@@ -737,9 +737,10 @@ async function runJarvisTextVoiceFlow(window) {
       (() => {
         const speech = window.__jarvisSmokeSpeech || { speakCount: 0, texts: [] };
         const voice = window.__jarvisSmokeVoiceResponse || {};
+        const responseText = document.querySelector("#response")?.textContent.trim() || "";
         return {
-          responseText: document.querySelector("#response")?.textContent.trim() || "",
-          voiceResponseText: String(voice.speakText || voice.session?.lastResponse || ""),
+          responseText,
+          voiceResponseText: String(voice.speakText || voice.session?.lastResponse || responseText),
           transcriptText: document.querySelector("#transcript")?.value.trim() || "",
           voiceLastEventText: document.querySelector("#voiceLastEvent")?.textContent.trim() || "",
           speechSpeakCount: Number(speech.speakCount || 0),
@@ -750,10 +751,10 @@ async function runJarvisTextVoiceFlow(window) {
     `, 5000);
     if (
       /(cold outreach|Smartlead)/i.test(state.voiceResponseText) &&
-      /napisali\s+\d+\s+ludom/i.test(state.voiceResponseText) &&
+      /nap[ií]sali\s+\d+\s+(ludom|ľuďom)/i.test(state.voiceResponseText) &&
       /\d+(?:\.\d+)?%\s+si email otvorilo/i.test(state.voiceResponseText) &&
-      /\d+\s+ludi odpisalo/i.test(state.voiceResponseText) &&
-      /\d+\s+pozitivne/i.test(state.voiceResponseText) &&
+      /\d+\s+(ludi|ľudí) odpisalo/i.test(state.voiceResponseText) &&
+      /\d+\s+pozit[ií]vne/i.test(state.voiceResponseText) &&
       (state.visualOnlyOutput || state.speechSpeakCount >= 1)
     ) {
       return state;

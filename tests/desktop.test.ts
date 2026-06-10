@@ -316,6 +316,7 @@ test("desktop shell exposes Jarvis wake-word UI and safe preload boundary", () =
   assert.match(renderer, /scrollIntoView/);
   assert.match(renderer, /window\.arcigyDesktop/);
   assert.match(renderer, /arcigyApi\.jarvisVoiceEvent/);
+  assert.match(renderer, /elements\.response\.textContent = result\.speakText/);
   assert.match(renderer, /openPath: async \(\) => "desktop-only"/);
   assert.match(renderer, /arcigyApi\.runDiagnostics/);
   assert.match(renderer, /arcigyApi\.productionReadiness/);

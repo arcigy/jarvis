@@ -2391,6 +2391,7 @@ async function handleTranscript(text) {
   state.session = result.session;
   setMode(result.session.state);
   if (result.speakText) {
+    elements.response.textContent = result.speakText;
     speak(result.speakText);
   }
 }
