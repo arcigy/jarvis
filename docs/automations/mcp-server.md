@@ -134,6 +134,7 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.preview_manual_review_pickup`: previews manual-review-pickup by filtering reviewed unsent leads, qualifying them, grouping by niche, and preparing injection plans without writes.
 - `arcigy.build_smartlead_injection_plan`: prepares Smartlead `lead_list` batches and the approval payload for `arcigy.add_leads_to_smartlead_campaign` without uploading.
 - `arcigy.build_smartlead_import_audit_preview`: compares prepared Smartlead leads against existing campaign leads, separates new/duplicate/already-imported records, and prepares a safe approval payload without uploading.
+- `arcigy.build_smartlead_history_suppression_preview`: filters CSV/manual leads already sent, replied, blocked, or matched in Smartlead before leadgen autopilot or upload steps.
 - `arcigy.build_smartlead_sender_capacity_preview`: checks sender accounts, warmup/reputation/limits, calculates safe daily capacity, and prepares a campaign configure payload without writing.
 - `arcigy.build_smartlead_deliverability_guard_preview`: checks campaign delivery metrics plus sender capacity and recommends continue, reduced daily limit, or pause before more uploads.
 - `arcigy.draft_niche_smartlead_campaign_setup`: prepares a niche campaign setup payload with sequences, schedule, settings, and AI reply webhook without creating the campaign.

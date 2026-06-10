@@ -31,6 +31,7 @@ import {
   buildLeadRepairQueuePreview,
   buildNicheOpsDashboardPreview,
   buildSuppressionListPreview,
+  buildSmartleadHistorySuppressionPreview,
   batchScrapeWebsiteContacts,
   batchDraftLeadIntros,
   buildAiIntroQualityAuditPreview,
@@ -1886,6 +1887,34 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildSuppressionListPreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_smartlead_history_suppression_preview",
+    {
+      title: "Build Smartlead history suppression preview",
+      description: "Filter CSV/manual leads that were already sent, replied, blocked, or matched in Smartlead before running leadgen autopilot or upload steps.",
+      inputSchema: {
+        leads: z.array(suppressionLeadSchema).optional(),
+        csvText: z.string().optional(),
+        delimiter: z.enum([",", ";"]).optional(),
+        maxRows: z.number().int().min(1).max(10_000).default(1000),
+        sourceName: z.string().optional(),
+        sourceType: z.enum(["google_maps", "csv", "serper", "manual", "other"]).default("csv"),
+        suppressAlreadySent: z.boolean().default(true),
+        suppressReplies: z.boolean().default(true),
+        suppressBlockedStatuses: z.boolean().default(true),
+        suppressExistingSmartleadMatch: z.boolean().default(true),
+        maxNextCalls: z.number().int().min(1).max(100).default(30),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildSmartleadHistorySuppressionPreview(input))
   );
 
   server.registerTool(

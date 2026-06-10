@@ -481,6 +481,16 @@ export type SuppressionListPreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type SmartleadHistorySuppressionPreview = {
+  mode: "smartlead-history-suppression-preview";
+  summary: string;
+  source: { name?: string; type?: "google_maps" | "csv" | "serper" | "manual" | "other" };
+  totals: { input: number; allowed: number; suppressed: number; alreadySent: number; replied: number; blockedStatus: number; alreadyInSmartlead: number };
+  allowedLeads: LeadCandidateInput[];
+  suppressed: Array<{ lead: LeadCandidateInput; reason: string; evidence: Record<string, string> }>;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type NicheOpsDashboardInput = {
   id?: string;
   slug: string;
@@ -1370,6 +1380,63 @@ export function buildSuppressionListPreview(input: {
     },
     suppression: { emails: [...emails], domains: suppressionDomains, keywords: [...keywords], reasons },
     filtered,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls).slice(0, maxNextCalls),
+  };
+}
+
+export function buildSmartleadHistorySuppressionPreview(input: {
+  leads?: LeadCandidateInput[];
+  csvText?: string;
+  delimiter?: "," | ";";
+  maxRows?: number;
+  sourceName?: string;
+  sourceType?: "google_maps" | "csv" | "serper" | "manual" | "other";
+  suppressAlreadySent?: boolean;
+  suppressReplies?: boolean;
+  suppressBlockedStatuses?: boolean;
+  suppressExistingSmartleadMatch?: boolean;
+  maxNextCalls?: number;
+}): SmartleadHistorySuppressionPreview {
+  const parsed = input.csvText ? parseLeadsCsv({ csvText: input.csvText, delimiter: input.delimiter, maxRows: input.maxRows }) : { leads: [] as LeadCsvRow[] };
+  const leads = [...(input.leads ?? []), ...parsed.leads];
+  const suppressed: SmartleadHistorySuppressionPreview["suppressed"] = [];
+  const allowedLeads: LeadCandidateInput[] = [];
+  for (const lead of leads) {
+    const evidence = smartleadHistoryEvidence(lead);
+    const reason = smartleadHistorySuppressionReason(evidence, input);
+    if (reason) suppressed.push({ lead, reason, evidence });
+    else allowedLeads.push(lead);
+  }
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 30), 1), 100);
+  const nextToolCalls: SmartleadHistorySuppressionPreview["nextToolCalls"] = [];
+  if (allowedLeads.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_leadgen_autopilot_batch_preview",
+      payload: {
+        sourceName: input.sourceName,
+        sourceType: input.sourceType ?? (input.csvText ? "csv" : "manual"),
+        leads: allowedLeads,
+        auditIntros: true,
+      },
+      reason: "Spusti leadgen autopilot iba na leadoch bez Smartlead historie.",
+      approvalRequired: false,
+    });
+  }
+  return {
+    mode: "smartlead-history-suppression-preview",
+    summary: `Smartlead history suppression: ${allowedLeads.length} allowed, ${suppressed.length} suppressed; sent ${suppressed.filter((item) => item.reason === "already_sent").length}, replied ${suppressed.filter((item) => item.reason === "already_replied").length}, blocked ${suppressed.filter((item) => item.reason === "blocked_status").length}. Ziadny zapis ani upload neprebehol.`,
+    source: { name: input.sourceName, type: input.sourceType },
+    totals: {
+      input: leads.length,
+      allowed: allowedLeads.length,
+      suppressed: suppressed.length,
+      alreadySent: suppressed.filter((item) => item.reason === "already_sent").length,
+      replied: suppressed.filter((item) => item.reason === "already_replied").length,
+      blockedStatus: suppressed.filter((item) => item.reason === "blocked_status").length,
+      alreadyInSmartlead: suppressed.filter((item) => item.reason === "already_in_smartlead").length,
+    },
+    allowedLeads,
+    suppressed,
     nextToolCalls: dedupeNextToolCalls(nextToolCalls).slice(0, maxNextCalls),
   };
 }
@@ -4360,6 +4427,35 @@ function csvMappedFields(headers: string[]): Record<string, string[]> {
     if (matches.length) fields[field] = matches;
   }
   return fields;
+}
+
+function smartleadHistoryEvidence(lead: LeadCandidateInput): Record<string, string> {
+  const custom = lead.customFields ?? {};
+  const field = (...keys: string[]) => keys.map((key) => custom[key]).find((value) => value !== undefined && value !== null && String(value).trim())?.toString().trim() ?? "";
+  return {
+    cold_email_sent: field("cold_email_sent"),
+    smartlead_replied: field("smartlead_replied"),
+    smartlead_match: field("smartlead_match"),
+    smartlead_campaigns: field("smartlead_campaigns"),
+    smartlead_statuses: field("smartlead_statuses"),
+    smartlead_sent_messages: field("smartlead_sent_messages"),
+    smartlead_emails: field("smartlead_emails"),
+  };
+}
+
+function smartleadHistorySuppressionReason(
+  evidence: Record<string, string>,
+  input: { suppressAlreadySent?: boolean; suppressReplies?: boolean; suppressBlockedStatuses?: boolean; suppressExistingSmartleadMatch?: boolean }
+): string | null {
+  if (input.suppressReplies !== false && truthyHistoryFlag(evidence.smartlead_replied)) return "already_replied";
+  if (input.suppressBlockedStatuses !== false && /(blocked|bounced|unsubscribed|replied|completed|stopped|paused)/i.test(evidence.smartlead_statuses)) return "blocked_status";
+  if (input.suppressAlreadySent !== false && (truthyHistoryFlag(evidence.cold_email_sent) || Number(evidence.smartlead_sent_messages || 0) > 0)) return "already_sent";
+  if (input.suppressExistingSmartleadMatch !== false && (truthyHistoryFlag(evidence.smartlead_match) || Boolean(evidence.smartlead_campaigns || evidence.smartlead_emails))) return "already_in_smartlead";
+  return null;
+}
+
+function truthyHistoryFlag(value?: string): boolean {
+  return /^(1|true|yes|ano|y|sent|replied|domain|email|match)$/i.test(String(value ?? "").trim());
 }
 
 function csvEscape(value: unknown): string {

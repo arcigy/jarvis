@@ -929,6 +929,18 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Suppress leads with existing Smartlead history",
+      tool: "arcigy.build_smartlead_history_suppression_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_smartlead_history_suppression_preview"),
+      body: {
+        sourceName: "kuchyne_sk_google_maps_smartlead_enriched_2026-04-27.csv",
+        sourceType: "google_maps",
+        csvText: "company,website,smartlead_match,smartlead_statuses,smartlead_sent_messages,cold_email_sent,smartlead_replied\nReady Studio,https://ready.sk,,,,no,no\nAlready Sent,https://sent.sk,domain,SENT,1,yes,no\nReplied Studio,https://reply.sk,domain,REPLIED,1,yes,yes",
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Draft a Smartlead sequence without writing",
       tool: "arcigy.draft_smartlead_campaign_sequence",
       method: "POST",

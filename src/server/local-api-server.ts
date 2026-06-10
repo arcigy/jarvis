@@ -30,6 +30,7 @@ import {
   buildLeadRepairQueuePreview,
   buildNicheOpsDashboardPreview,
   buildSuppressionListPreview,
+  buildSmartleadHistorySuppressionPreview,
   batchScrapeWebsiteContacts,
   batchDraftLeadIntros,
   buildAiIntroQualityAuditPreview,
@@ -1498,6 +1499,24 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         suppressWholeDomainForBounces: payload.suppressWholeDomainForBounces === true,
         suppressWholeDomainForUnsubscribes: payload.suppressWholeDomainForUnsubscribes === true,
         sourceName: optionalString(payload.sourceName),
+        maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_smartlead_history_suppression_preview") {
+    writeJson(response, 200, {
+      result: buildSmartleadHistorySuppressionPreview({
+        leads: Array.isArray(payload.leads) ? payload.leads as Parameters<typeof buildSmartleadHistorySuppressionPreview>[0]["leads"] : undefined,
+        csvText: optionalString(payload.csvText),
+        delimiter: payload.delimiter === ";" ? ";" : payload.delimiter === "," ? "," : undefined,
+        maxRows: typeof payload.maxRows === "number" ? payload.maxRows : undefined,
+        sourceName: optionalString(payload.sourceName),
+        sourceType: ["google_maps", "csv", "serper", "manual", "other"].includes(String(payload.sourceType)) ? payload.sourceType as Parameters<typeof buildSmartleadHistorySuppressionPreview>[0]["sourceType"] : undefined,
+        suppressAlreadySent: payload.suppressAlreadySent !== false,
+        suppressReplies: payload.suppressReplies !== false,
+        suppressBlockedStatuses: payload.suppressBlockedStatuses !== false,
+        suppressExistingSmartleadMatch: payload.suppressExistingSmartleadMatch !== false,
         maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
       }),
     });
