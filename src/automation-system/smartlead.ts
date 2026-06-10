@@ -133,12 +133,14 @@ export function buildSmartleadOutreachBrief(input: {
   const replied =
     readOptionalMetric(input.statistics, ["reply_count", "replied", "replied_count", "unique_reply_count", "total_replies"]) ??
     countPresentFields(input.statistics, ["reply_time"]);
-  const positiveReplies = readOptionalMetric(input.statistics, [
+  const prepared = input.preparedPositiveReplyCount ?? 0;
+  const smartleadPositiveReplies = readOptionalMetric(input.statistics, [
     "positive_reply_count",
     "positive_replies",
     "positive_replied_count",
     "interested_count",
   ]) ?? countTextFields(input.statistics, ["lead_category"], ["interested", "positive", "meeting", "booked", "qualified"]);
+  const positiveReplies = smartleadPositiveReplies ?? (prepared > 0 ? prepared : null);
 
   const openRate = rate(opened, contacted);
   const replyRate = rate(replied, contacted);
@@ -153,12 +155,14 @@ export function buildSmartleadOutreachBrief(input: {
 
   if (positiveReplies === null) {
     notes.push("Smartlead statistics did not include a positive reply field.");
-    summaryParts.push("Pozitivne odpovede Smartlead v tomto reporte neposlal; treba ich doplnit z lokalnej DB alebo klasifikovat z odpovedi.");
+    summaryParts[1] = `${openRate}% si email otvorilo, ${replied} ludi odpisalo, pozitivne odpovede su zatial neklasifikovane.`;
+  } else if (smartleadPositiveReplies === null) {
+    notes.push("Smartlead statistics did not include a positive reply field; using locally prepared positive replies.");
+    summaryParts[1] = `${openRate}% si email otvorilo, ${replied} ludi odpisalo, z toho ${positiveReplies} lokalne klasifikovane pozitivne.`;
   } else {
     summaryParts[1] = `${openRate}% si email otvorilo, ${replied} ludi odpisalo, z toho ${positiveReplies} pozitivne.`;
   }
 
-  const prepared = input.preparedPositiveReplyCount ?? 0;
   if (prepared > 0) {
     summaryParts.push(`Pripravil som ti ${smartleadReplyLabel(prepared)} na pozitivne reakcie a poslem ich az na tvoje potvrdenie.`);
   }

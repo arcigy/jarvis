@@ -4245,12 +4245,14 @@ function buildSmartleadOutreachBrief(input) {
   const replied =
     readOptionalSmartleadMetric(input.statistics, ["reply_count", "replied", "replied_count", "unique_reply_count", "total_replies"]) ??
     countPresentSmartleadFields(input.statistics, ["reply_time"]);
-  const positiveReplies = readOptionalSmartleadMetric(input.statistics, [
+  const preparedPositiveReplyCount = Math.max(0, Math.floor(Number(input.preparedPositiveReplyCount ?? 0)));
+  const smartleadPositiveReplies = readOptionalSmartleadMetric(input.statistics, [
     "positive_reply_count",
     "positive_replies",
     "positive_replied_count",
     "interested_count",
   ]) ?? countTextSmartleadFields(input.statistics, ["lead_category"], ["interested", "positive", "meeting", "booked", "qualified"]);
+  const positiveReplies = smartleadPositiveReplies ?? (preparedPositiveReplyCount > 0 ? preparedPositiveReplyCount : null);
   const openRate = rate(opened, contacted);
   const replyRate = rate(replied, contacted);
   const positiveReplyRate = positiveReplies === null ? null : rate(positiveReplies, replied);
@@ -4264,13 +4266,16 @@ function buildSmartleadOutreachBrief(input) {
 
   if (positiveReplies === null) {
     notes.push("Smartlead statistics did not include a positive reply field.");
-    summaryParts.push("Pozitivne odpovede Smartlead v tomto reporte neposlal; treba ich doplnit z lokalnej DB alebo klasifikovat z odpovedi.");
+    summaryParts[1] = `${openRate}% si email otvorilo, ${replied} ludi odpisalo, pozitivne odpovede su zatial neklasifikovane.`;
+  } else if (smartleadPositiveReplies === null) {
+    notes.push("Smartlead statistics did not include a positive reply field; using locally prepared positive replies.");
+    summaryParts[1] = `${openRate}% si email otvorilo, ${replied} ludi odpisalo, z toho ${positiveReplies} lokalne klasifikovane pozitivne.`;
   } else {
     summaryParts[1] = `${openRate}% si email otvorilo, ${replied} ludi odpisalo, z toho ${positiveReplies} pozitivne.`;
   }
 
-  if (input.preparedPositiveReplyCount > 0) {
-    summaryParts.push(`Pripravil som ti ${smartleadReplyLabel(input.preparedPositiveReplyCount)} na pozitivne reakcie a poslem ich az na tvoje potvrdenie.`);
+  if (preparedPositiveReplyCount > 0) {
+    summaryParts.push(`Pripravil som ti ${smartleadReplyLabel(preparedPositiveReplyCount)} na pozitivne reakcie a poslem ich az na tvoje potvrdenie.`);
   }
   if (input.pendingApprovalCount > 0) {
     summaryParts.push(`Caka ${smartleadReplyLabel(input.pendingApprovalCount)} na schvalenie.`);

@@ -2308,8 +2308,25 @@ test("Smartlead outreach brief does not invent positive replies when missing", (
   });
 
   assert.equal(brief.metrics.positiveReplies, null);
-  assert.match(brief.summary, /Smartlead v tomto reporte neposlal/);
+  assert.match(brief.summary, /pozitivne odpovede su zatial neklasifikovane/);
+  assert.doesNotMatch(brief.summary, /treba ich doplnit/i);
   assert.ok(brief.notes.some((note) => note.includes("positive reply field")));
+});
+
+test("Smartlead outreach brief uses locally prepared positives when Smartlead omits classification", () => {
+  const brief = buildSmartleadOutreachBrief({
+    campaignId: "123",
+    campaignIds: ["123"],
+    periodLabel: "dnes",
+    statistics: { total_sent: 20, opened_count: 10, replied_count: 3 },
+    preparedPositiveReplyCount: 2,
+    pendingApprovalCount: 2,
+  });
+
+  assert.equal(brief.metrics.positiveReplies, 2);
+  assert.match(brief.summary, /z toho 2 lokalne klasifikovane pozitivne/);
+  assert.match(brief.summary, /Pripravil som ti 2 odpovede/);
+  assert.ok(brief.notes.some((note) => note.includes("using locally prepared positive replies")));
 });
 
 test("lead discovery helpers call Serper, Google Places, and Google Sheets", async () => {
