@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { randomBytes } from "node:crypto";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 
@@ -77,6 +79,7 @@ type RemoteConnectionPack = {
 class TunnelExit extends Error {}
 
 const repoRoot = fileURLToPath(new URL("../", import.meta.url));
+const handoffArtifactPath = join(repoRoot, "generated", "remote-mcp-handoff", "latest.json");
 const args = process.argv.slice(2);
 
 loadLocalEnv(repoRoot);
@@ -160,6 +163,7 @@ async function main() {
     await verifyExternalManifest(publicUrl, token);
     const pack = await verifyExternalConnectionPack(publicUrl, token);
     const smoke = await verifyRemoteMcpSmoke(publicUrl, token);
+    writeTunnelHandoffArtifact({ publicUrl, preflight, pack, smoke, generatedToken });
 
     process.stdout.write(
       renderTunnelReadySummary({
@@ -463,6 +467,56 @@ function hasReadySmokeCheck(value: RemoteMcpSmoke, key: string): boolean {
   return Array.isArray(value.checks) && value.checks.some((check) => check.key === key && check.status === "ready");
 }
 
+function writeTunnelHandoffArtifact(input: {
+  publicUrl: string;
+  preflight: Preflight;
+  pack: RemoteConnectionPack | null;
+  smoke: RemoteMcpSmoke | null;
+  generatedToken: string | null;
+}) {
+  const readyGates = (input.smoke?.checks ?? []).filter((check) => check.status === "ready" && check.key).map((check) => String(check.key));
+  const payload = {
+    mode: "arcigy-jarvis-remote-mcp-handoff",
+    status: input.smoke?.status === "ready" ? "ready" : "attention",
+    generatedAt: new Date().toISOString(),
+    publicUrl: input.publicUrl,
+    urls: {
+      localUi: `${origin}/index.html`,
+      actionManifest: `${input.publicUrl}/.well-known/ai-plugin.json`,
+      jarvisManifest: `${input.publicUrl}/.well-known/arcigy-jarvis.json`,
+      openApiSchema: `${input.publicUrl}/api/openapi.json`,
+      connectionPack: `${input.publicUrl}/api/remote-mcp-pack?includeReadiness=true&live=true`,
+      smokeTest: `${input.publicUrl}/api/remote-mcp-smoke`,
+      secureTunnelStatus: `${input.publicUrl}/api/secure-tunnel-status`,
+      mcpToolPattern: `${input.publicUrl}/api/mcp/{toolName}`,
+    },
+    auth: {
+      header: "Authorization: Bearer <JARVIS_WEB_TOKEN>",
+      tokenValueStored: false,
+      tokenSource: input.generatedToken ? "one-time-session-token-not-stored" : "JARVIS_WEB_TOKEN",
+    },
+    tools: {
+      count: input.pack?.tools?.count ?? input.preflight.mcpToolCount ?? null,
+      approvalRequired: input.pack?.tools?.approvalRequired ?? [],
+      localStateWrite: input.pack?.tools?.localStateWrite ?? [],
+    },
+    proof: {
+      smokeStatus: input.smoke?.status ?? "unknown",
+      readyGateCount: readyGates.length,
+      readyGates,
+      summary: input.smoke?.summary ?? null,
+    },
+    firstSteps: [
+      "Import the OpenAPI schema for ChatGPT/Grok actions or use the MCP tool pattern for HTTP JSON calls.",
+      "Run the smoke test and require status=ready with all 37 required remote MCP smoke gates.",
+      "Call arcigy.get_operator_briefing, arcigy.get_jarvis_capability_audit, and arcigy.get_production_completion_score before work.",
+      "Never call approval-required tools without explicit operator approval for the exact payload.",
+    ],
+  };
+  mkdirSync(join(repoRoot, "generated", "remote-mcp-handoff"), { recursive: true });
+  writeFileSync(handoffArtifactPath, `${redactSensitiveText(JSON.stringify(payload, null, 2))}\n`, "utf-8");
+}
+
 function renderTunnelReadySummary(input: {
   publicUrl: string;
   preflight: Preflight;
@@ -489,6 +543,7 @@ function renderTunnelReadySummary(input: {
     `MCP tool count: ${toolCount}`,
     `Approval locks: ${approvalLocks}`,
     `Local memory write tools: ${localWrites}`,
+    `Handoff artifact: ${handoffArtifactPath}`,
     input.smoke?.summary ? `Smoke: ${input.smoke.summary}` : "Smoke: skipped because no bearer token was available.",
     "Auth header: Authorization: Bearer <JARVIS_WEB_TOKEN>",
     tokenLine,

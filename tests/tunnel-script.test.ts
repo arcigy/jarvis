@@ -10,6 +10,11 @@ test("web tunnel script orchestrates protected Jarvis MCP exposure", () => {
   assert.equal(packageJson.scripts["web:tunnel:secure"], "node scripts/start_web_tunnel.ts --generate-token");
   assert.match(script, /JARVIS_WEB_TOKEN/);
   assert.match(script, /randomBytes/);
+  assert.match(script, /remote-mcp-handoff/);
+  assert.match(script, /writeTunnelHandoffArtifact/);
+  assert.match(script, /arcigy-jarvis-remote-mcp-handoff/);
+  assert.match(script, /tokenValueStored: false/);
+  assert.match(script, /one-time-session-token-not-stored/);
   assert.match(script, /src\/server\/local-api-server\.ts/);
   assert.match(script, /\/api\/web-bridge-preflight/);
   assert.match(script, /fetchJson<Preflight>\(`\$\{origin\}\/api\/web-bridge-preflight`, token\)/);
@@ -55,6 +60,7 @@ test("web tunnel script orchestrates protected Jarvis MCP exposure", () => {
   assert.match(script, /pack-production-evidence-quick-start/);
   assert.match(script, /renderTunnelReadySummary/);
   assert.match(script, /Remote agent handoff block/);
+  assert.match(script, /Handoff artifact/);
   assert.match(script, /Required proof before work/);
   assert.match(script, /arcigy\.get_operator_briefing/);
   assert.match(script, /dryRun=true/);

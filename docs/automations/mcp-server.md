@@ -31,6 +31,8 @@ npm run web:tunnel:secure
 
 That command generates a one-time bearer token, starts the protected local bridge when needed, verifies the external manifest, and prints the token once for the remote MCP client. If another `npm run web` process is already running without that token, stop it first so the secure tunnel runner can own the protected bridge.
 
+After the tunnel is ready, the runner writes `generated/remote-mcp-handoff/latest.json`. That artifact is safe to inspect locally: it stores the public action manifest, OpenAPI schema, connection pack, smoke URL, MCP tool pattern, tool counts, ready gate list, and first agent steps, but it never stores the bearer token value.
+
 Run the same smoke proof from CLI when checking a local or external bridge:
 
 ```powershell
