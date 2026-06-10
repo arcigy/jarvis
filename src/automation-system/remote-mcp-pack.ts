@@ -1159,6 +1159,20 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Merge scrape and AI intro results into leads",
+      tool: "arcigy.build_lead_enrichment_merge_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_lead_enrichment_merge_preview"),
+      body: {
+        niche: { id: "niche-1", slug: "kuchyne", name: "Kuchynske studia", campaignId: "123456" },
+        leads: [{ companyName: "Ready Studio", website: "https://ready.sk" }],
+        scrapedResults: [{ url: "https://ready.sk", finalUrl: "https://ready.sk/", emails: ["jan@ready.sk"], phones: ["+421 900 111 222"], textPreview: "Realizacie kuchyn a showroom." }],
+        introDrafts: [{ companyName: "Ready Studio", website: "https://ready.sk", personalizedIntro: "Vsimol som si vase realizacie kuchyn." }],
+        minScore: 70,
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Build leadgen gap report before Smartlead",
       tool: "arcigy.build_leadgen_gap_report",
       method: "POST",

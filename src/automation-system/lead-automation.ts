@@ -623,6 +623,27 @@ export type LeadEnrichmentBatchPreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string }>;
 };
 
+export type LeadEnrichmentMergePreview = {
+  mode: "lead-enrichment-merge-preview";
+  summary: string;
+  totals: {
+    input: number;
+    enriched: number;
+    matchedScrapes: number;
+    matchedIntros: number;
+    unmatchedScrapes: number;
+    unmatchedIntros: number;
+    readyForSmartlead: number;
+    manualReview: number;
+    rejected: number;
+  };
+  leads: Array<LeadCandidateInput & { scraped?: Partial<ScrapedWebsiteContacts>; intro?: Partial<LeadIntroDraft>; context?: string }>;
+  unmatchedScrapes: Array<Partial<ScrapedWebsiteContacts>>;
+  unmatchedIntros: Array<Partial<LeadIntroDraft>>;
+  enrichmentPreview: LeadEnrichmentBatchPreview;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type LeadgenGapReport = {
   mode: "leadgen-gap-report";
   summary: string;
@@ -2202,6 +2223,75 @@ export function previewLeadEnrichmentBatch(input: {
     score,
     reviewQueue,
     smartleadPlan,
+    nextToolCalls,
+  };
+}
+
+export function buildLeadEnrichmentMergePreview(input: {
+  leads: LeadCandidateInput[];
+  scrapedResults?: Array<Partial<ScrapedWebsiteContacts>>;
+  introDrafts?: Array<Partial<LeadIntroDraft>>;
+  niche?: { id?: string; slug: string; name: string; campaignId?: string | number | null };
+  campaignTag?: string;
+  defaultSource?: string;
+  minScore?: number;
+  batchSize?: number;
+  maxNextCalls?: number;
+}): LeadEnrichmentMergePreview {
+  const scrapedUsed = new Set<number>();
+  const introUsed = new Set<number>();
+  const scraped = input.scrapedResults ?? [];
+  const intros = input.introDrafts ?? [];
+  const leads = input.leads.map((lead) => {
+    const scrapeIndex = scraped.findIndex((item, index) => !scrapedUsed.has(index) && scrapeMatchesLead(item, lead));
+    if (scrapeIndex >= 0) scrapedUsed.add(scrapeIndex);
+    const introIndex = intros.findIndex((item, index) => !introUsed.has(index) && introMatchesLead(item, lead));
+    if (introIndex >= 0) introUsed.add(introIndex);
+    const matchedScrape = scrapeIndex >= 0 ? scraped[scrapeIndex] : undefined;
+    const matchedIntro = introIndex >= 0 ? intros[introIndex] : undefined;
+    return {
+      ...lead,
+      email: lead.email ?? selectBestEmail(matchedScrape?.emails ?? []),
+      phone: lead.phone ?? matchedScrape?.phones?.[0],
+      scraped: matchedScrape,
+      intro: matchedIntro,
+      personalizedIntro: lead.personalizedIntro ?? matchedIntro?.personalizedIntro,
+      context: matchedScrape?.textPreview,
+    };
+  });
+  const enrichmentPreview = previewLeadEnrichmentBatch({
+    leads,
+    niche: input.niche,
+    campaignTag: input.campaignTag,
+    defaultSource: input.defaultSource ?? "enrichment-merge",
+    minScore: input.minScore,
+    batchSize: input.batchSize,
+  });
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 40), 1), 100);
+  const nextToolCalls = dedupeNextToolCalls(enrichmentPreview.nextToolCalls.map((call) => ({
+    ...call,
+    approvalRequired: call.tool === "arcigy.add_leads_to_smartlead_campaign",
+  }))).slice(0, maxNextCalls);
+  const unmatchedScrapes = scraped.filter((_item, index) => !scrapedUsed.has(index));
+  const unmatchedIntros = intros.filter((_item, index) => !introUsed.has(index));
+  return {
+    mode: "lead-enrichment-merge-preview",
+    summary: `Lead enrichment merge: ${leads.length} leadov, ${scrapedUsed.size} scrape matchov, ${introUsed.size} intro matchov, ${enrichmentPreview.totals.readyForSmartlead} ready do Smartlead. Ziadny zapis ani upload neprebehol.`,
+    totals: {
+      input: input.leads.length,
+      enriched: leads.filter((lead) => lead.scraped || lead.intro || lead.email || lead.personalizedIntro).length,
+      matchedScrapes: scrapedUsed.size,
+      matchedIntros: introUsed.size,
+      unmatchedScrapes: unmatchedScrapes.length,
+      unmatchedIntros: unmatchedIntros.length,
+      readyForSmartlead: enrichmentPreview.totals.readyForSmartlead,
+      manualReview: enrichmentPreview.totals.manualReview,
+      rejected: enrichmentPreview.totals.rejected,
+    },
+    leads,
+    unmatchedScrapes,
+    unmatchedIntros,
+    enrichmentPreview,
     nextToolCalls,
   };
 }
@@ -4107,6 +4197,21 @@ function emptyBatchScrape(urls: string[]): BatchScrapedWebsiteContacts {
 
 function leadIntroKey(input: { companyName: string; website?: string }): string {
   return `${input.companyName.trim().toLowerCase()}|${input.website?.trim().toLowerCase() ?? ""}`;
+}
+
+function scrapeMatchesLead(scrape: Partial<ScrapedWebsiteContacts>, lead: LeadCandidateInput): boolean {
+  const leadDomain = normalizeDomain(lead.website ?? "");
+  const scrapeDomains = [scrape.url, scrape.finalUrl].map((value) => normalizeDomain(value ?? "")).filter(Boolean);
+  return Boolean(leadDomain && scrapeDomains.includes(leadDomain));
+}
+
+function introMatchesLead(intro: Partial<LeadIntroDraft>, lead: LeadCandidateInput): boolean {
+  const introDomain = normalizeDomain(intro.website ?? "");
+  const leadDomain = normalizeDomain(lead.website ?? "");
+  if (introDomain && leadDomain && introDomain === leadDomain) return true;
+  const introName = slugify(intro.companyName ?? "");
+  const leadName = slugify(lead.companyName ?? "");
+  return Boolean(introName && leadName && introName === leadName);
 }
 
 function checkItem(ok: boolean, key: string, message: string): SmartleadCampaignQaPreview["checks"][number] {

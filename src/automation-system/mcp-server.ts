@@ -57,6 +57,7 @@ import {
   parseLeadsCsv,
   previewSmartleadEmailRendering,
   previewLeadEnrichmentBatch,
+  buildLeadEnrichmentMergePreview,
   prepareSmartleadLeads,
   runLeadgenResearchPipeline,
   scoreLeadQuality,
@@ -2502,6 +2503,55 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(previewLeadEnrichmentBatch(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_lead_enrichment_merge_preview",
+    {
+      title: "Build lead enrichment merge preview",
+      description: "Merge separate website scrape results and AI intro drafts back into original leads by domain/company, then prepare enrichment, review, and Smartlead next steps without writes.",
+      inputSchema: {
+        leads: z.array(manualReviewPickupLeadSchema).min(1).max(1000),
+        scrapedResults: z.array(z.object({
+          url: z.string().optional(),
+          finalUrl: z.string().optional(),
+          title: z.string().optional(),
+          description: z.string().optional(),
+          textPreview: z.string().optional(),
+          emails: z.array(z.string()).optional(),
+          phones: z.array(z.string()).optional(),
+          internalLinks: z.array(z.string()).optional(),
+          fetchedAt: z.string().optional(),
+        })).optional(),
+        introDrafts: z.array(z.object({
+          companyName: z.string().optional(),
+          website: z.string().optional(),
+          context: z.string().optional(),
+          offer: z.string().optional(),
+          language: z.enum(["sk", "en"]).optional(),
+          personalizedIntro: z.string().optional(),
+          model: z.string().optional(),
+        })).optional(),
+        niche: z.object({
+          id: z.string().optional(),
+          slug: z.string().min(1),
+          name: z.string().min(1),
+          campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+        }).optional(),
+        campaignTag: z.string().optional(),
+        defaultSource: z.string().optional(),
+        minScore: z.number().int().min(0).max(100).default(70),
+        batchSize: z.number().int().min(1).max(100).default(50),
+        maxNextCalls: z.number().int().min(1).max(100).default(40),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildLeadEnrichmentMergePreview(input))
   );
 
   server.registerTool(

@@ -56,6 +56,7 @@ import {
   parseLeadsCsv,
   previewSmartleadEmailRendering,
   previewLeadEnrichmentBatch,
+  buildLeadEnrichmentMergePreview,
   prepareSmartleadLeads,
   runLeadgenResearchPipeline,
   scoreLeadQuality,
@@ -1754,6 +1755,22 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         defaultSource: optionalString(payload.defaultSource),
         minScore: typeof payload.minScore === "number" ? payload.minScore : undefined,
         batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_lead_enrichment_merge_preview") {
+    writeJson(response, 200, {
+      result: buildLeadEnrichmentMergePreview({
+        leads: Array.isArray(payload.leads) ? payload.leads as Parameters<typeof buildLeadEnrichmentMergePreview>[0]["leads"] : [],
+        scrapedResults: Array.isArray(payload.scrapedResults) ? payload.scrapedResults as Parameters<typeof buildLeadEnrichmentMergePreview>[0]["scrapedResults"] : undefined,
+        introDrafts: Array.isArray(payload.introDrafts) ? payload.introDrafts as Parameters<typeof buildLeadEnrichmentMergePreview>[0]["introDrafts"] : undefined,
+        niche: payload.niche as Parameters<typeof buildLeadEnrichmentMergePreview>[0]["niche"],
+        campaignTag: optionalString(payload.campaignTag),
+        defaultSource: optionalString(payload.defaultSource),
+        minScore: typeof payload.minScore === "number" ? payload.minScore : undefined,
+        batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
+        maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
       }),
     });
     return;

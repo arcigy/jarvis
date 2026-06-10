@@ -53,6 +53,7 @@ import {
   filterBlacklistedLeads,
   parseLeadsCsv,
   previewLeadEnrichmentBatch,
+  buildLeadEnrichmentMergePreview,
   previewSmartleadEmailRendering,
   prepareSmartleadLeads,
   scoreLeadQuality,
@@ -184,6 +185,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.build_smartlead_campaign_qa_preview",
     "arcigy.build_smartlead_campaign_handoff_package_preview",
     "arcigy.preview_lead_enrichment_batch",
+    "arcigy.build_lead_enrichment_merge_preview",
     "arcigy.build_leadgen_gap_report",
     "arcigy.build_leadgen_campaign_pipeline_preview",
     "arcigy.build_lead_source_import_queue_preview",
@@ -1453,7 +1455,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 102 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 103 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -2817,6 +2819,33 @@ test("lead enrichment preview and daily runbook prepare safe Smartlead next step
   assert.equal(runbook.target.discoveryCount, 60);
   assert.ok(runbook.steps.some((step) => step.tool === "arcigy.preview_lead_enrichment_batch" && step.writes === false));
   assert.ok(runbook.steps.some((step) => step.tool === "arcigy.add_leads_to_smartlead_campaign" && step.approvalRequired));
+});
+
+test("lead enrichment merge preview joins scrape and intro results before Smartlead", () => {
+  const preview = buildLeadEnrichmentMergePreview({
+    niche: { id: "niche-1", slug: "kuchyne", name: "Kuchynske studia", campaignId: "123456" },
+    leads: [{ companyName: "Ready Studio", website: "https://ready.sk" }],
+    scrapedResults: [
+      { url: "https://ready.sk", finalUrl: "https://ready.sk/", emails: ["jan@ready.sk"], phones: ["+421 900 111 222"], textPreview: "Realizacie kuchyn a showroom." },
+      { url: "https://unmatched.sk", finalUrl: "https://unmatched.sk/", emails: ["x@unmatched.sk"] },
+    ],
+    introDrafts: [
+      { companyName: "Ready Studio", website: "https://ready.sk", personalizedIntro: "Vsimol som si vase realizacie kuchyn." },
+      { companyName: "Other Studio", website: "https://other.sk", personalizedIntro: "Vsimol som si showroom." },
+    ],
+    minScore: 70,
+  });
+
+  assert.equal(preview.mode, "lead-enrichment-merge-preview");
+  assert.equal(preview.totals.matchedScrapes, 1);
+  assert.equal(preview.totals.matchedIntros, 1);
+  assert.equal(preview.totals.unmatchedScrapes, 1);
+  assert.equal(preview.totals.unmatchedIntros, 1);
+  assert.equal(preview.leads[0].email, "jan@ready.sk");
+  assert.equal(preview.leads[0].personalizedIntro, "Vsimol som si vase realizacie kuchyn.");
+  assert.equal(preview.totals.readyForSmartlead, 1);
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.add_leads_to_smartlead_campaign" && call.approvalRequired));
+  assert.match(preview.summary, /Ziadny zapis ani upload/);
 });
 
 test("batch niche discovery plan prepares regional runbooks and read-only next calls", () => {
