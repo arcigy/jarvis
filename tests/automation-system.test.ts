@@ -28,7 +28,7 @@ import {
   extractCommandAfterWakeWord,
   handleJarvisVoiceEvent,
 } from "../src/automation-system/jarvis-voice.ts";
-import { resolveJarvisIntentFromTranscript } from "../src/automation-system/jarvis-intents.ts";
+import { answerJarvisIntent, resolveJarvisIntentFromTranscript } from "../src/automation-system/jarvis-intents.ts";
 import { buildProductionReadinessReport } from "../src/automation-system/production-readiness.ts";
 import { buildOperatorBriefing } from "../src/automation-system/operator-briefing.ts";
 import { buildProactiveAttentionDigest } from "../src/automation-system/proactive-attention-digest.ts";
@@ -2852,6 +2852,13 @@ test("Jarvis voice resolves production, remote MCP, contracts, Gmail, and client
   assert.equal(resolveJarvisIntentFromTranscript("Jarvis priprav zmluvny intake")?.kind, "voice_capability");
   assert.equal(resolveJarvisIntentFromTranscript("Jarvis skontroluj Gmail inbox")?.kind, "voice_capability");
   assert.equal(resolveJarvisIntentFromTranscript("Jarvis ake su klientske poziadavky?")?.kind, "voice_capability");
+  for (const transcript of ["Jarvis zmluvy", "Jarvis skontroluj Gmail inbox", "Jarvis ake su klientske poziadavky?"]) {
+    const intent = resolveJarvisIntentFromTranscript(transcript);
+    assert.ok(intent);
+    const answer = answerJarvisIntent(intent);
+    assert.doesNotMatch(answer, /[ĂÄĹâ�]/);
+    assert.match(answer, /Viem/);
+  }
   const approvalIntent = resolveJarvisIntentFromTranscript("Jarvis co caka na moje potvrdenie?");
   assert.equal(approvalIntent?.kind, "voice_capability");
   assert.equal(approvalIntent?.kind === "voice_capability" ? approvalIntent.capability : null, "approval_queue");
