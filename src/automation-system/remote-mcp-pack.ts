@@ -929,6 +929,25 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Build full leadgen campaign pipeline preview",
+      tool: "arcigy.build_leadgen_campaign_pipeline_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_leadgen_campaign_pipeline_preview"),
+      body: {
+        niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456" },
+        campaignTag: "autoservisy-ba",
+        offer: "AI asistent na odpovede a follow-up",
+        language: "sk",
+        leads: [
+          { companyName: "Modelova Firma", website: "https://example.com", scraped: { emails: ["jan.novak@example.com"], phones: ["+421 900 111 222"] } },
+          { companyName: "Druha Firma", website: "https://example.org" },
+        ],
+        minScore: 70,
+        batchSize: 50,
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Build exact daily leadgen runbook",
       tool: "arcigy.build_daily_leadgen_runbook",
       method: "POST",

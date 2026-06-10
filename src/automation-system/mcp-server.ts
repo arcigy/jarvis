@@ -20,6 +20,7 @@ import { buildLeadgenDailyReport, buildLeadgenEveningSummary, buildLeadgenOpsDig
 import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "./lead-discovery.ts";
 import {
   buildNicheLeadgenPlan,
+  buildLeadgenCampaignPipelinePreview,
   batchScrapeWebsiteContacts,
   batchDraftLeadIntros,
   buildManualReviewPickupPlan,
@@ -1847,6 +1848,13 @@ export function createJarvisMcpServer(): McpServer {
       contextPreview: z.string().optional(),
     }).optional(),
   });
+  const pipelineLeadSchema = enrichmentLeadSchema.extend({
+    intro: z.object({
+      personalizedIntro: z.string().optional(),
+      model: z.string().optional(),
+    }).partial().optional(),
+    context: z.string().optional(),
+  });
 
   server.registerTool(
     "arcigy.preview_manual_review_pickup",
@@ -1946,6 +1954,37 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(previewLeadEnrichmentBatch(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_leadgen_campaign_pipeline_preview",
+    {
+      title: "Build leadgen campaign pipeline preview",
+      description: "Build one read-only plan that chains website scraping, AI intro drafting, enrichment scoring, manual review, and Smartlead upload payloads.",
+      inputSchema: {
+        leads: z.array(pipelineLeadSchema).min(1),
+        niche: z.object({
+          id: z.string().optional(),
+          slug: z.string().min(1),
+          name: z.string().min(1),
+          campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+        }).optional(),
+        campaignTag: z.string().optional(),
+        defaultSource: z.string().optional(),
+        offer: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        minScore: z.number().int().min(0).max(100).default(70),
+        batchSize: z.number().int().min(1).max(100).default(50),
+        maxNextCalls: z.number().int().min(1).max(50).default(20),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildLeadgenCampaignPipelinePreview(input))
   );
 
   server.registerTool(

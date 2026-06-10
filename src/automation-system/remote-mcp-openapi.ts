@@ -397,6 +397,20 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       minScore: 70,
     };
   }
+  if (toolName === "arcigy.build_leadgen_campaign_pipeline_preview") {
+    return {
+      niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456" },
+      campaignTag: "autoservisy-ba",
+      offer: "AI asistent na odpovede a follow-up",
+      language: "sk",
+      leads: [
+        { companyName: "Modelova Firma", website: "https://example.com", scraped: { emails: ["jan.novak@example.com"], phones: ["+421 900 111 222"] } },
+        { companyName: "Druha Firma", website: "https://example.org" },
+      ],
+      minScore: 70,
+      batchSize: 50,
+    };
+  }
   if (toolName === "arcigy.build_daily_leadgen_runbook") {
     return {
       niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", keywords: ["autoservis", "pneuservis"], region: "Bratislava", campaignId: "123456" },

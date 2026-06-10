@@ -19,6 +19,7 @@ import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerpe
 import { buildLeadgenDailyReport, buildLeadgenEveningSummary, buildLeadgenOpsDigest, buildLeadgenSlackReportPreview, selectNextNiche } from "../automation-system/leadgen-report.ts";
 import {
   buildNicheLeadgenPlan,
+  buildLeadgenCampaignPipelinePreview,
   batchScrapeWebsiteContacts,
   batchDraftLeadIntros,
   buildManualReviewPickupPlan,
@@ -1518,6 +1519,22 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         defaultSource: optionalString(payload.defaultSource),
         minScore: typeof payload.minScore === "number" ? payload.minScore : undefined,
         batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_leadgen_campaign_pipeline_preview") {
+    writeJson(response, 200, {
+      result: buildLeadgenCampaignPipelinePreview({
+        leads: (payload.leads ?? []) as Parameters<typeof buildLeadgenCampaignPipelinePreview>[0]["leads"],
+        niche: payload.niche as Parameters<typeof buildLeadgenCampaignPipelinePreview>[0]["niche"],
+        campaignTag: optionalString(payload.campaignTag),
+        defaultSource: optionalString(payload.defaultSource),
+        offer: optionalString(payload.offer),
+        language: payload.language === "en" ? "en" : "sk",
+        minScore: typeof payload.minScore === "number" ? payload.minScore : undefined,
+        batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
+        maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
       }),
     });
     return;

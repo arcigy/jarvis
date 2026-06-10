@@ -68,6 +68,7 @@ export type JarvisMcpToolName =
   | "arcigy.build_smartlead_injection_plan"
   | "arcigy.draft_niche_smartlead_campaign_setup"
   | "arcigy.preview_lead_enrichment_batch"
+  | "arcigy.build_leadgen_campaign_pipeline_preview"
   | "arcigy.build_daily_leadgen_runbook"
   | "arcigy.parse_leads_csv"
   | "arcigy.filter_blacklisted_leads"
@@ -440,6 +441,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.preview_lead_enrichment_batch",
       description: "Zluci scraped/register/AI data pre batch leadov, spravi dedupe, scoring, manual review queue a volitelny Smartlead injection plan bez zapisu.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_leadgen_campaign_pipeline_preview",
+      description: "Z jedneho batchu leadov pripravi scrape, AI intro, enrichment a Smartlead next-step plan bez zapisu alebo uploadu.",
       requiresApproval: false,
     },
     {

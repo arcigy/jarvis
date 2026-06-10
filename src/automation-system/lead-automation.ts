@@ -213,6 +213,29 @@ export type LeadEnrichmentBatchPreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string }>;
 };
 
+export type LeadgenCampaignPipelinePreview = {
+  mode: "leadgen-campaign-pipeline-preview";
+  summary: string;
+  totals: {
+    input: number;
+    unique: number;
+    duplicates: number;
+    contactsPrepared: number;
+    introsPrepared: number;
+    websitesToScrape: number;
+    introsToDraft: number;
+    readyForSmartlead: number;
+    manualReview: number;
+    rejected: number;
+  };
+  leads: LeadCandidateInput[];
+  websitesToScrape: string[];
+  introInputs: LeadIntroInput[];
+  enrichmentPreview: LeadEnrichmentBatchPreview;
+  smartleadPlan?: SmartleadInjectionPlan;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string }>;
+};
+
 export type DailyLeadgenRunbook = {
   mode: "daily-leadgen-runbook";
   summary: string;
@@ -982,6 +1005,108 @@ export function previewLeadEnrichmentBatch(input: {
   };
 }
 
+export function buildLeadgenCampaignPipelinePreview(input: {
+  leads: Array<LeadCandidateInput & {
+    scraped?: Partial<ScrapedWebsiteContacts>;
+    intro?: Partial<LeadIntroDraft>;
+    context?: string;
+  }>;
+  niche?: { id?: string; slug: string; name: string; campaignId?: string | number | null };
+  campaignTag?: string;
+  defaultSource?: string;
+  offer?: string;
+  language?: "sk" | "en";
+  minScore?: number;
+  batchSize?: number;
+  maxNextCalls?: number;
+}): LeadgenCampaignPipelinePreview {
+  const normalized = input.leads.map((lead) => normalizePipelineLead(lead, input.campaignTag ?? input.niche?.slug, input.defaultSource));
+  const enrichmentPreview = previewLeadEnrichmentBatch({
+    leads: normalized,
+    niche: input.niche,
+    campaignTag: input.campaignTag,
+    defaultSource: input.defaultSource,
+    minScore: input.minScore,
+    batchSize: input.batchSize,
+  });
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 20), 1), 50);
+  const websitesToScrape = unique(enrichmentPreview.leads.filter((lead) => lead.website && !lead.email).map((lead) => lead.website as string)).slice(0, maxNextCalls);
+  const introInputs = enrichmentPreview.leads
+    .filter((lead) => lead.companyName && !lead.personalizedIntro)
+    .map((lead) => ({
+      companyName: lead.companyName as string,
+      website: lead.website,
+      context: stringField(lead.customFields ?? {}, "context_preview"),
+      offer: input.offer,
+      language: input.language ?? "sk",
+    }))
+    .slice(0, maxNextCalls);
+  const nextToolCalls: LeadgenCampaignPipelinePreview["nextToolCalls"] = [];
+  if (websitesToScrape.length) {
+    nextToolCalls.push({
+      tool: "arcigy.batch_scrape_website_contacts",
+      payload: { urls: websitesToScrape, includePriorityPages: true, maxPages: 4, maxSites: websitesToScrape.length },
+      reason: "Tieto leady maju web, ale chybaju im emaily; najprv vytiahni kontakty z webu.",
+    });
+  }
+  if (introInputs.length) {
+    nextToolCalls.push({
+      tool: "arcigy.batch_draft_lead_intros",
+      payload: { leads: introInputs, offer: input.offer, language: input.language ?? "sk", maxLeads: introInputs.length },
+      reason: "Tieto leady maju firmu, ale chybaju im personalizovane intra pre cold email.",
+    });
+  }
+  nextToolCalls.push({
+    tool: "arcigy.preview_lead_enrichment_batch",
+    payload: {
+      leads: normalized,
+      niche: input.niche,
+      campaignTag: input.campaignTag,
+      defaultSource: input.defaultSource,
+      minScore: input.minScore,
+      batchSize: input.batchSize,
+    },
+    reason: "Po scrape/intro krokoch znovu prepocitaj dedupe, score, manual review a Smartlead plan.",
+  });
+  if (enrichmentPreview.smartleadPlan?.addLeadsApprovalPayload) {
+    nextToolCalls.push({
+      tool: "arcigy.add_leads_to_smartlead_campaign",
+      payload: enrichmentPreview.smartleadPlan.addLeadsApprovalPayload as unknown as Record<string, unknown>,
+      reason: "Ready leady mozu ist do Smartlead az po explicitnom schvaleni operatorom.",
+    });
+  } else if (input.niche && enrichmentPreview.totals.readyForSmartlead > 0) {
+    nextToolCalls.push({
+      tool: "arcigy.draft_niche_smartlead_campaign_setup",
+      payload: { niche: { id: input.niche.id, slug: input.niche.slug, name: input.niche.name }, offer: input.offer, language: input.language ?? "sk" },
+      reason: "Niche nema campaignId; priprav Smartlead kampan pred uploadom leadov.",
+    });
+  }
+  const contactsPrepared = enrichmentPreview.leads.filter((lead) => Boolean(lead.email)).length;
+  const introsPrepared = enrichmentPreview.leads.filter((lead) => Boolean(lead.personalizedIntro)).length;
+  return {
+    mode: "leadgen-campaign-pipeline-preview",
+    summary: `Leadgen pipeline preview: ${enrichmentPreview.totals.readyForSmartlead} ready do Smartlead, ${websitesToScrape.length} webov na scrape, ${introInputs.length} intro draftov, ${enrichmentPreview.totals.manualReview} manual review. Ziadny zapis ani upload neprebehol.`,
+    totals: {
+      input: input.leads.length,
+      unique: enrichmentPreview.totals.unique,
+      duplicates: enrichmentPreview.totals.duplicates,
+      contactsPrepared,
+      introsPrepared,
+      websitesToScrape: websitesToScrape.length,
+      introsToDraft: introInputs.length,
+      readyForSmartlead: enrichmentPreview.totals.readyForSmartlead,
+      manualReview: enrichmentPreview.totals.manualReview,
+      rejected: enrichmentPreview.totals.rejected,
+    },
+    leads: enrichmentPreview.leads,
+    websitesToScrape,
+    introInputs,
+    enrichmentPreview,
+    smartleadPlan: enrichmentPreview.smartleadPlan,
+    nextToolCalls,
+  };
+}
+
 export function buildDailyLeadgenRunbook(input: {
   niche: { id?: string; slug: string; name: string; keywords?: string[]; region?: string; campaignId?: string | number | null };
   targetCount?: number;
@@ -1214,6 +1339,29 @@ function normalizeEnrichmentLead(
       campaign_tag: campaignTag,
       scraped_emails_count: lead.scraped?.emails?.length,
       scraped_phones_count: lead.scraped?.phones?.length,
+    },
+  };
+}
+
+function normalizePipelineLead(
+  lead: LeadCandidateInput & { scraped?: Partial<ScrapedWebsiteContacts>; intro?: Partial<LeadIntroDraft>; context?: string },
+  campaignTag?: string,
+  defaultSource?: string
+): ManualReviewPickupLead & { scraped?: Partial<ScrapedWebsiteContacts> } {
+  const scrapedEmail = selectBestEmail(lead.scraped?.emails ?? []);
+  const scrapedPhone = lead.scraped?.phones?.[0];
+  const contextPreview = lead.context ?? lead.scraped?.textPreview;
+  return {
+    ...lead,
+    email: lead.email ?? scrapedEmail,
+    phone: lead.phone ?? scrapedPhone,
+    source: lead.source ?? defaultSource,
+    personalizedIntro: lead.personalizedIntro ?? lead.intro?.personalizedIntro,
+    customFields: {
+      ...lead.customFields,
+      campaign_tag: campaignTag,
+      source: lead.source ?? defaultSource,
+      context_preview: contextPreview ? redactSensitiveText(contextPreview).slice(0, 1200) : undefined,
     },
   };
 }
