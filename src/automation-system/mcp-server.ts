@@ -26,6 +26,7 @@ import {
   buildManualReviewPickupPlan,
   buildManualReviewQueue,
   buildSmartleadCampaignLaunchPreview,
+  buildSmartleadCampaignQaPreview,
   buildSmartleadInjectionPlan,
   buildColdOutreachCsvImportPreview,
   dedupeLeadCandidates,
@@ -1962,6 +1963,32 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildSmartleadCampaignLaunchPreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_smartlead_campaign_qa_preview",
+    {
+      title: "Build Smartlead campaign QA preview",
+      description: "Validate Smartlead launch payloads, leads, sequences, schedule, and approval next steps without writing to Smartlead.",
+      inputSchema: {
+        launchPreview: z.record(z.string(), z.unknown()).optional(),
+        campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+        campaignName: z.string().optional(),
+        leads: z.array(z.record(z.string(), z.unknown())).optional(),
+        sequences: z.array(z.record(z.string(), z.unknown())).optional(),
+        schedule: z.record(z.string(), z.unknown()).optional(),
+        settings: z.record(z.string(), z.unknown()).optional(),
+        nextToolCalls: z.array(z.record(z.string(), z.unknown())).optional(),
+        maxNewLeadsPerDay: z.number().int().min(1).max(500).default(50),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildSmartleadCampaignQaPreview(input as Parameters<typeof buildSmartleadCampaignQaPreview>[0]))
   );
 
   server.registerTool(

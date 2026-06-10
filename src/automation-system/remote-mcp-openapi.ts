@@ -395,6 +395,20 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       batchSize: 50,
     };
   }
+  if (toolName === "arcigy.build_smartlead_campaign_qa_preview") {
+    return {
+      campaignId: "123456",
+      leads: [{ email: "jan.novak@example.com", company_name: "Modelova Firma", custom_fields: { personalized_intro: "Kratke AI intro." } }],
+      sequences: [{
+        seq_number: 1,
+        seq_delay_details: { delay_in_days: 0 },
+        seq_variants: [{ variant_label: "A", subject: "Otazka k {{company_name}}", email_body: "<p>{{personalized_intro}}</p><p>%signature%</p>" }],
+      }],
+      schedule: { timezone: "Europe/Bratislava", start_hour: "08:00", end_hour: "18:00", days_of_the_week: [1, 2, 3, 4, 5], max_new_leads_per_day: 30, min_time_btw_emails: 15 },
+      settings: { stopOnReply: true, trackOpen: false },
+      nextToolCalls: [{ tool: "arcigy.add_leads_to_smartlead_campaign", approvalRequired: true, payload: { campaignId: "123456" } }],
+    };
+  }
   if (toolName === "arcigy.preview_lead_enrichment_batch") {
     return {
       niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456" },

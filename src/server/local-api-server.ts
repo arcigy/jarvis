@@ -25,6 +25,7 @@ import {
   buildManualReviewPickupPlan,
   buildManualReviewQueue,
   buildSmartleadCampaignLaunchPreview,
+  buildSmartleadCampaignQaPreview,
   buildSmartleadInjectionPlan,
   buildColdOutreachCsvImportPreview,
   dedupeLeadCandidates,
@@ -1527,6 +1528,22 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         schedule: payload.schedule as Parameters<typeof buildSmartleadCampaignLaunchPreview>[0]["schedule"],
         settings: payload.settings as Parameters<typeof buildSmartleadCampaignLaunchPreview>[0]["settings"],
         batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_smartlead_campaign_qa_preview") {
+    writeJson(response, 200, {
+      result: buildSmartleadCampaignQaPreview({
+        launchPreview: payload.launchPreview as Parameters<typeof buildSmartleadCampaignQaPreview>[0]["launchPreview"],
+        campaignId: (payload.campaignId ?? null) as string | number | null,
+        campaignName: optionalString(payload.campaignName),
+        leads: Array.isArray(payload.leads) ? payload.leads as Parameters<typeof buildSmartleadCampaignQaPreview>[0]["leads"] : undefined,
+        sequences: Array.isArray(payload.sequences) ? payload.sequences as Parameters<typeof buildSmartleadCampaignQaPreview>[0]["sequences"] : undefined,
+        schedule: payload.schedule as Parameters<typeof buildSmartleadCampaignQaPreview>[0]["schedule"],
+        settings: payload.settings as Parameters<typeof buildSmartleadCampaignQaPreview>[0]["settings"],
+        nextToolCalls: Array.isArray(payload.nextToolCalls) ? payload.nextToolCalls as Parameters<typeof buildSmartleadCampaignQaPreview>[0]["nextToolCalls"] : undefined,
+        maxNewLeadsPerDay: typeof payload.maxNewLeadsPerDay === "number" ? payload.maxNewLeadsPerDay : undefined,
       }),
     });
     return;

@@ -216,6 +216,25 @@ export type SmartleadCampaignLaunchPreview = {
   };
 };
 
+export type SmartleadCampaignQaPreview = {
+  mode: "smartlead-campaign-qa-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  checks: Array<{ key: string; status: "ready" | "attention" | "blocked"; message: string }>;
+  totals: {
+    leads: number;
+    duplicateEmails: number;
+    genericEmails: number;
+    missingPersonalizedIntro: number;
+    sequenceCount: number;
+    variants: number;
+    approvalCalls: number;
+  };
+  requiredVariables: string[];
+  missingVariables: string[];
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type ColdOutreachCsvImportPreview = {
   mode: "cold-outreach-csv-import-preview";
   summary: string;
@@ -1207,6 +1226,67 @@ export function buildSmartleadCampaignLaunchPreview(input: {
   };
 }
 
+export function buildSmartleadCampaignQaPreview(input: {
+  launchPreview?: SmartleadCampaignLaunchPreview;
+  campaignId?: string | number | null;
+  campaignName?: string;
+  leads?: SmartleadLead[];
+  sequences?: NicheSmartleadCampaignSetupDraft["sequences"];
+  schedule?: NicheSmartleadCampaignSetupDraft["schedule"];
+  settings?: NicheSmartleadCampaignSetupDraft["settings"];
+  nextToolCalls?: SmartleadCampaignLaunchPreview["nextToolCalls"];
+  maxNewLeadsPerDay?: number;
+}): SmartleadCampaignQaPreview {
+  const launch = input.launchPreview;
+  const campaignId = input.campaignId ?? launch?.injectionPlan.niche.campaignId ?? launch?.approvalPayloads.configureCampaign?.campaignId ?? null;
+  const campaignName = input.campaignName ?? launch?.campaignSetup.campaignName;
+  const leads = input.leads ?? launch?.injectionPlan.batches.flatMap((batch) => batch.leads) ?? [];
+  const sequences = input.sequences ?? launch?.campaignSetup.sequences ?? [];
+  const schedule = input.schedule ?? launch?.campaignSetup.schedule;
+  const settings = input.settings ?? launch?.campaignSetup.settings;
+  const nextToolCalls = input.nextToolCalls ?? launch?.nextToolCalls ?? [];
+  const emails = leads.map((lead) => lead.email.trim().toLowerCase()).filter(Boolean);
+  const duplicates = duplicateValues(emails);
+  const genericEmails = emails.filter(isGenericEmail);
+  const missingIntro = leads.filter((lead) => !String(lead.custom_fields?.personalized_intro ?? "").trim());
+  const variantBodies = sequences.flatMap((sequence) => sequence.seq_variants.map((variant) => `${variant.subject}\n${variant.email_body}`));
+  const requiredVariables = unique(["{{company_name}}", "{{personalized_intro}}", ...variantBodies.flatMap(extractTemplateVariables)]);
+  const combinedSequenceText = variantBodies.join("\n");
+  const missingVariables = requiredVariables.filter((variable) => !combinedSequenceText.includes(variable));
+  const approvalCalls = nextToolCalls.filter((call) => call.approvalRequired).length;
+  const checks: SmartleadCampaignQaPreview["checks"] = [];
+  checks.push(checkItem(Boolean(campaignId || campaignName), "campaign-target", campaignId ? `Existing campaignId ${campaignId} is targeted.` : campaignName ? `New campaign ${campaignName} is prepared.` : "Missing campaignId or campaign name."));
+  checks.push(checkItem(leads.length > 0, "lead-count", leads.length ? `${leads.length} lead(s) prepared.` : "No Smartlead leads prepared."));
+  checks.push(checkItem(duplicates.length === 0, "duplicate-emails", duplicates.length ? `Duplicate emails: ${duplicates.join(", ")}` : "No duplicate emails."));
+  checks.push(attentionItem(genericEmails.length === 0, "generic-emails", genericEmails.length ? `${genericEmails.length} generic inbox email(s) need review.` : "No generic inbox emails."));
+  checks.push(attentionItem(missingIntro.length === 0, "personalized-intros", missingIntro.length ? `${missingIntro.length} lead(s) missing personalized_intro.` : "Every lead has personalized_intro."));
+  checks.push(checkItem(sequences.length > 0, "sequences", sequences.length ? `${sequences.length} sequence step(s) prepared.` : "No sequence steps prepared."));
+  checks.push(checkItem(missingVariables.length === 0, "sequence-variables", missingVariables.length ? `Missing variables in sequence copy: ${missingVariables.join(", ")}` : "Required variables appear in sequence copy."));
+  checks.push(attentionItem(Boolean(schedule?.timezone && schedule.start_hour && schedule.end_hour), "schedule", schedule ? `Schedule ${schedule.timezone ?? "unknown"} ${schedule.start_hour ?? "?"}-${schedule.end_hour ?? "?"}.` : "No schedule prepared."));
+  checks.push(attentionItem((schedule?.max_new_leads_per_day ?? 0) <= (input.maxNewLeadsPerDay ?? 50), "daily-limit", `Daily new-lead limit is ${schedule?.max_new_leads_per_day ?? "missing"}.`));
+  checks.push(attentionItem(settings?.stopOnReply !== false, "stop-on-reply", settings?.stopOnReply === false ? "stopOnReply is disabled." : "stopOnReply is enabled or defaulted."));
+  checks.push(checkItem(approvalCalls > 0, "approval-payloads", approvalCalls ? `${approvalCalls} approval-gated next call(s) prepared.` : "No approval-gated next calls prepared."));
+  const status = checks.some((check) => check.status === "blocked") ? "blocked" : checks.some((check) => check.status === "attention") ? "attention" : "ready";
+  return {
+    mode: "smartlead-campaign-qa-preview",
+    status,
+    summary: `Smartlead campaign QA ${status}: ${leads.length} leadov, ${sequences.length} sekvencii, ${duplicates.length} duplicit, ${genericEmails.length} generic emailov, ${missingIntro.length} bez intra. Ziadny zapis ani upload neprebehol.`,
+    checks,
+    totals: {
+      leads: leads.length,
+      duplicateEmails: duplicates.length,
+      genericEmails: genericEmails.length,
+      missingPersonalizedIntro: missingIntro.length,
+      sequenceCount: sequences.length,
+      variants: sequences.reduce((sum, sequence) => sum + sequence.seq_variants.length, 0),
+      approvalCalls,
+    },
+    requiredVariables,
+    missingVariables,
+    nextToolCalls,
+  };
+}
+
 export function previewLeadEnrichmentBatch(input: {
   leads: Array<ManualReviewPickupLead & {
     scraped?: Partial<ScrapedWebsiteContacts>;
@@ -1724,6 +1804,28 @@ function emptyBatchScrape(urls: string[]): BatchScrapedWebsiteContacts {
 
 function leadIntroKey(input: { companyName: string; website?: string }): string {
   return `${input.companyName.trim().toLowerCase()}|${input.website?.trim().toLowerCase() ?? ""}`;
+}
+
+function checkItem(ok: boolean, key: string, message: string): SmartleadCampaignQaPreview["checks"][number] {
+  return { key, status: ok ? "ready" : "blocked", message };
+}
+
+function attentionItem(ok: boolean, key: string, message: string): SmartleadCampaignQaPreview["checks"][number] {
+  return { key, status: ok ? "ready" : "attention", message };
+}
+
+function duplicateValues(values: string[]): string[] {
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+  for (const value of values) {
+    if (seen.has(value)) duplicates.add(value);
+    seen.add(value);
+  }
+  return [...duplicates];
+}
+
+function extractTemplateVariables(value: string): string[] {
+  return [...value.matchAll(/\{\{[a-zA-Z0-9_]+\}\}/g)].map((match) => match[0]);
 }
 
 function splitName(value?: string): { firstName?: string; lastName?: string } {
