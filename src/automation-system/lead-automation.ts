@@ -1978,6 +1978,40 @@ export type LeadgenExecutionQueuePreview = {
   warnings: string[];
 };
 
+export type StickyNicheLeadgenDecisionPreview = {
+  mode: "sticky-niche-leadgen-decision-preview";
+  status: "ready" | "attention" | "blocked";
+  decision: "continue_sticky_niche" | "start_next_niche" | "close_or_advance_niche" | "no_active_niche";
+  summary: string;
+  date: string;
+  selected?: {
+    niche: { id?: string; slug: string; name: string; region?: string; campaignId?: string | number | null };
+    reason: string;
+    score: number;
+    dailyTarget: number;
+    todaySent: number;
+    remainingToday: number;
+    currentRegionIndex: number;
+    lastWorkedAt?: string;
+    exhaustedCandidate: boolean;
+  };
+  candidates: Array<{
+    niche: { id?: string; slug: string; name: string; region?: string; campaignId?: string | number | null };
+    status: "ready" | "attention" | "blocked";
+    reason: string;
+    score: number;
+    dailyTarget: number;
+    todaySent: number;
+    remainingToday: number;
+    currentRegionIndex: number;
+    lastWorkedAt?: string;
+    exhaustedCandidate: boolean;
+  }>;
+  totals: { niches: number; active: number; completed: number; paused: number; filledToday: number; stickyCandidates: number };
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+  warnings: string[];
+};
+
 export type DailyLeadgenRunClosurePreview = {
   mode: "daily-leadgen-run-closure-preview";
   status: "ready" | "attention" | "blocked";
@@ -9964,6 +9998,192 @@ export function buildLeadgenExecutionQueuePreview(input: {
     },
     queue,
     nextToolCalls,
+    warnings,
+  };
+}
+
+export function buildStickyNicheLeadgenDecisionPreview(input: {
+  niches: Array<{
+    id?: string;
+    slug?: string;
+    name: string;
+    status?: string;
+    priority?: number;
+    keywords?: string[];
+    regions?: string[];
+    currentRegionIndex?: number;
+    dailyTarget?: number;
+    todaySent?: number;
+    todayDiscovered?: number;
+    todayEnriched?: number;
+    todayQualified?: number;
+    todayFailed?: number;
+    readyLeads?: number;
+    stuckLeads?: number;
+    lastWorkedAt?: string;
+    campaignId?: string | number | null;
+    smartleadCampaignId?: string | number | null;
+  }>;
+  date?: string;
+  stickyWindowHours?: number;
+  defaultRegions?: string[];
+  defaultDailyTarget?: number;
+  targetCount?: number;
+  batchSize?: number;
+  offer?: string;
+  painPoint?: string;
+  language?: "sk" | "en";
+  includeSmartleadSetup?: boolean;
+  maxNextCalls?: number;
+}): StickyNicheLeadgenDecisionPreview {
+  const date = input.date ?? new Date().toISOString().slice(0, 10);
+  const stickyWindowHours = Math.min(Math.max(Math.trunc(input.stickyWindowHours ?? 48), 1), 720);
+  const defaultRegions = input.defaultRegions?.length ? input.defaultRegions : ["Slovensko"];
+  const defaultDailyTarget = Math.min(Math.max(Math.trunc(input.defaultDailyTarget ?? 30), 1), 250);
+  const now = input.date ? Date.parse(`${date}T23:59:59.999Z`) : Date.now();
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 12), 1), 50);
+  const warnings: string[] = [];
+
+  const candidates = input.niches.map((source, index): StickyNicheLeadgenDecisionPreview["candidates"][number] => {
+    const slug = source.slug?.trim() || slugify(source.name);
+    const statusText = (source.status ?? "active").toLowerCase();
+    const regions = source.regions?.length ? source.regions : defaultRegions;
+    const currentRegionIndex = Math.min(Math.max(Math.trunc(source.currentRegionIndex ?? 0), 0), Math.max(regions.length - 1, 0));
+    const region = regions[currentRegionIndex];
+    const dailyTarget = Math.min(Math.max(Math.trunc(source.dailyTarget ?? defaultDailyTarget), 1), 250);
+    const todaySent = Math.max(Math.trunc(source.todaySent ?? 0), 0);
+    const remainingToday = Math.max(dailyTarget - todaySent, 0);
+    const lastWorkedMs = source.lastWorkedAt ? Date.parse(source.lastWorkedAt) : NaN;
+    const sticky = Number.isFinite(lastWorkedMs) && now - lastWorkedMs <= stickyWindowHours * 60 * 60 * 1000;
+    const atLastRegion = currentRegionIndex >= regions.length - 1;
+    const todayDiscovered = Math.max(Math.trunc(source.todayDiscovered ?? 0), 0);
+    const todayQualified = Math.max(Math.trunc(source.todayQualified ?? 0), 0);
+    const exhaustedCandidate = atLastRegion && todayDiscovered > 0 && todayDiscovered < Math.ceil(dailyTarget * 0.1) && todayQualified === 0;
+    const blocked = !source.name.trim() || !slug || ["paused", "completed", "archived", "blocked"].includes(statusText);
+    const filled = remainingToday <= 0;
+    const attention = Boolean(source.stuckLeads || source.todayFailed || exhaustedCandidate || !source.campaignId && !source.smartleadCampaignId);
+    const priority = Math.min(Math.max(Math.trunc(source.priority ?? 5), 1), 99);
+    const score = blocked
+      ? -1000 - index
+      : filled
+        ? -100 - index
+        : (sticky ? 1000 : 0) + (source.readyLeads ?? 0) * 8 + remainingToday * 3 + (100 - priority) - currentRegionIndex;
+    const status: StickyNicheLeadgenDecisionPreview["candidates"][number]["status"] = blocked ? "blocked" : attention ? "attention" : "ready";
+    const reason = blocked
+      ? `Skipped: status=${statusText || "missing"} alebo neplatna niche.`
+      : filled
+        ? "Denny target je uz naplneny."
+        : sticky
+          ? "Sticky niche z posledneho behu ma stale zostavajuci denny target."
+          : "Aktivna niche ma zostavajucu kapacitu na dnes.";
+    return {
+      niche: { id: source.id, slug, name: source.name, region, campaignId: source.campaignId ?? source.smartleadCampaignId ?? null },
+      status,
+      reason,
+      score,
+      dailyTarget,
+      todaySent,
+      remainingToday,
+      currentRegionIndex,
+      lastWorkedAt: source.lastWorkedAt,
+      exhaustedCandidate,
+    };
+  });
+
+  for (const candidate of candidates) {
+    if (!candidate.niche.name.trim()) warnings.push("Skipped niche with missing name.");
+    if (!candidate.niche.slug) warnings.push(`Skipped ${candidate.niche.name || "unknown niche"} because slug is missing.`);
+  }
+
+  const active = candidates.filter((item) => item.status !== "blocked");
+  const workable = active.filter((item) => item.remainingToday > 0);
+  const selected = [...workable].sort((a, b) => b.score - a.score)[0];
+  const stickySelected = selected?.lastWorkedAt && now - Date.parse(selected.lastWorkedAt) <= stickyWindowHours * 60 * 60 * 1000;
+  const decision: StickyNicheLeadgenDecisionPreview["decision"] = !selected
+    ? "no_active_niche"
+    : selected.exhaustedCandidate
+      ? "close_or_advance_niche"
+      : stickySelected
+        ? "continue_sticky_niche"
+        : "start_next_niche";
+
+  const nextToolCalls: StickyNicheLeadgenDecisionPreview["nextToolCalls"] = [];
+  if (selected) {
+    nextToolCalls.push({
+      tool: "arcigy.build_daily_leadgen_runbook",
+      payload: {
+        niche: { ...selected.niche, keywords: input.niches.find((item) => (item.slug?.trim() || slugify(item.name)) === selected.niche.slug)?.keywords },
+        targetCount: input.targetCount ?? Math.max(selected.remainingToday * 2, selected.dailyTarget),
+        dailyLimit: selected.remainingToday,
+        batchSize: input.batchSize,
+        offer: input.offer,
+        painPoint: input.painPoint,
+        language: input.language ?? "sk",
+        includeSmartleadSetup: input.includeSmartleadSetup === true || !selected.niche.campaignId,
+      },
+      reason: `Priprav denny leadgen runbook pre vybranu ${selected.niche.name}${selected.niche.region ? ` / ${selected.niche.region}` : ""}.`,
+      approvalRequired: false,
+    });
+    nextToolCalls.push({
+      tool: "arcigy.build_daily_leadgen_run_closure_preview",
+      payload: {
+        niche: {
+          id: selected.niche.id,
+          slug: selected.niche.slug,
+          name: selected.niche.name,
+          region: selected.niche.region,
+          campaignId: selected.niche.campaignId,
+          dailyTarget: selected.dailyTarget,
+        },
+        stats: {
+          discovered: input.niches.find((item) => (item.slug?.trim() || slugify(item.name)) === selected.niche.slug)?.todayDiscovered ?? 0,
+          enriched: input.niches.find((item) => (item.slug?.trim() || slugify(item.name)) === selected.niche.slug)?.todayEnriched ?? 0,
+          qualified: input.niches.find((item) => (item.slug?.trim() || slugify(item.name)) === selected.niche.slug)?.todayQualified ?? 0,
+          sentToSmartlead: selected.todaySent,
+          failed: input.niches.find((item) => (item.slug?.trim() || slugify(item.name)) === selected.niche.slug)?.todayFailed ?? 0,
+        },
+        date,
+        advanceRegion: selected.exhaustedCandidate,
+        offer: input.offer,
+        painPoint: input.painPoint,
+        language: input.language ?? "sk",
+      },
+      reason: "Po behu priprav closure ledger, region advance a local niche run zapis na explicitne schvalenie.",
+      approvalRequired: false,
+    });
+  } else {
+    nextToolCalls.push({
+      tool: "arcigy.build_region_expansion_queue_preview",
+      payload: { niches: input.niches, defaultRegions, dailyLimit: defaultDailyTarget, offer: input.offer, painPoint: input.painPoint, language: input.language ?? "sk" },
+      reason: "Nie je aktivna niche s kapacitou; priprav region expansion alebo dalsiu frontu.",
+      approvalRequired: false,
+    });
+  }
+
+  if (selected?.exhaustedCandidate) {
+    warnings.push(`${selected.niche.name} looks exhausted in current region; closure should advance region or mark completed.`);
+  }
+  const totals = {
+    niches: candidates.length,
+    active: active.length,
+    completed: input.niches.filter((item) => (item.status ?? "").toLowerCase() === "completed").length,
+    paused: input.niches.filter((item) => ["paused", "blocked"].includes((item.status ?? "").toLowerCase())).length,
+    filledToday: candidates.filter((item) => item.remainingToday <= 0 && item.status !== "blocked").length,
+    stickyCandidates: candidates.filter((item) => item.lastWorkedAt && Number.isFinite(Date.parse(item.lastWorkedAt)) && now - Date.parse(item.lastWorkedAt) <= stickyWindowHours * 60 * 60 * 1000).length,
+  };
+  const status: StickyNicheLeadgenDecisionPreview["status"] = !selected ? "blocked" : warnings.length || selected.status === "attention" ? "attention" : "ready";
+  return {
+    mode: "sticky-niche-leadgen-decision-preview",
+    status,
+    decision,
+    date,
+    summary: selected
+      ? `Sticky niche decision: ${decision} -> ${selected.niche.name}${selected.niche.region ? ` / ${selected.niche.region}` : ""}, remaining ${selected.remainingToday}/${selected.dailyTarget}. Ziadny zapis, scrape ani upload neprebehol.`
+      : "Sticky niche decision: no active niche with remaining daily capacity. Ziadny zapis, scrape ani upload neprebehol.",
+    selected,
+    candidates: candidates.sort((a, b) => b.score - a.score),
+    totals,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls).slice(0, maxNextCalls),
     warnings,
   };
 }

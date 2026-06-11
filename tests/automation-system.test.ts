@@ -18,6 +18,7 @@ import { appendRowsToGoogleSheet, discoverLeads, replaceGoogleSheetRows, searchG
 import {
   buildBatchNicheDiscoveryPlan,
   buildLeadgenExecutionQueuePreview,
+  buildStickyNicheLeadgenDecisionPreview,
   buildLeadDiscoveryMatrixPreview,
   buildNicheLeadgenPlan,
   buildDailyLeadgenRunClosurePreview,
@@ -245,6 +246,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.build_batch_niche_discovery_plan",
     "arcigy.build_lead_discovery_matrix_preview",
     "arcigy.build_leadgen_execution_queue_preview",
+    "arcigy.build_sticky_niche_leadgen_decision_preview",
     "arcigy.build_daily_leadgen_run_closure_preview",
     "arcigy.build_leadgen_run_resume_preview",
     "arcigy.build_region_expansion_queue_preview",
@@ -407,7 +409,7 @@ test("Jarvis capability audit maps the full requested production surface to evid
   assert.ok(remoteMcpCapability?.evidence.includes("production-evidence-tool-call"));
   assert.ok(audit.capabilities.some((item) => item.id === "contracts" && item.tools.includes("arcigy.build_pricing_proposal_preview") && item.tools.includes("arcigy.build_service_capacity_preview")));
   assert.ok(audit.capabilities.some((item) => item.id === "proactive-digest" && item.status === "ready" && item.tools.includes("arcigy.sync_gmail_recent_messages")));
-  assert.ok(audit.capabilities.some((item) => item.id === "lead-discovery" && item.tools.includes("arcigy.build_showcase_reply_preview") && item.tools.includes("arcigy.build_smartlead_reply_followup_queue_preview")));
+  assert.ok(audit.capabilities.some((item) => item.id === "lead-discovery" && item.tools.includes("arcigy.build_showcase_reply_preview") && item.tools.includes("arcigy.build_smartlead_reply_followup_queue_preview") && item.tools.includes("arcigy.build_sticky_niche_leadgen_decision_preview")));
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.append_leads_to_google_sheet")));
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.replace_google_sheet_rows")));
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.label_gmail_thread")));
@@ -515,10 +517,11 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.ok(paths.includes("/api/mcp/arcigy.label_gmail_thread"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_local_lead_register_update_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.apply_local_lead_register_update"));
-  assert.ok(paths.includes("/api/mcp/arcigy.build_outreach_contact_selection_preview"));
-  assert.ok(paths.includes("/api/mcp/arcigy.build_failed_scrape_recovery_queue_preview"));
-  assert.ok(paths.includes("/api/mcp/arcigy.build_daily_leadgen_run_closure_preview"));
-  assert.ok(paths.includes("/api/mcp/arcigy.build_leadgen_run_resume_preview"));
+    assert.ok(paths.includes("/api/mcp/arcigy.build_outreach_contact_selection_preview"));
+    assert.ok(paths.includes("/api/mcp/arcigy.build_failed_scrape_recovery_queue_preview"));
+    assert.ok(paths.includes("/api/mcp/arcigy.build_daily_leadgen_run_closure_preview"));
+    assert.ok(paths.includes("/api/mcp/arcigy.build_sticky_niche_leadgen_decision_preview"));
+    assert.ok(paths.includes("/api/mcp/arcigy.build_leadgen_run_resume_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_gmail_name_enrichment_queue_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_lead_identity_repair_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_lead_validation_scorecard_preview"));
@@ -552,6 +555,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   const localLeadRegisterPreview = document.paths["/api/mcp/arcigy.build_local_lead_register_update_preview"] as OpenApiPathFixture;
   const localLeadRegisterApply = document.paths["/api/mcp/arcigy.apply_local_lead_register_update"] as OpenApiPathFixture;
   const leadIdentityRepair = document.paths["/api/mcp/arcigy.build_lead_identity_repair_preview"] as OpenApiPathFixture;
+  const stickyNicheDecision = document.paths["/api/mcp/arcigy.build_sticky_niche_leadgen_decision_preview"] as OpenApiPathFixture;
   const leadValidationScorecard = document.paths["/api/mcp/arcigy.build_lead_validation_scorecard_preview"] as OpenApiPathFixture;
   const companyShortName = document.paths["/api/mcp/arcigy.build_company_short_name_preview"] as OpenApiPathFixture;
   const icebreakerWriteback = document.paths["/api/mcp/arcigy.build_ai_icebreaker_writeback_preview"] as OpenApiPathFixture;
@@ -595,6 +599,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.equal(localLeadRegisterPreview.post.requestBody.content["application/json"].examples.quickStart.value.primaryEmail, "lead@example.com");
   assert.equal(localLeadRegisterApply.post["x-arcigy-requiresApproval"], true);
   assert.equal(localLeadRegisterApply.post.requestBody.content["application/json"].examples.quickStart.value.approval.approved, true);
+  assert.equal(stickyNicheDecision.post.requestBody.content["application/json"].examples.quickStart.value.stickyWindowHours, 48);
   assert.equal(smartleadWebhooks.post.requestBody.content["application/json"].examples.quickStart.value.campaignId, "123456");
   assert.equal(smartleadEmailAccounts.post.requestBody.content["application/json"].examples.quickStart.value.requestedDailyLimit, 80);
   assert.equal(smartleadWebhookUpsert.post["x-arcigy-requiresApproval"], true);
@@ -3598,6 +3603,29 @@ test("leadgen execution queue preview prioritizes daily niche work without write
   assert.ok(queue.nextToolCalls.some((call) => call.tool === "arcigy.run_leadgen_research_pipeline" && !call.approvalRequired));
   assert.ok(queue.nextToolCalls.some((call) => call.tool === "arcigy.build_smartlead_campaign_handoff_package_preview" && !call.approvalRequired));
   assert.match(queue.summary, /Ziadny scraping ani upload neprebehol/);
+});
+
+test("sticky niche leadgen decision continues last worked niche before rotating", () => {
+  const decision = buildStickyNicheLeadgenDecisionPreview({
+    date: "2026-06-10",
+    niches: [
+      { id: "new", slug: "kuchyne", name: "Kuchyne", status: "active", priority: 1, regions: ["Kosice"], dailyTarget: 30, todaySent: 0, campaignId: "222" },
+      { id: "sticky", slug: "autoservisy", name: "Autoservisy", status: "active", priority: 5, keywords: ["autoservis"], regions: ["Bratislava", "Trnava"], currentRegionIndex: 1, dailyTarget: 30, todaySent: 12, todayDiscovered: 44, todayEnriched: 30, todayQualified: 18, campaignId: "123", lastWorkedAt: "2026-06-10T09:00:00.000Z" },
+      { id: "paused", slug: "paused", name: "Paused", status: "paused", dailyTarget: 30 },
+    ],
+    stickyWindowHours: 48,
+    offer: "AI asistent na dopyty",
+  });
+
+  assert.equal(decision.mode, "sticky-niche-leadgen-decision-preview");
+  assert.equal(decision.decision, "continue_sticky_niche");
+  assert.equal(decision.selected?.niche.id, "sticky");
+  assert.equal(decision.selected?.niche.region, "Trnava");
+  assert.equal(decision.selected?.remainingToday, 18);
+  assert.equal(decision.totals.stickyCandidates, 1);
+  assert.ok(decision.nextToolCalls.some((call) => call.tool === "arcigy.build_daily_leadgen_runbook" && !call.approvalRequired));
+  assert.ok(decision.nextToolCalls.some((call) => call.tool === "arcigy.build_daily_leadgen_run_closure_preview" && !call.approvalRequired));
+  assert.match(decision.summary, /Ziadny zapis, scrape ani upload neprebehol/);
 });
 
 test("daily leadgen run closure preview prepares approval ledger without writing", () => {

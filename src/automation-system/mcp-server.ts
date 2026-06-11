@@ -22,6 +22,7 @@ import { sendSlackMessage } from "./slack.ts";
 import {
   buildBatchNicheDiscoveryPlan,
   buildLeadgenExecutionQueuePreview,
+  buildStickyNicheLeadgenDecisionPreview,
   buildLeadDiscoveryMatrixPreview,
   buildNicheLeadgenPlan,
   buildLeadgenGapReport,
@@ -2859,6 +2860,43 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildLeadgenExecutionQueuePreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_sticky_niche_leadgen_decision_preview",
+    {
+      title: "Build sticky niche leadgen decision preview",
+      description: "Decide whether to continue the last worked niche/region or move to the next active niche, then prepare runbook and closure next steps without writes.",
+      inputSchema: {
+        niches: z.array(executionQueueNicheSchema.extend({
+          todayDiscovered: z.number().int().min(0).optional(),
+          todayEnriched: z.number().int().min(0).optional(),
+          todayQualified: z.number().int().min(0).optional(),
+          todayFailed: z.number().int().min(0).optional(),
+          readyLeads: z.number().int().min(0).optional(),
+          stuckLeads: z.number().int().min(0).optional(),
+          lastWorkedAt: z.string().optional(),
+        })).min(1).max(100),
+        date: z.string().optional(),
+        stickyWindowHours: z.number().int().min(1).max(720).default(48),
+        defaultRegions: z.array(z.string()).optional(),
+        defaultDailyTarget: z.number().int().min(1).max(250).default(30),
+        targetCount: z.number().int().min(1).max(500).optional(),
+        batchSize: z.number().int().min(1).max(100).optional(),
+        offer: z.string().optional(),
+        painPoint: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        includeSmartleadSetup: z.boolean().default(false),
+        maxNextCalls: z.number().int().min(1).max(50).default(12),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildStickyNicheLeadgenDecisionPreview(input))
   );
 
   server.registerTool(

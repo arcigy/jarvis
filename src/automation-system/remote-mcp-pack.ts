@@ -1012,6 +1012,24 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Decide sticky niche for today's leadgen run",
+      tool: "arcigy.build_sticky_niche_leadgen_decision_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_sticky_niche_leadgen_decision_preview"),
+      body: {
+        date: "2026-06-10",
+        niches: [
+          { id: "niche-1", slug: "autoservisy", name: "Autoservisy", status: "active", priority: 1, keywords: ["autoservis"], regions: ["Bratislava", "Trnava"], currentRegionIndex: 0, dailyTarget: 30, todaySent: 8, todayDiscovered: 42, todayQualified: 12, campaignId: "123456", lastWorkedAt: "2026-06-10T09:00:00.000Z" },
+          { id: "niche-2", slug: "kuchyne", name: "Kuchynske studia", status: "active", priority: 2, keywords: ["kuchynske studio"], regions: ["Kosice"], dailyTarget: 20, todaySent: 0 },
+        ],
+        stickyWindowHours: 48,
+        defaultDailyTarget: 30,
+        offer: "AI asistent na odpovede a follow-up",
+        language: "sk",
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Close a daily leadgen run safely",
       tool: "arcigy.build_daily_leadgen_run_closure_preview",
       method: "POST",

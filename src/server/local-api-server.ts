@@ -21,6 +21,7 @@ import { sendSlackMessage } from "../automation-system/slack.ts";
 import {
   buildBatchNicheDiscoveryPlan,
   buildLeadgenExecutionQueuePreview,
+  buildStickyNicheLeadgenDecisionPreview,
   buildLeadDiscoveryMatrixPreview,
   buildNicheLeadgenPlan,
   buildLeadgenGapReport,
@@ -1983,6 +1984,25 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         painPoint: optionalString(payload.painPoint),
         language: payload.language === "en" ? "en" : "sk",
         includeSmartleadSetup: payload.includeSmartleadSetup === true,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_sticky_niche_leadgen_decision_preview") {
+    writeJson(response, 200, {
+      result: buildStickyNicheLeadgenDecisionPreview({
+        niches: (payload.niches ?? []) as Parameters<typeof buildStickyNicheLeadgenDecisionPreview>[0]["niches"],
+        date: optionalString(payload.date),
+        stickyWindowHours: typeof payload.stickyWindowHours === "number" ? payload.stickyWindowHours : undefined,
+        defaultRegions: Array.isArray(payload.defaultRegions) ? payload.defaultRegions.map(String) : undefined,
+        defaultDailyTarget: typeof payload.defaultDailyTarget === "number" ? payload.defaultDailyTarget : undefined,
+        targetCount: typeof payload.targetCount === "number" ? payload.targetCount : undefined,
+        batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
+        offer: optionalString(payload.offer),
+        painPoint: optionalString(payload.painPoint),
+        language: payload.language === "en" ? "en" : "sk",
+        includeSmartleadSetup: payload.includeSmartleadSetup === true,
+        maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
       }),
     });
     return;
