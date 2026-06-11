@@ -1660,6 +1660,36 @@ export type SmartleadCampaignBackupPlan = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type SmartleadCampaignDeleteSafetyPreview = {
+  mode: "smartlead-campaign-delete-safety-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  backupPlan: SmartleadCampaignBackupPlan;
+  totals: {
+    campaigns: number;
+    deleteCandidates: number;
+    readyToDelete: number;
+    blocked: number;
+    protected: number;
+    missingBackupEvidence: number;
+    estimatedLeads: number;
+  };
+  queue: Array<{
+    campaignId: string;
+    name: string;
+    status?: string;
+    protected: boolean;
+    decision: "ready_to_delete" | "blocked" | "needs_backup_evidence";
+    reasons: string[];
+    requiredBackupArtifacts: string[];
+    deleteRequestPreview?: { method: "DELETE"; path: string; approvalPhrase: string };
+  }>;
+  protectedCampaigns: SmartleadCampaignBackupPlan["protectedCampaigns"];
+  requiredOperatorPhrase: string;
+  safetyGates: string[];
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type SmartleadCampaignRestoreBackup = {
   campaign?: Record<string, unknown>;
   sequences?: unknown[];
@@ -9709,6 +9739,111 @@ export function buildSmartleadCampaignBackupPlan(input: {
       "Kampane oznacene protected sa nesmu mazat ani hromadne prepisat bez samostatneho operator approval.",
       "Ak chyba leadCount, najprv dotiahni vsetky strany /campaigns/{id}/leads cez offset/limit.",
       "Po backupe porovnaj pocet leadov v manifeste so Smartlead countom.",
+    ],
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls),
+  };
+}
+
+export function buildSmartleadCampaignDeleteSafetyPreview(input: {
+  campaigns?: SmartleadCampaignBackupPlanCampaign[];
+  backupPlan?: SmartleadCampaignBackupPlan;
+  backupRunId?: string;
+  backedUpCampaignIds?: Array<string | number>;
+  protectedCampaignIds?: Array<string | number>;
+  protectedNameParts?: string[];
+  backupRoot?: string;
+  requireFullBackupEvidence?: boolean;
+  maxDeleteCandidates?: number;
+  operatorPhrase?: string;
+}): SmartleadCampaignDeleteSafetyPreview {
+  const backupPlan = input.backupPlan ?? buildSmartleadCampaignBackupPlan({
+    campaigns: input.campaigns,
+    backupRoot: input.backupRoot,
+    protectedCampaignIds: input.protectedCampaignIds,
+    protectedNameParts: input.protectedNameParts,
+    includeDeletePlan: true,
+  });
+  const backedUpIds = new Set((input.backedUpCampaignIds ?? []).map(String));
+  const requireFullBackupEvidence = input.requireFullBackupEvidence !== false;
+  const requiredOperatorPhrase = input.operatorPhrase?.trim() || "CONFIRM SMARTLEAD DELETE AFTER BACKUP";
+  const maxDeleteCandidates = Math.min(Math.max(Math.trunc(input.maxDeleteCandidates ?? 50), 1), 200);
+  const requiredBackupArtifacts = ["campaign.json", "sequences.json", "leads.json", "webhooks.json", "email_accounts.json"];
+  const queue = backupPlan.campaigns.slice(0, maxDeleteCandidates).map((campaign) => {
+    const hasBackupEvidence = Boolean(input.backupPlan) || backedUpIds.has(campaign.id) || (input.backupRunId && backedUpIds.has(`${input.backupRunId}:${campaign.id}`));
+    const reasons: string[] = [];
+    if (campaign.protected) reasons.push(`Protected campaign: ${campaign.protectionReasons.join("; ") || "protected flag"}.`);
+    if (requireFullBackupEvidence && !hasBackupEvidence) reasons.push("Missing backup evidence for this campaign.");
+    if (typeof campaign.leadCount !== "number") reasons.push("Missing lead count; fetch all lead pages before delete approval.");
+    const decision: SmartleadCampaignDeleteSafetyPreview["queue"][number]["decision"] = campaign.protected
+      ? "blocked"
+      : requireFullBackupEvidence && !hasBackupEvidence
+        ? "needs_backup_evidence"
+        : reasons.length
+          ? "blocked"
+          : "ready_to_delete";
+    return {
+      campaignId: campaign.id,
+      name: campaign.name,
+      status: campaign.status,
+      protected: campaign.protected,
+      decision,
+      reasons,
+      requiredBackupArtifacts,
+      deleteRequestPreview: decision === "ready_to_delete"
+        ? { method: "DELETE" as const, path: `/campaigns/${encodeURIComponent(campaign.id)}`, approvalPhrase: requiredOperatorPhrase }
+        : undefined,
+    };
+  });
+  const readyToDelete = queue.filter((item) => item.decision === "ready_to_delete").length;
+  const blocked = queue.filter((item) => item.decision === "blocked").length;
+  const missingBackupEvidence = queue.filter((item) => item.decision === "needs_backup_evidence").length;
+  const nextToolCalls: SmartleadCampaignDeleteSafetyPreview["nextToolCalls"] = [
+    {
+      tool: "arcigy.build_smartlead_campaign_backup_plan",
+      payload: {
+        campaigns: input.campaigns ?? backupPlan.campaigns,
+        protectedCampaignIds: input.protectedCampaignIds,
+        protectedNameParts: input.protectedNameParts,
+        includeDeletePlan: true,
+        backupRoot: input.backupRoot,
+      },
+      reason: "Najprv alebo znovu priprav backup manifest s delete kandidatmi pred akymkolvek manualnym delete krokom.",
+      approvalRequired: false,
+    },
+  ];
+  for (const item of queue.filter((candidate) => candidate.decision !== "ready_to_delete").slice(0, 10)) {
+    nextToolCalls.push({
+      tool: "arcigy.get_smartlead_campaign_leads",
+      payload: { campaignId: item.campaignId, offset: 0, limit: 100 },
+      reason: "Dotiahni lead count a prvu stranu leadov ako backup evidence pred delete rozhodnutim.",
+      approvalRequired: false,
+    });
+  }
+  const status: SmartleadCampaignDeleteSafetyPreview["status"] =
+    queue.length === 0 ? "blocked" : readyToDelete > 0 && blocked === 0 && missingBackupEvidence === 0 ? "ready" : readyToDelete > 0 ? "attention" : "blocked";
+  return {
+    mode: "smartlead-campaign-delete-safety-preview",
+    status,
+    summary: `Smartlead delete safety preview ${status}: ${readyToDelete} ready, ${blocked} blocked, ${missingBackupEvidence} bez backup evidence, ${backupPlan.protectedCampaigns.length} protected. Ziadny delete ani Smartlead zapis neprebehol.`,
+    backupPlan,
+    totals: {
+      campaigns: queue.length,
+      deleteCandidates: queue.filter((item) => !item.protected).length,
+      readyToDelete,
+      blocked,
+      protected: backupPlan.protectedCampaigns.length,
+      missingBackupEvidence,
+      estimatedLeads: backupPlan.totals.estimatedLeads,
+    },
+    queue,
+    protectedCampaigns: backupPlan.protectedCampaigns,
+    requiredOperatorPhrase,
+    safetyGates: [
+      ...backupPlan.safetyGates,
+      `Operator must type exactly: ${requiredOperatorPhrase}`,
+      "This MCP tool never deletes Smartlead campaigns; it only prepares a delete safety queue.",
+      "Do not delete protected campaigns, campaigns with missing lead counts, or campaigns without backup evidence.",
+      "After any manual delete, record campaign id, timestamp, result, and response in the backup manifest.",
     ],
     nextToolCalls: dedupeNextToolCalls(nextToolCalls),
   };

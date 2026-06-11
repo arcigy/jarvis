@@ -661,6 +661,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(openApiBody.paths["/api/mcp/arcigy.build_smartlead_send_readiness_queue_preview"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.build_bulk_ai_intro_work_queue_preview"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.build_smartlead_reply_followup_queue_preview"]);
+    assert.ok(openApiBody.paths["/api/mcp/arcigy.build_smartlead_campaign_delete_safety_preview"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.get_smartlead_campaign_webhooks"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.upsert_smartlead_campaign_webhook"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.get_smartlead_email_accounts"]);

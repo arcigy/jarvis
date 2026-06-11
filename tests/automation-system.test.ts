@@ -77,6 +77,7 @@ import {
   buildBulkSmartleadUploadQueuePreview,
   buildSmartleadSendReadinessQueuePreview,
   buildSmartleadCampaignBackupPlan,
+  buildSmartleadCampaignDeleteSafetyPreview,
   buildSmartleadCampaignRestorePlan,
   buildSmartleadInjectionPlan,
   buildSmartleadImportAuditPreview,
@@ -273,6 +274,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.build_smartlead_sender_capacity_preview",
     "arcigy.build_smartlead_deliverability_guard_preview",
     "arcigy.build_smartlead_campaign_backup_plan",
+    "arcigy.build_smartlead_campaign_delete_safety_preview",
     "arcigy.build_smartlead_campaign_restore_plan",
     "arcigy.draft_niche_smartlead_campaign_setup",
     "arcigy.build_smartlead_campaign_launch_preview",
@@ -537,11 +539,12 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.ok(paths.includes("/api/mcp/arcigy.build_leadgen_to_smartlead_dispatch_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_company_research_queue_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_research_results_import_preview"));
-  assert.ok(paths.includes("/api/mcp/arcigy.build_bulk_smartlead_upload_queue_preview"));
-  assert.ok(paths.includes("/api/mcp/arcigy.build_smartlead_send_readiness_queue_preview"));
-  assert.ok(paths.includes("/api/mcp/arcigy.build_bulk_ai_intro_work_queue_preview"));
-  assert.ok(paths.includes("/api/mcp/arcigy.build_ai_icebreaker_writeback_preview"));
-  assert.ok(paths.includes("/api/mcp/arcigy.get_smartlead_campaign_webhooks"));
+    assert.ok(paths.includes("/api/mcp/arcigy.build_bulk_smartlead_upload_queue_preview"));
+    assert.ok(paths.includes("/api/mcp/arcigy.build_smartlead_send_readiness_queue_preview"));
+    assert.ok(paths.includes("/api/mcp/arcigy.build_bulk_ai_intro_work_queue_preview"));
+    assert.ok(paths.includes("/api/mcp/arcigy.build_ai_icebreaker_writeback_preview"));
+    assert.ok(paths.includes("/api/mcp/arcigy.build_smartlead_campaign_delete_safety_preview"));
+    assert.ok(paths.includes("/api/mcp/arcigy.get_smartlead_campaign_webhooks"));
   assert.ok(paths.includes("/api/mcp/arcigy.upsert_smartlead_campaign_webhook"));
   assert.ok(paths.includes("/api/mcp/arcigy.get_smartlead_email_accounts"));
     assert.ok(paths.includes("/api/mcp/arcigy.build_pricing_proposal_preview"));
@@ -3346,6 +3349,32 @@ test("Smartlead campaign backup plan protects campaigns before risky changes", (
   assert.ok(plan.safetyGates.some((gate) => gate.includes("nikdy nemaze")));
   assert.ok(plan.nextToolCalls.some((call) => call.tool === "arcigy.get_smartlead_campaign_leads" && !call.approvalRequired));
   assert.match(plan.summary, /Ziadny backup, delete ani Smartlead zapis/);
+});
+
+test("Smartlead campaign delete safety preview blocks protected and unbacked campaigns", () => {
+  const preview = buildSmartleadCampaignDeleteSafetyPreview({
+    campaigns: [
+      { id: 3209165, name: "KUCHYNE-NA-MIRU-CZ_SK_FIXED", status: "ACTIVE", total_leads: 420 },
+      { id: 123456, name: "Autoservisy BA test", status: "DRAFT", total_leads: 80 },
+      { id: 555555, name: "No backup test", status: "DRAFT", total_leads: 2 },
+    ],
+    backedUpCampaignIds: ["123456"],
+    protectedCampaignIds: [3209165],
+    protectedNameParts: ["KUCHYNE"],
+  });
+
+  assert.equal(preview.mode, "smartlead-campaign-delete-safety-preview");
+  assert.equal(preview.status, "attention");
+  assert.equal(preview.totals.campaigns, 3);
+  assert.equal(preview.totals.readyToDelete, 1);
+  assert.equal(preview.totals.protected, 1);
+  assert.equal(preview.totals.missingBackupEvidence, 1);
+  assert.equal(preview.queue.find((item) => item.campaignId === "3209165")?.decision, "blocked");
+  assert.equal(preview.queue.find((item) => item.campaignId === "123456")?.deleteRequestPreview?.path, "/campaigns/123456");
+  assert.equal(preview.queue.find((item) => item.campaignId === "555555")?.decision, "needs_backup_evidence");
+  assert.ok(preview.safetyGates.some((gate) => gate.includes("CONFIRM SMARTLEAD DELETE AFTER BACKUP")));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_smartlead_campaign_backup_plan" && !call.approvalRequired));
+  assert.match(preview.summary, /Ziadny delete ani Smartlead zapis/);
 });
 
 test("Smartlead campaign restore plan normalizes backup JSON into approval payloads", () => {

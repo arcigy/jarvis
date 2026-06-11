@@ -1598,6 +1598,23 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Build Smartlead delete safety preview",
+      tool: "arcigy.build_smartlead_campaign_delete_safety_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_smartlead_campaign_delete_safety_preview"),
+      body: {
+        campaigns: [
+          { id: 3209165, name: "KUCHYNE-NA-MIRU-CZ_SK_FIXED", status: "ACTIVE", total_leads: 420 },
+          { id: 123456, name: "Autoservisy BA test", status: "DRAFT", total_leads: 80 },
+        ],
+        backedUpCampaignIds: ["123456"],
+        protectedCampaignIds: [3209165],
+        protectedNameParts: ["KUCHYNE"],
+        operatorPhrase: "CONFIRM SMARTLEAD DELETE AFTER BACKUP",
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Build Smartlead restore plan from backup JSON",
       tool: "arcigy.build_smartlead_campaign_restore_plan",
       method: "POST",

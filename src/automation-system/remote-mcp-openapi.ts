@@ -931,6 +931,18 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       protectedNameParts: ["KUCHYNE"],
     };
   }
+  if (toolName === "arcigy.build_smartlead_campaign_delete_safety_preview") {
+    return {
+      campaigns: [
+        { id: 3209165, name: "KUCHYNE-NA-MIRU-CZ_SK_FIXED", status: "ACTIVE", total_leads: 420 },
+        { id: 123456, name: "Autoservisy BA test", status: "DRAFT", total_leads: 80 },
+      ],
+      backedUpCampaignIds: ["123456"],
+      protectedCampaignIds: [3209165],
+      protectedNameParts: ["KUCHYNE"],
+      operatorPhrase: "CONFIRM SMARTLEAD DELETE AFTER BACKUP",
+    };
+  }
   if (toolName === "arcigy.build_smartlead_campaign_restore_plan") {
     return {
       restoreMode: "create-new",

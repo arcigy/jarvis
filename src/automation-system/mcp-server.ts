@@ -78,6 +78,7 @@ import {
   buildSmartleadCampaignHandoffPackagePreview,
   buildSmartleadFixedCampaignPackagePreview,
   buildSmartleadCampaignBackupPlan,
+  buildSmartleadCampaignDeleteSafetyPreview,
   buildSmartleadCampaignRestorePlan,
   buildSmartleadInjectionPlan,
   buildSmartleadImportAuditPreview,
@@ -3753,6 +3754,33 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildSmartleadCampaignBackupPlan(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_smartlead_campaign_delete_safety_preview",
+    {
+      title: "Build Smartlead campaign delete safety preview",
+      description: "Review Smartlead campaign delete candidates after backup, block protected campaigns, require backup evidence, and prepare a manual DELETE runbook without writing.",
+      inputSchema: {
+        campaigns: z.array(z.object({}).passthrough()).optional(),
+        backupPlan: z.record(z.string(), z.unknown()).optional(),
+        backupRunId: z.string().optional(),
+        backedUpCampaignIds: z.array(z.union([z.string(), z.number()])).optional(),
+        protectedCampaignIds: z.array(z.union([z.string(), z.number()])).optional(),
+        protectedNameParts: z.array(z.string()).optional(),
+        backupRoot: z.string().optional(),
+        requireFullBackupEvidence: z.boolean().default(true),
+        maxDeleteCandidates: z.number().int().min(1).max(200).default(50),
+        operatorPhrase: z.string().optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildSmartleadCampaignDeleteSafetyPreview(input as Parameters<typeof buildSmartleadCampaignDeleteSafetyPreview>[0]))
   );
 
   server.registerTool(
