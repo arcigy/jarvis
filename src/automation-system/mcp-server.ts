@@ -54,6 +54,7 @@ import {
   buildSuppressionListPreview,
   buildSmartleadHistorySuppressionPreview,
   buildSmartleadNonreplyCallListPreview,
+  buildMapsColdCallingExportPreview,
   batchScrapeWebsiteContacts,
   buildWebsiteScrapeQualityAuditPreview,
   buildFailedScrapeRecoveryQueuePreview,
@@ -2736,6 +2737,39 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildSmartleadNonreplyCallListPreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_maps_cold_calling_export_preview",
+    {
+      title: "Build Maps cold calling export preview",
+      description: "Prepare a deduped read-only cold-calling CSV from Google Maps, CSV, or manual leads with phones, missing-phone scrape next steps, and approval-gated export.",
+      inputSchema: {
+        leads: z.array(suppressionLeadSchema).optional(),
+        csvText: z.string().optional(),
+        delimiter: z.enum([",", ";"]).optional(),
+        maxRows: z.number().int().min(1).max(10_000).optional(),
+        results: z.array(z.record(z.string(), z.unknown())).optional(),
+        placesResults: z.array(z.record(z.string(), z.unknown())).optional(),
+        sourceName: z.string().optional(),
+        sourceType: z.enum(["google_places", "csv", "manual", "mixed"]).optional(),
+        defaultRegion: z.string().optional(),
+        country: z.string().optional(),
+        blacklistDomains: z.array(z.string()).optional(),
+        blacklistKeywords: z.array(z.string()).optional(),
+        existingDomains: z.array(z.string()).optional(),
+        existingPhones: z.array(z.string()).optional(),
+        maxResults: z.number().int().min(1).max(5000).default(1000),
+        maxNextCalls: z.number().int().min(1).max(200).default(50),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildMapsColdCallingExportPreview(input))
   );
 
   server.registerTool(

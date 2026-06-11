@@ -197,6 +197,7 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.build_lead_source_bundle_campaign_launch_preview`: turns a multi-source lead bundle into Smartlead campaign launch and handoff packages with approval-gated next steps, without writing or uploading.
 - `arcigy.build_leadgen_autopilot_batch_preview`: creates one read-only runbook from CSV/manual leads through scrape, fetch, AI intro audit, Smartlead import audit, and approval-gated upload steps.
 - `arcigy.build_lead_repair_queue_preview`: detects broken leads, bad AI intros, missing emails, missing decision-makers, failed verification, and proposes exact repair MCP calls without writing.
+- `arcigy.build_maps_cold_calling_export_preview`: prepares a deduplicated cold-calling CSV from Google Maps/CSV leads with phones, separates missing-phone scrape work, and keeps export approval-gated.
 - `arcigy.build_phone_enrichment_queue_preview`: prepares a read-only phone enrichment queue from CSV/leads, filters by country, skips existing phones, plans website/contact scraping, and prepares an approval-gated CSV export without writing.
 - `arcigy.build_phone_enrichment_writeback_preview`: merges scraped/CSV phone results back into leads, flags conflicts, and prepares call-list/export next steps without writing.
 - `arcigy.build_orphan_lead_assignment_preview`: analyzes orphan leads without niche assignment, infers likely niche/campaign matches, and prepares repair/import next steps without DB writes.

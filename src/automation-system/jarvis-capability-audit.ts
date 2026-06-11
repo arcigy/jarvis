@@ -181,6 +181,7 @@ const capabilityDefinitions: CapabilityDefinition[] = [
       "arcigy.build_suppression_list_preview",
       "arcigy.build_smartlead_history_suppression_preview",
       "arcigy.build_smartlead_nonreply_call_list_preview",
+      "arcigy.build_maps_cold_calling_export_preview",
       "arcigy.build_niche_leadgen_plan",
       "arcigy.build_batch_niche_discovery_plan",
       "arcigy.build_lead_discovery_matrix_preview",

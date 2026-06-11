@@ -3240,6 +3240,7 @@ function listWebMcpTools() {
     { name: "arcigy.build_suppression_list_preview", requiresApproval: false },
     { name: "arcigy.build_smartlead_history_suppression_preview", requiresApproval: false },
     { name: "arcigy.build_smartlead_nonreply_call_list_preview", requiresApproval: false },
+    { name: "arcigy.build_maps_cold_calling_export_preview", requiresApproval: false },
     { name: "arcigy.build_niche_leadgen_plan", requiresApproval: false },
     { name: "arcigy.build_batch_niche_discovery_plan", requiresApproval: false },
     { name: "arcigy.build_lead_discovery_matrix_preview", requiresApproval: false },

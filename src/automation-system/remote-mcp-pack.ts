@@ -1231,6 +1231,24 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Build Maps cold-calling CSV preview",
+      tool: "arcigy.build_maps_cold_calling_export_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_maps_cold_calling_export_preview"),
+      body: {
+        sourceName: "fotovoltaiky_slovensko_maps",
+        sourceType: "google_places",
+        country: "SK",
+        defaultRegion: "Bratislava",
+        placesResults: [
+          { displayName: "Solar Energia s.r.o.", formattedAddress: "Racianska 30A, Bratislava", websiteUri: "https://solarenergia.sk", nationalPhoneNumber: "0902 997 755", rating: 4.7, userRatingCount: 42, id: "place-1" },
+          { displayName: "Needs Phone Solar", formattedAddress: "Kosicka 12, Bratislava", websiteUri: "https://needs-phone-solar.sk", rating: 4.2, userRatingCount: 12, id: "place-2" },
+        ],
+        blacklistDomains: ["facebook.com", "zivefirmy.sk"],
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Draft a Smartlead sequence without writing",
       tool: "arcigy.draft_smartlead_campaign_sequence",
       method: "POST",

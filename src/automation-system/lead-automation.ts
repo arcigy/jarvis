@@ -1414,6 +1414,31 @@ export type SmartleadNonreplyCallListPreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type MapsColdCallingExportPreview = {
+  mode: "maps-cold-calling-export-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  source: { name?: string; type: "google_places" | "csv" | "manual" | "mixed"; country: string; defaultRegion?: string; parsedFromCsv: number };
+  totals: {
+    rawResults: number;
+    inputLeads: number;
+    callable: number;
+    missingPhone: number;
+    needsPhoneScrape: number;
+    invalidWebsite: number;
+    blocked: number;
+    duplicates: number;
+  };
+  callableRows: Array<LeadCandidateInput & { city?: string; address?: string; rating?: number; reviewCount?: number; placeId?: string }>;
+  needsPhoneScrape: LeadCandidateInput[];
+  invalidWebsite: LeadCandidateInput[];
+  blocked: ReturnType<typeof filterBlacklistedLeads>["blocked"];
+  duplicates: Array<{ lead: LeadCandidateInput; duplicateOf: string; reason: string }>;
+  exportPreview: ReturnType<typeof serializeLeadsCsv>;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+  warnings: string[];
+};
+
 export type NicheOpsDashboardInput = {
   id?: string;
   slug: string;
@@ -5188,6 +5213,135 @@ export function buildSmartleadNonreplyCallListPreview(input: {
     excluded,
     exportPreview,
     nextToolCalls: dedupeNextToolCalls(nextToolCalls).slice(0, maxNextCalls),
+  };
+}
+
+export function buildMapsColdCallingExportPreview(input: {
+  leads?: LeadCandidateInput[];
+  csvText?: string;
+  delimiter?: "," | ";";
+  maxRows?: number;
+  results?: Array<Record<string, unknown>>;
+  placesResults?: Array<Record<string, unknown>>;
+  sourceName?: string;
+  sourceType?: "google_places" | "csv" | "manual" | "mixed";
+  defaultRegion?: string;
+  country?: string;
+  blacklistDomains?: string[];
+  blacklistKeywords?: string[];
+  existingDomains?: string[];
+  existingPhones?: string[];
+  maxResults?: number;
+  maxNextCalls?: number;
+}): MapsColdCallingExportPreview {
+  const country = (input.country ?? "SK").toUpperCase();
+  const maxResults = Math.min(Math.max(Math.trunc(input.maxResults ?? 1000), 1), 5000);
+  const rawRows = [...(input.results ?? []), ...(input.placesResults ?? [])].slice(0, maxResults);
+  const parsed = input.csvText?.trim() ? parseLeadsCsv({ csvText: input.csvText, delimiter: input.delimiter, maxRows: input.maxRows }) : undefined;
+  const sourceType = input.sourceType ?? (rawRows.length && parsed?.leads.length ? "mixed" : rawRows.length ? "google_places" : parsed?.leads.length ? "csv" : "manual");
+  const mappedRows = rawRows.map((row, index) => mapResearchResultRow(row, "google_places", input.sourceName, undefined, input.defaultRegion, index));
+  const inputLeads = [...(input.leads ?? []), ...(parsed?.leads ?? []), ...mappedRows];
+  const filtered = filterBlacklistedLeads({ leads: inputLeads, domains: input.blacklistDomains, keywords: input.blacklistKeywords });
+  const existingDomains = new Set((input.existingDomains ?? []).map(normalizeDomain).filter(Boolean));
+  const existingPhones = new Set((input.existingPhones ?? []).map(phoneDedupeKey).filter(Boolean));
+  const seenKeys = new Map<string, LeadCandidateInput>();
+  const callableRows: MapsColdCallingExportPreview["callableRows"] = [];
+  const needsPhoneScrape: LeadCandidateInput[] = [];
+  const invalidWebsite: LeadCandidateInput[] = [];
+  const duplicates: MapsColdCallingExportPreview["duplicates"] = [];
+
+  for (const lead of filtered.allowed) {
+    const phone = normalizePhoneCandidate(lead.phone ?? stringField(lead.customFields ?? {}, "phone", "phones", "phone_number", "international_phone", "national_phone_number", "tel") ?? "");
+    const domain = lead.website ? normalizeDomain(lead.website) : "";
+    const phoneKey = phone ? phoneDedupeKey(phone) : "";
+    const fallbackKey = slugify([lead.companyName, coldCallCity(lead, input.defaultRegion)].filter(Boolean).join(" "));
+    const key = phoneKey || domain || fallbackKey;
+    if ((domain && existingDomains.has(domain)) || (phoneKey && existingPhones.has(phoneKey)) || (key && seenKeys.has(key))) {
+      duplicates.push({ lead, duplicateOf: domain || phoneKey || key, reason: "duplicate domain/phone/company in cold calling input" });
+      continue;
+    }
+    if (key) seenKeys.set(key, lead);
+    if (!phone) {
+      if (isScrapableLeadWebsite(lead.website)) needsPhoneScrape.push(lead);
+      else invalidWebsite.push(lead);
+      continue;
+    }
+    callableRows.push({
+      ...lead,
+      phone,
+      city: coldCallCity(lead, input.defaultRegion),
+      address: stringField(lead.customFields ?? {}, "research_address", "address", "formatted_address", "vicinity", "district_city"),
+      placeId: stringField(lead.customFields ?? {}, "google_place_id", "place_id", "placeId"),
+      rating: numberFromLead(lead, "rating", "google_rating"),
+      reviewCount: numberFromLead(lead, "reviewCount", "review_count", "reviews", "user_rating_count"),
+      source: lead.source ?? input.sourceName ?? sourceType,
+      customFields: {
+        ...lead.customFields,
+        city: coldCallCity(lead, input.defaultRegion),
+        address: stringField(lead.customFields ?? {}, "research_address", "address", "formatted_address", "vicinity", "district_city"),
+        phone,
+        cold_call_source: input.sourceName ?? sourceType,
+      },
+    });
+  }
+
+  const exportPreview = serializeLeadsCsv({
+    leads: callableRows,
+    columns: ["companyName", "phone", "city", "website", "address", "source", "rating", "reviewCount", "placeId"],
+  });
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 50), 1), 200);
+  const nextToolCalls: MapsColdCallingExportPreview["nextToolCalls"] = [];
+  if (needsPhoneScrape.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_phone_enrichment_queue_preview",
+      payload: { leads: needsPhoneScrape.slice(0, maxNextCalls), sourceName: input.sourceName, countryFilter: input.country, maxNextCalls },
+      reason: "Dohladat telefony pre Google Maps leady bez telefonu pred cold-calling exportom.",
+      approvalRequired: false,
+    });
+  }
+  if (callableRows.length) {
+    nextToolCalls.push(
+      {
+        tool: "arcigy.build_lead_batch_qa_preview",
+        payload: { leads: callableRows, sourceName: input.sourceName, requireEmail: false, requirePhoneOrDecisionMaker: true },
+        reason: "Skontrolovat cold-calling leady pred exportom.",
+        approvalRequired: false,
+      },
+      {
+        tool: "arcigy.export_leads_csv",
+        payload: { leads: callableRows, columns: exportPreview.columns, approval: { approved: true } },
+        reason: "Exportuj cold-calling CSV az po kontrole riadkov operatorom.",
+        approvalRequired: true,
+      }
+    );
+  }
+  const warnings: string[] = [];
+  if (rawRows.length >= maxResults) warnings.push("Maps results were truncated by maxResults.");
+  const totals = {
+    rawResults: rawRows.length,
+    inputLeads: inputLeads.length,
+    callable: callableRows.length,
+    missingPhone: needsPhoneScrape.length + invalidWebsite.length,
+    needsPhoneScrape: needsPhoneScrape.length,
+    invalidWebsite: invalidWebsite.length,
+    blocked: filtered.blocked.length,
+    duplicates: duplicates.length,
+  };
+  const status: MapsColdCallingExportPreview["status"] = totals.inputLeads === 0 || totals.callable === 0 ? "blocked" : totals.missingPhone || totals.blocked || totals.duplicates || warnings.length ? "attention" : "ready";
+  return {
+    mode: "maps-cold-calling-export-preview",
+    status,
+    summary: `Maps cold-calling export ${status}: ${totals.callable} callable, ${totals.needsPhoneScrape} potrebuje phone scrape, ${totals.duplicates} duplicity. Ziadny zapis ani export neprebehol.`,
+    source: { name: input.sourceName, type: sourceType, country, defaultRegion: input.defaultRegion, parsedFromCsv: parsed?.leads.length ?? 0 },
+    totals,
+    callableRows,
+    needsPhoneScrape,
+    invalidWebsite,
+    blocked: filtered.blocked,
+    duplicates,
+    exportPreview,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls).slice(0, maxNextCalls),
+    warnings,
   };
 }
 
@@ -10859,6 +11013,19 @@ function phoneResultPhones(result: Record<string, unknown>): string[] {
 function normalizePhoneCandidate(phone: string): string | undefined {
   const cleaned = phone.replace(/\s+/g, " ").trim();
   return cleaned.replace(/\D/g, "").length >= 7 ? cleaned : undefined;
+}
+
+function phoneDedupeKey(phone: string): string {
+  return phone.replace(/\D/g, "");
+}
+
+function coldCallCity(lead: LeadCandidateInput, fallback?: string): string | undefined {
+  return stringField(lead.customFields ?? {}, "city", "district_city", "region", "research_region") ?? fallback;
+}
+
+function numberFromLead(lead: LeadCandidateInput, ...keys: string[]): number | undefined {
+  const record = lead as Record<string, unknown>;
+  return numberField(record, ...keys) ?? numberField(lead.customFields ?? {}, ...keys);
 }
 
 function phoneResultUrls(result: Record<string, unknown>): string[] {

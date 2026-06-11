@@ -66,6 +66,7 @@ import {
   buildSuppressionListPreview,
   buildSmartleadHistorySuppressionPreview,
   buildSmartleadNonreplyCallListPreview,
+  buildMapsColdCallingExportPreview,
   buildSmartleadCampaignLaunchPreview,
   buildSmartleadCampaignQaPreview,
   buildSmartleadSequenceVariableRepairPreview,
@@ -243,6 +244,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.build_suppression_list_preview",
     "arcigy.build_smartlead_history_suppression_preview",
     "arcigy.build_smartlead_nonreply_call_list_preview",
+    "arcigy.build_maps_cold_calling_export_preview",
     "arcigy.build_niche_leadgen_plan",
     "arcigy.build_batch_niche_discovery_plan",
     "arcigy.build_lead_discovery_matrix_preview",
@@ -1954,6 +1956,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_leadgen_to_smartlead_dispatch_preview" && call.approvalRequired === false && Array.isArray(call.body.groups)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_company_research_queue_preview" && call.approvalRequired === false && Array.isArray(call.body.leads)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_research_results_import_preview" && call.approvalRequired === false && Array.isArray(call.body.placesResults)));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_maps_cold_calling_export_preview" && call.approvalRequired === false && Array.isArray(call.body.placesResults)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_bulk_smartlead_upload_queue_preview" && call.approvalRequired === false && Array.isArray(call.body.campaigns)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_smartlead_send_readiness_queue_preview" && call.approvalRequired === false && Array.isArray(call.body.campaigns)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_bulk_ai_intro_work_queue_preview" && call.approvalRequired === false && Array.isArray(call.body.groups)));
@@ -5865,6 +5868,37 @@ test("Smartlead nonreply call list preview prepares phone scrape and export step
   assert.equal(preview.exportPreview.rowCount, 1);
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.get_smartlead_campaign_leads" && !call.approvalRequired));
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_scrape_website_contacts" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.export_leads_csv" && call.approvalRequired));
+  assert.match(preview.summary, /Ziadny zapis ani export/);
+});
+
+test("Maps cold calling export preview builds deduped phone CSV from Places rows", () => {
+  const preview = buildMapsColdCallingExportPreview({
+    sourceName: "fotovoltaiky_slovensko_maps",
+    sourceType: "google_places",
+    country: "SK",
+    defaultRegion: "Bratislava",
+    placesResults: [
+      { displayName: "Solar Energia s.r.o.", formattedAddress: "Racianska 30A, Bratislava", websiteUri: "https://solarenergia.sk", nationalPhoneNumber: "0902 997 755", rating: 4.7, userRatingCount: 42, id: "place-1" },
+      { displayName: "Needs Phone Solar", formattedAddress: "Kosicka 12, Bratislava", websiteUri: "https://needs-phone-solar.sk", rating: 4.2, userRatingCount: 12, id: "place-2" },
+      { displayName: "Duplicate Solar", formattedAddress: "Ina 1, Bratislava", websiteUri: "https://duplicate.sk", nationalPhoneNumber: "0902 997 755", id: "place-3" },
+      { displayName: "Facebook Solar", formattedAddress: "Social 1, Bratislava", websiteUri: "https://facebook.com/solar", nationalPhoneNumber: "0903 111 222", id: "place-4" },
+    ],
+    blacklistDomains: ["facebook.com"],
+  });
+
+  assert.equal(preview.mode, "maps-cold-calling-export-preview");
+  assert.equal(preview.status, "attention");
+  assert.equal(preview.totals.rawResults, 4);
+  assert.equal(preview.totals.callable, 1);
+  assert.equal(preview.totals.needsPhoneScrape, 1);
+  assert.equal(preview.totals.blocked, 1);
+  assert.equal(preview.totals.duplicates, 1);
+  assert.equal(preview.callableRows[0].companyName, "Solar Energia s.r.o.");
+  assert.equal(preview.callableRows[0].phone, "0902 997 755");
+  assert.equal(preview.exportPreview.rowCount, 1);
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_phone_enrichment_queue_preview" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_lead_batch_qa_preview" && !call.approvalRequired));
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.export_leads_csv" && call.approvalRequired));
   assert.match(preview.summary, /Ziadny zapis ani export/);
 });

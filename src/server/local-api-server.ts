@@ -53,6 +53,7 @@ import {
   buildSuppressionListPreview,
   buildSmartleadHistorySuppressionPreview,
   buildSmartleadNonreplyCallListPreview,
+  buildMapsColdCallingExportPreview,
   batchScrapeWebsiteContacts,
   buildWebsiteScrapeQualityAuditPreview,
   buildFailedScrapeRecoveryQueuePreview,
@@ -1918,6 +1919,29 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         minSentMessages: typeof payload.minSentMessages === "number" ? payload.minSentMessages : undefined,
         excludeBlockedOrUnsubscribed: payload.excludeBlockedOrUnsubscribed !== false,
         includeWithoutPhone: payload.includeWithoutPhone === true,
+        maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_maps_cold_calling_export_preview") {
+    writeJson(response, 200, {
+      result: buildMapsColdCallingExportPreview({
+        leads: Array.isArray(payload.leads) ? payload.leads as Parameters<typeof buildMapsColdCallingExportPreview>[0]["leads"] : undefined,
+        csvText: optionalString(payload.csvText),
+        delimiter: payload.delimiter === ";" ? ";" : payload.delimiter === "," ? "," : undefined,
+        maxRows: typeof payload.maxRows === "number" ? payload.maxRows : undefined,
+        results: Array.isArray(payload.results) ? payload.results as Array<Record<string, unknown>> : undefined,
+        placesResults: Array.isArray(payload.placesResults) ? payload.placesResults as Array<Record<string, unknown>> : undefined,
+        sourceName: optionalString(payload.sourceName),
+        sourceType: ["google_places", "csv", "manual", "mixed"].includes(String(payload.sourceType)) ? payload.sourceType as Parameters<typeof buildMapsColdCallingExportPreview>[0]["sourceType"] : undefined,
+        defaultRegion: optionalString(payload.defaultRegion),
+        country: optionalString(payload.country),
+        blacklistDomains: Array.isArray(payload.blacklistDomains) ? payload.blacklistDomains.map(String) : undefined,
+        blacklistKeywords: Array.isArray(payload.blacklistKeywords) ? payload.blacklistKeywords.map(String) : undefined,
+        existingDomains: Array.isArray(payload.existingDomains) ? payload.existingDomains.map(String) : undefined,
+        existingPhones: Array.isArray(payload.existingPhones) ? payload.existingPhones.map(String) : undefined,
+        maxResults: typeof payload.maxResults === "number" ? payload.maxResults : undefined,
         maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
       }),
     });

@@ -93,6 +93,7 @@ export type JarvisMcpToolName =
   | "arcigy.build_suppression_list_preview"
   | "arcigy.build_smartlead_history_suppression_preview"
   | "arcigy.build_smartlead_nonreply_call_list_preview"
+  | "arcigy.build_maps_cold_calling_export_preview"
   | "arcigy.build_niche_leadgen_plan"
   | "arcigy.build_batch_niche_discovery_plan"
   | "arcigy.build_lead_discovery_matrix_preview"
@@ -655,6 +656,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.build_smartlead_nonreply_call_list_preview",
       description: "Pripravi call/follow-up list zo Smartlead alebo CSV leadov, ktorym sa pisalo a neodpovedali, vratane phone scrape a CSV export krokov.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_maps_cold_calling_export_preview",
+      description: "Z Google Maps/CSV leadov pripravi deduplikovany cold-calling CSV s telefonmi, oddeli missing phone scrape a export drzi za approval gate.",
       requiresApproval: false,
     },
     {
