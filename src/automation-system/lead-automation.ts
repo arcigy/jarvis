@@ -1808,6 +1808,48 @@ export type DailyLeadgenRunClosurePreview = {
   warnings: string[];
 };
 
+export type LeadgenRunResumePreview = {
+  mode: "leadgen-run-resume-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  run: {
+    runId?: string;
+    date?: string;
+    failedStage?: string;
+    failureReason?: string;
+  };
+  niche: {
+    id?: string;
+    slug: string;
+    name: string;
+    region?: string;
+    campaignId?: string | number | null;
+    dailyTarget: number;
+  };
+  checkpoint: {
+    discovered: number;
+    scraped: number;
+    contactsSelected: number;
+    introsReady: number;
+    readyForSmartlead: number;
+    sentToSmartlead: number;
+    remainingToTarget: number;
+  };
+  resumeFrom: "discovery" | "scrape" | "contact_selection" | "ai_intro" | "qa_repair" | "smartlead_upload" | "closure" | "done";
+  decisions: {
+    needsDiscovery: boolean;
+    needsScrape: boolean;
+    needsContactSelection: boolean;
+    needsAiIntro: boolean;
+    needsRepair: boolean;
+    needsSmartleadUpload: boolean;
+    needsClosure: boolean;
+  };
+  repairHints: string[];
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+  warnings: string[];
+};
+
 export type RegionExpansionQueuePreview = {
   mode: "region-expansion-queue-preview";
   summary: string;
@@ -8775,6 +8817,195 @@ export function buildLeadgenExecutionQueuePreview(input: {
   };
 }
 
+export function buildLeadgenRunResumePreview(input: {
+  niche: {
+    id?: string;
+    slug?: string;
+    name: string;
+    region?: string;
+    campaignId?: string | number | null;
+    smartleadCampaignId?: string | number | null;
+    keywords?: string[];
+    dailyTarget?: number;
+  };
+  runId?: string;
+  date?: string;
+  failedStage?: string;
+  failureReason?: string;
+  discoveredLeads?: Array<LeadCandidateInput & { scraped?: Partial<ScrapedWebsiteContacts>; intro?: Partial<LeadIntroDraft>; context?: string }>;
+  scrapedResults?: Array<Partial<ScrapedWebsiteContacts>>;
+  selectedContacts?: Array<LeadCandidateInput & { scraped?: Partial<ScrapedWebsiteContacts>; evidenceText?: string }>;
+  preparedLeads?: Array<LeadCandidateInput & { scraped?: Partial<ScrapedWebsiteContacts>; intro?: Partial<LeadIntroDraft>; context?: string }>;
+  readyLeads?: LeadCandidateInput[];
+  introDrafts?: Array<Partial<LeadIntroDraft> & { id?: string; email?: string; icebreakerSentence?: string; icebreaker_sentence?: string }>;
+  sentToSmartlead?: number;
+  dailyTarget?: number;
+  offer?: string;
+  painPoint?: string;
+  language?: "sk" | "en";
+  batchSize?: number;
+  maxNextCalls?: number;
+}): LeadgenRunResumePreview {
+  const slug = input.niche.slug?.trim() || slugify(input.niche.name);
+  const campaignId = input.niche.campaignId ?? input.niche.smartleadCampaignId ?? null;
+  const dailyTarget = Math.min(Math.max(Math.trunc(input.dailyTarget ?? input.niche.dailyTarget ?? 30), 1), 250);
+  const language = input.language ?? "sk";
+  const discoveredLeads = input.discoveredLeads ?? [];
+  const scrapedResults = input.scrapedResults ?? [];
+  const selectedContacts = input.selectedContacts ?? [];
+  const preparedLeads = input.preparedLeads ?? [];
+  const readyLeads = input.readyLeads ?? [];
+  const introDrafts = input.introDrafts ?? [];
+  const sentToSmartlead = Math.max(Math.trunc(input.sentToSmartlead ?? 0), 0);
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 12), 1), 50);
+
+  const discoveredWithScrapes = discoveredLeads.map((lead) => {
+    const scraped = lead.scraped ?? scrapedResults.find((scrape) => scrapeMatchesLead(scrape, lead));
+    const intro = lead.intro ?? introDrafts.find((draft) => introMatchesLead(draft, lead));
+    return normalizePipelineLead({ ...lead, scraped, intro, context: lead.context }, slug, slug);
+  });
+  const contactLeads = selectedContacts.length
+    ? selectedContacts.map((lead) => normalizePipelineLead(lead, slug, slug))
+    : preparedLeads.length
+      ? preparedLeads.map((lead) => normalizePipelineLead(lead, slug, slug))
+      : readyLeads.length
+        ? readyLeads
+        : discoveredLeads.filter((lead) => Boolean(lead.email)).map((lead) => normalizePipelineLead(lead, slug, slug));
+  const introReadyLeads = uniqueByLeadIdentity([
+    ...preparedLeads.map((lead) => normalizePipelineLead(lead, slug, slug)),
+    ...readyLeads,
+    ...contactLeads,
+  ]).filter((lead) => Boolean(extractLeadIntro(lead)));
+  const smartleadReady = introReadyLeads.filter((lead) => lead.email && lead.website && lead.companyName && extractLeadIntro(lead));
+  const websitesToScrape = unique(discoveredLeads
+    .filter((lead) => lead.website && !scrapedResults.some((scrape) => scrapeMatchesLead(scrape, lead)))
+    .map((lead) => lead.website as string));
+  const leadsMissingIntro = contactLeads.filter((lead) => lead.email && !extractLeadIntro(lead));
+  const leadsNeedingRepair = uniqueByLeadIdentity([
+    ...contactLeads.filter((lead) => !lead.email || !lead.companyName || !lead.website),
+    ...introReadyLeads.filter((lead) => !lead.email || !lead.website || !lead.companyName),
+  ]);
+
+  const checkpoint = {
+    discovered: discoveredLeads.length,
+    scraped: scrapedResults.length,
+    contactsSelected: contactLeads.length,
+    introsReady: introReadyLeads.length,
+    readyForSmartlead: smartleadReady.length,
+    sentToSmartlead,
+    remainingToTarget: Math.max(dailyTarget - sentToSmartlead, 0),
+  };
+  const failedStage = input.failedStage?.trim().toLowerCase();
+  const failureReason = input.failureReason?.trim();
+  const needsDiscovery = checkpoint.discovered === 0;
+  const needsScrape = checkpoint.discovered > 0 && scrapedResults.length === 0 && websitesToScrape.length > 0;
+  const needsContactSelection = scrapedResults.length > 0 && checkpoint.contactsSelected === 0;
+  const needsAiIntro = checkpoint.contactsSelected > 0 && leadsMissingIntro.length > 0;
+  const needsRepair = Boolean(failedStage || failureReason || leadsNeedingRepair.length > 0);
+  const needsSmartleadUpload = Boolean(campaignId) && checkpoint.readyForSmartlead > checkpoint.sentToSmartlead;
+  const needsClosure = checkpoint.sentToSmartlead > 0 && !needsSmartleadUpload && !needsAiIntro && !needsContactSelection && !needsScrape;
+
+  let resumeFrom: LeadgenRunResumePreview["resumeFrom"] = "done";
+  if (!input.niche.name.trim() || !slug) resumeFrom = "discovery";
+  else if (needsDiscovery) resumeFrom = "discovery";
+  else if (needsScrape) resumeFrom = "scrape";
+  else if (needsContactSelection) resumeFrom = "contact_selection";
+  else if (needsAiIntro) resumeFrom = "ai_intro";
+  else if (needsRepair && !needsSmartleadUpload) resumeFrom = "qa_repair";
+  else if (needsSmartleadUpload) resumeFrom = "smartlead_upload";
+  else if (needsClosure) resumeFrom = "closure";
+
+  const nextToolCalls: LeadgenRunResumePreview["nextToolCalls"] = [];
+  if (resumeFrom === "discovery") {
+    nextToolCalls.push({
+      tool: "arcigy.build_daily_leadgen_runbook",
+      payload: { niche: { id: input.niche.id, slug, name: input.niche.name, keywords: input.niche.keywords, region: input.niche.region, campaignId }, dailyLimit: dailyTarget, offer: input.offer, painPoint: input.painPoint, language },
+      reason: "Run nema dost leadov alebo uz poslal vsetko pripravene; priprav dalsi discovery/scrape/intro runbook.",
+      approvalRequired: false,
+    });
+  }
+  if (resumeFrom === "scrape" || websitesToScrape.length) {
+    nextToolCalls.push({
+      tool: "arcigy.batch_scrape_website_contacts",
+      payload: { urls: websitesToScrape.slice(0, 50) },
+      reason: "Discovery leady maju weby bez scrape vysledkov; pokracuj kontakt scrape batchom.",
+      approvalRequired: false,
+    });
+  }
+  if (resumeFrom === "contact_selection" || (scrapedResults.length && checkpoint.contactsSelected === 0)) {
+    nextToolCalls.push({
+      tool: "arcigy.build_outreach_contact_selection_preview",
+      payload: { scrapedResults, leads: discoveredLeads, sourceName: input.niche.name, offer: input.offer, language },
+      reason: "Scrape vysledky existuju, ale este nie je vybrany najlepsi outreach kontakt.",
+      approvalRequired: false,
+    });
+  }
+  if (resumeFrom === "ai_intro" || leadsMissingIntro.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_ai_intro_work_packet_preview",
+      payload: { leads: leadsMissingIntro.slice(0, 100), offer: input.offer, language, batchSize: input.batchSize ?? 25 },
+      reason: "Kontakty maju email, ale chybaju AI icebreakery/personalized intro.",
+      approvalRequired: false,
+    });
+  }
+  if (needsRepair) {
+    nextToolCalls.push({
+      tool: "arcigy.build_lead_repair_queue_preview",
+      payload: { leads: leadsNeedingRepair.slice(0, 100), offer: input.offer, language },
+      reason: "Run ma failure/stuck stav alebo leady s chybajucim emailom, webom, company name alebo introm.",
+      approvalRequired: false,
+    });
+  }
+  if (needsSmartleadUpload) {
+    nextToolCalls.push({
+      tool: "arcigy.build_smartlead_injection_plan",
+      payload: { niche: { id: input.niche.id, slug, name: input.niche.name, campaignId }, leads: smartleadReady.slice(sentToSmartlead), batchSize: input.batchSize ?? 50 },
+      reason: "Ready leadov je viac ako uz odoslanych do Smartlead; priprav approval-gated upload payload.",
+      approvalRequired: false,
+    });
+  }
+  if (needsClosure || resumeFrom === "done") {
+    nextToolCalls.push({
+      tool: "arcigy.build_daily_leadgen_run_closure_preview",
+      payload: { niche: { id: input.niche.id, slug, name: input.niche.name, region: input.niche.region, campaignId, dailyTarget }, stats: { discovered: checkpoint.discovered, enriched: Math.max(checkpoint.contactsSelected, checkpoint.introsReady), qualified: checkpoint.readyForSmartlead, sentToSmartlead, failed: leadsNeedingRepair.length }, offer: input.offer, painPoint: input.painPoint, language },
+      reason: "Po uploadoch alebo pri hotovom rune priprav denny closure ledger a lokalny zapis na schvalenie.",
+      approvalRequired: false,
+    });
+  }
+
+  const warnings: string[] = [];
+  if (!input.niche.name.trim()) warnings.push("Niche name is missing.");
+  if (!slug) warnings.push("Niche slug is missing and could not be inferred.");
+  if (!campaignId) warnings.push("Smartlead campaignId is missing; upload step will need campaign setup first.");
+  if (sentToSmartlead > smartleadReady.length) warnings.push("sentToSmartlead is higher than readyForSmartlead; verify checkpoint numbers.");
+  if (failedStage) warnings.push(`Run reports failedStage=${failedStage}.`);
+  if (failureReason) warnings.push(`Run reports failureReason=${failureReason.slice(0, 180)}.`);
+  const status: LeadgenRunResumePreview["status"] = !input.niche.name.trim() || !slug
+    ? "blocked"
+    : warnings.length || needsRepair || resumeFrom !== "done"
+      ? "attention"
+      : "ready";
+  const repairHints = unique([
+    ...leadsNeedingRepair.flatMap((lead) => leadGaps(lead).map((gap) => `${lead.companyName ?? lead.website ?? lead.email ?? "unknown lead"} missing ${gap}`)),
+    failedStage ? `failed stage: ${failedStage}` : "",
+    failureReason ? `failure: ${failureReason}` : "",
+  ].filter(Boolean)).slice(0, 30);
+
+  return {
+    mode: "leadgen-run-resume-preview",
+    status,
+    summary: `Leadgen resume ${status}: checkpoint discovered ${checkpoint.discovered}, scraped ${checkpoint.scraped}, contacts ${checkpoint.contactsSelected}, intros ${checkpoint.introsReady}, ready ${checkpoint.readyForSmartlead}, sent ${checkpoint.sentToSmartlead}. Pokracuj od ${resumeFrom}. Ziadny scrape, AI call ani upload neprebehol.`,
+    run: { runId: input.runId, date: input.date, failedStage: input.failedStage, failureReason },
+    niche: { id: input.niche.id, slug, name: input.niche.name, region: input.niche.region, campaignId, dailyTarget },
+    checkpoint,
+    resumeFrom,
+    decisions: { needsDiscovery, needsScrape, needsContactSelection, needsAiIntro, needsRepair, needsSmartleadUpload, needsClosure },
+    repairHints,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls).slice(0, maxNextCalls),
+    warnings,
+  };
+}
+
 export function buildDailyLeadgenRunClosurePreview(input: {
   niche: {
     id?: string;
@@ -9671,6 +9902,26 @@ function dedupeNextToolCalls<T extends { tool: string; payload: Record<string, u
     if (seen.has(key)) continue;
     seen.add(key);
     result.push(call);
+  }
+  return result;
+}
+
+function uniqueByLeadIdentity<T extends LeadCandidateInput>(leads: T[]): T[] {
+  const seen = new Set<string>();
+  const result: T[] = [];
+  for (const lead of leads) {
+    const key = [
+      lead.email?.trim().toLowerCase(),
+      normalizeDomain(lead.website ?? ""),
+      slugify(lead.companyName ?? ""),
+    ].find(Boolean);
+    if (!key) {
+      result.push(lead);
+      continue;
+    }
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(lead);
   }
   return result;
 }

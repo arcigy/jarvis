@@ -30,6 +30,7 @@ import {
   buildLeadgenCampaignPipelinePreview,
   buildLeadgenAutopilotBatchPreview,
   buildRegionExpansionQueuePreview,
+  buildLeadgenRunResumePreview,
   buildDailyLeadgenRunClosurePreview,
   buildPhoneEnrichmentQueuePreview,
   buildLeadSourceImportQueuePreview,
@@ -1963,6 +1964,31 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         painPoint: optionalString(payload.painPoint),
         language: payload.language === "en" ? "en" : "sk",
         batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_leadgen_run_resume_preview") {
+    writeJson(response, 200, {
+      result: buildLeadgenRunResumePreview({
+        niche: (payload.niche ?? {}) as Parameters<typeof buildLeadgenRunResumePreview>[0]["niche"],
+        runId: optionalString(payload.runId),
+        date: optionalString(payload.date),
+        failedStage: optionalString(payload.failedStage),
+        failureReason: optionalString(payload.failureReason),
+        discoveredLeads: Array.isArray(payload.discoveredLeads) ? payload.discoveredLeads as Parameters<typeof buildLeadgenRunResumePreview>[0]["discoveredLeads"] : undefined,
+        scrapedResults: Array.isArray(payload.scrapedResults) ? payload.scrapedResults as Parameters<typeof buildLeadgenRunResumePreview>[0]["scrapedResults"] : undefined,
+        selectedContacts: Array.isArray(payload.selectedContacts) ? payload.selectedContacts as Parameters<typeof buildLeadgenRunResumePreview>[0]["selectedContacts"] : undefined,
+        preparedLeads: Array.isArray(payload.preparedLeads) ? payload.preparedLeads as Parameters<typeof buildLeadgenRunResumePreview>[0]["preparedLeads"] : undefined,
+        readyLeads: Array.isArray(payload.readyLeads) ? payload.readyLeads as Parameters<typeof buildLeadgenRunResumePreview>[0]["readyLeads"] : undefined,
+        introDrafts: Array.isArray(payload.introDrafts) ? payload.introDrafts as Parameters<typeof buildLeadgenRunResumePreview>[0]["introDrafts"] : undefined,
+        sentToSmartlead: typeof payload.sentToSmartlead === "number" ? payload.sentToSmartlead : undefined,
+        dailyTarget: typeof payload.dailyTarget === "number" ? payload.dailyTarget : undefined,
+        offer: optionalString(payload.offer),
+        painPoint: optionalString(payload.painPoint),
+        language: payload.language === "en" ? "en" : "sk",
+        batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
+        maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
       }),
     });
     return;

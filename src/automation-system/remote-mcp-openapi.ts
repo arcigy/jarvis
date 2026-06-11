@@ -622,6 +622,19 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       language: "sk",
     };
   }
+  if (toolName === "arcigy.build_leadgen_run_resume_preview") {
+    return {
+      runId: "leadgen-2026-06-10-autoservisy",
+      niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", region: "Bratislava", dailyTarget: 30, campaignId: "123456" },
+      discoveredLeads: [{ companyName: "Auto Profi", website: "https://autoprofi.example", source: "google_maps" }],
+      scrapedResults: [{ url: "https://autoprofi.example", finalUrl: "https://autoprofi.example", emails: ["info@autoprofi.example"], phones: ["+421900000000"], textPreview: "Autoservis pre firemne flotily." }],
+      sentToSmartlead: 0,
+      failedStage: "ai_intro",
+      failureReason: "run stopped before icebreaker import",
+      offer: "AI asistent na odpovede a follow-up",
+      language: "sk",
+    };
+  }
   if (toolName === "arcigy.build_region_expansion_queue_preview") {
     return {
       regionPreset: "capitals",

@@ -96,6 +96,7 @@ export type JarvisMcpToolName =
   | "arcigy.build_lead_discovery_matrix_preview"
   | "arcigy.build_leadgen_execution_queue_preview"
   | "arcigy.build_daily_leadgen_run_closure_preview"
+  | "arcigy.build_leadgen_run_resume_preview"
   | "arcigy.build_region_expansion_queue_preview"
   | "arcigy.draft_smartlead_campaign_sequence"
   | "arcigy.build_smartlead_sequence_work_packet_preview"
@@ -659,6 +660,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.build_daily_leadgen_run_closure_preview",
       description: "Pripravi denny post-run ledger: discovered/enriched/qualified/sent/failed, region advance, exhaustion rozhodnutie a record_local_niche_run approval payload bez zapisu.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_leadgen_run_resume_preview",
+      description: "Najde checkpoint preruseneho leadgen runu a vrati presne dalsie MCP kroky pre discovery, scrape, kontakt selection, AI intro, repair, Smartlead upload alebo closure bez opakovania hotovej prace.",
       requiresApproval: false,
     },
     {

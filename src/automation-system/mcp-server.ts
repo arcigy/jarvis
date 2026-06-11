@@ -31,6 +31,7 @@ import {
   buildLeadgenCampaignPipelinePreview,
   buildLeadgenAutopilotBatchPreview,
   buildRegionExpansionQueuePreview,
+  buildLeadgenRunResumePreview,
   buildDailyLeadgenRunClosurePreview,
   buildPhoneEnrichmentQueuePreview,
   buildLeadSourceImportQueuePreview,
@@ -2786,6 +2787,43 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildDailyLeadgenRunClosurePreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_leadgen_run_resume_preview",
+    {
+      title: "Build leadgen run resume preview",
+      description: "Inspect a partially completed leadgen run and return the exact next MCP calls to resume from discovery, scrape, contact selection, AI intro, repair, Smartlead upload, or closure without repeating completed work.",
+      inputSchema: {
+        niche: batchNicheSchema.extend({
+          region: z.string().optional(),
+        }),
+        runId: z.string().optional(),
+        date: z.string().optional(),
+        failedStage: z.string().optional(),
+        failureReason: z.string().optional(),
+        discoveredLeads: z.array(z.object({}).passthrough()).optional(),
+        scrapedResults: z.array(z.object({}).passthrough()).optional(),
+        selectedContacts: z.array(z.object({}).passthrough()).optional(),
+        preparedLeads: z.array(z.object({}).passthrough()).optional(),
+        readyLeads: z.array(z.object({}).passthrough()).optional(),
+        introDrafts: z.array(z.object({}).passthrough()).optional(),
+        sentToSmartlead: z.number().int().min(0).optional(),
+        dailyTarget: z.number().int().min(1).max(250).optional(),
+        offer: z.string().optional(),
+        painPoint: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        batchSize: z.number().int().min(1).max(100).optional(),
+        maxNextCalls: z.number().int().min(1).max(50).default(12),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildLeadgenRunResumePreview(input))
   );
 
   server.registerTool(
