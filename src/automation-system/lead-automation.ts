@@ -484,6 +484,35 @@ export type LeadgenProgressWatchdogPreview = {
   warnings: string[];
 };
 
+export type LeadgenTargetBackfillPreview = {
+  mode: "leadgen-target-backfill-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  operatorBrief: string;
+  source: { name?: string; parsedFromCsv: number; generatedAt: string };
+  targets: {
+    readyLeads: number;
+    minReadyLeads: number;
+    readyPercent: number;
+    missingEmail: number;
+    missingDecisionMaker: number;
+    missingIntro: number;
+    missingOrsrName: number;
+    retryVerification: number;
+    readyForSmartlead: number;
+  };
+  queues: {
+    missingEmail: LeadCandidateInput[];
+    missingDecisionMaker: LeadCandidateInput[];
+    missingIntro: LeadCandidateInput[];
+    missingOrsrName: LeadCandidateInput[];
+    retryVerification: LeadCandidateInput[];
+    readyForSmartlead: LeadCandidateInput[];
+  };
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+  warnings: string[];
+};
+
 export type ColdOutreachMonitorRunbookPreview = {
   mode: "cold-outreach-monitor-runbook-preview";
   status: "ready" | "attention" | "blocked";
@@ -2802,7 +2831,7 @@ export function buildAiIntroQualityAuditPreview(input: {
 
 export function buildFlaggedLeadReviewPreview(input: {
   leads?: Array<LeadCandidateInput & {
-    id?: string;
+    id?: string | number;
     raw?: Record<string, string>;
     decisionMakerName?: string;
     decision_maker_name?: string;
@@ -5223,6 +5252,169 @@ export function buildLeadgenProgressWatchdogPreview(input: {
     groups,
     bottlenecks,
     queues: { needsScrape, missingEmail, missingDecisionMaker, missingIntro, needsVerification, readyForSmartlead: ready, failed },
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls).slice(0, maxNextCalls),
+    warnings,
+  };
+}
+
+export function buildLeadgenTargetBackfillPreview(input: {
+  leads?: Array<LeadCandidateInput & {
+    id?: string | number;
+    raw?: Record<string, string>;
+    primary_email?: string;
+    decisionMakerName?: string;
+    decision_maker_name?: string;
+    personalized_intro?: string;
+    icebreaker_sentence?: string;
+    verificationStatus?: string;
+    verification_status?: string;
+    verificationUpdatedAt?: string;
+    verification_updated_at?: string;
+    sentToSmartlead?: boolean;
+    sent_to_smartlead?: boolean;
+    official_company_name?: string;
+    ico?: string;
+  }>;
+  csvText?: string;
+  delimiter?: "," | ";";
+  sourceName?: string;
+  niche?: string;
+  offer?: string;
+  language?: "sk" | "en";
+  minReadyLeads?: number;
+  retryFailedAfterHours?: number;
+  includeSmartleadAudit?: boolean;
+  maxQueueItems?: number;
+  maxNextCalls?: number;
+}): LeadgenTargetBackfillPreview {
+  const parsed = input.csvText?.trim() ? parseLeadsCsv({ csvText: input.csvText, delimiter: input.delimiter }) : undefined;
+  const leads = [...(input.leads ?? []), ...(parsed?.leads ?? [])] as NonNullable<typeof input.leads>;
+  const language = input.language ?? "sk";
+  const minReadyLeads = Math.max(Math.trunc(input.minReadyLeads ?? 50), 0);
+  const retryFailedAfterHours = Math.max(Math.trunc(input.retryFailedAfterHours ?? 24), 1);
+  const maxQueueItems = Math.min(Math.max(Math.trunc(input.maxQueueItems ?? 50), 1), 200);
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 30), 1), 100);
+  const nowMs = Date.now();
+
+  const emailFor = (lead: NonNullable<typeof input.leads>[number]) => lead.email ?? lead.primary_email ?? leadgenStatusField(lead, "email", "primary_email", "smartlead_email");
+  const websiteFor = (lead: NonNullable<typeof input.leads>[number]) => lead.website ?? leadgenStatusField(lead, "website", "web", "url");
+  const decisionMakerFor = (lead: NonNullable<typeof input.leads>[number]) => lead.decisionMakerName ?? lead.decision_maker_name ?? leadgenStatusField(lead, "decision_maker_name", "decisionMakerName", "contact_name", "full_name");
+  const introFor = (lead: NonNullable<typeof input.leads>[number]) => lead.personalizedIntro ?? lead.personalized_intro ?? lead.icebreaker_sentence ?? leadgenStatusField(lead, "personalized_intro", "icebreaker_sentence", "icebreaker");
+  const icoFor = (lead: NonNullable<typeof input.leads>[number]) => lead.ico ?? leadgenStatusField(lead, "ico", "ICO");
+  const officialNameFor = (lead: NonNullable<typeof input.leads>[number]) => lead.official_company_name ?? leadgenStatusField(lead, "official_company_name", "officialCompanyName");
+  const statusFor = (lead: NonNullable<typeof input.leads>[number]) => String(lead.verificationStatus ?? lead.verification_status ?? leadgenStatusField(lead, "verification_status", "status") ?? "").toLowerCase();
+  const sentFor = (lead: NonNullable<typeof input.leads>[number]) => lead.sentToSmartlead === true || lead.sent_to_smartlead === true || /true|sent|uploaded|opened|replied/i.test(String(leadgenStatusField(lead, "sent_to_smartlead", "sentToSmartlead", "smartlead_status") ?? ""));
+  const failedFor = (lead: NonNullable<typeof input.leads>[number]) => /failed|error|rejected|timeout|invalid/.test(statusFor(lead));
+  const retryAgeOk = (lead: NonNullable<typeof input.leads>[number]) => {
+    const rawDate = lead.verificationUpdatedAt ?? lead.verification_updated_at ?? leadgenStatusField(lead, "verification_updated_at", "updated_at", "updatedAt");
+    if (!rawDate) return true;
+    const parsedDate = Date.parse(rawDate);
+    if (!Number.isFinite(parsedDate)) return true;
+    return nowMs - parsedDate >= retryFailedAfterHours * 60 * 60 * 1000;
+  };
+  const readyLead = (lead: NonNullable<typeof input.leads>[number]) => Boolean(emailFor(lead) && introFor(lead) && !failedFor(lead) && !sentFor(lead));
+
+  const missingEmail = leads.filter((lead) => !emailFor(lead) && !failedFor(lead)).slice(0, maxQueueItems);
+  const missingDecisionMaker = leads.filter((lead) => emailFor(lead) && !decisionMakerFor(lead) && !failedFor(lead)).slice(0, maxQueueItems);
+  const missingIntro = leads.filter((lead) => emailFor(lead) && !introFor(lead) && !failedFor(lead)).slice(0, maxQueueItems);
+  const missingOrsrName = leads.filter((lead) => icoFor(lead) && !decisionMakerFor(lead) && !officialNameFor(lead) && !failedFor(lead)).slice(0, maxQueueItems);
+  const retryVerification = leads.filter((lead) => failedFor(lead) && retryAgeOk(lead)).slice(0, maxQueueItems);
+  const readyForSmartlead = leads.filter((lead) => readyLead(lead)).slice(0, maxQueueItems);
+  const readyLeads = leads.filter((lead) => readyLead(lead)).length;
+  const readyPercent = minReadyLeads > 0 ? percent(readyLeads, minReadyLeads) : percent(readyLeads, leads.length);
+
+  const nextToolCalls: LeadgenTargetBackfillPreview["nextToolCalls"] = [];
+  if (missingEmail.length) {
+    const scrapeLeads = missingEmail.filter((lead) => websiteFor(lead)).slice(0, maxQueueItems);
+    if (scrapeLeads.length) {
+      nextToolCalls.push({
+        tool: "arcigy.batch_scrape_website_contacts",
+        payload: { leads: scrapeLeads, maxPagesPerSite: 4 },
+        reason: "Dopln emaily a kontakty z webov pred AI intro a Smartlead importom.",
+        approvalRequired: false,
+      });
+    }
+    nextToolCalls.push({
+      tool: "arcigy.build_company_research_queue_preview",
+      payload: { leads: missingEmail, sourceName: input.sourceName, niche: input.niche ? { name: input.niche } : undefined, includeGooglePlaces: true, includeSerper: true, includeFetch: true, includeDispatch: true },
+      reason: "Dohladaj firmy bez emailu cez Google Places/Serper/fetch a priprav dispatch queue.",
+      approvalRequired: false,
+    });
+  }
+  if (missingOrsrName.length || missingDecisionMaker.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_slovak_register_batch_preview",
+      payload: { leads: [...missingOrsrName, ...missingDecisionMaker].slice(0, maxQueueItems), sourceName: input.sourceName, offer: input.offer, language },
+      reason: "Dopln ORSR/konatela pre leady s ICO alebo firmou, ktore nemaju decision maker meno.",
+      approvalRequired: false,
+    });
+    nextToolCalls.push({
+      tool: "arcigy.build_gmail_name_enrichment_queue_preview",
+      payload: { leads: missingDecisionMaker, sourceName: input.sourceName, includeSmartleadPreview: true },
+      reason: "Skus doplnit meno z emailovej adresy, ked ORSR nema jasny vysledok.",
+      approvalRequired: false,
+    });
+  }
+  if (missingIntro.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_ai_intro_work_packet_preview",
+      payload: { leads: missingIntro, sourceName: input.sourceName, niche: input.niche, offer: input.offer, language, maxLeads: maxQueueItems },
+      reason: "Priprav AI work packet pre chybajuce icebreakery/personalizovane intra.",
+      approvalRequired: false,
+    });
+  }
+  if (retryVerification.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_lead_repair_queue_preview",
+      payload: { leads: retryVerification, sourceName: input.sourceName, includeRegisterBatch: true, includeScrapeRecovery: true },
+      reason: "Znova oprav failed/rejected leady po retry okne.",
+      approvalRequired: false,
+    });
+  }
+  if (readyForSmartlead.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_smartlead_import_audit_preview",
+      payload: { leads: readyForSmartlead, sourceName: input.sourceName, requirePersonalizedIntro: true },
+      reason: "Skontroluj ready leady pred akymkolvek Smartlead uploadom.",
+      approvalRequired: false,
+    });
+    if (input.includeSmartleadAudit !== false) {
+      nextToolCalls.push({
+        tool: "arcigy.build_smartlead_send_readiness_queue_preview",
+        payload: { campaigns: [{ name: input.niche ?? input.sourceName ?? "leadgen-backfill", leads: readyForSmartlead }] },
+        reason: "Over batch readiness, QA a approval payload pred odoslanim do Smartleadu.",
+        approvalRequired: false,
+      });
+    }
+  }
+
+  const targets = {
+    readyLeads,
+    minReadyLeads,
+    readyPercent,
+    missingEmail: missingEmail.length,
+    missingDecisionMaker: missingDecisionMaker.length,
+    missingIntro: missingIntro.length,
+    missingOrsrName: missingOrsrName.length,
+    retryVerification: retryVerification.length,
+    readyForSmartlead: readyForSmartlead.length,
+  };
+  const warnings: string[] = [];
+  if (!leads.length) warnings.push("No leads supplied; pass DB export, CSV, or lead rows.");
+  if (minReadyLeads > 0 && readyLeads < minReadyLeads) warnings.push(`Ready target not reached: ${readyLeads}/${minReadyLeads}.`);
+  const status: LeadgenTargetBackfillPreview["status"] = !leads.length
+    ? "blocked"
+    : targets.missingEmail || targets.missingDecisionMaker || targets.missingIntro || targets.missingOrsrName || targets.retryVerification || (minReadyLeads > 0 && readyLeads < minReadyLeads)
+      ? "attention"
+      : "ready";
+  return {
+    mode: "leadgen-target-backfill-preview",
+    status,
+    summary: `Leadgen target backfill ${status}: ${readyLeads}/${minReadyLeads || leads.length} ready, ${missingEmail.length} bez emailu, ${missingDecisionMaker.length} bez mena, ${missingIntro.length} bez AI intra, ${missingOrsrName.length} ORSR meno chyba, ${retryVerification.length} retry verification. Ziadny zapis ani upload neprebehol.`,
+    operatorBrief: `Backfill: ready ${readyLeads}/${minReadyLeads || leads.length}. Najprv ries ${missingEmail.length} email/scrape, potom ${missingDecisionMaker.length} mena/ORSR, ${missingIntro.length} AI intra a az potom ${readyForSmartlead.length} leadov posli cez Smartlead audit.`,
+    source: { name: input.sourceName, parsedFromCsv: parsed?.leads.length ?? 0, generatedAt: new Date().toISOString() },
+    targets,
+    queues: { missingEmail, missingDecisionMaker, missingIntro, missingOrsrName, retryVerification, readyForSmartlead },
     nextToolCalls: dedupeNextToolCalls(nextToolCalls).slice(0, maxNextCalls),
     warnings,
   };

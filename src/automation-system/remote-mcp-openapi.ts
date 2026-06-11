@@ -1156,6 +1156,18 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       maxNextCalls: 30,
     };
   }
+  if (toolName === "arcigy.build_leadgen_target_backfill_preview") {
+    return {
+      sourceName: "kuchyne-sk-backfill",
+      niche: "kuchyne",
+      offer: "automatizacia ziskavania dopytov",
+      minReadyLeads: 50,
+      retryFailedAfterHours: 24,
+      csvText: "company,campaign_tag,primary_email,website,decision_maker_name,ico,official_company_name,icebreaker_sentence,sent_to_smartlead,verification_status,verification_updated_at\nReady Studio,kuchyne,jan@ready.sk,https://ready.sk,Jan Novak,12345678,Ready Studio s.r.o.,Vsimol som si vase realizacie kuchyn.,false,verified,\nNeeds Email,kuchyne,,https://needs-email.sk,,,,,false,,\nNeeds Orosr,kuchyne,info@orsr.sk,https://orsr.sk,,87654321,,,false,,\nNeeds Intro,kuchyne,info@needs-intro.sk,https://needs-intro.sk,Eva Horna,11223344,Needs Intro s.r.o.,,false,verified,\nRetry Lead,kuchyne,retry@example.com,https://retry.sk,,,Retry s.r.o.,,false,failed,2026-06-09T10:00:00Z",
+      maxQueueItems: 50,
+      maxNextCalls: 30,
+    };
+  }
   if (toolName === "arcigy.build_leadgen_maintenance_runbook_preview") {
     return {
       sourceName: "local-leadgen-maintenance",

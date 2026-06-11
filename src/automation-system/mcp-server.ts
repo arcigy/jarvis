@@ -31,6 +31,7 @@ import {
   buildLeadgenStatusBoardPreview,
   buildLeadgenDbStatusPreview,
   buildLeadgenProgressWatchdogPreview,
+  buildLeadgenTargetBackfillPreview,
   buildLeadgenMaintenanceRunbookPreview,
   buildColdOutreachMonitorRunbookPreview,
   buildGmailOutreachReadinessPreview,
@@ -4471,6 +4472,50 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildLeadgenProgressWatchdogPreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_leadgen_target_backfill_preview",
+    {
+      title: "Build leadgen target backfill preview",
+      description: "Build a read-only backfill runbook for old check-progress/check-ORSR/check-icebreaker workflows: missing email/scrape, decision maker/ORSR, AI intro, verification retry, and ready Smartlead audit queues without writing or uploading.",
+      inputSchema: {
+        leads: z.array(pipelineLeadSchema.extend({
+          raw: z.record(z.string(), z.string()).optional(),
+          primary_email: z.string().optional(),
+          decisionMakerName: z.string().optional(),
+          decision_maker_name: z.string().optional(),
+          personalized_intro: z.string().optional(),
+          icebreaker_sentence: z.string().optional(),
+          verificationStatus: z.string().optional(),
+          verification_status: z.string().optional(),
+          verificationUpdatedAt: z.string().optional(),
+          verification_updated_at: z.string().optional(),
+          sentToSmartlead: z.boolean().optional(),
+          sent_to_smartlead: z.boolean().optional(),
+          official_company_name: z.string().optional(),
+          ico: z.string().optional(),
+        }).passthrough()).optional(),
+        csvText: z.string().optional(),
+        delimiter: z.enum([",", ";"]).optional(),
+        sourceName: z.string().optional(),
+        niche: z.string().optional(),
+        offer: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        minReadyLeads: z.number().int().min(0).default(50),
+        retryFailedAfterHours: z.number().int().min(1).max(720).default(24),
+        includeSmartleadAudit: z.boolean().default(true),
+        maxQueueItems: z.number().int().min(1).max(200).default(50),
+        maxNextCalls: z.number().int().min(1).max(100).default(30),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildLeadgenTargetBackfillPreview(input))
   );
 
   server.registerTool(

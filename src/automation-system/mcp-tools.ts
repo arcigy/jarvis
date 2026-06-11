@@ -138,6 +138,7 @@ export type JarvisMcpToolName =
   | "arcigy.build_leadgen_status_board_preview"
   | "arcigy.build_leadgen_db_status_preview"
   | "arcigy.build_leadgen_progress_watchdog_preview"
+  | "arcigy.build_leadgen_target_backfill_preview"
   | "arcigy.build_leadgen_maintenance_runbook_preview"
   | "arcigy.build_google_sheet_sync_preview"
   | "arcigy.build_leadgen_campaign_pipeline_preview"
@@ -891,6 +892,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.build_leadgen_progress_watchdog_preview",
       description: "Read-only vypocita leadgen percenta hotovosti, bottlenecky, group progress a dalsie scrape/fetch/AI/Smartlead next kroky bez zapisov alebo uploadu.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_leadgen_target_backfill_preview",
+      description: "Read-only backfill runbook zo starych check-progress/check-orsr/check-icebreaker flow: chyba email/scrape, decision maker/ORSR, AI intro, retry verification a ready Smartlead audit kroky bez zapisu.",
       requiresApproval: false,
     },
     {

@@ -3287,6 +3287,7 @@ function listWebMcpTools() {
     { name: "arcigy.build_leadgen_status_board_preview", requiresApproval: false },
     { name: "arcigy.build_leadgen_db_status_preview", requiresApproval: false },
     { name: "arcigy.build_leadgen_progress_watchdog_preview", requiresApproval: false },
+    { name: "arcigy.build_leadgen_target_backfill_preview", requiresApproval: false },
     { name: "arcigy.build_leadgen_maintenance_runbook_preview", requiresApproval: false },
     { name: "arcigy.build_google_sheet_sync_preview", requiresApproval: false },
     { name: "arcigy.build_leadgen_campaign_pipeline_preview", requiresApproval: false },

@@ -158,6 +158,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(names.includes("arcigy.build_leadgen_status_board_preview"));
   assert.ok(names.includes("arcigy.build_leadgen_db_status_preview"));
   assert.ok(names.includes("arcigy.build_leadgen_progress_watchdog_preview"));
+  assert.ok(names.includes("arcigy.build_leadgen_target_backfill_preview"));
   assert.ok(names.includes("arcigy.build_leadgen_maintenance_runbook_preview"));
   assert.ok(names.includes("arcigy.build_google_sheet_sync_preview"));
   assert.ok(names.includes("arcigy.build_leadgen_campaign_pipeline_preview"));
@@ -502,6 +503,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_gmail_unread_triage" && call.approvalRequired === false && call.body.query === "is:unread category:primary"));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_gmail_outreach_readiness_preview" && call.approvalRequired === false && Array.isArray(call.body.accounts)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_leadgen_progress_watchdog_preview" && call.approvalRequired === false && call.body.targetReadyLeads === 50));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_leadgen_target_backfill_preview" && call.approvalRequired === false && call.body.minReadyLeads === 50));
   assert.ok(
     pack.quickStartCalls.some(
       (call) =>

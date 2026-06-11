@@ -56,6 +56,7 @@ import {
   buildLeadgenStatusBoardPreview,
   buildLeadgenDbStatusPreview,
   buildLeadgenProgressWatchdogPreview,
+  buildLeadgenTargetBackfillPreview,
   buildLeadgenMaintenanceRunbookPreview,
   buildColdOutreachMonitorRunbookPreview,
   buildGmailOutreachReadinessPreview,
@@ -299,6 +300,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.build_leadgen_status_board_preview",
     "arcigy.build_leadgen_db_status_preview",
     "arcigy.build_leadgen_progress_watchdog_preview",
+    "arcigy.build_leadgen_target_backfill_preview",
     "arcigy.build_leadgen_maintenance_runbook_preview",
     "arcigy.build_google_sheet_sync_preview",
     "arcigy.build_leadgen_campaign_pipeline_preview",
@@ -556,6 +558,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
     assert.ok(paths.includes("/api/mcp/arcigy.build_company_research_queue_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_leadgen_maintenance_runbook_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_leadgen_progress_watchdog_preview"));
+  assert.ok(paths.includes("/api/mcp/arcigy.build_leadgen_target_backfill_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_research_results_import_preview"));
     assert.ok(paths.includes("/api/mcp/arcigy.build_bulk_smartlead_upload_queue_preview"));
     assert.ok(paths.includes("/api/mcp/arcigy.build_smartlead_send_readiness_queue_preview"));
@@ -2004,6 +2007,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_campaign_webhooks" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_leadgen_db_status_preview" && call.approvalRequired === false && Array.isArray(call.body.blacklistDomains)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_leadgen_progress_watchdog_preview" && call.approvalRequired === false && call.body.targetReadyLeads === 50));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_leadgen_target_backfill_preview" && call.approvalRequired === false && call.body.minReadyLeads === 50));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_leadgen_maintenance_runbook_preview" && call.approvalRequired === false && Array.isArray(call.body.campaigns)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.upsert_smartlead_campaign_webhook" && call.approvalRequired === true));
   assert.ok(pack.quickStartCalls.some((call) => call.label === "Spustit remote MCP smoke proof"));
@@ -4117,6 +4121,43 @@ test("leadgen progress watchdog calculates percent bottlenecks and next actions"
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_bulk_ai_intro_work_queue_preview" && !call.approvalRequired));
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_smartlead_injection_plan" && !call.approvalRequired));
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_lead_repair_queue_preview" && !call.approvalRequired));
+  assert.match(preview.summary, /Ziadny zapis ani upload/);
+});
+
+test("leadgen target backfill splits old progress ORSR and icebreaker queues", () => {
+  const preview = buildLeadgenTargetBackfillPreview({
+    sourceName: "kuchyne-sk-backfill",
+    niche: "kuchyne",
+    offer: "automatizacia dopytov",
+    minReadyLeads: 4,
+    retryFailedAfterHours: 24,
+    csvText: [
+      "company,campaign_tag,primary_email,website,decision_maker_name,ico,official_company_name,icebreaker_sentence,sent_to_smartlead,verification_status,verification_updated_at",
+      "Ready Studio,kuchyne,jan@ready.sk,https://ready.sk,Jan Novak,12345678,Ready Studio s.r.o.,Vsimol som si vase realizacie kuchyn.,false,verified,",
+      "Needs Email,kuchyne,,https://needs-email.sk,,,,,false,,",
+      "Needs Orosr,kuchyne,info@orsr.sk,https://orsr.sk,,87654321,,,false,,",
+      "Needs Intro,kuchyne,info@needs-intro.sk,https://needs-intro.sk,Eva Horna,11223344,Needs Intro s.r.o.,,false,verified,",
+      "Retry Lead,kuchyne,retry@example.com,https://retry.sk,,,Retry s.r.o.,,false,failed,2026-06-09T10:00:00Z",
+    ].join("\n"),
+  });
+
+  assert.equal(preview.mode, "leadgen-target-backfill-preview");
+  assert.equal(preview.status, "attention");
+  assert.equal(preview.source.parsedFromCsv, 5);
+  assert.equal(preview.targets.readyLeads, 1);
+  assert.equal(preview.targets.minReadyLeads, 4);
+  assert.equal(preview.targets.missingEmail, 1);
+  assert.equal(preview.targets.missingDecisionMaker, 1);
+  assert.equal(preview.targets.missingIntro, 2);
+  assert.equal(preview.targets.missingOrsrName, 1);
+  assert.equal(preview.targets.retryVerification, 1);
+  assert.equal(preview.targets.readyForSmartlead, 1);
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_scrape_website_contacts" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_company_research_queue_preview" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_slovak_register_batch_preview" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_ai_intro_work_packet_preview" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_lead_repair_queue_preview" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_smartlead_import_audit_preview" && !call.approvalRequired));
   assert.match(preview.summary, /Ziadny zapis ani upload/);
 });
 

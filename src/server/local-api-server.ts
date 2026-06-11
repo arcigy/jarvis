@@ -30,6 +30,7 @@ import {
   buildLeadgenStatusBoardPreview,
   buildLeadgenDbStatusPreview,
   buildLeadgenProgressWatchdogPreview,
+  buildLeadgenTargetBackfillPreview,
   buildLeadgenMaintenanceRunbookPreview,
   buildColdOutreachMonitorRunbookPreview,
   buildGmailOutreachReadinessPreview,
@@ -2657,6 +2658,25 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         targetReadyLeads: typeof payload.targetReadyLeads === "number" ? payload.targetReadyLeads : undefined,
         minCompletionPercent: typeof payload.minCompletionPercent === "number" ? payload.minCompletionPercent : undefined,
         includeSmartleadPlan: payload.includeSmartleadPlan !== false,
+        maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_leadgen_target_backfill_preview") {
+    writeJson(response, 200, {
+      result: buildLeadgenTargetBackfillPreview({
+        leads: Array.isArray(payload.leads) ? payload.leads as Parameters<typeof buildLeadgenTargetBackfillPreview>[0]["leads"] : undefined,
+        csvText: optionalString(payload.csvText),
+        delimiter: payload.delimiter === ";" ? ";" : payload.delimiter === "," ? "," : undefined,
+        sourceName: optionalString(payload.sourceName),
+        niche: optionalString(payload.niche),
+        offer: optionalString(payload.offer),
+        language: payload.language === "en" ? "en" : "sk",
+        minReadyLeads: typeof payload.minReadyLeads === "number" ? payload.minReadyLeads : undefined,
+        retryFailedAfterHours: typeof payload.retryFailedAfterHours === "number" ? payload.retryFailedAfterHours : undefined,
+        includeSmartleadAudit: payload.includeSmartleadAudit !== false,
+        maxQueueItems: typeof payload.maxQueueItems === "number" ? payload.maxQueueItems : undefined,
         maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
       }),
     });
