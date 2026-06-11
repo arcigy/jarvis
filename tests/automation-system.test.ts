@@ -55,6 +55,7 @@ import {
   buildPhoneEnrichmentWritebackPreview,
   buildLeadgenStatusBoardPreview,
   buildLeadgenDbStatusPreview,
+  buildLeadgenMaintenanceRunbookPreview,
   buildGoogleSheetSyncPreview,
   buildWebsiteScrapeQualityAuditPreview,
   buildFailedScrapeRecoveryQueuePreview,
@@ -288,6 +289,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.build_leadgen_gap_report",
     "arcigy.build_leadgen_status_board_preview",
     "arcigy.build_leadgen_db_status_preview",
+    "arcigy.build_leadgen_maintenance_runbook_preview",
     "arcigy.build_google_sheet_sync_preview",
     "arcigy.build_leadgen_campaign_pipeline_preview",
     "arcigy.build_leadgen_to_smartlead_dispatch_preview",
@@ -541,6 +543,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
     assert.ok(paths.includes("/api/mcp/arcigy.build_leadgen_to_smartlead_dispatch_preview"));
     assert.ok(paths.includes("/api/mcp/arcigy.build_international_market_leadgen_preview"));
     assert.ok(paths.includes("/api/mcp/arcigy.build_company_research_queue_preview"));
+  assert.ok(paths.includes("/api/mcp/arcigy.build_leadgen_maintenance_runbook_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_research_results_import_preview"));
     assert.ok(paths.includes("/api/mcp/arcigy.build_bulk_smartlead_upload_queue_preview"));
     assert.ok(paths.includes("/api/mcp/arcigy.build_smartlead_send_readiness_queue_preview"));
@@ -1981,6 +1984,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_email_accounts" && call.body.requestedDailyLimit === 80 && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_campaign_webhooks" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_leadgen_db_status_preview" && call.approvalRequired === false && Array.isArray(call.body.blacklistDomains)));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_leadgen_maintenance_runbook_preview" && call.approvalRequired === false && Array.isArray(call.body.campaigns)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.upsert_smartlead_campaign_webhook" && call.approvalRequired === true));
   assert.ok(pack.quickStartCalls.some((call) => call.label === "Spustit remote MCP smoke proof"));
   assert.ok(pack.quickStartCalls.some((call) => call.label === "Ziskat najnovsiu production verification evidence"));
@@ -3934,6 +3938,43 @@ test("leadgen DB status preview summarizes pipeline state with resume and blackl
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_smartlead_injection_plan" && !call.approvalRequired));
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_leadgen_status_board_preview" && !call.approvalRequired));
   assert.match(preview.summary, /Ziadny DB zapis ani upload/);
+});
+
+test("leadgen maintenance runbook plans DB Smartlead Gmail and repair work without writes", () => {
+  const preview = buildLeadgenMaintenanceRunbookPreview({
+    sourceName: "local-leadgen-maintenance",
+    csvText: [
+      "company,campaign_tag,primary_email,website,company_name_short,ico,icebreaker_sentence,sent_to_smartlead,verification_status",
+      "Ready Studio,kuchyne,jan@ready.sk,https://ready.sk,Ready Studio,12345678,Vsimol som si vase realizacie kuchyn.,false,verified",
+      "Needs Email,kuchyne,,https://needs-email.sk,,,,false,",
+      "Needs Intro,kuchyne,info@needs-intro.sk,https://needs-intro.sk,Needs Intro,,,false,",
+      "Needs Short,kuchyne,short@needs.sk,https://needs-short.sk,,87654321,Vsimol som si showroom.,false,verified",
+      "Bad Intro,kuchyne,bad@intro.sk,https://bad-intro.sk,Bad Intro,11111111,Dobry den pan Novak placeholder {{company_name}},false,verified",
+    ].join("\n"),
+    niches: [{ slug: "kuchyne", name: "Kuchynske studia", campaignId: "123456", resume: { regionIndex: 2, nextRegion: "Trnava" } }],
+    campaigns: [{ id: "123456", name: "Kuchyne SK", nicheSlug: "kuchyne", localLeadCount: 80, remoteLeadCount: 72, customFieldDrift: 4, sequenceUsesCompanyName: true, webhookMissing: true }],
+    gmailAccounts: [{ accountEnvKey: "GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP", email: "branislav.l@arcigy.group", labelName: "COLD-OUTREACH", labelReady: false }],
+    includeGoogleSheetSync: true,
+  });
+
+  assert.equal(preview.mode, "leadgen-maintenance-runbook-preview");
+  assert.equal(preview.status, "attention");
+  assert.equal(preview.totals.inputLeads, 5);
+  assert.equal(preview.totals.missingEmail, 1);
+  assert.equal(preview.totals.missingIntro, 2);
+  assert.equal(preview.totals.missingCompanyShort, 2);
+  assert.equal(preview.totals.missingIco, 2);
+  assert.equal(preview.totals.badIntro, 3);
+  assert.equal(preview.totals.smartleadSyncIssues, 1);
+  assert.equal(preview.totals.gmailLabelIssues, 1);
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_company_research_queue_preview" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_bulk_ai_intro_work_queue_preview" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_company_short_name_preview" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_slovak_register_batch_preview" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_smartlead_safe_sync_runbook_preview" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.get_gmail_unread_triage" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_google_sheet_sync_preview" && !call.approvalRequired));
+  assert.match(preview.summary, /Ziadny DB zapis, Gmail label, Smartlead update ani upload/);
 });
 
 test("Google Sheet sync preview maps lead exports to replace payload without writing", () => {

@@ -30,6 +30,7 @@ import {
   buildLeadgenGapReport,
   buildLeadgenStatusBoardPreview,
   buildLeadgenDbStatusPreview,
+  buildLeadgenMaintenanceRunbookPreview,
   buildGoogleSheetSyncPreview,
   buildLeadgenCampaignPipelinePreview,
   buildLeadgenToSmartleadDispatchPreview,
@@ -4236,6 +4237,81 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildLeadgenDbStatusPreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_leadgen_maintenance_runbook_preview",
+    {
+      title: "Build leadgen maintenance runbook preview",
+      description: "Build a read-only maintenance runbook from DB status, lead rows, Smartlead campaign drift, and Gmail label readiness: missing email, AI intro, company_short, ICO, sync, and label next steps.",
+      inputSchema: {
+        leads: z.array(z.record(z.string(), z.unknown())).optional(),
+        csvText: z.string().optional(),
+        delimiter: z.enum([",", ";"]).optional(),
+        sourceName: z.string().optional(),
+        niches: z.array(z.object({
+          slug: z.string(),
+          name: z.string().optional(),
+          campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+          stats: z.object({
+            total: z.number().optional(),
+            enriched: z.number().optional(),
+            inSmartlead: z.number().optional(),
+            in_smartlead: z.number().optional(),
+            sentToSmartlead: z.number().optional(),
+            verified: z.number().optional(),
+            pendingEnrich: z.number().optional(),
+            pending_enrich: z.number().optional(),
+            failed: z.number().optional(),
+          }).optional(),
+          resume: z.object({ regionIndex: z.number().optional(), region_index: z.number().optional(), nextRegion: z.string().optional(), updatedAt: z.string().optional() }).optional(),
+        })).optional(),
+        resumeStates: z.array(z.object({
+          key: z.string(),
+          regionIndex: z.number().optional(),
+          region_index: z.number().optional(),
+          value: z.object({ regionIndex: z.number().optional(), region_index: z.number().optional() }).optional(),
+          updatedAt: z.string().optional(),
+          updated_at: z.string().optional(),
+        })).optional(),
+        blacklistDomains: z.array(z.string()).optional(),
+        campaigns: z.array(z.object({
+          id: z.union([z.string(), z.number()]).optional(),
+          name: z.string().optional(),
+          nicheSlug: z.string().optional(),
+          campaignId: z.union([z.string(), z.number()]).optional(),
+          status: z.string().optional(),
+          localLeadCount: z.number().optional(),
+          remoteLeadCount: z.number().optional(),
+          missingInSmartlead: z.number().optional(),
+          customFieldDrift: z.number().optional(),
+          sequenceUsesCompanyName: z.boolean().optional(),
+          webhookMissing: z.boolean().optional(),
+          deliverabilityIssue: z.boolean().optional(),
+        })).optional(),
+        gmailAccounts: z.array(z.object({
+          accountEnvKey: z.string().optional(),
+          email: z.string().optional(),
+          labelName: z.string().optional(),
+          labelReady: z.boolean().optional(),
+          unreadLeadReplies: z.number().optional(),
+        })).optional(),
+        includeSmartleadSync: z.boolean().default(true),
+        includeGmailLabelSetup: z.boolean().default(true),
+        includeGoogleSheetSync: z.boolean().default(false),
+        maxNextCalls: z.number().int().min(1).max(100).default(30),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildLeadgenMaintenanceRunbookPreview({
+      ...input,
+      leads: input.leads as Parameters<typeof buildLeadgenMaintenanceRunbookPreview>[0]["leads"],
+    }))
   );
 
   server.registerTool(

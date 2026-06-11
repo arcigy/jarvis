@@ -395,6 +395,47 @@ export type LeadgenDbStatusPreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type LeadgenMaintenanceRunbookPreview = {
+  mode: "leadgen-maintenance-runbook-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  source: { name?: string; parsedFromCsv: number; generatedAt: string };
+  totals: {
+    inputLeads: number;
+    niches: number;
+    pendingEnrich: number;
+    missingEmail: number;
+    missingIntro: number;
+    missingCompanyShort: number;
+    missingIco: number;
+    badIntro: number;
+    smartleadSyncIssues: number;
+    gmailLabelIssues: number;
+  };
+  dbStatus: LeadgenDbStatusPreview;
+  campaigns: Array<{
+    id?: string | number;
+    name?: string;
+    nicheSlug?: string;
+    status?: string;
+    localLeadCount?: number;
+    remoteLeadCount?: number;
+    issues: string[];
+    nextAction: string;
+  }>;
+  repairQueues: {
+    missingEmail: LeadCandidateInput[];
+    missingIntro: LeadCandidateInput[];
+    companyShort: LeadCandidateInput[];
+    ico: LeadCandidateInput[];
+    badIntro: LeadCandidateInput[];
+  };
+  gmailLabels: Array<{ accountEnvKey?: string; email?: string; labelName: string; ready: boolean; nextAction: string }>;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+  manualChecks: string[];
+  warnings: string[];
+};
+
 export type LeadBatchQaPreview = {
   mode: "lead-batch-qa-preview";
   status: "ready" | "attention" | "blocked";
@@ -4722,6 +4763,256 @@ export function buildLeadgenDbStatusPreview(input: {
     })),
     blacklistDomains,
     nextToolCalls: dedupeNextToolCalls(nextToolCalls),
+  };
+}
+
+export function buildLeadgenMaintenanceRunbookPreview(input: {
+  leads?: Array<LeadCandidateInput & {
+    raw?: Record<string, string>;
+    primary_email?: string;
+    companyNameShort?: string;
+    company_name_short?: string;
+    official_company_name?: string;
+    ico?: string;
+    personalized_intro?: string;
+    icebreaker_sentence?: string;
+    verificationStatus?: string;
+    verification_status?: string;
+    campaignTag?: string;
+    campaign_tag?: string;
+    campaignId?: string | number | null;
+    sentToSmartlead?: boolean;
+    sent_to_smartlead?: boolean;
+  }>;
+  csvText?: string;
+  delimiter?: "," | ";";
+  sourceName?: string;
+  niches?: Parameters<typeof buildLeadgenDbStatusPreview>[0]["niches"];
+  resumeStates?: Parameters<typeof buildLeadgenDbStatusPreview>[0]["resumeStates"];
+  blacklistDomains?: string[];
+  campaigns?: Array<{
+    id?: string | number;
+    name?: string;
+    nicheSlug?: string;
+    campaignId?: string | number;
+    status?: string;
+    localLeadCount?: number;
+    remoteLeadCount?: number;
+    missingInSmartlead?: number;
+    customFieldDrift?: number;
+    sequenceUsesCompanyName?: boolean;
+    webhookMissing?: boolean;
+    deliverabilityIssue?: boolean;
+  }>;
+  gmailAccounts?: Array<{ accountEnvKey?: string; email?: string; labelName?: string; labelReady?: boolean; unreadLeadReplies?: number }>;
+  includeSmartleadSync?: boolean;
+  includeGmailLabelSetup?: boolean;
+  includeGoogleSheetSync?: boolean;
+  maxNextCalls?: number;
+}): LeadgenMaintenanceRunbookPreview {
+  const parsed = input.csvText?.trim() ? parseLeadsCsv({ csvText: input.csvText, delimiter: input.delimiter }) : undefined;
+  const leads = [...(input.leads ?? []), ...(parsed?.leads ?? [])] as NonNullable<typeof input.leads>;
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 30), 1), 100);
+  const dbStatus = buildLeadgenDbStatusPreview({
+    leads,
+    niches: input.niches,
+    resumeStates: input.resumeStates,
+    blacklistDomains: input.blacklistDomains,
+    sourceName: input.sourceName,
+    delimiter: input.delimiter,
+    maxNextCalls,
+  });
+
+  const emailFor = (lead: LeadCandidateInput & { primary_email?: string }) => lead.email ?? lead.primary_email ?? leadgenStatusField(lead, "email", "primary_email", "smartlead_emails");
+  const introFor = (lead: LeadCandidateInput & { personalized_intro?: string; icebreaker_sentence?: string }) =>
+    lead.personalizedIntro ?? lead.personalized_intro ?? lead.icebreaker_sentence ?? leadgenStatusField(lead, "personalized_intro", "icebreaker_sentence", "icebreaker");
+  const companyShortFor = (lead: LeadCandidateInput & { companyNameShort?: string; company_name_short?: string; official_company_name?: string }) =>
+    lead.companyNameShort ?? lead.company_name_short ?? lead.customFields?.company_name_short ?? leadgenStatusField(lead, "company_name_short");
+  const icoFor = (lead: LeadCandidateInput & { ico?: string }) => lead.ico ?? leadgenStatusField(lead, "ico");
+  const missingEmail = leads.filter((lead) => !emailFor(lead)).slice(0, maxNextCalls);
+  const missingIntro = leads.filter((lead) => !introFor(lead)).slice(0, maxNextCalls);
+  const companyShort = leads.filter((lead) => !companyShortFor(lead) && (lead.companyName || lead.official_company_name || leadgenStatusField(lead, "company_name", "official_company_name", "original_name"))).slice(0, maxNextCalls);
+  const ico = leads.filter((lead) => !icoFor(lead) && !/(failed|rejected)/i.test(lead.verificationStatus ?? lead.verification_status ?? leadgenStatusField(lead, "verification_status") ?? "")).slice(0, maxNextCalls);
+  const badIntro = leads.filter((lead) => {
+    const intro = introFor(lead);
+    return introQualityIssues(intro, importantIntroTerms(introEvidenceText(lead)), 0, lead).some((issue) => issue !== "missing_intro");
+  }).slice(0, maxNextCalls);
+
+  const campaigns = (input.campaigns ?? []).map((campaign) => {
+    const issues: string[] = [];
+    const localCount = campaign.localLeadCount ?? 0;
+    const remoteCount = campaign.remoteLeadCount ?? 0;
+    if ((campaign.missingInSmartlead ?? 0) > 0 || localCount > remoteCount) issues.push("missing_remote_leads");
+    if ((campaign.customFieldDrift ?? 0) > 0) issues.push("custom_field_drift");
+    if (campaign.sequenceUsesCompanyName) issues.push("sequence_uses_company_name");
+    if (campaign.webhookMissing) issues.push("webhook_missing");
+    if (campaign.deliverabilityIssue) issues.push("deliverability_attention");
+    const nextAction = issues.includes("sequence_uses_company_name")
+      ? "Repair sequence variables before more sends."
+      : issues.includes("custom_field_drift") || issues.includes("missing_remote_leads")
+        ? "Run Smartlead sync/reconciliation before uploading more leads."
+        : issues.includes("webhook_missing")
+          ? "Audit and upsert Smartlead reply webhook after approval."
+          : issues.includes("deliverability_attention")
+            ? "Run deliverability guard and reduce/pause if needed."
+            : "Campaign looks stable; continue reply monitoring.";
+    return {
+      id: campaign.id ?? campaign.campaignId,
+      name: campaign.name,
+      nicheSlug: campaign.nicheSlug,
+      status: campaign.status,
+      localLeadCount: campaign.localLeadCount,
+      remoteLeadCount: campaign.remoteLeadCount,
+      issues,
+      nextAction,
+    };
+  });
+  const smartleadSyncIssues = campaigns.filter((campaign) => campaign.issues.length).length;
+  const gmailLabels = (input.gmailAccounts ?? []).map((account) => {
+    const labelName = account.labelName?.trim() || "COLD-OUTREACH";
+    const ready = account.labelReady === true;
+    return {
+      accountEnvKey: account.accountEnvKey,
+      email: account.email,
+      labelName,
+      ready,
+      nextAction: ready ? "Label exists; continue Gmail sync/triage." : "Create/apply label through label_gmail_thread on a real thread or configure Gmail labels manually.",
+    };
+  });
+  const gmailLabelIssues = gmailLabels.filter((account) => !account.ready).length;
+
+  const nextToolCalls: LeadgenMaintenanceRunbookPreview["nextToolCalls"] = [
+    ...dbStatus.nextToolCalls.slice(0, maxNextCalls),
+  ];
+  if (missingEmail.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_phone_enrichment_queue_preview",
+      payload: { leads: missingEmail, sourceName: input.sourceName, includeCsvExport: true },
+      reason: "Leady bez emailu casto potrebuju website/contact scrape a telefon fallback pred manualnym outreachom.",
+      approvalRequired: false,
+    });
+    nextToolCalls.push({
+      tool: "arcigy.build_company_research_queue_preview",
+      payload: { leads: missingEmail, sourceName: input.sourceName, includeGooglePlaces: true, includeSerper: true, includeDispatch: true },
+      reason: "Dohladaj web/email pre incomplete leady pred AI intro a Smartlead.",
+      approvalRequired: false,
+    });
+  }
+  if (missingIntro.length || badIntro.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_ai_intro_cleanup_preview",
+      payload: { leads: [...missingIntro, ...badIntro].slice(0, maxNextCalls), language: "sk" },
+      reason: "Oprav intra s pozdravom, placeholdermi alebo generickym textom pred Smartleadom.",
+      approvalRequired: false,
+    });
+    nextToolCalls.push({
+      tool: "arcigy.build_bulk_ai_intro_work_queue_preview",
+      payload: { groups: [{ sourceName: input.sourceName ?? "maintenance", niche: "maintenance-repair", leads: missingIntro.slice(0, maxNextCalls) }], language: "sk" },
+      reason: "Chybajuce intra posli do AI work packetov pre ChatGPT/Claude.",
+      approvalRequired: false,
+    });
+  }
+  if (companyShort.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_company_short_name_preview",
+      payload: { leads: companyShort },
+      reason: "Dopln company_name_short pred subject variables a Smartlead custom fields.",
+      approvalRequired: false,
+    });
+  }
+  if (ico.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_slovak_register_batch_preview",
+      payload: { sourceName: input.sourceName, leads: ico },
+      reason: "Dopln ICO/official company name pre leady, ktore este nie su overene.",
+      approvalRequired: false,
+    });
+  }
+  if (input.includeSmartleadSync !== false && smartleadSyncIssues) {
+    for (const campaign of campaigns.filter((item) => item.issues.length).slice(0, Math.min(5, maxNextCalls))) {
+      nextToolCalls.push({
+        tool: "arcigy.build_smartlead_safe_sync_runbook_preview",
+        payload: { campaignId: campaign.id, campaignName: campaign.name, localLeads: [], remoteLeads: [] },
+        reason: `Safe sync runbook pre kampan ${campaign.name ?? campaign.id}: ${campaign.issues.join(", ")}.`,
+        approvalRequired: false,
+      });
+      if (campaign.issues.includes("sequence_uses_company_name")) {
+        nextToolCalls.push({
+          tool: "arcigy.build_smartlead_sequence_variable_repair_preview",
+          payload: { campaignId: campaign.id, sequences: [] },
+          reason: "Subjecty pouzivaju company_name; oprav na company_name_short pred dalsim launchom.",
+          approvalRequired: false,
+        });
+      }
+      if (campaign.issues.includes("webhook_missing")) {
+        nextToolCalls.push({
+          tool: "arcigy.get_smartlead_campaign_webhooks",
+          payload: { campaignId: campaign.id },
+          reason: "Najprv precitaj webhooky, az potom priprav approval-gated upsert.",
+          approvalRequired: false,
+        });
+      }
+    }
+  }
+  if (input.includeGoogleSheetSync && leads.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_google_sheet_sync_preview",
+      payload: { leads: leads.slice(0, maxNextCalls), sourceName: input.sourceName },
+      reason: "Priprav operator review sheet pre maintenance batch bez zapisu.",
+      approvalRequired: false,
+    });
+  }
+  if (input.includeGmailLabelSetup !== false && gmailLabelIssues) {
+    for (const account of gmailLabels.filter((item) => !item.ready).slice(0, Math.min(5, maxNextCalls))) {
+      nextToolCalls.push({
+        tool: "arcigy.get_gmail_unread_triage",
+        payload: { accountEnvKeys: account.accountEnvKey ? [account.accountEnvKey] : undefined, query: "in:inbox newer_than:14d" },
+        reason: `Najdi realny thread pre account ${account.email ?? account.accountEnvKey ?? "gmail"} pred label setupom ${account.labelName}.`,
+        approvalRequired: false,
+      });
+    }
+  }
+
+  const totals = {
+    inputLeads: leads.length,
+    niches: dbStatus.totals.niches,
+    pendingEnrich: dbStatus.totals.pendingEnrich,
+    missingEmail: missingEmail.length,
+    missingIntro: missingIntro.length,
+    missingCompanyShort: companyShort.length,
+    missingIco: ico.length,
+    badIntro: badIntro.length,
+    smartleadSyncIssues,
+    gmailLabelIssues,
+  };
+  const warnings: string[] = [];
+  if (!leads.length && !input.niches?.length) warnings.push("No leads or niche stats supplied; run DB export/status first.");
+  if (gmailLabelIssues) warnings.push("Gmail label setup needs a real thread id; preview only queues triage, not label creation.");
+  if (smartleadSyncIssues) warnings.push("Smartlead sync/sequence/webhook repairs must stay behind backup and approval gates.");
+  const status: LeadgenMaintenanceRunbookPreview["status"] = totals.inputLeads === 0 && totals.niches === 0
+    ? "blocked"
+    : totals.missingEmail || totals.missingIntro || totals.missingCompanyShort || totals.missingIco || totals.badIntro || totals.smartleadSyncIssues || totals.gmailLabelIssues || dbStatus.status !== "ready"
+      ? "attention"
+      : "ready";
+
+  return {
+    mode: "leadgen-maintenance-runbook-preview",
+    status,
+    summary: `Leadgen maintenance ${status}: ${totals.inputLeads} leadov, ${totals.niches} niches, ${totals.pendingEnrich} pending enrich, ${totals.missingEmail} bez emailu, ${totals.missingIntro} bez intra, ${totals.badIntro} zlych intr, ${totals.smartleadSyncIssues} Smartlead sync issues. Ziadny DB zapis, Gmail label, Smartlead update ani upload neprebehol.`,
+    source: { name: input.sourceName, parsedFromCsv: parsed?.leads.length ?? 0, generatedAt: new Date().toISOString() },
+    totals,
+    dbStatus,
+    campaigns,
+    repairQueues: { missingEmail, missingIntro, companyShort, ico, badIntro },
+    gmailLabels,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls).slice(0, maxNextCalls),
+    manualChecks: [
+      "Ak maintenance ukaze Smartlead drift, najprv sprav backup/safe sync runbook, az potom write approval.",
+      "Ak Gmail label chyba, vytvor ho cez label_gmail_thread iba na realnom threade po approval, alebo manualne v Gmail UI.",
+      "Po AI intro cleanup/importe spusti lead batch QA a az potom Smartlead injection/import audit.",
+      "Po ORSR/ICO opravach obnov Google Sheet review export, aby operator videl aktualny stav.",
+    ],
+    warnings,
   };
 }
 

@@ -1818,6 +1818,22 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Build leadgen maintenance runbook",
+      tool: "arcigy.build_leadgen_maintenance_runbook_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_leadgen_maintenance_runbook_preview"),
+      body: {
+        sourceName: "local-leadgen-maintenance",
+        csvText: "company,campaign_tag,primary_email,website,company_name_short,ico,icebreaker_sentence,sent_to_smartlead,verification_status\nReady Studio,kuchyne,jan@ready.sk,https://ready.sk,Ready Studio,12345678,Vsimol som si vase realizacie kuchyn.,false,verified\nNeeds Email,kuchyne,,https://needs-email.sk,,,,false,\nNeeds Intro,kuchyne,info@needs-intro.sk,https://needs-intro.sk,Needs Intro,,,false,\nAlready Sent,kuchyne,sent@ready.sk,https://sent.sk,Sent Studio,87654321,Vsimol som si showroom.,true,verified",
+        niches: [{ slug: "kuchyne", name: "Kuchynske studia", campaignId: "123456", resume: { regionIndex: 2, nextRegion: "Trnava" } }],
+        campaigns: [{ id: "123456", name: "Kuchyne SK", nicheSlug: "kuchyne", localLeadCount: 80, remoteLeadCount: 72, customFieldDrift: 4, sequenceUsesCompanyName: true, webhookMissing: true }],
+        gmailAccounts: [{ accountEnvKey: "GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP", email: "branislav.l@arcigy.group", labelName: "COLD-OUTREACH", labelReady: false }],
+        includeGoogleSheetSync: true,
+        maxNextCalls: 30,
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Build Google Sheet sync preview",
       tool: "arcigy.build_google_sheet_sync_preview",
       method: "POST",
