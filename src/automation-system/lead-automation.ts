@@ -55,6 +55,28 @@ export type WebsiteScrapeQualityAuditPreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type FailedScrapeRecoveryQueuePreview = {
+  mode: "failed-scrape-recovery-queue-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  totals: {
+    failedUrls: number;
+    weakScrapes: number;
+    retryUrls: number;
+    fetchUrls: number;
+    fallbackSearches: number;
+    contactSelectionReady: number;
+    leadsAffected: number;
+  };
+  retryUrls: string[];
+  fetchUrls: string[];
+  fallbackSearches: Array<{ query: string; website?: string; companyName?: string; reason: string }>;
+  affectedLeads: LeadCandidateInput[];
+  scrapeAudit: WebsiteScrapeQualityAuditPreview;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+  warnings: string[];
+};
+
 export type OutreachContactSelectionPreview = {
   mode: "outreach-contact-selection-preview";
   status: "ready" | "attention" | "blocked";
@@ -2970,6 +2992,141 @@ export function buildWebsiteScrapeQualityAuditPreview(input: {
     enrichedLeads,
     rescrapeUrls,
     nextToolCalls: dedupeNextToolCalls(nextToolCalls),
+  };
+}
+
+export function buildFailedScrapeRecoveryQueuePreview(input: {
+  scrapedResults?: Array<Partial<ScrapedWebsiteContacts>>;
+  batch?: Partial<BatchScrapedWebsiteContacts>;
+  failures?: Array<{ url: string; error?: string }>;
+  leads?: LeadCandidateInput[];
+  sourceName?: string;
+  minTextChars?: number;
+  maxRetryUrls?: number;
+  maxFetchUrls?: number;
+  includeFallbackSearch?: boolean;
+  offer?: string;
+  language?: "sk" | "en";
+}): FailedScrapeRecoveryQueuePreview {
+  const scrapeAudit = buildWebsiteScrapeQualityAuditPreview({
+    scrapedResults: input.scrapedResults,
+    batch: input.batch,
+    leads: input.leads,
+    minTextChars: input.minTextChars,
+    offer: input.offer,
+    language: input.language,
+  });
+  const failures = [...(input.batch?.failures ?? []), ...(input.failures ?? [])];
+  const maxRetryUrls = Math.min(Math.max(Math.trunc(input.maxRetryUrls ?? 30), 1), 100);
+  const maxFetchUrls = Math.min(Math.max(Math.trunc(input.maxFetchUrls ?? 20), 1), 50);
+  const failedUrls = unique(failures.map((failure) => failure.url).filter(Boolean));
+  const weakUrls = unique(scrapeAudit.items
+    .filter((item) => item.status === "needs_rescrape")
+    .map((item) => item.scrape.url ?? item.scrape.finalUrl)
+    .filter((value): value is string => Boolean(value)));
+  const retryUrls = unique([...failedUrls, ...weakUrls]).slice(0, maxRetryUrls);
+  const fetchUrls = unique([...weakUrls, ...failedUrls]).slice(0, maxFetchUrls);
+  const affectedLeads = uniqueByLeadIdentity([
+    ...(input.leads ?? []).filter((lead) => {
+      const domain = normalizeDomain(lead.website ?? "");
+      return Boolean(domain && retryUrls.some((url) => normalizeDomain(url) === domain));
+    }),
+    ...scrapeAudit.enrichedLeads.filter((lead) => lead.website && retryUrls.some((url) => normalizeDomain(url) === normalizeDomain(lead.website ?? ""))),
+  ]);
+  const fallbackSearches = input.includeFallbackSearch === false
+    ? []
+    : unique([
+        ...affectedLeads.map((lead) => {
+          const companyName = companyNameForLead(lead) ?? lead.companyName;
+          const website = lead.website;
+          const domain = normalizeDomain(website ?? "");
+          const query = [companyName, domain, "kontakt email"].filter(Boolean).join(" ");
+          return JSON.stringify({ query: query || `${website} kontakt email`, website, companyName, reason: "scrape failed or returned weak contact evidence" });
+        }),
+        ...failedUrls.map((url) => {
+          const domain = normalizeDomain(url);
+          const companyName = titleFromHostname(domain || url);
+          return JSON.stringify({ query: `${domain || url} kontakt email`, website: url, companyName, reason: "failed URL needs fallback search" });
+        }),
+      ])
+      .map((value) => JSON.parse(value) as { query: string; website?: string; companyName?: string; reason: string })
+      .filter((item) => item.query.trim())
+      .slice(0, 30);
+
+  const nextToolCalls: FailedScrapeRecoveryQueuePreview["nextToolCalls"] = [];
+  if (retryUrls.length) {
+    nextToolCalls.push({
+      tool: "arcigy.batch_scrape_website_contacts",
+      payload: { urls: retryUrls, includePriorityPages: true, maxPages: 6, maxSites: retryUrls.length },
+      reason: "Zlyhane alebo slabe scrape vysledky retryni hlbsim contact/about scrape.",
+      approvalRequired: false,
+    });
+  }
+  if (fetchUrls.length) {
+    nextToolCalls.push({
+      tool: "arcigy.batch_fetch_url_previews",
+      payload: { urls: fetchUrls, method: "GET", maxBytes: 30000, maxUrls: fetchUrls.length },
+      reason: "Ak scrape parser zlyhal, nacitaj redacted public fetch preview pre diagnostiku obsahu a blokovani.",
+      approvalRequired: false,
+    });
+  }
+  if (fallbackSearches.length) {
+    nextToolCalls.push({
+      tool: "arcigy.search_serper",
+      payload: { query: fallbackSearches[0].query, num: 10 },
+      reason: "Pri zlyhanom webe pouzi fallback web search na kontakt alebo alternativnu domenu.",
+      approvalRequired: false,
+    });
+  }
+  const contactReadyScrapes = scrapeAudit.items
+    .filter((item) => item.status !== "needs_rescrape" && (item.preferredEmail || item.preferredPhone))
+    .map((item) => item.scrape);
+  if (contactReadyScrapes.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_outreach_contact_selection_preview",
+      payload: { scrapedResults: contactReadyScrapes, leads: input.leads ?? [], sourceName: input.sourceName, offer: input.offer, language: input.language ?? "sk" },
+      reason: "Cast scrape vysledkov ma kontakt; vyber najlepsi outreach email/telefon pred AI introm.",
+      approvalRequired: false,
+    });
+  }
+  if (affectedLeads.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_lead_repair_queue_preview",
+      payload: { leads: affectedLeads, offer: input.offer, language: input.language ?? "sk" },
+      reason: "Oznac leady dotknute failed scrape na opravu emailu, webu alebo rozhodovatela.",
+      approvalRequired: false,
+    });
+  }
+
+  const warnings: string[] = [];
+  if (!retryUrls.length && !contactReadyScrapes.length) warnings.push("No failed, weak, or contact-ready scrape records were supplied.");
+  if (failedUrls.length > maxRetryUrls) warnings.push("Some failed URLs were truncated by maxRetryUrls.");
+  const status: FailedScrapeRecoveryQueuePreview["status"] = !retryUrls.length && !contactReadyScrapes.length
+    ? "blocked"
+    : retryUrls.length || fallbackSearches.length
+      ? "attention"
+      : "ready";
+  const totals = {
+    failedUrls: failedUrls.length,
+    weakScrapes: weakUrls.length,
+    retryUrls: retryUrls.length,
+    fetchUrls: fetchUrls.length,
+    fallbackSearches: fallbackSearches.length,
+    contactSelectionReady: contactReadyScrapes.length,
+    leadsAffected: affectedLeads.length,
+  };
+  return {
+    mode: "failed-scrape-recovery-queue-preview",
+    status,
+    summary: `Failed scrape recovery ${status}: ${totals.retryUrls} URL na retry, ${totals.fetchUrls} fetch preview, ${totals.fallbackSearches} fallback search, ${totals.contactSelectionReady} scrape pripravenych na contact selection. Ziadny fetch, scrape ani zapis neprebehol.`,
+    totals,
+    retryUrls,
+    fetchUrls,
+    fallbackSearches,
+    affectedLeads,
+    scrapeAudit,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls),
+    warnings,
   };
 }
 

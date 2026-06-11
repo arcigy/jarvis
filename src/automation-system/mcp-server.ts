@@ -51,6 +51,7 @@ import {
   buildSmartleadNonreplyCallListPreview,
   batchScrapeWebsiteContacts,
   buildWebsiteScrapeQualityAuditPreview,
+  buildFailedScrapeRecoveryQueuePreview,
   buildOutreachContactSelectionPreview,
   batchDraftLeadIntros,
   buildAiIntroQualityAuditPreview,
@@ -2200,6 +2201,47 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildWebsiteScrapeQualityAuditPreview(input as Parameters<typeof buildWebsiteScrapeQualityAuditPreview>[0]))
+  );
+
+  server.registerTool(
+    "arcigy.build_failed_scrape_recovery_queue_preview",
+    {
+      title: "Build failed scrape recovery queue preview",
+      description: "Turn failed or weak website scrape results into retry scrape URLs, safe fetch previews, fallback contact searches, and next contact-selection/repair steps without fetching or writing.",
+      inputSchema: {
+        scrapedResults: z.array(z.object({
+          url: z.string().optional(),
+          finalUrl: z.string().optional(),
+          title: z.string().optional(),
+          description: z.string().optional(),
+          textPreview: z.string().optional(),
+          emails: z.array(z.string()).optional(),
+          phones: z.array(z.string()).optional(),
+          internalLinks: z.array(z.string()).optional(),
+          fetchedAt: z.string().optional(),
+        }).partial()).optional(),
+        batch: z.object({
+          results: z.array(z.object({}).passthrough()).optional(),
+          failures: z.array(z.object({ url: z.string(), error: z.string().optional() })).optional(),
+        }).partial().optional(),
+        failures: z.array(z.object({ url: z.string(), error: z.string().optional() })).optional(),
+        leads: z.array(z.object({}).passthrough()).optional(),
+        sourceName: z.string().optional(),
+        minTextChars: z.number().int().min(40).max(2000).default(180),
+        maxRetryUrls: z.number().int().min(1).max(100).default(30),
+        maxFetchUrls: z.number().int().min(1).max(50).default(20),
+        includeFallbackSearch: z.boolean().default(true),
+        offer: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildFailedScrapeRecoveryQueuePreview(input as Parameters<typeof buildFailedScrapeRecoveryQueuePreview>[0]))
   );
 
   server.registerTool(

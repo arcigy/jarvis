@@ -50,6 +50,7 @@ import {
   buildSmartleadNonreplyCallListPreview,
   batchScrapeWebsiteContacts,
   buildWebsiteScrapeQualityAuditPreview,
+  buildFailedScrapeRecoveryQueuePreview,
   buildOutreachContactSelectionPreview,
   batchDraftLeadIntros,
   buildAiIntroQualityAuditPreview,
@@ -1681,6 +1682,24 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         leads: Array.isArray(payload.leads) ? payload.leads as Parameters<typeof buildWebsiteScrapeQualityAuditPreview>[0]["leads"] : undefined,
         minTextChars: typeof payload.minTextChars === "number" ? payload.minTextChars : undefined,
         maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
+        offer: optionalString(payload.offer),
+        language: payload.language === "en" ? "en" : "sk",
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_failed_scrape_recovery_queue_preview") {
+    writeJson(response, 200, {
+      result: buildFailedScrapeRecoveryQueuePreview({
+        scrapedResults: Array.isArray(payload.scrapedResults) ? payload.scrapedResults as Parameters<typeof buildFailedScrapeRecoveryQueuePreview>[0]["scrapedResults"] : undefined,
+        batch: isRecord(payload.batch) ? payload.batch as Parameters<typeof buildFailedScrapeRecoveryQueuePreview>[0]["batch"] : undefined,
+        failures: Array.isArray(payload.failures) ? payload.failures as Parameters<typeof buildFailedScrapeRecoveryQueuePreview>[0]["failures"] : undefined,
+        leads: Array.isArray(payload.leads) ? payload.leads as Parameters<typeof buildFailedScrapeRecoveryQueuePreview>[0]["leads"] : undefined,
+        sourceName: optionalString(payload.sourceName),
+        minTextChars: typeof payload.minTextChars === "number" ? payload.minTextChars : undefined,
+        maxRetryUrls: typeof payload.maxRetryUrls === "number" ? payload.maxRetryUrls : undefined,
+        maxFetchUrls: typeof payload.maxFetchUrls === "number" ? payload.maxFetchUrls : undefined,
+        includeFallbackSearch: payload.includeFallbackSearch !== false,
         offer: optionalString(payload.offer),
         language: payload.language === "en" ? "en" : "sk",
       }),

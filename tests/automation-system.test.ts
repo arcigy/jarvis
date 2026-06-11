@@ -49,6 +49,7 @@ import {
   buildLeadgenDbStatusPreview,
   buildGoogleSheetSyncPreview,
   buildWebsiteScrapeQualityAuditPreview,
+  buildFailedScrapeRecoveryQueuePreview,
   buildOutreachContactSelectionPreview,
   buildSlovakRegisterBatchPreview,
   buildSlovakSalutationPreview,
@@ -219,6 +220,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.scrape_website_contacts",
     "arcigy.batch_scrape_website_contacts",
     "arcigy.build_website_scrape_quality_audit_preview",
+    "arcigy.build_failed_scrape_recovery_queue_preview",
     "arcigy.build_outreach_contact_selection_preview",
     "arcigy.enrich_slovak_company_register",
     "arcigy.build_local_lead_register_update_preview",
@@ -503,6 +505,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.ok(paths.includes("/api/mcp/arcigy.build_local_lead_register_update_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.apply_local_lead_register_update"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_outreach_contact_selection_preview"));
+  assert.ok(paths.includes("/api/mcp/arcigy.build_failed_scrape_recovery_queue_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_daily_leadgen_run_closure_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_leadgen_run_resume_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_gmail_name_enrichment_queue_preview"));
@@ -1915,6 +1918,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_local_lead_register_update_preview" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.apply_local_lead_register_update" && call.approvalRequired === true));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_outreach_contact_selection_preview" && call.approvalRequired === false && Array.isArray(call.body.scrapedResults)));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_failed_scrape_recovery_queue_preview" && call.approvalRequired === false && typeof call.body.batch === "object"));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_daily_leadgen_run_closure_preview" && call.approvalRequired === false && (call.body.stats as { sentToSmartlead?: number }).sentToSmartlead === 18));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_leadgen_run_resume_preview" && call.approvalRequired === false && call.body.failedStage === "ai_intro"));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_gmail_name_enrichment_queue_preview" && call.approvalRequired === false && call.body.accountEmail === "branislav.l@arcigy.group"));
@@ -4721,6 +4725,43 @@ test("website scrape quality audit selects preferred contacts and plans rescrape
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_ai_intro_work_packet_preview" && !call.approvalRequired));
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_lead_enrichment_merge_preview" && !call.approvalRequired));
   assert.match(preview.summary, /Ziadny fetch ani zapis/);
+});
+
+test("failed scrape recovery queue prepares retry fetch and fallback actions", () => {
+  const preview = buildFailedScrapeRecoveryQueuePreview({
+    sourceName: "kuchyne-contact-scrape",
+    batch: {
+      results: [
+        { url: "https://weak.sk", finalUrl: "https://weak.sk", title: "Weak", textPreview: "Domov", emails: [], phones: [], internalLinks: [], fetchedAt: "2026-06-10T10:00:00.000Z" },
+        { url: "https://ready.sk", finalUrl: "https://ready.sk", title: "Ready", textPreview: "Kuchyne na mieru showroom Bratislava.", emails: ["jan@ready.sk"], phones: ["+421 900 111 222"], internalLinks: ["https://ready.sk/kontakt"], fetchedAt: "2026-06-10T10:00:00.000Z" },
+      ],
+      failures: [{ url: "https://failed.sk", error: "timeout" }],
+    },
+    leads: [
+      { companyName: "Weak Studio", website: "https://weak.sk" },
+      { companyName: "Failed Studio", website: "https://failed.sk" },
+      { companyName: "Ready Studio", website: "https://ready.sk" },
+    ],
+    minTextChars: 40,
+    offer: "AI follow-up",
+  });
+
+  assert.equal(preview.mode, "failed-scrape-recovery-queue-preview");
+  assert.equal(preview.status, "attention");
+  assert.equal(preview.totals.failedUrls, 1);
+  assert.equal(preview.totals.weakScrapes, 1);
+  assert.equal(preview.totals.retryUrls, 2);
+  assert.equal(preview.totals.fetchUrls, 2);
+  assert.equal(preview.totals.contactSelectionReady, 1);
+  assert.ok(preview.retryUrls.includes("https://weak.sk"));
+  assert.ok(preview.retryUrls.includes("https://failed.sk"));
+  assert.ok(preview.fallbackSearches.some((item) => item.query.includes("kontakt email")));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_scrape_website_contacts" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_fetch_url_previews" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.search_serper" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_outreach_contact_selection_preview" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_lead_repair_queue_preview" && !call.approvalRequired));
+  assert.match(preview.summary, /Ziadny fetch, scrape ani zapis/);
 });
 
 test("outreach contact selection ranks scraped emails and prepares fallback search", () => {

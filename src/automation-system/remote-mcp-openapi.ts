@@ -464,6 +464,19 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       language: "sk",
     };
   }
+  if (toolName === "arcigy.build_failed_scrape_recovery_queue_preview") {
+    return {
+      sourceName: "kuchyne-contact-scrape",
+      batch: {
+        results: [{ url: "https://weak.sk", title: "Weak", textPreview: "Domov", emails: [], phones: [], internalLinks: [] }],
+        failures: [{ url: "https://failed.sk", error: "Website fetch failed: 503" }],
+      },
+      leads: [{ companyName: "Weak Studio", website: "https://weak.sk" }, { companyName: "Failed Studio", website: "https://failed.sk" }],
+      includeFallbackSearch: true,
+      offer: "AI asistent na dopyty a follow-up",
+      language: "sk",
+    };
+  }
   if (toolName === "arcigy.build_outreach_contact_selection_preview") {
     return {
       sourceName: "kuchyne-contact-scrape",
