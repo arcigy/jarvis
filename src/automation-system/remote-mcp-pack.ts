@@ -688,6 +688,23 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Build Gmail outreach readiness runbook",
+      tool: "arcigy.build_gmail_outreach_readiness_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_gmail_outreach_readiness_preview"),
+      body: {
+        accounts: [{ accountEnvKey: "GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP", email: "branislav.l@arcigy.group", labelName: "COLD-OUTREACH", labelReady: false, authReady: true, unreadTotal: 8, unreadLeadReplies: 2 }],
+        replyEvents: [
+          { source: "gmail", accountEnvKey: "GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP", threadId: "thread-123", email: "lead@example.com", leadName: "Jan Novak", companyName: "Modelova Firma", replyBody: "Dobry den, poslite mi prosim ukazku.", category: "positive" },
+        ],
+        knownLeads: [{ email: "lead@example.com", companyName: "Modelova Firma", website: "https://example.com" }],
+        targetLabel: "COLD-OUTREACH",
+        query: "is:unread category:primary",
+        maxNextCalls: 20,
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Build leadgen daily report without Slack",
       tool: "arcigy.get_leadgen_daily_report",
       method: "POST",

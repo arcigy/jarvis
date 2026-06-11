@@ -50,6 +50,7 @@ export type JarvisMcpToolName =
   | "arcigy.get_gmail_lead_context"
   | "arcigy.lookup_public_email_profile"
   | "arcigy.get_gmail_unread_triage"
+  | "arcigy.build_gmail_outreach_readiness_preview"
   | "arcigy.label_gmail_thread"
   | "arcigy.get_smartlead_campaign_status"
   | "arcigy.get_smartlead_outreach_brief"
@@ -447,6 +448,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.get_gmail_unread_triage",
       description: "Read-only nacita unread primary Gmail spravy, roztriedi lead replies vs automaticke/interne emaily a pripravi get_gmail_lead_context/preview_gmail_ai_reply dalsie kroky bez labelu, zapisu alebo odoslania.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_gmail_outreach_readiness_preview",
+      description: "Read-only spoji Gmail account readiness, COLD-OUTREACH label stav, unread reply queue a known lead match do dalsich safe MCP krokov bez labelovania alebo odoslania.",
       requiresApproval: false,
     },
     {

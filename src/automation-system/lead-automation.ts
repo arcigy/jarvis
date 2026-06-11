@@ -483,6 +483,49 @@ export type ColdOutreachMonitorRunbookPreview = {
   warnings: string[];
 };
 
+export type GmailOutreachReadinessPreview = {
+  mode: "gmail-outreach-readiness-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  targetLabel: string;
+  totals: {
+    accounts: number;
+    authReady: number;
+    labelReady: number;
+    missingLabel: number;
+    authIssues: number;
+    unreadTotal: number;
+    unreadLeadReplies: number;
+    knownLeadMatches: number;
+    positiveReplies: number;
+  };
+  accounts: Array<{
+    accountEnvKey?: string;
+    email?: string;
+    labelName: string;
+    authReady: boolean;
+    labelReady: boolean;
+    unreadTotal: number;
+    unreadLeadReplies: number;
+    issues: string[];
+    nextAction: string;
+  }>;
+  replyQueue: Array<{
+    source: "gmail" | "smartlead" | "manual";
+    accountEnvKey?: string;
+    threadId?: string;
+    email?: string;
+    leadName?: string;
+    companyName?: string;
+    replyBody: string;
+    category: "positive" | "negative" | "neutral";
+    knownLead: boolean;
+    nextAction: string;
+  }>;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+  warnings: string[];
+};
+
 export type LeadBatchQaPreview = {
   mode: "lead-batch-qa-preview";
   status: "ready" | "attention" | "blocked";
@@ -5294,6 +5337,204 @@ export function buildColdOutreachMonitorRunbookPreview(input: {
     totals,
     campaigns: campaignRows.map(({ bounced: _bounced, unsubscribed: _unsubscribed, negativeReplies: _negativeReplies, ...campaign }) => campaign),
     positiveReplies: positiveReplyItems,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls).slice(0, maxNextCalls),
+    warnings,
+  };
+}
+
+export function buildGmailOutreachReadinessPreview(input: {
+  accounts?: Array<{
+    accountEnvKey?: string;
+    email?: string;
+    labelName?: string;
+    labelReady?: boolean;
+    authReady?: boolean;
+    tokenReady?: boolean;
+    unreadTotal?: number;
+    unreadLeadReplies?: number;
+    lastSyncAt?: string;
+  }>;
+  replyEvents?: Array<{
+    source?: "gmail" | "smartlead" | "manual";
+    accountEnvKey?: string;
+    threadId?: string;
+    messageId?: string;
+    email?: string;
+    leadEmail?: string;
+    fromEmail?: string;
+    leadName?: string;
+    companyName?: string;
+    subject?: string;
+    replyBody?: string;
+    body?: string;
+    text?: string;
+    classification?: string;
+    category?: string;
+  }>;
+  knownLeads?: LeadCandidateInput[];
+  targetLabel?: string;
+  query?: string;
+  includeUnreadTriage?: boolean;
+  includeLeadContext?: boolean;
+  includeReplyDrafts?: boolean;
+  includeLabelApprovalPayloads?: boolean;
+  maxNextCalls?: number;
+}): GmailOutreachReadinessPreview {
+  const targetLabel = input.targetLabel?.trim() || "COLD-OUTREACH";
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 30), 1), 100);
+  const query = input.query?.trim() || "is:unread category:primary";
+  const knownLeadEmails = new Set((input.knownLeads ?? []).map((lead) => lead.email?.trim().toLowerCase()).filter(Boolean) as string[]);
+  const accounts = (input.accounts ?? []).map((account) => {
+    const labelName = account.labelName?.trim() || targetLabel;
+    const authReady = account.authReady ?? account.tokenReady ?? Boolean(account.accountEnvKey || account.email);
+    const labelReady = account.labelReady === true;
+    const unreadTotal = Math.max(0, Math.trunc(account.unreadTotal ?? 0));
+    const unreadLeadReplies = Math.max(0, Math.trunc(account.unreadLeadReplies ?? 0));
+    const issues: string[] = [];
+    if (!authReady) issues.push("auth_missing");
+    if (!labelReady) issues.push("label_missing");
+    if (unreadLeadReplies > 0) issues.push("unread_lead_replies");
+    const nextAction = !authReady
+      ? "Reconnect Gmail OAuth account before reply automation."
+      : !labelReady
+        ? "Find a real thread and apply the outreach label after approval, or create it manually in Gmail."
+        : unreadLeadReplies > 0
+          ? "Run unread triage and prepare draft-only replies for lead messages."
+          : unreadTotal > 0
+            ? "Run unread triage to separate leads from automated/internal mail."
+            : "Account is ready for cold outreach reply monitoring.";
+    return {
+      accountEnvKey: account.accountEnvKey,
+      email: account.email,
+      labelName,
+      authReady,
+      labelReady,
+      unreadTotal,
+      unreadLeadReplies,
+      issues,
+      nextAction,
+    };
+  });
+
+  const replyQueue: GmailOutreachReadinessPreview["replyQueue"] = (input.replyEvents ?? []).slice(0, maxNextCalls).map((event) => {
+    const email = event.email ?? event.leadEmail ?? event.fromEmail;
+    const body = event.replyBody ?? event.body ?? event.text ?? "";
+    const classified = classifyMonitorReply({
+      source: event.source ?? "gmail",
+      email,
+      leadEmail: email,
+      leadName: event.leadName,
+      companyName: event.companyName,
+      replyBody: body,
+      body,
+      classification: event.classification,
+      category: event.category,
+      threadId: event.threadId,
+      messageId: event.messageId,
+      accountEnvKey: event.accountEnvKey,
+    });
+    const knownLead = email ? knownLeadEmails.has(email.trim().toLowerCase()) : false;
+    const nextAction = classified.category === "positive"
+      ? "Prepare draft-only reply and wait for operator approval before sending."
+      : classified.category === "negative"
+        ? "Add to suppression/review list; do not draft a positive follow-up."
+        : "Fetch lead context and classify before drafting.";
+    return {
+      source: classified.source === "smartlead" || classified.source === "manual" ? classified.source : "gmail",
+      accountEnvKey: event.accountEnvKey,
+      threadId: event.threadId,
+      email,
+      leadName: event.leadName,
+      companyName: event.companyName,
+      replyBody: classified.replyBody,
+      category: classified.category,
+      knownLead,
+      nextAction,
+    };
+  });
+
+  const nextToolCalls: GmailOutreachReadinessPreview["nextToolCalls"] = [];
+  if (input.includeUnreadTriage !== false) {
+    for (const account of accounts.filter((item) => item.authReady).slice(0, Math.min(5, maxNextCalls))) {
+      nextToolCalls.push({
+        tool: "arcigy.get_gmail_unread_triage",
+        payload: { accountEnvKey: account.accountEnvKey, query, maxResults: 20, includeBody: true },
+        reason: `Skontroluj unread spravy pre ${account.email ?? account.accountEnvKey ?? "Gmail"} a rozdel lead replies od automatickych mailov.`,
+        approvalRequired: false,
+      });
+    }
+  }
+  if (input.includeLeadContext !== false) {
+    for (const reply of replyQueue.filter((item) => item.email).slice(0, Math.min(10, maxNextCalls))) {
+      nextToolCalls.push({
+        tool: "arcigy.get_gmail_lead_context",
+        payload: { leadEmail: reply.email, accountEnvKey: reply.accountEnvKey, maxMessages: 10, includeBody: true },
+        reason: "Nacitaj Gmail historiu a display-name kontext pred AI reply preview.",
+        approvalRequired: false,
+      });
+    }
+  }
+  if (input.includeReplyDrafts !== false && replyQueue.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_outreach_reply_triage_preview",
+      payload: {
+        replies: replyQueue.map((reply) => ({
+          source: reply.source,
+          email: reply.email,
+          leadName: reply.leadName,
+          companyName: reply.companyName,
+          replyBody: reply.replyBody,
+          threadId: reply.threadId,
+          accountEnvKey: reply.accountEnvKey,
+        })),
+        aiRepliesActive: true,
+        useAiClassification: false,
+      },
+      reason: "Z reply queue priprav draft-only follow-up kroky bez odoslania.",
+      approvalRequired: false,
+    });
+  }
+  if (input.includeLabelApprovalPayloads !== false) {
+    for (const reply of replyQueue.filter((item) => item.threadId && item.accountEnvKey).slice(0, Math.min(10, maxNextCalls))) {
+      nextToolCalls.push({
+        tool: "arcigy.label_gmail_thread",
+        payload: { accountEnvKey: reply.accountEnvKey, threadId: reply.threadId, labelName: targetLabel, markRead: true },
+        reason: "Po operator approval oznac vybaveny outreach thread labelom a volitelne ako precitany.",
+        approvalRequired: true,
+      });
+    }
+  }
+
+  const totals = {
+    accounts: accounts.length,
+    authReady: accounts.filter((account) => account.authReady).length,
+    labelReady: accounts.filter((account) => account.labelReady).length,
+    missingLabel: accounts.filter((account) => !account.labelReady).length,
+    authIssues: accounts.filter((account) => !account.authReady).length,
+    unreadTotal: sum(accounts.map((account) => account.unreadTotal)),
+    unreadLeadReplies: sum(accounts.map((account) => account.unreadLeadReplies)),
+    knownLeadMatches: replyQueue.filter((reply) => reply.knownLead).length,
+    positiveReplies: replyQueue.filter((reply) => reply.category === "positive").length,
+  };
+  const warnings: string[] = [];
+  if (!accounts.length) warnings.push("No Gmail accounts supplied; list configured Gmail accounts or pass account readiness first.");
+  if (totals.authIssues) warnings.push("Some Gmail accounts are missing OAuth/auth readiness.");
+  if (totals.missingLabel) warnings.push("Some Gmail accounts are missing the outreach label; preview only prepares approval payloads, it does not label threads.");
+  if (replyQueue.some((reply) => !reply.knownLead && reply.email)) warnings.push("Some replies do not match supplied known leads; run identify_email or Gmail lead context before drafting.");
+  const status: GmailOutreachReadinessPreview["status"] = !accounts.length
+    ? "blocked"
+    : totals.authIssues || totals.missingLabel || totals.unreadLeadReplies || totals.positiveReplies || warnings.length
+      ? "attention"
+      : "ready";
+
+  return {
+    mode: "gmail-outreach-readiness-preview",
+    status,
+    summary: `Gmail outreach readiness ${status}: ${totals.accounts} uctov, ${totals.authReady} auth ready, ${totals.labelReady} label ready, ${totals.unreadLeadReplies} unread lead replies, ${totals.positiveReplies} pozitivnych odpovedi. Ziadny Gmail label, reply ani DB zapis neprebehol.`,
+    targetLabel,
+    totals,
+    accounts,
+    replyQueue,
     nextToolCalls: dedupeNextToolCalls(nextToolCalls).slice(0, maxNextCalls),
     warnings,
   };
@@ -12869,7 +13110,7 @@ function classifyMonitorReply(event: Record<string, unknown> & {
   const normalizedBody = replyBody.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   const negative = /negative|not interested|unsubscribe|unsubscribed|nezaujem|stop|spam/.test(label)
     || /\b(nie|nemame zaujem|nezaujem|odhlasit|unsubscribe|stop|spam)\b/.test(normalizedBody);
-  const positive = /positive|interested|zaujem|ano|áno|poslite|pošlite|send|call|meeting|termin|stretn|ukaz|demo/.test(label)
+  const positive = /positive|interested|zaujem|ano|poslite|send|call|meeting|termin|stretn|ukaz|demo/.test(label)
     || /\b(ano|poslite|send|call|meeting|termin|demo|zaujima|zaujem|ukazku|showcase)\b/.test(normalizedBody);
   const category = negative ? "negative" : positive ? "positive" : "neutral";
   const confidence = label ? "high" : replyBody.length > 30 ? "medium" : "low";

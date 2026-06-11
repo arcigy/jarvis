@@ -57,6 +57,7 @@ import {
   buildLeadgenDbStatusPreview,
   buildLeadgenMaintenanceRunbookPreview,
   buildColdOutreachMonitorRunbookPreview,
+  buildGmailOutreachReadinessPreview,
   buildGoogleSheetSyncPreview,
   buildWebsiteScrapeQualityAuditPreview,
   buildFailedScrapeRecoveryQueuePreview,
@@ -207,6 +208,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.get_gmail_lead_context",
     "arcigy.lookup_public_email_profile",
     "arcigy.get_gmail_unread_triage",
+    "arcigy.build_gmail_outreach_readiness_preview",
     "arcigy.label_gmail_thread",
     "arcigy.get_smartlead_campaign_status",
     "arcigy.get_smartlead_outreach_brief",
@@ -530,6 +532,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.ok(paths.includes("/api/mcp/arcigy.get_gmail_lead_context"));
   assert.ok(paths.includes("/api/mcp/arcigy.lookup_public_email_profile"));
   assert.ok(paths.includes("/api/mcp/arcigy.get_gmail_unread_triage"));
+  assert.ok(paths.includes("/api/mcp/arcigy.build_gmail_outreach_readiness_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.label_gmail_thread"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_local_lead_register_update_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.apply_local_lead_register_update"));
@@ -1986,6 +1989,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_smartlead_local_reconciliation_preview" && call.approvalRequired === false && Array.isArray(call.body.localLeads)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_email_accounts" && call.body.requestedDailyLimit === 80 && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_cold_outreach_monitor_runbook_preview" && call.approvalRequired === false && Array.isArray(call.body.replyEvents)));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_gmail_outreach_readiness_preview" && call.approvalRequired === false && Array.isArray(call.body.accounts)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_campaign_webhooks" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_leadgen_db_status_preview" && call.approvalRequired === false && Array.isArray(call.body.blacklistDomains)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_leadgen_maintenance_runbook_preview" && call.approvalRequired === false && Array.isArray(call.body.campaigns)));
@@ -3009,6 +3013,33 @@ test("cold outreach monitor runbook summarizes stats replies and next actions", 
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_smartlead_reply_followup_queue_preview" && !call.approvalRequired));
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_smartlead_nonreply_call_list_preview" && !call.approvalRequired));
   assert.match(preview.summary, /Ziadny fetch, reply ani export/);
+});
+
+test("Gmail outreach readiness plans labels triage and reply drafts without writing", () => {
+  const preview = buildGmailOutreachReadinessPreview({
+    accounts: [
+      { accountEnvKey: "GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP", email: "branislav.l@arcigy.group", labelName: "COLD-OUTREACH", labelReady: false, authReady: true, unreadTotal: 8, unreadLeadReplies: 2 },
+    ],
+    replyEvents: [
+      { source: "gmail", accountEnvKey: "GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP", threadId: "thread-123", email: "lead@example.com", leadName: "Jan Novak", companyName: "Modelova Firma", replyBody: "Dobry den, poslite mi prosim ukazku.", category: "positive" },
+    ],
+    knownLeads: [{ email: "lead@example.com", companyName: "Modelova Firma", website: "https://example.com" }],
+    targetLabel: "COLD-OUTREACH",
+  });
+
+  assert.equal(preview.mode, "gmail-outreach-readiness-preview");
+  assert.equal(preview.status, "attention");
+  assert.equal(preview.totals.accounts, 1);
+  assert.equal(preview.totals.authReady, 1);
+  assert.equal(preview.totals.missingLabel, 1);
+  assert.equal(preview.totals.unreadLeadReplies, 2);
+  assert.equal(preview.totals.knownLeadMatches, 1);
+  assert.equal(preview.totals.positiveReplies, 1);
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.get_gmail_unread_triage" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.get_gmail_lead_context" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_outreach_reply_triage_preview" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.label_gmail_thread" && call.approvalRequired));
+  assert.match(preview.summary, /Ziadny Gmail label, reply ani DB zapis/);
 });
 
 test("Smartlead outreach brief aggregates campaigns when campaignId is omitted", async () => {

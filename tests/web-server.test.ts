@@ -644,6 +644,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(openApiBody.paths["/api/mcp/arcigy.get_gmail_lead_context"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.lookup_public_email_profile"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.get_gmail_unread_triage"]);
+    assert.ok(openApiBody.paths["/api/mcp/arcigy.build_gmail_outreach_readiness_preview"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.label_gmail_thread"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.build_outreach_contact_selection_preview"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.build_failed_scrape_recovery_queue_preview"]);
@@ -938,6 +939,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_gmail_lead_context" && call.body.leadEmail === "lead@example.com"));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.lookup_public_email_profile" && call.body.email === "jan.novak@example.com"));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_gmail_unread_triage" && call.body.query === "is:unread category:primary"));
+    assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_gmail_outreach_readiness_preview" && Array.isArray(call.body.accounts)));
     assert.ok(
       remotePackBody.quickStartCalls.some(
         (call) =>

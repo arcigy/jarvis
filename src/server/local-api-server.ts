@@ -31,6 +31,7 @@ import {
   buildLeadgenDbStatusPreview,
   buildLeadgenMaintenanceRunbookPreview,
   buildColdOutreachMonitorRunbookPreview,
+  buildGmailOutreachReadinessPreview,
   buildGoogleSheetSyncPreview,
   buildLeadgenCampaignPipelinePreview,
   buildLeadgenToSmartleadDispatchPreview,
@@ -1433,6 +1434,23 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         query: optionalString(payload.query) ?? defaultGmailUnreadTriageQuery,
         maxResults: typeof payload.maxResults === "number" ? payload.maxResults : undefined,
         includeBody: payload.includeBody !== false,
+        maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_gmail_outreach_readiness_preview") {
+    writeJson(response, 200, {
+      result: buildGmailOutreachReadinessPreview({
+        accounts: Array.isArray(payload.accounts) ? payload.accounts as Parameters<typeof buildGmailOutreachReadinessPreview>[0]["accounts"] : undefined,
+        replyEvents: Array.isArray(payload.replyEvents) ? payload.replyEvents as Parameters<typeof buildGmailOutreachReadinessPreview>[0]["replyEvents"] : undefined,
+        knownLeads: Array.isArray(payload.knownLeads) ? payload.knownLeads as Parameters<typeof buildGmailOutreachReadinessPreview>[0]["knownLeads"] : undefined,
+        targetLabel: optionalString(payload.targetLabel) ?? "COLD-OUTREACH",
+        query: optionalString(payload.query) ?? defaultGmailUnreadTriageQuery,
+        includeUnreadTriage: payload.includeUnreadTriage !== false,
+        includeLeadContext: payload.includeLeadContext !== false,
+        includeReplyDrafts: payload.includeReplyDrafts !== false,
+        includeLabelApprovalPayloads: payload.includeLabelApprovalPayloads !== false,
         maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
       }),
     });

@@ -305,6 +305,16 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
   if (toolName === "arcigy.get_gmail_lead_context") return { leadEmail: "lead@example.com", maxMessages: 10, includeBody: true };
   if (toolName === "arcigy.lookup_public_email_profile") return { email: "jan.novak@example.com", companyName: "Modelova Firma", website: "https://example.com", sourceName: "lead-enrichment" };
   if (toolName === "arcigy.get_gmail_unread_triage") return { query: "is:unread category:primary", maxResults: 10, includeBody: true, maxNextCalls: 10 };
+  if (toolName === "arcigy.build_gmail_outreach_readiness_preview") {
+    return {
+      accounts: [{ accountEnvKey: "GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP", email: "branislav.l@arcigy.group", labelName: "COLD-OUTREACH", labelReady: false, authReady: true, unreadTotal: 8, unreadLeadReplies: 2 }],
+      replyEvents: [{ source: "gmail", accountEnvKey: "GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP", threadId: "thread-123", email: "lead@example.com", leadName: "Jan Novak", companyName: "Modelova Firma", replyBody: "Dobry den, poslite mi prosim ukazku.", category: "positive" }],
+      knownLeads: [{ email: "lead@example.com", companyName: "Modelova Firma", website: "https://example.com" }],
+      targetLabel: "COLD-OUTREACH",
+      query: "is:unread category:primary",
+      maxNextCalls: 20,
+    };
+  }
   if (toolName === "arcigy.label_gmail_thread") return { accountEnvKey: "GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP", threadId: "thread-123", labelName: "Jarvis/Handled", markRead: true, approval: { approved: true } };
   if (toolName === "arcigy.build_local_lead_register_update_preview") return { primaryEmail: "lead@example.com", companyName: "Arcigy s. r. o.", ico: "12345678", data: { source: "manual-review" } };
   if (toolName === "arcigy.apply_local_lead_register_update") return { primaryEmail: "lead@example.com", kind: "lead", companyName: "Arcigy s. r. o.", data: { ico: "12345678", orsr_verified: true, decision_maker_name: "Jan Novak" }, approval: { approved: true } };

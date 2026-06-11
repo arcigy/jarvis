@@ -32,6 +32,7 @@ import {
   buildLeadgenDbStatusPreview,
   buildLeadgenMaintenanceRunbookPreview,
   buildColdOutreachMonitorRunbookPreview,
+  buildGmailOutreachReadinessPreview,
   buildGoogleSheetSyncPreview,
   buildLeadgenCampaignPipelinePreview,
   buildLeadgenToSmartleadDispatchPreview,
@@ -1531,6 +1532,62 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(await fetchGmailUnreadTriage(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_gmail_outreach_readiness_preview",
+    {
+      title: "Build Gmail outreach readiness preview",
+      description: "Read-only Gmail cold outreach reply readiness runbook. Checks account auth, COLD-OUTREACH label readiness, unread lead replies, known-lead matches, and safe next MCP calls without labels, writes, or sends.",
+      inputSchema: {
+        accounts: z.array(z.object({
+          accountEnvKey: z.string().optional(),
+          email: z.string().optional(),
+          labelName: z.string().optional(),
+          labelReady: z.boolean().optional(),
+          authReady: z.boolean().optional(),
+          tokenReady: z.boolean().optional(),
+          unreadTotal: z.number().optional(),
+          unreadLeadReplies: z.number().optional(),
+          lastSyncAt: z.string().optional(),
+        })).optional(),
+        replyEvents: z.array(z.object({
+          source: z.enum(["gmail", "smartlead", "manual"]).optional(),
+          accountEnvKey: z.string().optional(),
+          threadId: z.string().optional(),
+          messageId: z.string().optional(),
+          email: z.string().optional(),
+          leadEmail: z.string().optional(),
+          fromEmail: z.string().optional(),
+          leadName: z.string().optional(),
+          companyName: z.string().optional(),
+          subject: z.string().optional(),
+          replyBody: z.string().optional(),
+          body: z.string().optional(),
+          text: z.string().optional(),
+          classification: z.string().optional(),
+          category: z.string().optional(),
+        })).optional(),
+        knownLeads: z.array(z.record(z.string(), z.unknown())).optional(),
+        targetLabel: z.string().default("COLD-OUTREACH"),
+        query: z.string().default(defaultGmailUnreadTriageQuery),
+        includeUnreadTriage: z.boolean().default(true),
+        includeLeadContext: z.boolean().default(true),
+        includeReplyDrafts: z.boolean().default(true),
+        includeLabelApprovalPayloads: z.boolean().default(true),
+        maxNextCalls: z.number().int().min(1).max(100).default(30),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildGmailOutreachReadinessPreview({
+      ...input,
+      knownLeads: input.knownLeads as Parameters<typeof buildGmailOutreachReadinessPreview>[0]["knownLeads"],
+    }))
   );
 
   server.registerTool(
