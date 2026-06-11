@@ -65,6 +65,7 @@ import {
   buildSmartleadInjectionPlan,
   buildSmartleadImportAuditPreview,
   buildSmartleadCampaignSyncPlanPreview,
+  buildSmartleadLocalReconciliationPreview,
   buildSmartleadSafeSyncRunbookPreview,
   buildSmartleadSenderCapacityPreview,
   buildSmartleadDeliverabilityGuardPreview,
@@ -2048,6 +2049,18 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         localLeads: (payload.localLeads ?? []) as Parameters<typeof buildSmartleadCampaignSyncPlanPreview>[0]["localLeads"],
         remoteLeads: Array.isArray(payload.remoteLeads) ? payload.remoteLeads as Parameters<typeof buildSmartleadCampaignSyncPlanPreview>[0]["remoteLeads"] : undefined,
         updateExisting: payload.updateExisting !== false,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_smartlead_local_reconciliation_preview") {
+    writeJson(response, 200, {
+      result: buildSmartleadLocalReconciliationPreview({
+        campaignId: typeof payload.campaignId === "string" || typeof payload.campaignId === "number" || payload.campaignId === null ? payload.campaignId : undefined,
+        localLeads: Array.isArray(payload.localLeads) ? payload.localLeads as Parameters<typeof buildSmartleadLocalReconciliationPreview>[0]["localLeads"] : [],
+        remoteLeads: Array.isArray(payload.remoteLeads) ? payload.remoteLeads as Parameters<typeof buildSmartleadLocalReconciliationPreview>[0]["remoteLeads"] : undefined,
+        syncUpdates: Array.isArray(payload.syncUpdates) ? payload.syncUpdates as Parameters<typeof buildSmartleadLocalReconciliationPreview>[0]["syncUpdates"] : undefined,
+        maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
       }),
     });
     return;

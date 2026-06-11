@@ -66,6 +66,7 @@ import {
   buildSmartleadInjectionPlan,
   buildSmartleadImportAuditPreview,
   buildSmartleadCampaignSyncPlanPreview,
+  buildSmartleadLocalReconciliationPreview,
   buildSmartleadSafeSyncRunbookPreview,
   buildSmartleadSenderCapacityPreview,
   buildSmartleadDeliverabilityGuardPreview,
@@ -3126,6 +3127,70 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildSmartleadCampaignSyncPlanPreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_smartlead_local_reconciliation_preview",
+    {
+      title: "Build Smartlead local reconciliation preview",
+      description: "Compare local lead sent/reply fields with Smartlead remote leads or sync updates, then prepare a read-only local patch plan for sent_to_smartlead, contact id, reply status, and sentiment.",
+      inputSchema: {
+        campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+        localLeads: z.array(z.object({
+          id: z.union([z.string(), z.number()]).optional(),
+          email: z.string().optional(),
+          primary_email: z.string().optional(),
+          companyName: z.string().optional(),
+          company_name: z.string().optional(),
+          firstName: z.string().optional(),
+          first_name: z.string().optional(),
+          lastName: z.string().optional(),
+          last_name: z.string().optional(),
+          website: z.string().optional(),
+          personalizedIntro: z.string().optional(),
+          personalized_intro: z.string().optional(),
+          sentToSmartlead: z.boolean().optional(),
+          sent_to_smartlead: z.boolean().optional(),
+          smartleadContactId: z.union([z.string(), z.number()]).optional(),
+          smartlead_contact_id: z.union([z.string(), z.number()]).optional(),
+          replyStatus: z.string().optional(),
+          reply_status: z.string().optional(),
+          replySentiment: z.string().nullable().optional(),
+          reply_sentiment: z.string().nullable().optional(),
+          customFields: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
+        }).passthrough()).default([]),
+        remoteLeads: z.array(z.object({
+          id: z.union([z.string(), z.number()]).optional(),
+          lead_id: z.union([z.string(), z.number()]).optional(),
+          email: z.string().min(1),
+          first_name: z.string().optional(),
+          last_name: z.string().optional(),
+          company_name: z.string().optional(),
+          website: z.string().optional(),
+          status: z.string().optional(),
+          category_name: z.string().nullable().optional(),
+          reply_status: z.string().optional(),
+          reply_sentiment: z.string().nullable().optional(),
+          custom_fields: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
+        }).passthrough()).optional(),
+        syncUpdates: z.array(z.object({
+          campaignId: z.union([z.string(), z.number()]).optional(),
+          email: z.string().min(1),
+          smartleadContactId: z.union([z.string(), z.number()]).optional(),
+          status: z.string().optional(),
+          categoryName: z.string().nullable().optional(),
+          localUpdate: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
+        })).optional(),
+        maxNextCalls: z.number().int().min(1).max(200).default(50),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildSmartleadLocalReconciliationPreview(input))
   );
 
   server.registerTool(

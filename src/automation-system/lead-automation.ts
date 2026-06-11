@@ -663,6 +663,44 @@ export type SmartleadCampaignSyncPlanPreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type SmartleadLocalReconciliationPreview = {
+  mode: "smartlead-local-reconciliation-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  campaignId?: string | number | null;
+  totals: {
+    localLeads: number;
+    remoteLeads: number;
+    matched: number;
+    needsLocalMarkSent: number;
+    needsReplyUpdate: number;
+    localSentRemoteMissing: number;
+    alreadySynced: number;
+    remoteUnmatched: number;
+    duplicateRemoteEmails: number;
+  };
+  items: Array<{
+    email: string;
+    localLead?: LeadCandidateInput & {
+      id?: string | number;
+      sentToSmartlead?: boolean;
+      sent_to_smartlead?: boolean;
+      smartleadContactId?: string | number;
+      smartlead_contact_id?: string | number;
+      replyStatus?: string;
+      reply_status?: string;
+      replySentiment?: string | null;
+      reply_sentiment?: string | null;
+    };
+    remoteLead?: SmartleadLead & { id?: string | number; lead_id?: string | number; status?: string; category_name?: string | null; reply_status?: string; reply_sentiment?: string | null };
+    status: "needs_local_mark_sent" | "needs_reply_update" | "local_sent_remote_missing" | "already_synced" | "remote_unmatched" | "duplicate_remote";
+    issues: string[];
+    localUpdatePatch?: Record<string, string | number | boolean | null | undefined>;
+  }>;
+  localUpdatePatches: Array<{ email: string; localId?: string | number; patch: Record<string, string | number | boolean | null | undefined> }>;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type SmartleadSafeSyncRunbookPreview = {
   mode: "smartlead-safe-sync-runbook-preview";
   status: "ready" | "attention" | "blocked";
@@ -4979,6 +5017,130 @@ export function buildSmartleadCampaignSyncPlanPreview(input: {
   };
 }
 
+export function buildSmartleadLocalReconciliationPreview(input: {
+  campaignId?: string | number | null;
+  localLeads: Array<LeadCandidateInput & {
+    id?: string | number;
+    primary_email?: string;
+    sentToSmartlead?: boolean;
+    sent_to_smartlead?: boolean;
+    smartleadContactId?: string | number;
+    smartlead_contact_id?: string | number;
+    replyStatus?: string;
+    reply_status?: string;
+    replySentiment?: string | null;
+    reply_sentiment?: string | null;
+  }>;
+  remoteLeads?: Array<SmartleadLead & { id?: string | number; lead_id?: string | number; status?: string; category_name?: string | null; reply_status?: string; reply_sentiment?: string | null }>;
+  syncUpdates?: Array<{ campaignId?: string | number; email: string; smartleadContactId?: string | number; status?: string; categoryName?: string | null; localUpdate?: Record<string, string | number | boolean | null | undefined> }>;
+  maxNextCalls?: number;
+}): SmartleadLocalReconciliationPreview {
+  const campaignId = input.campaignId ?? input.syncUpdates?.[0]?.campaignId ?? null;
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 50), 1), 200);
+  const localByEmail = new Map(input.localLeads.flatMap((lead) => {
+    const email = localReconciliationEmail(lead);
+    return email ? [[email, lead] as const] : [];
+  }));
+  const remoteRows = [
+    ...(input.remoteLeads ?? []).map((lead) => ({ email: localReconciliationEmail(lead), remoteLead: lead, update: undefined })),
+    ...(input.syncUpdates ?? []).map((update) => ({ email: update.email?.trim().toLowerCase(), remoteLead: undefined, update })),
+  ].filter((item) => item.email);
+  const remoteCounts = new Map<string, number>();
+  for (const row of remoteRows) remoteCounts.set(row.email as string, (remoteCounts.get(row.email as string) ?? 0) + 1);
+  const seenRemote = new Set<string>();
+  const items: SmartleadLocalReconciliationPreview["items"] = [];
+  for (const row of remoteRows) {
+    const email = row.email as string;
+    const localLead = localByEmail.get(email);
+    const remoteLead = row.remoteLead;
+    const update = row.update;
+    const patch = localReconciliationPatch(localLead, remoteLead, update);
+    const issues: string[] = [];
+    if ((remoteCounts.get(email) ?? 0) > 1) issues.push("duplicate_remote_email");
+    if (!localLead) issues.push("remote_email_not_found_locally");
+    if (localLead && !leadSentToSmartlead(localLead)) issues.push("local_not_marked_sent");
+    if (localLead && patch && (patch.reply_status !== undefined || patch.reply_sentiment !== undefined)) issues.push("reply_fields_need_update");
+    const status: SmartleadLocalReconciliationPreview["items"][number]["status"] = issues.includes("duplicate_remote_email")
+      ? "duplicate_remote"
+      : !localLead
+        ? "remote_unmatched"
+        : issues.includes("local_not_marked_sent")
+          ? "needs_local_mark_sent"
+          : issues.includes("reply_fields_need_update")
+            ? "needs_reply_update"
+            : "already_synced";
+    items.push({ email, localLead, remoteLead, status, issues, localUpdatePatch: patch });
+    seenRemote.add(email);
+  }
+  for (const [email, localLead] of localByEmail.entries()) {
+    if (!leadSentToSmartlead(localLead) || seenRemote.has(email)) continue;
+    items.push({
+      email,
+      localLead,
+      status: "local_sent_remote_missing",
+      issues: ["local_marked_sent_but_missing_remote"],
+    });
+  }
+  const localUpdatePatches = items
+    .filter((item) => item.localLead && item.localUpdatePatch && (item.status === "needs_local_mark_sent" || item.status === "needs_reply_update"))
+    .map((item) => ({ email: item.email, localId: item.localLead?.id, patch: item.localUpdatePatch as Record<string, string | number | boolean | null | undefined> }));
+  const nextToolCalls: SmartleadLocalReconciliationPreview["nextToolCalls"] = [];
+  if (campaignId) {
+    nextToolCalls.push({
+      tool: "arcigy.get_smartlead_campaign_leads",
+      payload: { campaignId, offset: 0, limit: 500 },
+      reason: "Pred lokalnym oznacenim sent_to_smartlead znovu nacitaj remote leady zo Smartlead kampane.",
+      approvalRequired: false,
+    });
+  }
+  const missingRemoteLocalLeads = items
+    .filter((item) => item.status === "local_sent_remote_missing" && item.localLead)
+    .map((item) => item.localLead as LeadCandidateInput)
+    .slice(0, maxNextCalls);
+  if (missingRemoteLocalLeads.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_smartlead_campaign_sync_plan_preview",
+      payload: { campaignId, localLeads: missingRemoteLocalLeads.map(localLeadToSmartleadLead), remoteLeads: input.remoteLeads ?? [] },
+      reason: "Lokálne marked sent leady chybaju v remote kampani; over missing upload/update plan.",
+      approvalRequired: false,
+    });
+  }
+  if (localUpdatePatches.length) {
+    nextToolCalls.push({
+      tool: "arcigy.get_local_memory_snapshot",
+      payload: { limit: Math.min(localUpdatePatches.length, maxNextCalls) },
+      reason: "Pred lokalnym zapisom ukaz snapshot a porovnaj patch payloady; tento preview sam nic nezapisuje.",
+      approvalRequired: false,
+    });
+  }
+  const totals = {
+    localLeads: input.localLeads.length,
+    remoteLeads: remoteRows.length,
+    matched: items.filter((item) => item.localLead && item.remoteLead || item.localLead && item.localUpdatePatch).length,
+    needsLocalMarkSent: items.filter((item) => item.status === "needs_local_mark_sent").length,
+    needsReplyUpdate: items.filter((item) => item.status === "needs_reply_update").length,
+    localSentRemoteMissing: items.filter((item) => item.status === "local_sent_remote_missing").length,
+    alreadySynced: items.filter((item) => item.status === "already_synced").length,
+    remoteUnmatched: items.filter((item) => item.status === "remote_unmatched").length,
+    duplicateRemoteEmails: items.filter((item) => item.status === "duplicate_remote").length,
+  };
+  const status: SmartleadLocalReconciliationPreview["status"] = !input.localLeads.length && !remoteRows.length
+    ? "blocked"
+    : totals.needsLocalMarkSent || totals.needsReplyUpdate || totals.localSentRemoteMissing || totals.remoteUnmatched || totals.duplicateRemoteEmails
+      ? "attention"
+      : "ready";
+  return {
+    mode: "smartlead-local-reconciliation-preview",
+    status,
+    summary: `Smartlead local reconciliation ${status}: ${totals.needsLocalMarkSent} oznacit sent, ${totals.needsReplyUpdate} reply update, ${totals.localSentRemoteMissing} lokalne sent ale remote chyba, ${totals.remoteUnmatched} remote bez lokalneho leada. Ziadny DB ani Smartlead zapis neprebehol.`,
+    campaignId,
+    totals,
+    items,
+    localUpdatePatches,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls),
+  };
+}
+
 export function buildSmartleadSafeSyncRunbookPreview(input: {
   campaignId?: string | number | null;
   campaignName?: string;
@@ -8478,6 +8640,59 @@ function buildSmartleadLeadSyncPayload(localLead: SmartleadLead, remoteLead: Sma
     if (normalizedCompareValue(customFields[key]) !== normalizedCompareValue(remoteLead.custom_fields?.[key])) changedFields.push(`custom_fields.${key}`);
   }
   return { changedFields: unique(changedFields), payload };
+}
+
+function localReconciliationEmail(record: Record<string, unknown>): string | undefined {
+  return stringField(record, "email", "primary_email", "lead_email")?.toLowerCase();
+}
+
+function localReconciliationPatch(
+  localLead: (LeadCandidateInput & {
+    sentToSmartlead?: boolean;
+    sent_to_smartlead?: boolean;
+    smartleadContactId?: string | number;
+    smartlead_contact_id?: string | number;
+    replyStatus?: string;
+    reply_status?: string;
+    replySentiment?: string | null;
+    reply_sentiment?: string | null;
+  }) | undefined,
+  remoteLead?: SmartleadLead & { id?: string | number; lead_id?: string | number; status?: string; category_name?: string | null; reply_status?: string; reply_sentiment?: string | null },
+  update?: { smartleadContactId?: string | number; status?: string; categoryName?: string | null; localUpdate?: Record<string, string | number | boolean | null | undefined> }
+): Record<string, string | number | boolean | null | undefined> | undefined {
+  if (!localLead) return update?.localUpdate;
+  const contactId = update?.smartleadContactId ?? remoteLead?.id ?? remoteLead?.lead_id;
+  const replyStatus = update?.status ?? remoteLead?.status ?? remoteLead?.reply_status;
+  const replySentiment = update?.categoryName ?? remoteLead?.category_name ?? remoteLead?.reply_sentiment ?? null;
+  const patch: Record<string, string | number | boolean | null | undefined> = {};
+  if (!leadSentToSmartlead(localLead)) patch.sent_to_smartlead = true;
+  const currentContactId = stringField(localLead as Record<string, unknown>, "smartleadContactId", "smartlead_contact_id") ?? stringField(localLead.customFields ?? {}, "smartlead_contact_id");
+  if (contactId !== undefined && String(contactId) !== (currentContactId ?? "")) patch.smartlead_contact_id = contactId;
+  const currentReplyStatus = stringField(localLead as Record<string, unknown>, "replyStatus", "reply_status") ?? stringField(localLead.customFields ?? {}, "reply_status");
+  if (replyStatus !== undefined && replyStatus !== currentReplyStatus) patch.reply_status = replyStatus;
+  const currentReplySentiment = stringField(localLead as Record<string, unknown>, "replySentiment", "reply_sentiment") ?? stringField(localLead.customFields ?? {}, "reply_sentiment");
+  if ((replySentiment ?? null) !== (currentReplySentiment ?? null)) patch.reply_sentiment = replySentiment ?? null;
+  return Object.keys(patch).length ? patch : undefined;
+}
+
+function localLeadToSmartleadLead(lead: LeadCandidateInput): SmartleadLead {
+  const customFields = cleanSmartleadCustomFields({
+    ...lead.customFields,
+    personalized_intro: lead.personalizedIntro ?? lead.customFields?.personalized_intro,
+    icebreaker_sentence: lead.personalizedIntro ?? lead.customFields?.icebreaker_sentence,
+  });
+  return {
+    email: lead.email ?? "",
+    first_name: lead.firstName,
+    last_name: lead.lastName,
+    company_name: lead.companyName,
+    website: lead.website,
+    custom_fields: customFields,
+  };
+}
+
+function cleanSmartleadCustomFields(fields: Record<string, string | number | boolean | null | undefined>): Record<string, string | number | boolean> {
+  return Object.fromEntries(Object.entries(fields).filter((entry): entry is [string, string | number | boolean] => entry[1] !== undefined && entry[1] !== null));
 }
 
 function normalizedCompareValue(value: unknown): string {

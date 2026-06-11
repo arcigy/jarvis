@@ -887,6 +887,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_lead_validation_scorecard_preview" && call.approvalRequired === false && call.body.minScore === 70));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_campaign_webhooks" && call.approvalRequired === false));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_email_accounts" && call.body.requestedDailyLimit === 80 && call.approvalRequired === false));
+    assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_smartlead_local_reconciliation_preview" && call.approvalRequired === false && Array.isArray(call.body.localLeads)));
     assert.ok(
       remotePackBody.quickStartCalls.some(
         (call) =>

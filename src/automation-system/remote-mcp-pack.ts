@@ -1313,6 +1313,26 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Reconcile Smartlead remote state with local leads",
+      tool: "arcigy.build_smartlead_local_reconciliation_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_smartlead_local_reconciliation_preview"),
+      body: {
+        campaignId: "123456",
+        localLeads: [
+          { id: "lead-1", email: "jan@ready.sk", companyName: "Ready Studio", sent_to_smartlead: false },
+          { id: "lead-2", email: "reply@ready.sk", companyName: "Reply Studio", sent_to_smartlead: true, smartlead_contact_id: "sl-2", reply_status: "sent" },
+          { id: "lead-3", email: "missing@ready.sk", companyName: "Missing Remote", sent_to_smartlead: true },
+        ],
+        remoteLeads: [
+          { id: "sl-1", email: "jan@ready.sk", status: "sent", category_name: null },
+          { id: "sl-2", email: "reply@ready.sk", status: "replied", category_name: "Interested" },
+          { id: "sl-x", email: "unknown@remote.sk", status: "sent" },
+        ],
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Build safe Smartlead sync runbook",
       tool: "arcigy.build_smartlead_safe_sync_runbook_preview",
       method: "POST",

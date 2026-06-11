@@ -65,6 +65,7 @@ import {
   buildSmartleadInjectionPlan,
   buildSmartleadImportAuditPreview,
   buildSmartleadCampaignSyncPlanPreview,
+  buildSmartleadLocalReconciliationPreview,
   buildSmartleadSafeSyncRunbookPreview,
   buildSmartleadSenderCapacityPreview,
   buildSmartleadDeliverabilityGuardPreview,
@@ -240,6 +241,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.build_smartlead_injection_plan",
     "arcigy.build_smartlead_import_audit_preview",
     "arcigy.build_smartlead_campaign_sync_plan_preview",
+    "arcigy.build_smartlead_local_reconciliation_preview",
     "arcigy.build_smartlead_safe_sync_runbook_preview",
     "arcigy.build_smartlead_sender_capacity_preview",
     "arcigy.build_smartlead_deliverability_guard_preview",
@@ -1904,6 +1906,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_flagged_lead_review_preview" && call.approvalRequired === false && typeof call.body.csvText === "string"));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.lookup_public_email_profile" && call.body.email === "jan.novak@example.com" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.preview_smartlead_lead_sync" && call.approvalRequired === false));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_smartlead_local_reconciliation_preview" && call.approvalRequired === false && Array.isArray(call.body.localLeads)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_email_accounts" && call.body.requestedDailyLimit === 80 && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_campaign_webhooks" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_leadgen_db_status_preview" && call.approvalRequired === false && Array.isArray(call.body.blacklistDomains)));
@@ -5340,6 +5343,38 @@ test("Smartlead campaign sync plan separates missing updates and unchanged leads
   assert.ok(preview.updateExisting[0].changedFields.includes("custom_fields.personalized_intro"));
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.add_leads_to_smartlead_campaign" && call.approvalRequired));
   assert.match(preview.summary, /Ziadny Smartlead ani DB zapis/);
+});
+
+test("Smartlead local reconciliation prepares DB patch plan without writing", () => {
+  const preview = buildSmartleadLocalReconciliationPreview({
+    campaignId: "123456",
+    localLeads: [
+      { id: "lead-1", email: "jan@ready.sk", companyName: "Ready Studio", sent_to_smartlead: false },
+      { id: "lead-2", email: "reply@ready.sk", companyName: "Reply Studio", sent_to_smartlead: true, smartlead_contact_id: "sl-2", reply_status: "sent" },
+      { id: "lead-3", email: "missing@ready.sk", companyName: "Missing Remote", sent_to_smartlead: true },
+      { id: "lead-4", email: "same@ready.sk", companyName: "Same Remote", sent_to_smartlead: true, smartlead_contact_id: "sl-4", reply_status: "sent" },
+    ],
+    remoteLeads: [
+      { id: "sl-1", email: "jan@ready.sk", status: "sent", category_name: null },
+      { id: "sl-2", email: "reply@ready.sk", status: "replied", category_name: "Interested" },
+      { id: "sl-4", email: "same@ready.sk", status: "sent", category_name: null },
+      { id: "sl-x", email: "unknown@remote.sk", status: "sent" },
+    ],
+  });
+
+  assert.equal(preview.mode, "smartlead-local-reconciliation-preview");
+  assert.equal(preview.status, "attention");
+  assert.equal(preview.totals.needsLocalMarkSent, 1);
+  assert.equal(preview.totals.needsReplyUpdate, 1);
+  assert.equal(preview.totals.localSentRemoteMissing, 1);
+  assert.equal(preview.totals.remoteUnmatched, 1);
+  assert.equal(preview.totals.alreadySynced, 1);
+  assert.equal(preview.localUpdatePatches.find((item) => item.email === "jan@ready.sk")?.patch.sent_to_smartlead, true);
+  assert.equal(preview.localUpdatePatches.find((item) => item.email === "reply@ready.sk")?.patch.reply_status, "replied");
+  assert.equal(preview.localUpdatePatches.find((item) => item.email === "reply@ready.sk")?.patch.reply_sentiment, "Interested");
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.get_smartlead_campaign_leads" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_smartlead_campaign_sync_plan_preview" && !call.approvalRequired));
+  assert.match(preview.summary, /Ziadny DB ani Smartlead zapis/);
 });
 
 test("Smartlead safe sync runbook wraps sync plan with backup pause and re-check steps", () => {
