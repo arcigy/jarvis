@@ -795,6 +795,22 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       minScore: 70,
     };
   }
+  if (toolName === "arcigy.build_phone_enrichment_queue_preview") {
+    return {
+      sourceName: "slovakia-apollo-export.csv",
+      countryFilter: "Slovakia",
+      csvText: "company,country,orgCountry,website,phone,email\nReady Firma,Slovakia,Slovakia,https://ready.sk,+421 900 111 222,jan@ready.sk\nNeeds Phone,Slovakia,Slovakia,https://needs-phone.sk,,info@needs-phone.sk\nNeeds Scrape,Slovakia,Slovakia,https://needs-scrape.sk,,info@needs-scrape.sk\nWrong Country,Czechia,Czechia,https://wrong.cz,,info@wrong.cz\nBad Website,Slovakia,Slovakia,https://linkedin.com/company/bad,,bad@example.com",
+      scrapedResults: [
+        {
+          url: "https://needs-phone.sk",
+          finalUrl: "https://needs-phone.sk/kontakt",
+          phones: ["+421 900 222 333"],
+          emails: ["info@needs-phone.sk"],
+          textPreview: "Kontakt",
+        },
+      ],
+    };
+  }
   if (toolName === "arcigy.build_orphan_lead_assignment_preview") {
     return {
       sourceName: "orphan-leads-db-export",

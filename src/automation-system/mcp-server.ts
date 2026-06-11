@@ -27,6 +27,7 @@ import {
   buildLeadgenCampaignPipelinePreview,
   buildLeadgenAutopilotBatchPreview,
   buildRegionExpansionQueuePreview,
+  buildPhoneEnrichmentQueuePreview,
   buildLeadSourceImportQueuePreview,
   buildLeadSourceBundlePreview,
   buildLeadSourceBundleCampaignLaunchPreview,
@@ -3254,6 +3255,41 @@ export function createJarvisMcpServer(): McpServer {
     personalizedIntro: z.string().optional(),
     customFields: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
   });
+
+  server.registerTool(
+    "arcigy.build_phone_enrichment_queue_preview",
+    {
+      title: "Build phone enrichment queue preview",
+      description: "Prepare a read-only phone enrichment queue from CSV or leads: filter country rows, skip existing phones, plan website/contact scrape, and prepare a reviewed CSV export payload.",
+      inputSchema: {
+        leads: z.array(leadCandidateSchema.extend({
+          raw: z.record(z.string(), z.string()).optional(),
+        })).optional(),
+        csvText: z.string().optional(),
+        delimiter: z.enum([",", ";"]).optional(),
+        sourceName: z.string().optional(),
+        countryFilter: z.string().optional(),
+        scrapedResults: z.array(z.object({
+          url: z.string().optional(),
+          finalUrl: z.string().optional(),
+          title: z.string().optional(),
+          description: z.string().optional(),
+          textPreview: z.string().optional(),
+          emails: z.array(z.string()).optional(),
+          phones: z.array(z.string()).optional(),
+          internalLinks: z.array(z.string()).optional(),
+        }).partial()).optional(),
+        maxNextCalls: z.number().int().min(1).max(200).default(50),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildPhoneEnrichmentQueuePreview(input))
+  );
 
   server.registerTool(
     "arcigy.build_lead_csv_mapping_preview",

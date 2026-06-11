@@ -36,6 +36,7 @@ import {
   buildLeadSourceBundleCampaignLaunchPreview,
   buildUrlIntelligenceQueuePreview,
   buildLeadRepairQueuePreview,
+  buildPhoneEnrichmentQueuePreview,
   buildSlovakRegisterBatchPreview,
   buildSlovakSalutationPreview,
   buildOrphanLeadAssignmentPreview,
@@ -215,6 +216,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.build_lead_source_bundle_campaign_launch_preview",
     "arcigy.build_leadgen_autopilot_batch_preview",
     "arcigy.build_lead_repair_queue_preview",
+    "arcigy.build_phone_enrichment_queue_preview",
     "arcigy.build_orphan_lead_assignment_preview",
     "arcigy.build_niche_ops_dashboard_preview",
     "arcigy.build_cold_outreach_csv_import_preview",
@@ -1481,7 +1483,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 116 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 117 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -3307,6 +3309,43 @@ test("lead repair queue preview detects broken leads and proposes safe fixes", (
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_draft_lead_intros" && !call.approvalRequired));
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_manual_review_queue" && !call.approvalRequired));
   assert.match(preview.summary, /Ziadny zapis ani upload/);
+});
+
+test("phone enrichment queue preview plans scrape and merges supplied phone results", () => {
+  const preview = buildPhoneEnrichmentQueuePreview({
+    sourceName: "slovakia-apollo-export.csv",
+    countryFilter: "Slovakia",
+    csvText: [
+      "company,country,orgCountry,website,phone,email",
+      "Ready Firma,Slovakia,Slovakia,https://ready.sk,+421 900 111 222,jan@ready.sk",
+      "Needs Phone,Slovakia,Slovakia,https://needs-phone.sk,,info@needs-phone.sk",
+      "Needs Scrape,Slovakia,Slovakia,https://needs-scrape.sk,,info@needs-scrape.sk",
+      "Wrong Country,Czechia,Czechia,https://wrong.cz,,info@wrong.cz",
+      "Bad Website,Slovakia,Slovakia,https://linkedin.com/company/bad,,bad@example.com",
+    ].join("\n"),
+    scrapedResults: [
+      {
+        url: "https://needs-phone.sk",
+        finalUrl: "https://needs-phone.sk/kontakt",
+        phones: ["+421 900 222 333"],
+        emails: ["info@needs-phone.sk"],
+        textPreview: "Kontakt",
+      },
+    ],
+  });
+
+  assert.equal(preview.mode, "phone-enrichment-queue-preview");
+  assert.equal(preview.totals.input, 5);
+  assert.equal(preview.totals.filteredOut, 1);
+  assert.equal(preview.totals.withPhone, 1);
+  assert.equal(preview.totals.phoneFoundFromScrape, 1);
+  assert.equal(preview.totals.needsPhoneScrape, 1);
+  assert.equal(preview.totals.invalidWebsite, 1);
+  assert.ok(preview.enrichedLeads.some((lead) => lead.phone === "+421 900 222 333"));
+  assert.ok(preview.scrapeUrls.includes("https://needs-scrape.sk"));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_scrape_website_contacts" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.export_leads_csv" && call.approvalRequired));
+  assert.match(preview.summary, /Ziadny zapis ani export/);
 });
 
 test("Slovak register batch preview prepares ORSR lookup queue without writes", () => {

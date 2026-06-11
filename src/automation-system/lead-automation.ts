@@ -139,6 +139,33 @@ export type LeadBatchQaPreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type PhoneEnrichmentQueuePreview = {
+  mode: "phone-enrichment-queue-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  source: { name?: string; countryFilter?: string; parsedFromCsv: number };
+  totals: {
+    input: number;
+    included: number;
+    filteredOut: number;
+    withPhone: number;
+    needsPhoneScrape: number;
+    invalidWebsite: number;
+    phoneFoundFromScrape: number;
+  };
+  items: Array<{
+    lead: LeadCandidateInput & { raw?: Record<string, string> };
+    status: "with_phone" | "needs_scrape" | "phone_found" | "invalid_website" | "filtered_out";
+    phone?: string;
+    sourceUrls: string[];
+    reason: string;
+  }>;
+  enrichedLeads: LeadCandidateInput[];
+  scrapeUrls: string[];
+  exportPreview: ReturnType<typeof serializeLeadsCsv>;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type PreparedSmartleadLeadInput = {
   email: string;
   companyName?: string;
@@ -1709,6 +1736,103 @@ export function buildLeadBatchQaPreview(input: {
     repairLeads,
     rejectedLeads,
     smartleadPrepared,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls),
+  };
+}
+
+export function buildPhoneEnrichmentQueuePreview(input: {
+  leads?: Array<LeadCandidateInput & { raw?: Record<string, string> }>;
+  csvText?: string;
+  delimiter?: "," | ";";
+  sourceName?: string;
+  countryFilter?: string;
+  scrapedResults?: Array<Partial<ScrapedWebsiteContacts>>;
+  maxNextCalls?: number;
+}): PhoneEnrichmentQueuePreview {
+  const parsed = input.csvText?.trim() ? parseLeadsCsv({ csvText: input.csvText, delimiter: input.delimiter }) : undefined;
+  const leads = [...(input.leads ?? []), ...(parsed?.leads ?? [])] as Array<LeadCandidateInput & { raw?: Record<string, string> }>;
+  const countryFilter = input.countryFilter?.trim();
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 50), 1), 200);
+  const scrapeByDomain = new Map((input.scrapedResults ?? []).flatMap((scrape) => {
+    const keys = unique([normalizeDomain(scrape.url ?? ""), normalizeDomain(scrape.finalUrl ?? "")].filter(Boolean));
+    return keys.map((key) => [key, scrape] as const);
+  }));
+  const items: PhoneEnrichmentQueuePreview["items"] = leads.map((lead) => {
+    if (countryFilter && !leadMatchesCountry(lead, countryFilter)) {
+      return { lead, status: "filtered_out", sourceUrls: [], reason: `country not ${countryFilter}` };
+    }
+    const existingPhone = lead.phone ?? stringField(lead.customFields ?? {}, "phone", "international_phone", "phone_number");
+    if (existingPhone) return { lead, status: "with_phone", phone: existingPhone, sourceUrls: [], reason: "phone already present" };
+    if (!isScrapableLeadWebsite(lead.website)) return { lead, status: "invalid_website", sourceUrls: [], reason: "missing or unsupported website" };
+    const scraped = scrapeByDomain.get(normalizeDomain(lead.website as string));
+    const foundPhone = scraped?.phones?.[0];
+    if (foundPhone) {
+      return {
+        lead,
+        status: "phone_found",
+        phone: foundPhone,
+        sourceUrls: [scraped.finalUrl, scraped.url].filter((value): value is string => Boolean(value)),
+        reason: "phone found in supplied scrape result",
+      };
+    }
+    return { lead, status: "needs_scrape", sourceUrls: [], reason: "phone missing; scrape website/contact pages" };
+  });
+  const enrichedLeads = items
+    .filter((item) => item.status !== "filtered_out" && item.status !== "invalid_website")
+    .map((item) => ({
+      ...item.lead,
+      phone: item.phone ?? item.lead.phone,
+      source: item.lead.source ?? input.sourceName,
+      customFields: {
+        ...item.lead.customFields,
+        phone_source_urls: item.sourceUrls.join("; ") || item.lead.customFields?.phone_source_urls,
+      },
+    }));
+  const scrapeUrls = unique(items
+    .filter((item) => item.status === "needs_scrape" && item.lead.website)
+    .map((item) => item.lead.website as string))
+    .slice(0, maxNextCalls);
+  const exportPreview = serializeLeadsCsv({
+    leads: enrichedLeads,
+    columns: ["companyName", "email", "website", "phone", "source", "phone_source_urls"],
+  });
+  const nextToolCalls: PhoneEnrichmentQueuePreview["nextToolCalls"] = [];
+  if (scrapeUrls.length) {
+    nextToolCalls.push({
+      tool: "arcigy.batch_scrape_website_contacts",
+      payload: { urls: scrapeUrls, includePriorityPages: true, maxPages: 3, maxSites: scrapeUrls.length },
+      reason: "Dohladat telefony z webov a kontakt podstranok pre leady bez telefonu.",
+      approvalRequired: false,
+    });
+  }
+  if (enrichedLeads.some((lead) => lead.phone)) {
+    nextToolCalls.push({
+      tool: "arcigy.export_leads_csv",
+      payload: { leads: enrichedLeads, columns: ["companyName", "email", "website", "phone", "source", "phone_source_urls"] },
+      reason: "Exportuj phone-enriched CSV az po kontrole riadkov operatorom.",
+      approvalRequired: true,
+    });
+  }
+  const totals = {
+    input: leads.length,
+    included: items.filter((item) => item.status !== "filtered_out").length,
+    filteredOut: items.filter((item) => item.status === "filtered_out").length,
+    withPhone: items.filter((item) => item.status === "with_phone").length,
+    needsPhoneScrape: items.filter((item) => item.status === "needs_scrape").length,
+    invalidWebsite: items.filter((item) => item.status === "invalid_website").length,
+    phoneFoundFromScrape: items.filter((item) => item.status === "phone_found").length,
+  };
+  const status: PhoneEnrichmentQueuePreview["status"] = totals.input === 0 ? "blocked" : totals.needsPhoneScrape > 0 || totals.invalidWebsite > 0 ? "attention" : "ready";
+  return {
+    mode: "phone-enrichment-queue-preview",
+    status,
+    summary: `Phone enrichment queue ${status}: ${totals.withPhone} uz ma telefon, ${totals.phoneFoundFromScrape} doplnenych zo scrape, ${totals.needsPhoneScrape} potrebuje scrape. Ziadny zapis ani export neprebehol.`,
+    source: { name: input.sourceName, countryFilter, parsedFromCsv: parsed?.leads.length ?? 0 },
+    totals,
+    items,
+    enrichedLeads,
+    scrapeUrls,
+    exportPreview,
     nextToolCalls: dedupeNextToolCalls(nextToolCalls),
   };
 }
@@ -6358,6 +6482,26 @@ function isBlockedLeadSourceDomain(website: string): boolean {
     "bydlo.cz", "doporucenefirmy.cz", "easy-prace.cz", "alza.sk", "mall.sk", "booking.com", "tripadvisor.com",
   ]);
   return blocked.has(domain) || domain.endsWith(".pl") || /^(info-|katalog-)/i.test(domain);
+}
+
+function leadMatchesCountry(lead: LeadCandidateInput & { raw?: Record<string, string> }, country: string): boolean {
+  const expected = country.trim().toLowerCase();
+  const values = [
+    lead.customFields?.country,
+    lead.customFields?.orgCountry,
+    lead.customFields?.org_country,
+    lead.raw?.country,
+    lead.raw?.orgCountry,
+    lead.raw?.org_country,
+  ].map((value) => String(value ?? "").trim().toLowerCase()).filter(Boolean);
+  return values.some((value) => value === expected || slugify(value) === slugify(expected));
+}
+
+function isScrapableLeadWebsite(website: string | undefined): boolean {
+  if (!website?.trim()) return false;
+  if (/^(mailto:|tel:|javascript:)/i.test(website)) return false;
+  if (/linkedin\.com|facebook\.com|instagram\.com/i.test(website)) return false;
+  return Boolean(normalizeDomain(website));
 }
 
 function cleanLeadCompanyShort(value: string | undefined, website?: string, fallbackName?: string): string | undefined {

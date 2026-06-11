@@ -195,6 +195,7 @@ const capabilityDefinitions: CapabilityDefinition[] = [
       "arcigy.build_lead_source_bundle_campaign_launch_preview",
       "arcigy.build_leadgen_autopilot_batch_preview",
       "arcigy.build_lead_repair_queue_preview",
+      "arcigy.build_phone_enrichment_queue_preview",
       "arcigy.build_orphan_lead_assignment_preview",
       "arcigy.build_niche_ops_dashboard_preview",
       "arcigy.build_cold_outreach_csv_import_preview",
