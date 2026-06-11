@@ -998,6 +998,22 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Repair lead identity fields before Smartlead",
+      tool: "arcigy.build_lead_identity_repair_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_lead_identity_repair_preview"),
+      body: {
+        sourceName: "kuchyne-sk",
+        defaultSource: "google-maps",
+        campaignId: "123456",
+        leads: [
+          { companyName: "Ready Studio - Kuchyne na mieru", email: "jan.novak@ready.sk", website: "https://ready.sk" },
+          { companyName: "Kontakt Studio", email: "info@kontakt-studio.sk", website: "https://kontakt-studio.sk" },
+        ],
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Score lead quality before import",
       tool: "arcigy.score_lead_quality",
       method: "POST",

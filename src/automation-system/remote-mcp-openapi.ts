@@ -448,6 +448,17 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       ],
     };
   }
+  if (toolName === "arcigy.build_lead_identity_repair_preview") {
+    return {
+      sourceName: "kuchyne-sk",
+      defaultSource: "google-maps",
+      campaignId: "123456",
+      leads: [
+        { companyName: "Ready Studio - Kuchyne na mieru", email: "jan.novak@ready.sk", website: "https://ready.sk" },
+        { companyName: "Kontakt Studio", email: "info@kontakt-studio.sk", website: "https://kontakt-studio.sk" },
+      ],
+    };
+  }
   if (toolName === "arcigy.score_lead_quality") {
     return { minScore: 70, leads: [{ email: "majitel@example.sk", website: "https://example.sk", decisionMaker: "Jan Novak", registerVerified: true, personalizedIntro: "Kratke AI intro." }] };
   }

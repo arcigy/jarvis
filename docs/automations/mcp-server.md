@@ -136,6 +136,7 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.apply_local_lead_register_update`: approval-required local SQLite write that stores reviewed ORSR enrichment in the existing local person JSON `data` payload.
 - `arcigy.build_slovak_register_batch_preview`: builds a batch ORSR/register enrichment queue for leads with ICO/name lookups, repair checks, and merge next steps without writes.
 - `arcigy.build_slovak_salutation_preview`: builds Slovak `pan`/`pani` Smartlead custom fields like `last_name_with_salutation` and `greeting` for a lead batch without writes.
+- `arcigy.build_lead_identity_repair_preview`: infers decision-maker names from personal emails, cleans `company_name_short`, and prepares Smartlead-safe identity fields without writes.
 - `arcigy.score_lead_quality`: scores lead candidates 0-100 using email type, website, `.sk` domain, decision maker, register verification, AI intro, and validation status.
 - `arcigy.dedupe_lead_candidates`: deduplicates lead candidates by email, website, phone, or company name before import.
 - `arcigy.build_suppression_list_preview`: builds a read-only suppression/blacklist filter from bounces, unsubscribes, negative replies, and manual rules.

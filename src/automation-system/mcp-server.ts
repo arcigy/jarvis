@@ -37,6 +37,7 @@ import {
   buildOrphanLeadAssignmentPreview,
   buildUrlIntelligenceQueuePreview,
   buildLeadRepairQueuePreview,
+  buildLeadIdentityRepairPreview,
   buildSlovakRegisterBatchPreview,
   buildSlovakSalutationPreview,
   buildNicheOpsDashboardPreview,
@@ -2169,6 +2170,29 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildSlovakSalutationPreview(input as Parameters<typeof buildSlovakSalutationPreview>[0]))
+  );
+
+  server.registerTool(
+    "arcigy.build_lead_identity_repair_preview",
+    {
+      title: "Build lead identity repair preview",
+      description: "Infer person names from personal emails, clean company_name_short, and prepare Smartlead-safe identity fields without DB writes or uploads.",
+      inputSchema: {
+        leads: z.array(z.object({}).passthrough()).min(1).max(1000),
+        sourceName: z.string().optional(),
+        defaultSource: z.string().optional(),
+        campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+        includeSmartleadPreview: z.boolean().default(true),
+        maxItems: z.number().int().min(1).max(1000).default(300),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildLeadIdentityRepairPreview(input as Parameters<typeof buildLeadIdentityRepairPreview>[0]))
   );
 
   server.registerTool(

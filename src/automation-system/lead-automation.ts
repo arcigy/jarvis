@@ -256,6 +256,42 @@ export type LeadBatchQaPreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type LeadIdentityRepairPreview = {
+  mode: "lead-identity-repair-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  source: { name?: string; defaultSource?: string };
+  totals: {
+    input: number;
+    repaired: number;
+    inferredNames: number;
+    genericEmails: number;
+    invalidEmails: number;
+    companyShortUpdated: number;
+    missingIdentity: number;
+    smartleadReady: number;
+  };
+  items: Array<{
+    lead: LeadRepairQueueLead & { companyNameShort?: string; company_name_short?: string; official_company_name?: string; original_name?: string };
+    status: "repaired" | "unchanged" | "manual_review" | "rejected";
+    issues: string[];
+    confidence: "high" | "medium" | "low";
+    updates: {
+      email?: string | null;
+      companyName?: string;
+      companyNameShort?: string;
+      firstName?: string;
+      lastName?: string;
+      decisionMakerName?: string;
+      customFields: Record<string, string | number | boolean | null | undefined>;
+    };
+  }>;
+  repairedLeads: PreparedSmartleadLeadInput[];
+  manualReviewLeads: LeadRepairQueueLead[];
+  smartleadPrepared: ReturnType<typeof prepareSmartleadLeads>;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type PhoneEnrichmentQueuePreview = {
   mode: "phone-enrichment-queue-preview";
   status: "ready" | "attention" | "blocked";
@@ -2001,6 +2037,143 @@ export function buildLeadBatchQaPreview(input: {
     readyLeads,
     repairLeads,
     rejectedLeads,
+    smartleadPrepared,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls),
+  };
+}
+
+export function buildLeadIdentityRepairPreview(input: {
+  leads: Array<LeadRepairQueueLead & { companyNameShort?: string; company_name_short?: string; official_company_name?: string; original_name?: string }>;
+  sourceName?: string;
+  defaultSource?: string;
+  campaignId?: string | number | null;
+  includeSmartleadPreview?: boolean;
+  maxItems?: number;
+}): LeadIdentityRepairPreview {
+  const maxItems = Math.min(Math.max(Math.trunc(input.maxItems ?? 300), 1), 1000);
+  const leads = input.leads.slice(0, maxItems);
+  const items: LeadIdentityRepairPreview["items"] = leads.map((lead) => {
+    const custom = lead.customFields ?? {};
+    const email = lead.email?.trim().toLowerCase() || undefined;
+    const emailQuality = classifyIdentityEmail(email);
+    const website = lead.website ?? stringField(custom, "website", "domain");
+    const companyName = lead.companyName ?? stringField(lead, "official_company_name", "original_name", "companyNameShort", "company_name_short") ?? stringField(custom, "official_company_name", "original_name", "company_name_short");
+    const companyNameShort = cleanLeadCompanyShort(stringField(lead, "companyNameShort", "company_name_short") ?? stringField(custom, "company_name_short") ?? companyName, website, companyName);
+    const existingDecisionMaker = decisionMakerForLead(lead);
+    const inferred = inferPersonNameFromEmail(email, companyNameShort ?? companyName, website);
+    const selectedName = existingDecisionMaker && !looksLikeBusinessAlias(existingDecisionMaker) ? existingDecisionMaker : inferred.fullName;
+    const split = splitName(selectedName);
+    const issues: string[] = [];
+    if (!email) issues.push("missing_email");
+    else if (emailQuality === "invalid") issues.push("invalid_email");
+    else if (emailQuality === "generic") issues.push("generic_email");
+    if (!companyName) issues.push("missing_company_name");
+    if (companyNameShort && companyNameShort !== (stringField(lead, "companyNameShort", "company_name_short") ?? stringField(custom, "company_name_short") ?? companyName)) issues.push("company_short_cleaned");
+    if (!existingDecisionMaker && inferred.fullName) issues.push("decision_maker_inferred_from_email");
+    if (existingDecisionMaker && looksLikeBusinessAlias(existingDecisionMaker) && inferred.fullName) issues.push("business_alias_replaced");
+    if (!selectedName) issues.push("missing_decision_maker");
+    const rejected = emailQuality === "invalid";
+    const manual = !selectedName || !companyName || emailQuality === "generic" || emailQuality === "missing";
+    const status: LeadIdentityRepairPreview["items"][number]["status"] = rejected
+      ? "rejected"
+      : manual
+        ? "manual_review"
+        : issues.length
+          ? "repaired"
+          : "unchanged";
+    const confidence: LeadIdentityRepairPreview["items"][number]["confidence"] = inferred.confidence === "high" && emailQuality === "personal" ? "high" : selectedName ? "medium" : "low";
+    return {
+      lead,
+      status,
+      issues,
+      confidence,
+      updates: {
+        email: rejected ? null : email,
+        companyName,
+        companyNameShort,
+        firstName: split.firstName ?? lead.firstName,
+        lastName: split.lastName ?? lead.lastName,
+        decisionMakerName: selectedName,
+        customFields: {
+          ...custom,
+          source: input.defaultSource ?? lead.source ?? stringField(custom, "source"),
+          company_name_short: companyNameShort,
+          decision_maker_name: selectedName,
+          decision_maker_first_name: split.firstName ?? lead.firstName,
+          decision_maker_last_name: split.lastName ?? lead.lastName,
+          identity_repair_status: status,
+          identity_repair_confidence: confidence,
+          identity_repair_issues: issues.join(","),
+        },
+      },
+    };
+  });
+  const repairedLeads: PreparedSmartleadLeadInput[] = items
+    .filter((item) => item.status !== "rejected" && item.updates.email && item.updates.companyName)
+    .map((item) => ({
+      email: item.updates.email as string,
+      companyName: item.updates.companyName,
+      firstName: item.updates.firstName,
+      lastName: item.updates.lastName,
+      website: item.lead.website,
+      phone: item.lead.phone,
+      source: input.defaultSource ?? item.lead.source,
+      personalizedIntro: item.lead.personalizedIntro,
+      customFields: item.updates.customFields,
+    }));
+  const manualReviewLeads = items.filter((item) => item.status === "manual_review" || item.status === "rejected").map((item) => item.lead);
+  const smartleadPrepared = prepareSmartleadLeads({ leads: repairedLeads, defaultSource: input.defaultSource ?? input.sourceName ?? "lead-identity-repair" });
+  const nextToolCalls: LeadIdentityRepairPreview["nextToolCalls"] = [];
+  if (input.includeSmartleadPreview !== false && repairedLeads.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_slovak_salutation_preview",
+      payload: { leads: repairedLeads, defaultSource: input.defaultSource ?? input.sourceName ?? "lead-identity-repair", campaignId: input.campaignId },
+      reason: "Po oprave identity dopln pan/pani custom fields pre Smartlead.",
+      approvalRequired: false,
+    });
+    nextToolCalls.push({
+      tool: "arcigy.build_lead_batch_qa_preview",
+      payload: { leads: repairedLeads, campaignId: input.campaignId, defaultSource: input.defaultSource ?? input.sourceName ?? "lead-identity-repair" },
+      reason: "Pred Smartlead importom este prever emaily, intro a company_short.",
+      approvalRequired: false,
+    });
+  }
+  if (manualReviewLeads.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_manual_review_queue",
+      payload: { leads: manualReviewLeads, minScore: 50 },
+      reason: "Leady s generickym emailom, chybajucim menom alebo invalid emailom nechaj na manual review.",
+      approvalRequired: false,
+    });
+  }
+  if (input.campaignId && smartleadPrepared.leadList.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_smartlead_import_audit_preview",
+      payload: { campaignId: input.campaignId, leads: smartleadPrepared.leadList },
+      reason: "Pred uploadom porovnaj opravene leady s existujucou Smartlead kampanou.",
+      approvalRequired: false,
+    });
+  }
+  const totals = {
+    input: leads.length,
+    repaired: items.filter((item) => item.status === "repaired").length,
+    inferredNames: items.filter((item) => item.issues.includes("decision_maker_inferred_from_email") || item.issues.includes("business_alias_replaced")).length,
+    genericEmails: items.filter((item) => item.issues.includes("generic_email")).length,
+    invalidEmails: items.filter((item) => item.issues.includes("invalid_email")).length,
+    companyShortUpdated: items.filter((item) => item.issues.includes("company_short_cleaned")).length,
+    missingIdentity: items.filter((item) => item.issues.includes("missing_decision_maker")).length,
+    smartleadReady: smartleadPrepared.leadList.length,
+  };
+  const status: LeadIdentityRepairPreview["status"] = totals.input === 0 ? "blocked" : totals.invalidEmails || totals.genericEmails || totals.missingIdentity ? "attention" : "ready";
+  return {
+    mode: "lead-identity-repair-preview",
+    status,
+    summary: `Lead identity repair ${status}: ${totals.repaired} opravenych, ${totals.inferredNames} mien z emailu, ${totals.companyShortUpdated} company_short uprav, ${totals.smartleadReady} ready pre Smartlead. Ziadny zapis ani upload neprebehol.`,
+    source: { name: input.sourceName, defaultSource: input.defaultSource },
+    totals,
+    items,
+    repairedLeads,
+    manualReviewLeads,
     smartleadPrepared,
     nextToolCalls: dedupeNextToolCalls(nextToolCalls),
   };
@@ -8147,6 +8320,49 @@ function isUsableBatchQaEmail(email: string | undefined): boolean {
   if (/^(e-?shop|support|podpora|reklamace|webmaster|marketing|newsletter|license|noreply|no-reply)@/i.test(value)) return false;
   if (/(adresa\.cz|domena\.cz|e-mail\.cz|php\.net|freebiesxpress|rambler\.ru|a\.an)$/i.test(value)) return false;
   return true;
+}
+
+function classifyIdentityEmail(email: string | undefined): "personal" | "generic" | "invalid" | "missing" {
+  const value = email?.trim().toLowerCase();
+  if (!value) return "missing";
+  if (!isUsableBatchQaEmail(value)) return /^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}$/i.test(value) ? "generic" : "invalid";
+  const local = value.split("@")[0] ?? "";
+  if (genericEmailLocalParts.has(normalizeNameToken(local.replace(/[._+\-]+/g, " ")))) return "generic";
+  if (/^(info|kontakt|contact|office|hello|sales|support|admin|marketing|obchod|servis|reklamacie|objednavky|recepcia|fakturacia)([._+\-]|\d|$)/i.test(local)) return "generic";
+  return "personal";
+}
+
+const genericEmailLocalParts = new Set([
+  "info", "kontakt", "contact", "mail", "hello", "office", "admin", "webmaster", "support", "sales",
+  "dopyt", "objednavky", "predajna", "prijem", "servis", "marketing", "obchod", "technik",
+  "administrativa", "fakturacia", "recepcia", "newsletter", "eshop", "team", "firma", "katalog",
+]);
+
+function inferPersonNameFromEmail(email: string | undefined, companyName?: string, website?: string): { fullName?: string; confidence: "high" | "medium" | "low" } {
+  if (classifyIdentityEmail(email) !== "personal") return { confidence: "low" };
+  const local = email!.split("@")[0]?.split("+")[0] ?? "";
+  const tokens = local
+    .split(/[._\-]+/g)
+    .map((part) => part.replace(/\d+/g, "").trim())
+    .filter((part) => part.length >= 2)
+    .filter((part) => !genericEmailLocalParts.has(normalizeNameToken(part)));
+  const blocked = new Set([...(companyName ?? "").split(/\s+/), ...(brandFromWebsite(website) ?? "").split(/\s+/)].map((part) => normalizeNameToken(part)).filter(Boolean));
+  const personTokens = tokens.filter((part) => !blocked.has(normalizeNameToken(part)));
+  if (personTokens.length >= 2) {
+    return { fullName: personTokens.slice(0, 2).map(titleCaseNamePart).join(" "), confidence: "high" };
+  }
+  if (personTokens.length === 1 && /[._\-]/.test(local)) {
+    return { fullName: titleCaseNamePart(personTokens[0]), confidence: "medium" };
+  }
+  return { confidence: "low" };
+}
+
+function titleCaseNamePart(value: string): string {
+  return value
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
 }
 
 function looksLikeBusinessAlias(name: string | undefined): boolean {

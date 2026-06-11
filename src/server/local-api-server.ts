@@ -36,6 +36,7 @@ import {
   buildOrphanLeadAssignmentPreview,
   buildUrlIntelligenceQueuePreview,
   buildLeadRepairQueuePreview,
+  buildLeadIdentityRepairPreview,
   buildSlovakRegisterBatchPreview,
   buildSlovakSalutationPreview,
   buildNicheOpsDashboardPreview,
@@ -1661,6 +1662,19 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
     writeJson(response, 200, {
       result: buildSlovakSalutationPreview({
         leads: Array.isArray(payload.leads) ? payload.leads as Parameters<typeof buildSlovakSalutationPreview>[0]["leads"] : [],
+        defaultSource: optionalString(payload.defaultSource),
+        campaignId: typeof payload.campaignId === "string" || typeof payload.campaignId === "number" || payload.campaignId === null ? payload.campaignId : undefined,
+        includeSmartleadPreview: payload.includeSmartleadPreview !== false,
+        maxItems: typeof payload.maxItems === "number" ? payload.maxItems : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_lead_identity_repair_preview") {
+    writeJson(response, 200, {
+      result: buildLeadIdentityRepairPreview({
+        leads: Array.isArray(payload.leads) ? payload.leads as Parameters<typeof buildLeadIdentityRepairPreview>[0]["leads"] : [],
+        sourceName: optionalString(payload.sourceName),
         defaultSource: optionalString(payload.defaultSource),
         campaignId: typeof payload.campaignId === "string" || typeof payload.campaignId === "number" || payload.campaignId === null ? payload.campaignId : undefined,
         includeSmartleadPreview: payload.includeSmartleadPreview !== false,

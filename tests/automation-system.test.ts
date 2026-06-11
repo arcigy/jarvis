@@ -23,6 +23,7 @@ import {
   buildAiIntroQualityAuditPreview,
   buildAiIntroCleanupPreview,
   buildLeadBatchQaPreview,
+  buildLeadIdentityRepairPreview,
   buildLocalLeadRegisterUpdatePreview,
   batchScrapeWebsiteContacts,
   batchDraftLeadIntros,
@@ -205,6 +206,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.apply_local_lead_register_update",
     "arcigy.build_slovak_register_batch_preview",
     "arcigy.build_slovak_salutation_preview",
+    "arcigy.build_lead_identity_repair_preview",
     "arcigy.score_lead_quality",
     "arcigy.dedupe_lead_candidates",
     "arcigy.build_suppression_list_preview",
@@ -468,6 +470,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.ok(paths.includes("/api/mcp/arcigy.label_gmail_thread"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_local_lead_register_update_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.apply_local_lead_register_update"));
+  assert.ok(paths.includes("/api/mcp/arcigy.build_lead_identity_repair_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.get_smartlead_campaign_webhooks"));
   assert.ok(paths.includes("/api/mcp/arcigy.upsert_smartlead_campaign_webhook"));
   const operatorBriefing = document.paths["/api/mcp/arcigy.get_operator_briefing"] as OpenApiPathFixture;
@@ -483,6 +486,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   const gmailLabelThread = document.paths["/api/mcp/arcigy.label_gmail_thread"] as OpenApiPathFixture;
   const localLeadRegisterPreview = document.paths["/api/mcp/arcigy.build_local_lead_register_update_preview"] as OpenApiPathFixture;
   const localLeadRegisterApply = document.paths["/api/mcp/arcigy.apply_local_lead_register_update"] as OpenApiPathFixture;
+  const leadIdentityRepair = document.paths["/api/mcp/arcigy.build_lead_identity_repair_preview"] as OpenApiPathFixture;
   const smartleadWebhooks = document.paths["/api/mcp/arcigy.get_smartlead_campaign_webhooks"] as OpenApiPathFixture;
   const smartleadWebhookUpsert = document.paths["/api/mcp/arcigy.upsert_smartlead_campaign_webhook"] as OpenApiPathFixture;
   const contractGenerate = document.paths["/api/mcp/arcigy.generate_contract_documents"] as OpenApiPathFixture;
@@ -496,6 +500,8 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.equal(localNicheQueue.post.requestBody.content["application/json"].examples.quickStart.value.status, "active");
   assert.equal(localNicheRun.post["x-arcigy-requiresApproval"], true);
   assert.equal(localNicheRun.post.requestBody.content["application/json"].examples.quickStart.value.approval.approved, true);
+  assert.equal(leadIdentityRepair.post["x-arcigy-requiresApproval"], false);
+  assert.ok(Array.isArray(leadIdentityRepair.post.requestBody.content["application/json"].examples.quickStart.value.leads));
   assert.equal(operatorBriefing.post.requestBody.content["application/json"].examples.quickStart.value.syncGmail, false);
   assert.equal(gmailSync.post.requestBody.content["application/json"].examples.quickStart.value.dryRun, true);
   assert.equal(gmailLeadContext.post.requestBody.content["application/json"].examples.quickStart.value.leadEmail, "lead@example.com");
@@ -1841,6 +1847,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.record_local_niche_run" && call.approvalRequired === true));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_local_lead_register_update_preview" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.apply_local_lead_register_update" && call.approvalRequired === true));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_lead_identity_repair_preview" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.preview_smartlead_lead_sync" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_campaign_webhooks" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.upsert_smartlead_campaign_webhook" && call.approvalRequired === true));
@@ -3807,6 +3814,29 @@ test("Slovak salutation preview prepares Smartlead custom fields", () => {
   assert.equal(preview.smartleadPrepared.leadList[0].custom_fields?.last_name_with_salutation, "pan Novak");
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.prepare_smartlead_leads" && !call.approvalRequired));
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_smartlead_import_audit_preview" && !call.approvalRequired));
+  assert.match(preview.summary, /Ziadny zapis ani upload/);
+});
+
+test("lead identity repair preview infers names and prepares safe next steps", () => {
+  const preview = buildLeadIdentityRepairPreview({
+    sourceName: "kuchyne-sk",
+    defaultSource: "google-maps",
+    campaignId: "123456",
+    leads: [
+      { companyName: "Ready Studio - Kuchyne na mieru", email: "jan.novak@ready.sk", website: "https://ready.sk" },
+      { companyName: "Kontakt Studio", email: "info@kontakt-studio.sk", website: "https://kontakt-studio.sk" },
+    ],
+  });
+
+  assert.equal(preview.mode, "lead-identity-repair-preview");
+  assert.equal(preview.totals.inferredNames, 1);
+  assert.equal(preview.totals.genericEmails, 1);
+  assert.equal(preview.items[0].updates.decisionMakerName, "Jan Novak");
+  assert.equal(preview.items[0].updates.customFields.decision_maker_last_name, "Novak");
+  assert.equal(preview.items[1].status, "manual_review");
+  assert.ok(preview.repairedLeads.some((lead) => lead.email === "jan.novak@ready.sk" && lead.firstName === "Jan"));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_slovak_salutation_preview" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_manual_review_queue" && !call.approvalRequired));
   assert.match(preview.summary, /Ziadny zapis ani upload/);
 });
 

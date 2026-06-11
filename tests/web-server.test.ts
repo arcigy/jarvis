@@ -646,6 +646,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(openApiBody.paths["/api/mcp/arcigy.label_gmail_thread"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.build_local_lead_register_update_preview"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.apply_local_lead_register_update"]);
+    assert.ok(openApiBody.paths["/api/mcp/arcigy.build_lead_identity_repair_preview"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.get_smartlead_campaign_webhooks"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.upsert_smartlead_campaign_webhook"]);
     const openApiOperator = openApiBody.paths["/api/mcp/arcigy.get_operator_briefing"] as OpenApiPathFixture;
@@ -661,6 +662,7 @@ test("local web bridge serves UI and API health", async () => {
     const openApiGmailLabelThread = openApiBody.paths["/api/mcp/arcigy.label_gmail_thread"] as OpenApiPathFixture;
     const openApiLocalLeadRegisterPreview = openApiBody.paths["/api/mcp/arcigy.build_local_lead_register_update_preview"] as OpenApiPathFixture;
     const openApiLocalLeadRegisterApply = openApiBody.paths["/api/mcp/arcigy.apply_local_lead_register_update"] as OpenApiPathFixture;
+    const openApiLeadIdentityRepair = openApiBody.paths["/api/mcp/arcigy.build_lead_identity_repair_preview"] as OpenApiPathFixture;
     const openApiSmartleadWebhooks = openApiBody.paths["/api/mcp/arcigy.get_smartlead_campaign_webhooks"] as OpenApiPathFixture;
     const openApiSmartleadWebhookUpsert = openApiBody.paths["/api/mcp/arcigy.upsert_smartlead_campaign_webhook"] as OpenApiPathFixture;
     const openApiContract = openApiBody.paths["/api/mcp/arcigy.generate_contract_documents"] as OpenApiPathFixture;
@@ -682,6 +684,8 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(openApiLocalLeadRegisterPreview.post.requestBody.content["application/json"].examples.quickStart.value.primaryEmail, "lead@example.com");
     assert.equal(openApiLocalLeadRegisterApply.post["x-arcigy-requiresApproval"], true);
     assert.equal(openApiLocalLeadRegisterApply.post.requestBody.content["application/json"].examples.quickStart.value.approval.approved, true);
+    assert.equal(openApiLeadIdentityRepair.post["x-arcigy-requiresApproval"], false);
+    assert.ok(Array.isArray(openApiLeadIdentityRepair.post.requestBody.content["application/json"].examples.quickStart.value.leads));
     assert.equal(openApiSmartleadWebhooks.post.requestBody.content["application/json"].examples.quickStart.value.campaignId, "123456");
     assert.equal(openApiSmartleadWebhookUpsert.post["x-arcigy-requiresApproval"], true);
     assert.equal(openApiSmartleadWebhookUpsert.post.requestBody.content["application/json"].examples.quickStart.value.approval.approved, true);
@@ -863,6 +867,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.record_local_niche_run" && call.approvalRequired === true));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_local_lead_register_update_preview" && call.approvalRequired === false));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.apply_local_lead_register_update" && call.approvalRequired === true));
+    assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_lead_identity_repair_preview" && call.approvalRequired === false));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_campaign_webhooks" && call.approvalRequired === false));
     assert.ok(
       remotePackBody.quickStartCalls.some(

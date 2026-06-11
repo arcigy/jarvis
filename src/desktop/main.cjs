@@ -1307,6 +1307,7 @@ function jarvisCapabilityDefinitions() {
         "arcigy.record_local_niche_run",
         "arcigy.build_local_lead_register_update_preview",
         "arcigy.apply_local_lead_register_update",
+        "arcigy.build_lead_identity_repair_preview",
         "arcigy.scrape_website_contacts",
         "arcigy.draft_lead_intro",
         "arcigy.prepare_smartlead_leads",
@@ -1912,6 +1913,22 @@ function buildRemoteMcpQuickStartCalls(baseUrl) {
       url: toolUrl("arcigy.apply_local_lead_register_update"),
       body: { primaryEmail: "lead@example.com", kind: "lead", companyName: "Arcigy s. r. o.", data: { ico: "12345678", orsr_verified: true, decision_maker_name: "Jan Novak" }, approval: { approved: true } },
       approvalRequired: true,
+    },
+    {
+      label: "Repair lead identity fields before Smartlead",
+      tool: "arcigy.build_lead_identity_repair_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_lead_identity_repair_preview"),
+      body: {
+        sourceName: "kuchyne-sk",
+        defaultSource: "google-maps",
+        campaignId: "123456",
+        leads: [
+          { companyName: "Ready Studio - Kuchyne na mieru", email: "jan.novak@ready.sk", website: "https://ready.sk" },
+          { companyName: "Kontakt Studio", email: "info@kontakt-studio.sk", website: "https://kontakt-studio.sk" },
+        ],
+      },
+      approvalRequired: false,
     },
     {
       label: "Get Smartlead outreach brief",
@@ -3154,6 +3171,7 @@ function listWebMcpTools() {
     { name: "arcigy.apply_local_lead_register_update", requiresApproval: true },
     { name: "arcigy.build_slovak_register_batch_preview", requiresApproval: false },
     { name: "arcigy.build_slovak_salutation_preview", requiresApproval: false },
+    { name: "arcigy.build_lead_identity_repair_preview", requiresApproval: false },
     { name: "arcigy.score_lead_quality", requiresApproval: false },
     { name: "arcigy.dedupe_lead_candidates", requiresApproval: false },
     { name: "arcigy.build_suppression_list_preview", requiresApproval: false },
