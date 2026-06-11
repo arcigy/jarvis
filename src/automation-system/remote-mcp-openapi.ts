@@ -590,6 +590,20 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       existingSmartleadLeads: [{ email: "existing@example.com", id: "lead-1" }],
     };
   }
+  if (toolName === "arcigy.build_smartlead_campaign_sync_plan_preview") {
+    return {
+      campaignId: "123456",
+      localLeads: [
+        { email: "new@example.com", first_name: "Jan", company_name: "Nova Firma", website: "https://new.example", custom_fields: { personalized_intro: "Kratke AI intro.", company_name_short: "Nova Firma" } },
+        { email: "existing@example.com", first_name: "Eva", company_name: "Existujuca Firma", website: "https://existing.example", custom_fields: { personalized_intro: "Aktualizovane intro.", company_name_short: "Existujuca" } },
+        { email: "same@example.com", first_name: "Same", company_name: "Same Firma", custom_fields: { personalized_intro: "Rovnaky text." } },
+      ],
+      remoteLeads: [
+        { id: "sl-1", email: "existing@example.com", first_name: "Eva", company_name: "Stara Firma", website: "https://existing.example", custom_fields: { personalized_intro: "Stare intro.", company_name_short: "Stara" } },
+        { id: "sl-2", email: "same@example.com", first_name: "Same", company_name: "Same Firma", custom_fields: { personalized_intro: "Rovnaky text." } },
+      ],
+    };
+  }
   if (toolName === "arcigy.build_smartlead_sender_capacity_preview") {
     return {
       campaignId: "123456",

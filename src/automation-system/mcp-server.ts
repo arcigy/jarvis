@@ -52,6 +52,7 @@ import {
   buildSmartleadCampaignRestorePlan,
   buildSmartleadInjectionPlan,
   buildSmartleadImportAuditPreview,
+  buildSmartleadCampaignSyncPlanPreview,
   buildSmartleadSenderCapacityPreview,
   buildSmartleadDeliverabilityGuardPreview,
   buildColdOutreachCsvImportPreview,
@@ -2488,6 +2489,43 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildSmartleadImportAuditPreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_smartlead_campaign_sync_plan_preview",
+    {
+      title: "Build Smartlead campaign sync plan preview",
+      description: "Compare local prepared leads with a remote Smartlead campaign lead list and prepare missing upload plus manual update payloads without writing.",
+      inputSchema: {
+        campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+        localLeads: z.array(z.object({
+          email: z.string().min(1),
+          first_name: z.string().optional(),
+          last_name: z.string().optional(),
+          company_name: z.string().optional(),
+          website: z.string().optional(),
+          custom_fields: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
+        })).min(1).max(1000),
+        remoteLeads: z.array(z.object({
+          id: z.union([z.string(), z.number()]).optional(),
+          lead_id: z.union([z.string(), z.number()]).optional(),
+          email: z.string().min(1),
+          first_name: z.string().optional(),
+          last_name: z.string().optional(),
+          company_name: z.string().optional(),
+          website: z.string().optional(),
+          custom_fields: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
+        })).optional(),
+        updateExisting: z.boolean().default(true),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildSmartleadCampaignSyncPlanPreview(input))
   );
 
   server.registerTool(

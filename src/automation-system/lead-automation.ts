@@ -284,6 +284,34 @@ export type SmartleadImportAuditPreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type SmartleadCampaignSyncPlanPreview = {
+  mode: "smartlead-campaign-sync-plan-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  campaignId?: string | number;
+  totals: {
+    localLeads: number;
+    remoteLeads: number;
+    missingInSmartlead: number;
+    updateExisting: number;
+    unchanged: number;
+    skipped: number;
+  };
+  missingInSmartlead: SmartleadLead[];
+  updateExisting: Array<{
+    email: string;
+    remoteLeadId?: string | number;
+    payload: SmartleadLead;
+    changedFields: string[];
+  }>;
+  unchanged: SmartleadLead[];
+  skipped: Array<{ lead: SmartleadLead; reason: string }>;
+  addLeadsApprovalPayload?: { campaignId: string | number; leads: SmartleadLead[]; settings: { ignore_global_block_list: false; ignore_unsubscribe_list: false }; approval: { approved: true } };
+  manualUpdateApprovalPayloads: Array<{ method: "POST"; endpoint: string; campaignId: string | number; leadId: string | number; payload: SmartleadLead; approval: { approved: true } }>;
+  operatorRunbook: string[];
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type NicheSmartleadCampaignSetupDraft = {
   mode: "niche-smartlead-campaign-setup-draft";
   campaignName: string;
@@ -2664,6 +2692,110 @@ export function buildSmartleadImportAuditPreview(input: {
     skipped: prepared.skipped,
     addLeadsApprovalPayload,
     nextToolCalls,
+  };
+}
+
+export function buildSmartleadCampaignSyncPlanPreview(input: {
+  campaignId?: string | number | null;
+  localLeads: SmartleadLead[];
+  remoteLeads?: Array<SmartleadLead & { id?: string | number; lead_id?: string | number }>;
+  updateExisting?: boolean;
+}): SmartleadCampaignSyncPlanPreview {
+  const prepared = prepareSmartleadLeads({
+    leads: input.localLeads.map((lead) => ({
+      email: lead.email,
+      firstName: lead.first_name,
+      lastName: lead.last_name,
+      companyName: lead.company_name,
+      website: lead.website,
+      customFields: lead.custom_fields,
+    })),
+  });
+  const campaignId = input.campaignId ?? undefined;
+  const remoteByEmail = new Map((input.remoteLeads ?? [])
+    .filter((lead) => lead.email?.trim())
+    .map((lead) => [lead.email.trim().toLowerCase(), lead]));
+  const missingInSmartlead: SmartleadLead[] = [];
+  const updateExisting: SmartleadCampaignSyncPlanPreview["updateExisting"] = [];
+  const unchanged: SmartleadLead[] = [];
+  const skipped: SmartleadCampaignSyncPlanPreview["skipped"] = prepared.skipped.map((item) => ({ lead: { email: item.email ?? "" }, reason: item.reason }));
+  for (const localLead of prepared.leadList) {
+    const email = localLead.email.trim().toLowerCase();
+    const remoteLead = remoteByEmail.get(email);
+    if (!remoteLead) {
+      missingInSmartlead.push(localLead);
+      continue;
+    }
+    const { changedFields, payload } = buildSmartleadLeadSyncPayload(localLead, remoteLead);
+    if (changedFields.length && input.updateExisting !== false) {
+      updateExisting.push({ email, remoteLeadId: remoteLead.id ?? remoteLead.lead_id, payload, changedFields });
+    } else {
+      unchanged.push(localLead);
+    }
+  }
+  const addLeadsApprovalPayload = campaignId && missingInSmartlead.length
+    ? {
+        campaignId,
+        leads: missingInSmartlead,
+        settings: { ignore_global_block_list: false as const, ignore_unsubscribe_list: false as const },
+        approval: { approved: true as const },
+      }
+    : undefined;
+  const manualUpdateApprovalPayloads = campaignId
+    ? updateExisting
+        .filter((item) => item.remoteLeadId !== undefined)
+        .map((item) => ({
+          method: "POST" as const,
+          endpoint: `/campaigns/${campaignId}/leads/${item.remoteLeadId}`,
+          campaignId,
+          leadId: item.remoteLeadId as string | number,
+          payload: item.payload,
+          approval: { approved: true as const },
+        }))
+    : [];
+  const nextToolCalls: SmartleadCampaignSyncPlanPreview["nextToolCalls"] = [];
+  if (campaignId && missingInSmartlead.length) {
+    nextToolCalls.push({
+      tool: "arcigy.add_leads_to_smartlead_campaign",
+      payload: addLeadsApprovalPayload as unknown as Record<string, unknown>,
+      reason: "Nahrat leady, ktore este nie su v Smartlead kampani.",
+      approvalRequired: true,
+    });
+  }
+  nextToolCalls.push({
+    tool: "arcigy.build_smartlead_import_audit_preview",
+    payload: { campaignId, leads: prepared.leadList, existingSmartleadLeads: input.remoteLeads ?? [] },
+    reason: "Pred uploadom znovu overit duplicity a uz existujuce emaily.",
+    approvalRequired: false,
+  });
+  const totals = {
+    localLeads: input.localLeads.length,
+    remoteLeads: input.remoteLeads?.length ?? 0,
+    missingInSmartlead: missingInSmartlead.length,
+    updateExisting: updateExisting.length,
+    unchanged: unchanged.length,
+    skipped: skipped.length,
+  };
+  const status: SmartleadCampaignSyncPlanPreview["status"] = !campaignId ? "blocked" : totals.missingInSmartlead || totals.updateExisting ? "attention" : "ready";
+  return {
+    mode: "smartlead-campaign-sync-plan-preview",
+    status,
+    summary: `Smartlead campaign sync plan ${status}: ${totals.missingInSmartlead} missing upload, ${totals.updateExisting} existing update, ${totals.unchanged} unchanged. Ziadny Smartlead ani DB zapis neprebehol.`,
+    campaignId,
+    totals,
+    missingInSmartlead,
+    updateExisting,
+    unchanged,
+    skipped,
+    addLeadsApprovalPayload,
+    manualUpdateApprovalPayloads,
+    operatorRunbook: [
+      "Ak kampan bezi, pred manual update krokmi ju najprv pauzni v Smartlead UI.",
+      "Schval add_leads payload iba pre missingInSmartlead.",
+      "Manual update payloady pouzi iba po kontrole changedFields a po explicitnom schvaleni.",
+      "Po synchronizacii znovu zavolaj arcigy.get_smartlead_campaign_leads a tento sync plan.",
+    ],
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls),
   };
 }
 
@@ -5670,6 +5802,35 @@ function duplicateSmartleadInputLeads(leads: SmartleadLead[]): SmartleadImportAu
     seen.add(email);
   }
   return duplicates;
+}
+
+function buildSmartleadLeadSyncPayload(localLead: SmartleadLead, remoteLead: SmartleadLead): { changedFields: string[]; payload: SmartleadLead } {
+  const customFields = { ...(remoteLead.custom_fields ?? {}), ...(localLead.custom_fields ?? {}) };
+  const payload: SmartleadLead = {
+    email: localLead.email,
+    first_name: localLead.first_name ?? remoteLead.first_name,
+    last_name: localLead.last_name ?? remoteLead.last_name,
+    company_name: localLead.company_name ?? remoteLead.company_name,
+    website: localLead.website ?? remoteLead.website,
+    custom_fields: customFields,
+  };
+  const changedFields: string[] = [];
+  const compare = (field: keyof SmartleadLead, label = String(field)) => {
+    if (normalizedCompareValue(payload[field]) !== normalizedCompareValue(remoteLead[field])) changedFields.push(label);
+  };
+  compare("first_name");
+  compare("last_name");
+  compare("company_name");
+  compare("website");
+  for (const key of ["company_name_short", "personalized_intro", "icebreaker_sentence", "ico", "last_name_with_salutation"]) {
+    if (normalizedCompareValue(customFields[key]) !== normalizedCompareValue(remoteLead.custom_fields?.[key])) changedFields.push(`custom_fields.${key}`);
+  }
+  return { changedFields: unique(changedFields), payload };
+}
+
+function normalizedCompareValue(value: unknown): string {
+  if (value === undefined || value === null) return "";
+  return String(value).replace(/\s+/g, " ").trim();
 }
 
 function booleanField(record: Record<string, unknown>, ...keys: string[]): boolean | undefined {

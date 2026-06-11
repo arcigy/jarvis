@@ -52,6 +52,7 @@ import {
   buildSmartleadCampaignRestorePlan,
   buildSmartleadInjectionPlan,
   buildSmartleadImportAuditPreview,
+  buildSmartleadCampaignSyncPlanPreview,
   buildSmartleadSenderCapacityPreview,
   buildSmartleadDeliverabilityGuardPreview,
   buildDailyLeadgenRunbook,
@@ -196,6 +197,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.preview_manual_review_pickup",
     "arcigy.build_smartlead_injection_plan",
     "arcigy.build_smartlead_import_audit_preview",
+    "arcigy.build_smartlead_campaign_sync_plan_preview",
     "arcigy.build_smartlead_sender_capacity_preview",
     "arcigy.build_smartlead_deliverability_guard_preview",
     "arcigy.build_smartlead_campaign_backup_plan",
@@ -1479,7 +1481,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 115 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 116 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -4318,6 +4320,32 @@ test("Smartlead nonreply call list preview prepares phone scrape and export step
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_scrape_website_contacts" && !call.approvalRequired));
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.export_leads_csv" && call.approvalRequired));
   assert.match(preview.summary, /Ziadny zapis ani export/);
+});
+
+test("Smartlead campaign sync plan separates missing updates and unchanged leads", () => {
+  const preview = buildSmartleadCampaignSyncPlanPreview({
+    campaignId: "123456",
+    localLeads: [
+      { email: "new@example.com", first_name: "Jan", company_name: "Nova Firma", website: "https://new.example", custom_fields: { personalized_intro: "Kratke AI intro.", company_name_short: "Nova Firma" } },
+      { email: "existing@example.com", first_name: "Eva", company_name: "Existujuca Firma", website: "https://existing.example", custom_fields: { personalized_intro: "Aktualizovane intro.", company_name_short: "Existujuca" } },
+      { email: "same@example.com", first_name: "Same", company_name: "Same Firma", custom_fields: { personalized_intro: "Rovnaky text." } },
+    ],
+    remoteLeads: [
+      { id: "sl-1", email: "existing@example.com", first_name: "Eva", company_name: "Stara Firma", website: "https://existing.example", custom_fields: { personalized_intro: "Stare intro.", company_name_short: "Stara" } },
+      { id: "sl-2", email: "same@example.com", first_name: "Same", company_name: "Same Firma", custom_fields: { personalized_intro: "Rovnaky text." } },
+    ],
+  });
+
+  assert.equal(preview.mode, "smartlead-campaign-sync-plan-preview");
+  assert.equal(preview.totals.missingInSmartlead, 1);
+  assert.equal(preview.totals.updateExisting, 1);
+  assert.equal(preview.totals.unchanged, 1);
+  assert.equal(preview.addLeadsApprovalPayload?.leads[0].email, "new@example.com");
+  assert.equal(preview.manualUpdateApprovalPayloads[0].endpoint, "/campaigns/123456/leads/sl-1");
+  assert.ok(preview.updateExisting[0].changedFields.includes("company_name"));
+  assert.ok(preview.updateExisting[0].changedFields.includes("custom_fields.personalized_intro"));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.add_leads_to_smartlead_campaign" && call.approvalRequired));
+  assert.match(preview.summary, /Ziadny Smartlead ani DB zapis/);
 });
 
 test("niche plan and Smartlead sequence drafts follow leadgen conventions", () => {

@@ -51,6 +51,7 @@ import {
   buildSmartleadCampaignRestorePlan,
   buildSmartleadInjectionPlan,
   buildSmartleadImportAuditPreview,
+  buildSmartleadCampaignSyncPlanPreview,
   buildSmartleadSenderCapacityPreview,
   buildSmartleadDeliverabilityGuardPreview,
   buildColdOutreachCsvImportPreview,
@@ -1753,6 +1754,17 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         campaignId: (payload.campaignId ?? null) as string | number | null,
         leads: (payload.leads ?? []) as Parameters<typeof buildSmartleadImportAuditPreview>[0]["leads"],
         existingSmartleadLeads: Array.isArray(payload.existingSmartleadLeads) ? payload.existingSmartleadLeads as Array<Record<string, unknown>> : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_smartlead_campaign_sync_plan_preview") {
+    writeJson(response, 200, {
+      result: buildSmartleadCampaignSyncPlanPreview({
+        campaignId: typeof payload.campaignId === "string" || typeof payload.campaignId === "number" || payload.campaignId === null ? payload.campaignId : undefined,
+        localLeads: (payload.localLeads ?? []) as Parameters<typeof buildSmartleadCampaignSyncPlanPreview>[0]["localLeads"],
+        remoteLeads: Array.isArray(payload.remoteLeads) ? payload.remoteLeads as Parameters<typeof buildSmartleadCampaignSyncPlanPreview>[0]["remoteLeads"] : undefined,
+        updateExisting: payload.updateExisting !== false,
       }),
     });
     return;

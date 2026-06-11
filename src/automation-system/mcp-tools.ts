@@ -82,6 +82,7 @@ export type JarvisMcpToolName =
   | "arcigy.preview_manual_review_pickup"
   | "arcigy.build_smartlead_injection_plan"
   | "arcigy.build_smartlead_import_audit_preview"
+  | "arcigy.build_smartlead_campaign_sync_plan_preview"
   | "arcigy.build_smartlead_sender_capacity_preview"
   | "arcigy.build_smartlead_deliverability_guard_preview"
   | "arcigy.build_smartlead_campaign_backup_plan"
@@ -548,6 +549,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.build_smartlead_import_audit_preview",
       description: "Porovna pripravene Smartlead leady s existujucimi leadmi v kampani, oddeli nove/duplicitne a pripravi safe approval payload bez uploadu.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_smartlead_campaign_sync_plan_preview",
+      description: "Porovna lokalne pripravene leady s remote Smartlead kampanou a pripravi missing upload aj manual update payloady bez zapisu.",
       requiresApproval: false,
     },
     {

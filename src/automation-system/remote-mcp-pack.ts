@@ -1139,6 +1139,25 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Plan Smartlead campaign sync",
+      tool: "arcigy.build_smartlead_campaign_sync_plan_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_smartlead_campaign_sync_plan_preview"),
+      body: {
+        campaignId: "123456",
+        localLeads: [
+          { email: "new@example.com", first_name: "Jan", company_name: "Nova Firma", website: "https://new.example", custom_fields: { personalized_intro: "Kratke AI intro.", company_name_short: "Nova Firma" } },
+          { email: "existing@example.com", first_name: "Eva", company_name: "Existujuca Firma", website: "https://existing.example", custom_fields: { personalized_intro: "Aktualizovane intro.", company_name_short: "Existujuca" } },
+          { email: "same@example.com", first_name: "Same", company_name: "Same Firma", custom_fields: { personalized_intro: "Rovnaky text." } },
+        ],
+        remoteLeads: [
+          { id: "sl-1", email: "existing@example.com", first_name: "Eva", company_name: "Stara Firma", website: "https://existing.example", custom_fields: { personalized_intro: "Stare intro.", company_name_short: "Stara" } },
+          { id: "sl-2", email: "same@example.com", first_name: "Same", company_name: "Same Firma", custom_fields: { personalized_intro: "Rovnaky text." } },
+        ],
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Preview Smartlead sender capacity",
       tool: "arcigy.build_smartlead_sender_capacity_preview",
       method: "POST",
