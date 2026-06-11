@@ -157,6 +157,7 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.build_lead_enrichment_merge_preview`: merges separate scrape results and AI intro drafts back into original leads by domain/company before review and Smartlead next steps.
 - `arcigy.build_leadgen_gap_report`: audits a lead batch before Smartlead, reports missing email/website/AI intro/decision-maker gaps, and proposes safe next MCP calls without writing.
 - `arcigy.build_leadgen_status_board_preview`: builds a read-only leadgen status board from CSV/leads, grouped by niche/campaign/source, with counts for ready, missing email, missing intro, missing phone, sent, verified, failed, and exact repair/import next steps.
+- `arcigy.build_google_sheet_sync_preview`: prepares a read-only Google Sheets sync plan from CSV/leads with headers, rows, clear/update ranges, and the approval payload for replacing a sheet.
 - `arcigy.build_leadgen_campaign_pipeline_preview`: chains a raw lead batch into website scrape needs, AI intro needs, enrichment scoring, manual review, and Smartlead next-step payloads without writing or uploading.
 - `arcigy.build_lead_source_import_queue_preview`: turns Google Maps, CSV, Serper, or manual lead source rows into niche/campaign import queues with scrape, intro, review, and Smartlead audit next steps without writing or uploading.
 - `arcigy.build_lead_source_bundle_preview`: merges multiple CSV, JSON, and manual lead exports into one read-only leadgen runbook with scrape, AI intro, review, and Smartlead next steps.
@@ -184,6 +185,7 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.run_leadgen_research_pipeline`: read-only discovery + optional website scraping + optional Gemini intro drafts for Smartlead-ready research.
 - `arcigy.add_leads_to_smartlead_campaign`: approval-gated upload of prepared `lead_list` batches to a Smartlead campaign.
 - `arcigy.append_leads_to_google_sheet`: explicit Google Sheets append for prepared lead rows.
+- `arcigy.replace_google_sheet_rows`: approval-gated Google Sheets clear+update for replacing a prepared lead overview sheet.
 - `arcigy.jarvis_voice_event`: wake-word state handling for the desktop voice layer.
 
 Use `JARVIS_PYTHON` if the MCP runtime needs a specific Python executable.

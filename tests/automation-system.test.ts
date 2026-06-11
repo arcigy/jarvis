@@ -14,7 +14,7 @@ import { getIntegrationHealth } from "../src/automation-system/env.ts";
 import { buildClientReplyPrompt, buildPositiveOutreachReplyPrompt, generateGeminiText } from "../src/automation-system/gemini.ts";
 import { defaultGmailSyncQuery, encodeGmailRawMessage, listRecentGmailMessageEvents, parseFromHeader, refreshGoogleAccessToken, sendGmailTextMessage } from "../src/automation-system/gmail.ts";
 import { batchFetchPublicUrlPreviews, fetchPublicUrlPreview } from "../src/automation-system/http-fetch.ts";
-import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "../src/automation-system/lead-discovery.ts";
+import { appendRowsToGoogleSheet, discoverLeads, replaceGoogleSheetRows, searchGooglePlaces, searchSerper } from "../src/automation-system/lead-discovery.ts";
 import {
   buildBatchNicheDiscoveryPlan,
   buildLeadgenExecutionQueuePreview,
@@ -39,6 +39,7 @@ import {
   buildLeadRepairQueuePreview,
   buildPhoneEnrichmentQueuePreview,
   buildLeadgenStatusBoardPreview,
+  buildGoogleSheetSyncPreview,
   buildWebsiteScrapeQualityAuditPreview,
   buildSlovakRegisterBatchPreview,
   buildSlovakSalutationPreview,
@@ -220,6 +221,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.build_lead_enrichment_merge_preview",
     "arcigy.build_leadgen_gap_report",
     "arcigy.build_leadgen_status_board_preview",
+    "arcigy.build_google_sheet_sync_preview",
     "arcigy.build_leadgen_campaign_pipeline_preview",
     "arcigy.build_lead_source_import_queue_preview",
     "arcigy.build_lead_source_bundle_preview",
@@ -247,6 +249,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.run_leadgen_research_pipeline",
     "arcigy.add_leads_to_smartlead_campaign",
     "arcigy.append_leads_to_google_sheet",
+    "arcigy.replace_google_sheet_rows",
   ]);
   assert.ok(localStateWriteToolNames.has("arcigy.sync_gmail_recent_messages"));
   assert.ok(localStateWriteToolNames.has("arcigy.ingest_client_message"));
@@ -343,6 +346,7 @@ test("Jarvis capability audit maps the full requested production surface to evid
   assert.ok(remoteMcpCapability?.evidence.includes("production-evidence-tool-call"));
   assert.ok(audit.capabilities.some((item) => item.id === "proactive-digest" && item.status === "ready" && item.tools.includes("arcigy.sync_gmail_recent_messages")));
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.append_leads_to_google_sheet")));
+  assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.replace_google_sheet_rows")));
   assert.doesNotMatch(JSON.stringify(audit), /AIza|GOCSPX|1\/\/|postgresql:\/\/|redis:\/\//);
 
   const score = buildProductionCompletionScore({ readiness, productionEvidence, capabilityAudit: audit, env, generatedAt: "2026-06-09T00:00:00.000Z" });
@@ -497,6 +501,7 @@ test("remote MCP smoke checks every response for bearer token leaks", async () =
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.export_leads_csv") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet") ||
+      url.endsWith("/api/mcp/arcigy.replace_google_sheet_rows") ||
       url.endsWith("/api/mcp/arcigy.add_leads_to_smartlead_campaign") ||
       url.endsWith("/api/mcp/arcigy.create_smartlead_campaign") ||
       url.endsWith("/api/mcp/arcigy.configure_smartlead_campaign")
@@ -559,7 +564,8 @@ test("remote MCP smoke requires valid quick-start URLs", async () => {
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
-      url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
+      url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet") ||
+      url.endsWith("/api/mcp/arcigy.replace_google_sheet_rows")
     ) {
       return responseJson({ error: "approval required" }, 409);
     }
@@ -618,7 +624,8 @@ test("remote MCP smoke requires quick-start approval policy parity", async () =>
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
-      url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
+      url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet") ||
+      url.endsWith("/api/mcp/arcigy.replace_google_sheet_rows")
     ) {
       return responseJson({ error: "approval required" }, 409);
     }
@@ -677,7 +684,8 @@ test("remote MCP smoke requires exact MCP call parity in quick-starts", async ()
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
-      url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
+      url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet") ||
+      url.endsWith("/api/mcp/arcigy.replace_google_sheet_rows")
     ) {
       return responseJson({ error: "approval required" }, 409);
     }
@@ -756,7 +764,8 @@ test("remote MCP smoke blocks generic secret patterns in response bodies", async
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
-      url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
+      url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet") ||
+      url.endsWith("/api/mcp/arcigy.replace_google_sheet_rows")
     ) {
       return responseJson({ error: "approval required" }, 409);
     }
@@ -814,7 +823,8 @@ test("remote MCP smoke requires exact manifest and pack tool registries", async 
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
-      url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
+      url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet") ||
+      url.endsWith("/api/mcp/arcigy.replace_google_sheet_rows")
     ) {
       return responseJson({ error: "approval required" }, 409);
     }
@@ -874,7 +884,8 @@ test("remote MCP smoke requires valid manifest tool metadata", async () => {
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
-      url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
+      url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet") ||
+      url.endsWith("/api/mcp/arcigy.replace_google_sheet_rows")
     ) {
       return responseJson({ error: "approval required" }, 409);
     }
@@ -931,7 +942,8 @@ test("remote MCP smoke requires exact manifest and pack tool policies", async ()
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
-      url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
+      url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet") ||
+      url.endsWith("/api/mcp/arcigy.replace_google_sheet_rows")
     ) {
       return responseJson({ error: "approval required" }, 409);
     }
@@ -989,7 +1001,8 @@ test("remote MCP smoke requires guarded connection pack limits", async () => {
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
-      url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
+      url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet") ||
+      url.endsWith("/api/mcp/arcigy.replace_google_sheet_rows")
     ) {
       return responseJson({ error: "approval required" }, 409);
     }
@@ -1264,7 +1277,8 @@ test("remote MCP smoke requires the audit trail quick-start", async () => {
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
-      url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
+      url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet") ||
+      url.endsWith("/api/mcp/arcigy.replace_google_sheet_rows")
     ) {
       return responseJson({ error: "approval required" }, 409);
     }
@@ -1331,7 +1345,8 @@ test("remote MCP smoke requires the production evidence quick-start", async () =
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
-      url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
+      url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet") ||
+      url.endsWith("/api/mcp/arcigy.replace_google_sheet_rows")
     ) {
       return responseJson({ error: "approval required" }, 409);
     }
@@ -1398,7 +1413,8 @@ test("remote MCP smoke requires the production evidence voice quick-start", asyn
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
-      url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
+      url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet") ||
+      url.endsWith("/api/mcp/arcigy.replace_google_sheet_rows")
     ) {
       return responseJson({ error: "approval required" }, 409);
     }
@@ -1495,7 +1511,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 123 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 125 toolov, 13 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -1531,7 +1547,8 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
-      url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet")
+      url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet") ||
+      url.endsWith("/api/mcp/arcigy.replace_google_sheet_rows")
     ) {
       return responseJson({ error: "approval required" }, 409);
     }
@@ -3148,6 +3165,33 @@ test("leadgen status board summarizes DB export and proposes exact next steps", 
   assert.match(preview.summary, /Ziadny zapis ani upload/);
 });
 
+test("Google Sheet sync preview maps lead exports to replace payload without writing", () => {
+  const preview = buildGoogleSheetSyncPreview({
+    sourceName: "db-to-google-sheets",
+    spreadsheetId: "sheet-123",
+    range: "Leads!A1",
+    clearRange: "Leads!A1:M5000",
+    csvText: [
+      "verification_status,website,official_company_name,ico,address,decision_maker_name,decision_maker_last_name,email,icebreaker_sentence,original_name,verification_notes,campaign_tag",
+      "verified,https://ready.sk,Ready Studio s.r.o.,12345678,Bratislava,Jan,Novak,jan@ready.sk,Vsimol som si vase realizacie kuchyn.,Ready Studio,,kuchyne",
+      "flagged,https://needs-intro.sk,Needs Intro s.r.o.,,,Eva,Horna,info@needs-intro.sk,,,Doplnit intro,kuchyne",
+    ].join("\n"),
+  });
+
+  assert.equal(preview.mode, "google-sheet-sync-preview");
+  assert.equal(preview.status, "attention");
+  assert.equal(preview.totals.input, 2);
+  assert.equal(preview.totals.rows, 3);
+  assert.equal(preview.totals.missingIntro, 1);
+  assert.equal(preview.headers[0], "Status");
+  assert.equal(preview.rowsPreview[0][0], "Status");
+  assert.equal(preview.rowsPreview[1][2], "Ready Studio s.r.o.");
+  assert.equal(preview.replaceApprovalPayload?.spreadsheetId, "sheet-123");
+  assert.equal(preview.replaceApprovalPayload?.rows.length, 3);
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.replace_google_sheet_rows" && call.approvalRequired));
+  assert.match(preview.summary, /Ziadny zapis do Google Sheets/);
+});
+
 test("leadgen campaign pipeline preview chains scrape intro enrichment and Smartlead next steps", () => {
   const preview = buildLeadgenCampaignPipelinePreview({
     niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456" },
@@ -3811,6 +3855,39 @@ test("Google Sheets append falls back across configured OAuth accounts", async (
   assert.deepEqual(refreshTokens, ["bad-refresh", "bad-refresh", "good-refresh"]);
   assert.deepEqual(authorizationHeaders, ["Bearer good-access-token"]);
   assert.deepEqual(result, { updates: { updatedRows: 1 } });
+});
+
+test("Google Sheets replace clears and updates rows after OAuth refresh", async () => {
+  const calls: Array<{ url: string; method?: string; body?: string }> = [];
+  const fetchImpl = async (url: string | URL | Request, init?: RequestInit) => {
+    const target = String(url);
+    if (target.includes("oauth2.googleapis.com") || target.includes("www.googleapis.com/oauth2/v4/token")) {
+      return responseJson({ access_token: "sheet-access-token" });
+    }
+    if (target.includes("sheets.googleapis.com")) {
+      calls.push({ url: target, method: init?.method, body: String(init?.body ?? "") });
+      if (target.endsWith(":clear")) return responseJson({ clearedRange: "Leads!A1:M5000" });
+      return responseJson({ updatedRange: "Leads!A1:M2", updatedRows: 2 });
+    }
+    throw new Error(`Unexpected URL: ${target}`);
+  };
+
+  const result = await replaceGoogleSheetRows(
+    { spreadsheetId: "sheet-id", range: "Leads!A1", clearRange: "Leads!A1:M5000", rows: [["Status", "Web"], ["verified", "https://ready.sk"]] },
+    {
+      GOOGLE_CLIENT_ID: "client",
+      GOOGLE_CLIENT_SECRET: "secret",
+      GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP: "refresh",
+    },
+    fetchImpl as typeof fetch
+  );
+
+  assert.equal(result.rows, 2);
+  assert.equal(calls[0].method, "POST");
+  assert.ok(calls[0].url.includes("values/Leads!A1%3AM5000:clear"));
+  assert.equal(calls[1].method, "PUT");
+  assert.ok(calls[1].url.includes("values/Leads!A1?valueInputOption=USER_ENTERED"));
+  assert.match(calls[1].body ?? "", /https:\/\/ready\.sk/);
 });
 
 test("Google Sheets append redacts secrets from transport errors", async () => {

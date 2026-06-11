@@ -98,6 +98,7 @@ export type JarvisMcpToolName =
   | "arcigy.build_lead_enrichment_merge_preview"
   | "arcigy.build_leadgen_gap_report"
   | "arcigy.build_leadgen_status_board_preview"
+  | "arcigy.build_google_sheet_sync_preview"
   | "arcigy.build_leadgen_campaign_pipeline_preview"
   | "arcigy.build_lead_source_import_queue_preview"
   | "arcigy.build_lead_source_bundle_preview"
@@ -125,6 +126,7 @@ export type JarvisMcpToolName =
   | "arcigy.run_leadgen_research_pipeline"
   | "arcigy.add_leads_to_smartlead_campaign"
   | "arcigy.append_leads_to_google_sheet"
+  | "arcigy.replace_google_sheet_rows"
   | "arcigy.jarvis_voice_event";
 
 export type JarvisMcpTool = {
@@ -639,6 +641,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
       requiresApproval: false,
     },
     {
+      name: "arcigy.build_google_sheet_sync_preview",
+      description: "Pripravi Google Sheets sync plan z CSV alebo leadov: hlavicky, riadky, clear/update rozsahy a schvalovaci replace payload bez zapisu.",
+      requiresApproval: false,
+    },
+    {
       name: "arcigy.build_leadgen_campaign_pipeline_preview",
       description: "Z jedneho batchu leadov pripravi scrape, AI intro, enrichment a Smartlead next-step plan bez zapisu alebo uploadu.",
       requiresApproval: false,
@@ -771,6 +778,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.append_leads_to_google_sheet",
       description: "Zapise pripravene lead rows do Google Sheetu po explicitnom schvalenom volani.",
+      requiresApproval: true,
+    },
+    {
+      name: "arcigy.replace_google_sheet_rows",
+      description: "Po explicitnom schvaleni vycisti cielovy Google Sheet range a prepise ho pripravenymi riadkami.",
       requiresApproval: true,
     },
   ];

@@ -201,6 +201,7 @@ app.whenReady().then(() => {
   ipcMain.handle("jarvis:getSmartleadOutreachBrief", (_event, payload) => getSmartleadOutreachBrief(payload));
   ipcMain.handle("jarvis:discoverLeads", (_event, payload) => discoverLeads(payload));
   ipcMain.handle("jarvis:appendLeadsToGoogleSheet", (_event, payload) => appendLeadsToGoogleSheet(payload));
+  ipcMain.handle("jarvis:replaceGoogleSheetRows", (_event, payload) => replaceGoogleSheetRows(payload));
   ipcMain.handle("contracts:draftIntake", (_event, payload) => draftContractIntake(payload));
   ipcMain.handle("contracts:generate", (_event, payload) => generateContracts(payload));
   createWindow();
@@ -613,6 +614,7 @@ function buildReadinessLaunchChecklist(integrations, bridge, blockers, diagnosti
     "arcigy.send_approved_outreach_reply",
     "arcigy.send_smartlead_thread_reply",
     "arcigy.append_leads_to_google_sheet",
+    "arcigy.replace_google_sheet_rows",
   ];
   const approvalReady = requiredApprovalTools.every((tool) => approvalTools.includes(tool));
   const liveChecks = diagnostics?.checks || [];
@@ -1294,12 +1296,14 @@ function jarvisCapabilityDefinitions() {
         "arcigy.draft_lead_intro",
         "arcigy.prepare_smartlead_leads",
         "arcigy.run_leadgen_research_pipeline",
+        "arcigy.build_google_sheet_sync_preview",
         "arcigy.select_next_niche",
         "arcigy.preview_smartlead_lead_sync",
         "arcigy.add_leads_to_smartlead_campaign",
         "arcigy.append_leads_to_google_sheet",
+        "arcigy.replace_google_sheet_rows",
       ],
-      approvalRequired: ["arcigy.add_leads_to_smartlead_campaign", "arcigy.append_leads_to_google_sheet"],
+      approvalRequired: ["arcigy.add_leads_to_smartlead_campaign", "arcigy.append_leads_to_google_sheet", "arcigy.replace_google_sheet_rows"],
       evidence: ["tests", "doctor-live"],
       envKeys: ["serper", "googleMaps", "gemini", "smartlead", "googleSheets"],
     },
@@ -1317,6 +1321,7 @@ function jarvisCapabilityDefinitions() {
         "arcigy.send_smartlead_thread_reply",
         "arcigy.add_leads_to_smartlead_campaign",
         "arcigy.append_leads_to_google_sheet",
+        "arcigy.replace_google_sheet_rows",
       ],
       evidence: ["approval-gate", "approval-shape-gate", "secret-redaction", "secret-scan", "ai-draft-safety"],
     },
@@ -1449,7 +1454,7 @@ async function getRemoteMcpPack(payload = {}) {
       "Call MCP tools with POST JSON to mcpToolCallPattern.",
       "Use the bearer auth header placeholder; the real token must be supplied by the operator and is never returned by this pack.",
       "Use tunnel.statusUrl to inspect public tunnel URLs from the redacted secure-tunnel log. Browser-launched tunnel start requires a strong JARVIS_WEB_TOKEN.",
-      "Treat generate_contract_documents, generate_price_offer_document, approve_prepared_outreach_reply, send_approved_outreach_reply, send_smartlead_thread_reply, update_client_need_status, export_leads_csv, create_smartlead_campaign, configure_smartlead_campaign, add_leads_to_smartlead_campaign, and append_leads_to_google_sheet as approval-gated actions.",
+      "Treat generate_contract_documents, generate_price_offer_document, approve_prepared_outreach_reply, send_approved_outreach_reply, send_smartlead_thread_reply, update_client_need_status, export_leads_csv, create_smartlead_campaign, configure_smartlead_campaign, add_leads_to_smartlead_campaign, append_leads_to_google_sheet, and replace_google_sheet_rows as approval-gated actions.",
       "Treat localStateWrite tools as local memory writes. Prefer dryRun: true for sync_gmail_recent_messages before ingesting messages.",
       "Use get_operator_briefing for a Jarvis-style daily status before making recommendations.",
     ],
@@ -2351,6 +2356,7 @@ async function checkApprovalGates(baseUrl, token, topLevelApproved) {
     ["arcigy.export_local_memory_snapshot", { outputPath: "generated/local-memory/smoke.json" }],
     ["arcigy.export_leads_csv", { outputPath: "generated/leads/smoke.csv", leads: [{ email: "smoke@example.com" }] }],
     ["arcigy.append_leads_to_google_sheet", { rows: [["Smoke", "https://example.com"]] }],
+    ["arcigy.replace_google_sheet_rows", { rows: [["Smoke", "https://example.com"]] }],
     ["arcigy.add_leads_to_smartlead_campaign", { campaignId: "123", leads: [{ email: "smoke@example.com" }] }],
     ["arcigy.send_smartlead_thread_reply", { campaignId: "123", email: "smoke@example.com", emailBody: "Smoke reply body." }],
     ["arcigy.create_smartlead_campaign", { name: "SMOKE CAMPAIGN" }],
@@ -2515,6 +2521,7 @@ function hasSafeOpenApiExample(toolName, value) {
   if (toolName === "arcigy.generate_price_offer_document") return value.approval?.approved === true && typeof value.offer === "object";
   if (toolName === "arcigy.export_leads_csv") return value.approval?.approved === true && Array.isArray(value.leads);
   if (toolName === "arcigy.append_leads_to_google_sheet") return value.approval?.approved === true && Array.isArray(value.rows);
+  if (toolName === "arcigy.replace_google_sheet_rows") return value.approval?.approved === true && Array.isArray(value.rows);
   if (toolName === "arcigy.add_leads_to_smartlead_campaign") return value.approval?.approved === true && Array.isArray(value.leads);
   if (toolName === "arcigy.send_smartlead_thread_reply") return value.approval?.approved === true && typeof value.emailBody === "string";
   if (toolName === "arcigy.create_smartlead_campaign") return value.approval?.approved === true && typeof value.name === "string";
@@ -3073,6 +3080,7 @@ function listWebMcpTools() {
     { name: "arcigy.build_lead_enrichment_merge_preview", requiresApproval: false },
     { name: "arcigy.build_leadgen_gap_report", requiresApproval: false },
     { name: "arcigy.build_leadgen_status_board_preview", requiresApproval: false },
+    { name: "arcigy.build_google_sheet_sync_preview", requiresApproval: false },
     { name: "arcigy.build_leadgen_campaign_pipeline_preview", requiresApproval: false },
     { name: "arcigy.build_lead_source_import_queue_preview", requiresApproval: false },
     { name: "arcigy.build_lead_source_bundle_preview", requiresApproval: false },
@@ -3100,6 +3108,7 @@ function listWebMcpTools() {
     { name: "arcigy.run_leadgen_research_pipeline", requiresApproval: false },
     { name: "arcigy.add_leads_to_smartlead_campaign", requiresApproval: true },
     { name: "arcigy.append_leads_to_google_sheet", requiresApproval: true },
+    { name: "arcigy.replace_google_sheet_rows", requiresApproval: true },
   ];
 }
 
@@ -4783,6 +4792,68 @@ async function appendLeadsToGoogleSheet(payload) {
     if (accountEnvKey) break;
   }
   throw new Error(lastError || "Google Sheets append failed.");
+}
+
+async function replaceGoogleSheetRows(payload) {
+  if (payload?.approval?.approved !== true) {
+    throw new Error('arcigy.replace_google_sheet_rows requires explicit approval. Send {"approval":{"approved":true}} after user confirmation.');
+  }
+  const rows = Array.isArray(payload?.rows) ? payload.rows : [];
+  if (!rows.length) throw new Error("At least one lead row is required.");
+  const spreadsheetId = String(payload?.spreadsheetId || requireRuntimeEnv("GOOGLE_SHEET_ID"));
+  const range = String(payload?.range || "Leads!A1");
+  const clearRange = String(payload?.clearRange || "Leads!A1:Z5000");
+  const accountEnvKey = String(payload?.accountEnvKey ?? "").trim();
+  const accounts = listConfiguredGmailAccounts().filter((item) => !accountEnvKey || item.envKey === accountEnvKey);
+  if (!accounts.length) {
+    throw new Error(accountEnvKey ? `Google account not configured: ${accountEnvKey}` : "No configured Google OAuth account found.");
+  }
+  let lastError = "";
+  for (const [index, account] of accounts.entries()) {
+    try {
+      const accessToken = await refreshGoogleAccessToken(account.refreshToken);
+      const headers = {
+        authorization: `Bearer ${accessToken}`,
+        "content-type": "application/json",
+      };
+      const clearResponse = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(clearRange)}:clear`,
+        { method: "POST", headers, body: "{}" }
+      );
+      if (!clearResponse.ok) {
+        lastError = `Google Sheets clear failed after account ${index + 1}/${accounts.length}: ${clearResponse.status}`;
+        if (accountEnvKey) break;
+        continue;
+      }
+      const params = new URLSearchParams({ valueInputOption: "USER_ENTERED" });
+      const updateResponse = await fetch(
+        `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(range)}?${params.toString()}`,
+        {
+          method: "PUT",
+          headers,
+          body: JSON.stringify({ majorDimension: "ROWS", values: rows }),
+        }
+      );
+      if (updateResponse.ok) {
+        const result = {
+          spreadsheetId,
+          range,
+          clearRange,
+          rows: rows.length,
+          cleared: await clearResponse.json().catch(() => ({})),
+          update: await updateResponse.json().catch(() => ({})),
+        };
+        addAuditEvent("arcigy.replace_google_sheet_rows", "replaced", payload, result, true);
+        return result;
+      }
+      lastError = `Google Sheets update failed after account ${index + 1}/${accounts.length}: ${updateResponse.status}`;
+    } catch (error) {
+      const message = redactSensitiveText(error instanceof Error ? error.message : String(error));
+      lastError = `Google Sheets replace failed after account ${index + 1}/${accounts.length}: ${message}`;
+    }
+    if (accountEnvKey) break;
+  }
+  throw new Error(lastError || "Google Sheets replace failed.");
 }
 
 async function draftContractIntake(payload) {

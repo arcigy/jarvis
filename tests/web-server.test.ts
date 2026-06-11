@@ -313,6 +313,20 @@ test("local web bridge serves UI and API health", async () => {
     });
     assert.equal(topLevelApprovedSheetExport.status, 409);
 
+    const unapprovedSheetReplace = await fetch(`${baseUrl}/api/mcp/arcigy.replace_google_sheet_rows`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ rows: [["ACME", "https://example.com"]] }),
+    });
+    assert.equal(unapprovedSheetReplace.status, 409);
+
+    const topLevelApprovedSheetReplace = await fetch(`${baseUrl}/api/mcp/arcigy.replace_google_sheet_rows`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ approved: true, rows: [["ACME", "https://example.com"]] }),
+    });
+    assert.equal(topLevelApprovedSheetReplace.status, 409);
+
     const contractTool = await postJson(`${baseUrl}/api/mcp/arcigy.generate_contract_documents`, {
       approval: { approved: true },
       intake: JSON.parse(readFileSync("docs/contracts/examples/sample-intake.json", "utf-8")),
@@ -545,6 +559,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(capabilityAuditBody.toolCount, listJarvisMcpTools().length);
     assert.ok(capabilityAuditBody.capabilities.some((item) => item.id === "remote-mcp" && item.tools.includes("arcigy.get_jarvis_capability_audit")));
     assert.ok(capabilityAuditBody.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.append_leads_to_google_sheet")));
+    assert.ok(capabilityAuditBody.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.replace_google_sheet_rows")));
     assert.equal(JSON.stringify(capabilityAuditBody).includes(syntheticGoogleKey), false);
 
     const mcpCapabilityAudit = await postJson(`${baseUrl}/api/mcp/arcigy.get_jarvis_capability_audit`, { live: false });
@@ -746,6 +761,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_client_need_alerts" && call.body.status === "new"));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_audit_events" && call.body.limit === 20));
     assert.ok(remotePackBody.tools.approvalRequired.includes("arcigy.append_leads_to_google_sheet"));
+    assert.ok(remotePackBody.tools.approvalRequired.includes("arcigy.replace_google_sheet_rows"));
     assert.ok(remotePackBody.tools.approvalRequired.includes("arcigy.send_approved_outreach_reply"));
     assert.ok(remotePackBody.tools.localStateWrite.includes("arcigy.sync_gmail_recent_messages"));
     assert.ok(remotePackBody.tools.localStateWrite.includes("arcigy.prepare_positive_outreach_reply"));
@@ -1498,6 +1514,7 @@ test("local web bridge preflight reports tunnel readiness without leaking secret
     assert.ok(body.riskyToolsRequiringApproval.includes("arcigy.approve_prepared_outreach_reply"));
     assert.ok(body.riskyToolsRequiringApproval.includes("arcigy.send_approved_outreach_reply"));
     assert.ok(body.riskyToolsRequiringApproval.includes("arcigy.append_leads_to_google_sheet"));
+    assert.ok(body.riskyToolsRequiringApproval.includes("arcigy.replace_google_sheet_rows"));
     assert.equal(body.pathPolicy, "repo-only");
     assert.equal(body.maxJsonBytes > 0, true);
   } finally {

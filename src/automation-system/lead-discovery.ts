@@ -24,6 +24,10 @@ export type SheetAppendInput = {
   accountEnvKey?: string;
 };
 
+export type SheetReplaceInput = SheetAppendInput & {
+  clearRange?: string;
+};
+
 export type LeadDiscoveryInput = {
   query: string;
   placesQuery?: string;
@@ -164,6 +168,70 @@ export async function appendRowsToGoogleSheet(
     if (input.accountEnvKey) break;
   }
   throw new Error(lastError || "Google Sheets append failed.");
+}
+
+export async function replaceGoogleSheetRows(
+  input: SheetReplaceInput,
+  env: RuntimeEnv = process.env,
+  fetchImpl: FetchLike = fetch
+): Promise<{ spreadsheetId: string; range: string; clearRange: string; rows: number; update: unknown; cleared?: unknown }> {
+  if (!input.rows.length) {
+    throw new Error("At least one row is required.");
+  }
+  const spreadsheetId = input.spreadsheetId || requireEnv(env, "GOOGLE_SHEET_ID");
+  const range = input.range ?? "Leads!A1";
+  const clearRange = input.clearRange ?? "Leads!A1:Z5000";
+  const accounts = listConfiguredGmailAccounts(env).filter((item) => !input.accountEnvKey || item.envKey === input.accountEnvKey);
+  if (!accounts.length) {
+    throw new Error(input.accountEnvKey ? `Google account not configured: ${input.accountEnvKey}` : "No configured Google OAuth account found.");
+  }
+  let lastError = "";
+  for (const [index, account] of accounts.entries()) {
+    try {
+      const accessToken = await refreshGoogleAccessToken(account.refreshToken, env, fetchImpl);
+      const headers = {
+        authorization: `Bearer ${accessToken}`,
+        "content-type": "application/json",
+      };
+      const clearResponse = await fetchImpl(
+        `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(clearRange)}:clear`,
+        { method: "POST", headers, body: "{}" }
+      );
+      if (!clearResponse.ok) {
+        lastError = `Google Sheets clear failed after account ${index + 1}/${accounts.length}: ${clearResponse.status}`;
+        if (input.accountEnvKey) break;
+        continue;
+      }
+      const params = new URLSearchParams({ valueInputOption: "USER_ENTERED" });
+      const updateResponse = await fetchImpl(
+        `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(range)}?${params.toString()}`,
+        {
+          method: "PUT",
+          headers,
+          body: JSON.stringify({
+            majorDimension: "ROWS",
+            values: input.rows,
+          }),
+        }
+      );
+      if (updateResponse.ok) {
+        return {
+          spreadsheetId,
+          range,
+          clearRange,
+          rows: input.rows.length,
+          cleared: await clearResponse.json().catch(() => ({})),
+          update: await updateResponse.json().catch(() => ({})),
+        };
+      }
+      lastError = `Google Sheets update failed after account ${index + 1}/${accounts.length}: ${updateResponse.status}`;
+    } catch (error) {
+      const message = redactSensitiveText(error instanceof Error ? error.message : String(error));
+      lastError = `Google Sheets replace failed after account ${index + 1}/${accounts.length}: ${message}`;
+    }
+    if (input.accountEnvKey) break;
+  }
+  throw new Error(lastError || "Google Sheets replace failed.");
 }
 
 export async function discoverLeads(

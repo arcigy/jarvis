@@ -1228,6 +1228,32 @@ export type LeadgenGapReport = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type GoogleSheetSyncPreview = {
+  mode: "google-sheet-sync-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  sheet: { spreadsheetId?: string; range: string; clearRange: string; accountEnvKey?: string; includeHeader: boolean };
+  totals: {
+    input: number;
+    rows: number;
+    dataRows: number;
+    missingEmail: number;
+    missingWebsite: number;
+    missingIntro: number;
+    skipped: number;
+  };
+  headers: string[];
+  rowsPreview: Array<Array<string | number | boolean | null>>;
+  replaceApprovalPayload?: {
+    spreadsheetId?: string;
+    range: string;
+    clearRange: string;
+    accountEnvKey?: string;
+    rows: Array<Array<string | number | boolean | null>>;
+  };
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type LeadgenCampaignPipelinePreview = {
   mode: "leadgen-campaign-pipeline-preview";
   summary: string;
@@ -2427,6 +2453,85 @@ export function buildLeadgenStatusBoardPreview(input: {
     totals,
     groups,
     nextToolCalls: dedupeNextToolCalls(nextToolCalls),
+  };
+}
+
+const defaultGoogleSheetLeadHeaders = [
+  "Status",
+  "Web",
+  "Official Company Name",
+  "ICO",
+  "Address",
+  "Decision Maker",
+  "Last Name / Salutation",
+  "Stakeholders",
+  "Email",
+  "Icebreaker",
+  "Original Name",
+  "Note",
+  "Campaign",
+];
+
+export function buildGoogleSheetSyncPreview(input: {
+  leads?: Array<LeadCandidateInput & { raw?: Record<string, string>; verificationStatus?: string; campaignTag?: string; ico?: string; address?: string }>;
+  csvText?: string;
+  delimiter?: "," | ";";
+  sourceName?: string;
+  spreadsheetId?: string;
+  range?: string;
+  clearRange?: string;
+  accountEnvKey?: string;
+  includeHeader?: boolean;
+  maxRows?: number;
+  previewRows?: number;
+}): GoogleSheetSyncPreview {
+  const parsed = input.csvText?.trim() ? parseLeadsCsv({ csvText: input.csvText, delimiter: input.delimiter, maxRows: input.maxRows }) : undefined;
+  const leads = [...(input.leads ?? []), ...(parsed?.leads ?? [])];
+  const includeHeader = input.includeHeader !== false;
+  const range = input.range ?? "Leads!A1";
+  const clearRange = input.clearRange ?? "Leads!A1:M5000";
+  const dataRows = leads.map(googleSheetLeadRow);
+  const rows = includeHeader ? [defaultGoogleSheetLeadHeaders, ...dataRows] : dataRows;
+  const replaceApprovalPayload = rows.length
+    ? {
+        spreadsheetId: input.spreadsheetId,
+        range,
+        clearRange,
+        accountEnvKey: input.accountEnvKey,
+        rows,
+      }
+    : undefined;
+  const missingEmail = leads.filter((lead) => !sheetLeadValue(lead, "email", "primary_email", "smartlead_emails")).length;
+  const missingWebsite = leads.filter((lead) => !sheetLeadValue(lead, "website", "web", "url", "domain", "google_domain")).length;
+  const missingIntro = leads.filter((lead) => !sheetLeadValue(lead, "personalizedIntro", "personalized_intro", "icebreaker_sentence", "icebreaker")).length;
+  const status: GoogleSheetSyncPreview["status"] = leads.length === 0 ? "blocked" : missingEmail || missingWebsite || missingIntro || (parsed?.skipped.length ?? 0) ? "attention" : "ready";
+  const nextToolCalls: GoogleSheetSyncPreview["nextToolCalls"] = [];
+  if (replaceApprovalPayload) {
+    nextToolCalls.push({
+      tool: "arcigy.replace_google_sheet_rows",
+      payload: replaceApprovalPayload,
+      reason: "Po kontrole riadkov prepis cielovy Google Sheet cez clear+update.",
+      approvalRequired: true,
+    });
+  }
+  return {
+    mode: "google-sheet-sync-preview",
+    status,
+    summary: `Google Sheet sync preview ${status}: ${dataRows.length} lead rows, ${missingEmail} bez emailu, ${missingWebsite} bez webu, ${missingIntro} bez intra. Ziadny zapis do Google Sheets neprebehol.`,
+    sheet: { spreadsheetId: input.spreadsheetId, range, clearRange, accountEnvKey: input.accountEnvKey, includeHeader },
+    totals: {
+      input: leads.length,
+      rows: rows.length,
+      dataRows: dataRows.length,
+      missingEmail,
+      missingWebsite,
+      missingIntro,
+      skipped: parsed?.skipped.length ?? 0,
+    },
+    headers: defaultGoogleSheetLeadHeaders,
+    rowsPreview: rows.slice(0, Math.min(Math.max(Math.trunc(input.previewRows ?? 5), 1), 25)),
+    replaceApprovalPayload,
+    nextToolCalls,
   };
 }
 
@@ -8212,6 +8317,44 @@ const csvCustomFieldKeys = new Set([
   "types",
   "verification_status",
 ]);
+
+function googleSheetLeadRow(lead: LeadCandidateInput & { raw?: Record<string, string>; verificationStatus?: string; campaignTag?: string; ico?: string; address?: string }): Array<string | number | boolean | null> {
+  return [
+    sheetLeadValue(lead, "verificationStatus", "verification_status", "smartlead_status", "smartlead_statuses") || "",
+    sheetLeadValue(lead, "website", "web", "url", "domain", "google_domain") || "",
+    sheetLeadValue(lead, "official_company_name", "officialCompanyName", "companyName", "company_name") || "",
+    sheetLeadValue(lead, "ico") || "",
+    sheetLeadValue(lead, "address", "district_city") || "",
+    sheetLeadValue(lead, "decision_maker_name", "decisionMakerName", "firstName", "first_name") || "",
+    sheetLeadValue(lead, "decision_maker_last_name", "lastName", "last_name", "last_name_with_salutation", "greeting") || "",
+    sheetLeadValue(lead, "stakeholders", "executives", "partners") || "",
+    sheetLeadValue(lead, "email", "primary_email", "smartlead_emails") || "",
+    sheetLeadValue(lead, "personalizedIntro", "personalized_intro", "icebreaker_sentence", "icebreaker") || "",
+    sheetLeadValue(lead, "original_name", "name", "companyName", "company_name") || "",
+    sheetLeadValue(lead, "verification_notes", "note", "notes") || "",
+    sheetLeadValue(lead, "campaignTag", "campaign_tag", "source", "niche") || "",
+  ];
+}
+
+function sheetLeadValue(lead: LeadCandidateInput & { raw?: Record<string, string> }, ...aliases: string[]): string | undefined {
+  const raw = lead.raw ?? {};
+  const custom = lead.customFields ?? {};
+  const normalizedRaw = new Map(Object.entries(raw).map(([key, value]) => [slugify(key).replace(/-/g, "_"), value]));
+  const normalizedCustom = new Map(Object.entries(custom).map(([key, value]) => [slugify(key).replace(/-/g, "_"), value]));
+  const record = lead as Record<string, unknown>;
+  for (const alias of aliases) {
+    const direct = record[alias];
+    if (typeof direct === "string" && direct.trim()) return direct.trim();
+    if (typeof direct === "number" || typeof direct === "boolean") return String(direct);
+    const normalized = slugify(alias).replace(/-/g, "_");
+    const customValue = normalizedCustom.get(normalized);
+    if (typeof customValue === "string" && customValue.trim()) return customValue.trim();
+    if (typeof customValue === "number" || typeof customValue === "boolean") return String(customValue);
+    const rawValue = normalizedRaw.get(normalized);
+    if (typeof rawValue === "string" && rawValue.trim()) return rawValue.trim();
+  }
+  return undefined;
+}
 
 function normalizeWebsiteValue(value: string): string {
   const trimmed = value.trim();

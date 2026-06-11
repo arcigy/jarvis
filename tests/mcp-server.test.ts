@@ -118,6 +118,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(names.includes("arcigy.build_lead_enrichment_merge_preview"));
   assert.ok(names.includes("arcigy.build_leadgen_gap_report"));
   assert.ok(names.includes("arcigy.build_leadgen_status_board_preview"));
+  assert.ok(names.includes("arcigy.build_google_sheet_sync_preview"));
   assert.ok(names.includes("arcigy.build_leadgen_campaign_pipeline_preview"));
   assert.ok(names.includes("arcigy.build_lead_source_import_queue_preview"));
   assert.ok(names.includes("arcigy.build_lead_source_bundle_preview"));
@@ -145,6 +146,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(names.includes("arcigy.run_leadgen_research_pipeline"));
   assert.ok(names.includes("arcigy.add_leads_to_smartlead_campaign"));
   assert.ok(names.includes("arcigy.append_leads_to_google_sheet"));
+  assert.ok(names.includes("arcigy.replace_google_sheet_rows"));
   assert.match(readFileSync("src/automation-system/mcp-server.ts", "utf-8"), /localCold\.metrics\?\.preparedPositiveReplyCount/);
   assert.match(readFileSync("src/automation-system/mcp-server.ts", "utf-8"), /pendingPositiveApprovalCount/);
 
@@ -271,6 +273,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.equal(audit.toolCount, listJarvisMcpTools().length);
   assert.ok(audit.capabilities.some((item) => item.id === "remote-mcp" && item.tools.includes("arcigy.get_jarvis_capability_audit")));
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.append_leads_to_google_sheet")));
+  assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.replace_google_sheet_rows")));
   assert.doesNotMatch(JSON.stringify(audit), /AIza|GOCSPX|1\/\/|postgresql:\/\/|redis:\/\//);
 
   const voiceAuditResult = await client.callTool({
@@ -406,6 +409,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_outreach_brief" && !("campaignId" in call.body)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.sync_gmail_recent_messages" && call.body.dryRun === true));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.send_approved_outreach_reply" && call.approvalRequired === true));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_google_sheet_sync_preview" && call.approvalRequired === false && typeof call.body.csvText === "string"));
   assert.ok(
     pack.quickStartCalls.some(
       (call) => call.tool === "arcigy.draft_contract_intake" && call.approvalRequired === false && typeof call.body.brief === "string"
@@ -442,6 +446,15 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assertToolError(
     await client.callTool({
       name: "arcigy.append_leads_to_google_sheet",
+      arguments: {
+        rows: [["Name", "Website"], ["ACME", "https://example.com"]],
+      },
+    }),
+    /requires explicit approval/
+  );
+  assertToolError(
+    await client.callTool({
+      name: "arcigy.replace_google_sheet_rows",
       arguments: {
         rows: [["Name", "Website"], ["ACME", "https://example.com"]],
       },

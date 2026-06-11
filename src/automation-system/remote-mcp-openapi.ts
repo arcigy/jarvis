@@ -788,6 +788,17 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       csvText: "company,campaign_tag,email,website,phone,icebreaker_sentence,sent_to_smartlead,verification_status\nReady Studio,kuchyne,jan@ready.sk,https://ready.sk,+421 900 111 222,Vsimol som si vase realizacie kuchyn.,false,verified\nNeeds Email,kuchyne,,https://needs-email.sk,,,false,\nNeeds Intro,kuchyne,info@needs-intro.sk,https://needs-intro.sk,+421 900 222 333,,false,\nAlready Sent,kuchyne,sent@ready.sk,https://sent.sk,+421 900 333 444,Vsimol som si showroom.,true,verified\nOrphan Lead,,orphan@example.com,https://orphan.sk,,,false,failed",
     };
   }
+  if (toolName === "arcigy.build_google_sheet_sync_preview") {
+    return {
+      sourceName: "db-to-google-sheets",
+      spreadsheetId: "sheet_id",
+      range: "Leads!A1",
+      clearRange: "Leads!A1:M5000",
+      csvText: "verification_status,website,official_company_name,ico,address,decision_maker_name,decision_maker_last_name,email,icebreaker_sentence,original_name,verification_notes,campaign_tag\nverified,https://ready.sk,Ready Studio s.r.o.,12345678,Bratislava,Jan,Novak,jan@ready.sk,Vsimol som si vase realizacie kuchyn.,Ready Studio,,kuchyne\nflagged,https://needs-intro.sk,Needs Intro s.r.o.,,,Eva,Horna,info@needs-intro.sk,,,Doplnit intro,kuchyne",
+      includeHeader: true,
+      previewRows: 5,
+    };
+  }
   if (toolName === "arcigy.build_leadgen_campaign_pipeline_preview") {
     return {
       niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456" },
@@ -1040,5 +1051,6 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
   if (toolName === "arcigy.send_approved_outreach_reply") return { preparedEventId: "prepared_reply_id", approval: { approved: true } };
   if (toolName === "arcigy.update_client_need_status") return { needSignalId: "client_need_signal_id", status: "resolved", approval: { approved: true } };
   if (toolName === "arcigy.append_leads_to_google_sheet") return { rows: [["Modelova Firma", "https://example.com", "lead@example.com"]], approval: { approved: true } };
+  if (toolName === "arcigy.replace_google_sheet_rows") return { rows: [["Company", "Website", "Email"], ["Modelova Firma", "https://example.com", "lead@example.com"]], range: "Leads!A1", clearRange: "Leads!A1:C1000", approval: { approved: true } };
   return {};
 }

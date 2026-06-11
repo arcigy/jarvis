@@ -191,6 +191,7 @@ function buildLaunchChecklist(
     "arcigy.configure_smartlead_campaign",
     "arcigy.add_leads_to_smartlead_campaign",
     "arcigy.append_leads_to_google_sheet",
+    "arcigy.replace_google_sheet_rows",
   ];
   const approvalReady = requiredApprovalTools.every((tool) => approvalTools.includes(tool));
   const liveChecks = diagnostics?.checks ?? [];

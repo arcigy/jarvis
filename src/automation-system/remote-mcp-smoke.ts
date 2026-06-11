@@ -329,6 +329,7 @@ async function checkApprovalGates(fetchImpl: typeof fetch, baseUrl: string, bear
     ["arcigy.export_local_memory_snapshot", { outputPath: "generated/local-memory/smoke.json" }],
     ["arcigy.export_leads_csv", { outputPath: "generated/leads/smoke.csv", leads: [{ email: "smoke@example.com" }] }],
     ["arcigy.append_leads_to_google_sheet", { rows: [["Smoke", "https://example.com"]] }],
+    ["arcigy.replace_google_sheet_rows", { rows: [["Smoke", "https://example.com"]] }],
     ["arcigy.add_leads_to_smartlead_campaign", { campaignId: "123", leads: [{ email: "smoke@example.com" }] }],
     ["arcigy.send_smartlead_thread_reply", { campaignId: "123", email: "smoke@example.com", emailBody: "Smoke reply body." }],
     ["arcigy.create_smartlead_campaign", { name: "SMOKE CAMPAIGN" }],
@@ -556,6 +557,7 @@ function hasSafeOpenApiExample(toolName: string, value: unknown): boolean {
   if (toolName === "arcigy.generate_price_offer_document") return (payload.approval as { approved?: unknown } | undefined)?.approved === true && typeof payload.offer === "object";
   if (toolName === "arcigy.export_leads_csv") return (payload.approval as { approved?: unknown } | undefined)?.approved === true && Array.isArray(payload.leads);
   if (toolName === "arcigy.append_leads_to_google_sheet") return (payload.approval as { approved?: unknown } | undefined)?.approved === true && Array.isArray(payload.rows);
+  if (toolName === "arcigy.replace_google_sheet_rows") return (payload.approval as { approved?: unknown } | undefined)?.approved === true && Array.isArray(payload.rows);
   if (toolName === "arcigy.add_leads_to_smartlead_campaign") return (payload.approval as { approved?: unknown } | undefined)?.approved === true && Array.isArray(payload.leads);
   if (toolName === "arcigy.send_smartlead_thread_reply") return (payload.approval as { approved?: unknown } | undefined)?.approved === true && typeof payload.emailBody === "string";
   if (toolName === "arcigy.create_smartlead_campaign") return (payload.approval as { approved?: unknown } | undefined)?.approved === true && typeof payload.name === "string";

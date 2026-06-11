@@ -17,7 +17,7 @@ import { batchFetchPublicUrlPreviews, fetchPublicUrlPreview } from "./http-fetch
 import { handleJarvisVoiceEvent, type JarvisVoiceSession } from "./jarvis-voice.ts";
 import { buildJarvisCapabilityAudit, summarizeJarvisCapabilityAuditForVoice } from "./jarvis-capability-audit.ts";
 import { buildLeadgenDailyReport, buildLeadgenEveningSummary, buildLeadgenOpsDigest, buildLeadgenSlackReportPreview, selectNextNiche } from "./leadgen-report.ts";
-import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "./lead-discovery.ts";
+import { appendRowsToGoogleSheet, discoverLeads, replaceGoogleSheetRows, searchGooglePlaces, searchSerper } from "./lead-discovery.ts";
 import {
   buildBatchNicheDiscoveryPlan,
   buildLeadgenExecutionQueuePreview,
@@ -25,6 +25,7 @@ import {
   buildNicheLeadgenPlan,
   buildLeadgenGapReport,
   buildLeadgenStatusBoardPreview,
+  buildGoogleSheetSyncPreview,
   buildLeadgenCampaignPipelinePreview,
   buildLeadgenAutopilotBatchPreview,
   buildRegionExpansionQueuePreview,
@@ -3025,6 +3026,40 @@ export function createJarvisMcpServer(): McpServer {
   );
 
   server.registerTool(
+    "arcigy.build_google_sheet_sync_preview",
+    {
+      title: "Build Google Sheet sync preview",
+      description: "Create a read-only Google Sheets sync plan from CSV or lead objects, including headers, rows, clear/update ranges, and the approval-gated replace payload.",
+      inputSchema: {
+        leads: z.array(pipelineLeadSchema.extend({
+          raw: z.record(z.string(), z.string()).optional(),
+          verificationStatus: z.string().optional(),
+          campaignTag: z.string().optional(),
+          ico: z.string().optional(),
+          address: z.string().optional(),
+        }).passthrough()).optional(),
+        csvText: z.string().optional(),
+        delimiter: z.enum([",", ";"]).optional(),
+        sourceName: z.string().optional(),
+        spreadsheetId: z.string().optional(),
+        range: z.string().default("Leads!A1"),
+        clearRange: z.string().default("Leads!A1:M5000"),
+        accountEnvKey: z.string().optional(),
+        includeHeader: z.boolean().default(true),
+        maxRows: z.number().int().min(1).max(10000).optional(),
+        previewRows: z.number().int().min(1).max(25).default(5),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildGoogleSheetSyncPreview(input))
+  );
+
+  server.registerTool(
     "arcigy.build_leadgen_campaign_pipeline_preview",
     {
       title: "Build leadgen campaign pipeline preview",
@@ -3927,6 +3962,32 @@ export function createJarvisMcpServer(): McpServer {
     async (input) => {
       requireExplicitApproval("arcigy.append_leads_to_google_sheet", input);
       return jsonResult(await appendRowsToGoogleSheet(input));
+    }
+  );
+
+  server.registerTool(
+    "arcigy.replace_google_sheet_rows",
+    {
+      title: "Replace Google Sheet rows",
+      description: "Clear a target Google Sheet range and update it with prepared rows. This is an explicit external write action.",
+      inputSchema: {
+        spreadsheetId: z.string().optional(),
+        range: z.string().default("Leads!A1"),
+        clearRange: z.string().default("Leads!A1:Z5000"),
+        accountEnvKey: z.string().optional(),
+        rows: z.array(z.array(z.union([z.string(), z.number(), z.boolean(), z.null()]))).min(1),
+        approval: approvalSchema,
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (input) => {
+      requireExplicitApproval("arcigy.replace_google_sheet_rows", input);
+      return jsonResult(await replaceGoogleSheetRows(input));
     }
   );
 

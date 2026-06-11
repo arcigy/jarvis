@@ -15,7 +15,7 @@ import { defaultGmailBriefingQuery, defaultGmailSyncQuery, listConfiguredGmailAc
 import { batchFetchPublicUrlPreviews, fetchPublicUrlPreview } from "../automation-system/http-fetch.ts";
 import { containsWakeWord, extractCommandAfterWakeWord, type JarvisVoiceSession } from "../automation-system/jarvis-voice.ts";
 import { buildJarvisCapabilityAudit, summarizeJarvisCapabilityAuditForVoice } from "../automation-system/jarvis-capability-audit.ts";
-import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerper } from "../automation-system/lead-discovery.ts";
+import { appendRowsToGoogleSheet, discoverLeads, replaceGoogleSheetRows, searchGooglePlaces, searchSerper } from "../automation-system/lead-discovery.ts";
 import { buildLeadgenDailyReport, buildLeadgenEveningSummary, buildLeadgenOpsDigest, buildLeadgenSlackReportPreview, selectNextNiche } from "../automation-system/leadgen-report.ts";
 import {
   buildBatchNicheDiscoveryPlan,
@@ -24,6 +24,7 @@ import {
   buildNicheLeadgenPlan,
   buildLeadgenGapReport,
   buildLeadgenStatusBoardPreview,
+  buildGoogleSheetSyncPreview,
   buildLeadgenCampaignPipelinePreview,
   buildLeadgenAutopilotBatchPreview,
   buildRegionExpansionQueuePreview,
@@ -2017,6 +2018,24 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
     });
     return;
   }
+  if (name === "arcigy.build_google_sheet_sync_preview") {
+    writeJson(response, 200, {
+      result: buildGoogleSheetSyncPreview({
+        leads: Array.isArray(payload.leads) ? payload.leads as Parameters<typeof buildGoogleSheetSyncPreview>[0]["leads"] : undefined,
+        csvText: optionalString(payload.csvText),
+        delimiter: payload.delimiter === ";" ? ";" : payload.delimiter === "," ? "," : undefined,
+        sourceName: optionalString(payload.sourceName),
+        spreadsheetId: optionalString(payload.spreadsheetId),
+        range: optionalString(payload.range),
+        clearRange: optionalString(payload.clearRange),
+        accountEnvKey: optionalString(payload.accountEnvKey),
+        includeHeader: payload.includeHeader !== false,
+        maxRows: typeof payload.maxRows === "number" ? payload.maxRows : undefined,
+        previewRows: typeof payload.previewRows === "number" ? payload.previewRows : undefined,
+      }),
+    });
+    return;
+  }
   if (name === "arcigy.build_leadgen_campaign_pipeline_preview") {
     writeJson(response, 200, {
       result: buildLeadgenCampaignPipelinePreview({
@@ -2523,6 +2542,19 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
       });
     const responseBody = { result };
     addAuditEvent("arcigy.append_leads_to_google_sheet", "appended", payload, responseBody, true);
+    writeJson(response, 200, responseBody);
+    return;
+  }
+  if (name === "arcigy.replace_google_sheet_rows") {
+    const result = await replaceGoogleSheetRows({
+        spreadsheetId: optionalString(payload.spreadsheetId),
+        range: optionalString(payload.range),
+        clearRange: optionalString(payload.clearRange),
+        accountEnvKey: optionalString(payload.accountEnvKey),
+        rows: (payload.rows ?? []) as Array<Array<string | number | boolean | null>>,
+      });
+    const responseBody = { result };
+    addAuditEvent("arcigy.replace_google_sheet_rows", "replaced", payload, responseBody, true);
     writeJson(response, 200, responseBody);
     return;
   }
