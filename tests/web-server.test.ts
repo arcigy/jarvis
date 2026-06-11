@@ -646,6 +646,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(openApiBody.paths["/api/mcp/arcigy.get_gmail_unread_triage"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.label_gmail_thread"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.build_outreach_contact_selection_preview"]);
+    assert.ok(openApiBody.paths["/api/mcp/arcigy.build_daily_leadgen_run_closure_preview"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.build_local_lead_register_update_preview"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.apply_local_lead_register_update"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.build_gmail_name_enrichment_queue_preview"]);
@@ -886,6 +887,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_local_lead_register_update_preview" && call.approvalRequired === false));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.apply_local_lead_register_update" && call.approvalRequired === true));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_outreach_contact_selection_preview" && call.approvalRequired === false));
+    assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_daily_leadgen_run_closure_preview" && call.approvalRequired === false));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_gmail_name_enrichment_queue_preview" && call.approvalRequired === false));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_lead_identity_repair_preview" && call.approvalRequired === false));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_lead_validation_scorecard_preview" && call.approvalRequired === false && call.body.minScore === 70));

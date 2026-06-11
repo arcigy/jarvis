@@ -1767,6 +1767,47 @@ export type LeadgenExecutionQueuePreview = {
   warnings: string[];
 };
 
+export type DailyLeadgenRunClosurePreview = {
+  mode: "daily-leadgen-run-closure-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  niche: {
+    id?: string;
+    slug: string;
+    name: string;
+    activeRegion?: string;
+    nextRegion?: string;
+    currentRegionIndex: number;
+    nextRegionIndex: number;
+    dailyTarget: number;
+    campaignId?: string | number | null;
+  };
+  stats: { discovered: number; enriched: number; qualified: number; sentToSmartlead: number; failed: number };
+  rates: { enrichmentRate: number; qualificationRate: number; sendRate: number; targetFillRate: number };
+  decisions: {
+    advanceRegion: boolean;
+    markCompletedIfExhausted: boolean;
+    exhaustedCandidate: boolean;
+    needsMoreDiscovery: boolean;
+    needsRepair: boolean;
+    needsSmartleadUpload: boolean;
+  };
+  approvalPayloads: {
+    recordLocalNicheRun: {
+      slug: string;
+      nicheId?: string;
+      date?: string;
+      workedAt?: string;
+      advanceRegion: boolean;
+      markCompletedIfExhausted: boolean;
+      stats: { discovered: number; enriched: number; qualified: number; sentToSmartlead: number; failed: number };
+      approval: { approved: true };
+    };
+  };
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+  warnings: string[];
+};
+
 export type RegionExpansionQueuePreview = {
   mode: "region-expansion-queue-preview";
   summary: string;
@@ -8730,6 +8771,132 @@ export function buildLeadgenExecutionQueuePreview(input: {
     },
     queue,
     nextToolCalls,
+    warnings,
+  };
+}
+
+export function buildDailyLeadgenRunClosurePreview(input: {
+  niche: {
+    id?: string;
+    slug?: string;
+    name: string;
+    regions?: string[];
+    currentRegionIndex?: number;
+    dailyTarget?: number;
+    campaignId?: string | number | null;
+    smartleadCampaignId?: string | number | null;
+  };
+  stats: { discovered?: number; enriched?: number; qualified?: number; sentToSmartlead?: number; sent_to_smartlead?: number; failed?: number };
+  date?: string;
+  workedAt?: string;
+  advanceRegion?: boolean;
+  markCompletedIfExhausted?: boolean;
+  offer?: string;
+  painPoint?: string;
+  language?: "sk" | "en";
+  batchSize?: number;
+}): DailyLeadgenRunClosurePreview {
+  const slug = input.niche.slug?.trim() || slugify(input.niche.name);
+  const regions = input.niche.regions?.length ? input.niche.regions : [];
+  const currentRegionIndex = Math.max(Math.trunc(input.niche.currentRegionIndex ?? 0), 0);
+  const activeRegion = regions.length ? regions[currentRegionIndex % regions.length] : undefined;
+  const nextRegionIndex = currentRegionIndex + 1;
+  const nextRegion = regions.length ? regions[nextRegionIndex % regions.length] : undefined;
+  const dailyTarget = Math.min(Math.max(Math.trunc(input.niche.dailyTarget ?? 30), 1), 250);
+  const stats = {
+    discovered: Math.max(Math.trunc(input.stats.discovered ?? 0), 0),
+    enriched: Math.max(Math.trunc(input.stats.enriched ?? 0), 0),
+    qualified: Math.max(Math.trunc(input.stats.qualified ?? 0), 0),
+    sentToSmartlead: Math.max(Math.trunc(input.stats.sentToSmartlead ?? input.stats.sent_to_smartlead ?? 0), 0),
+    failed: Math.max(Math.trunc(input.stats.failed ?? 0), 0),
+  };
+  const exhaustedCandidate = stats.discovered < Math.ceil(dailyTarget * 0.1) && (!regions.length || nextRegionIndex >= regions.length);
+  const needsMoreDiscovery = stats.discovered < dailyTarget && !exhaustedCandidate;
+  const needsRepair = stats.enriched > stats.qualified || stats.failed > 0;
+  const needsSmartleadUpload = stats.qualified > stats.sentToSmartlead;
+  const advanceRegion = input.advanceRegion !== false;
+  const markCompletedIfExhausted = input.markCompletedIfExhausted !== false;
+  const recordLocalNicheRun = {
+    slug,
+    nicheId: input.niche.id,
+    date: input.date,
+    workedAt: input.workedAt,
+    advanceRegion,
+    markCompletedIfExhausted,
+    stats,
+    approval: { approved: true as const },
+  };
+  const nextToolCalls: DailyLeadgenRunClosurePreview["nextToolCalls"] = [{
+    tool: "arcigy.record_local_niche_run",
+    payload: recordLocalNicheRun as unknown as Record<string, unknown>,
+    reason: "Po kontrole operatorom zapis denny run, posun region index a pripadne oznac vycerpany niche.",
+    approvalRequired: true,
+  }];
+  if (needsRepair) {
+    nextToolCalls.push({
+      tool: "arcigy.build_lead_repair_queue_preview",
+      payload: { leads: [], offer: input.offer, language: input.language ?? "sk" },
+      reason: "Run ma failed/nequalified rozdiel; nacitaj stuck leady z DB/exportu a oprav email, meno alebo intro pred dalsim uploadom.",
+      approvalRequired: false,
+    });
+  }
+  if (needsSmartleadUpload) {
+    nextToolCalls.push({
+      tool: "arcigy.build_smartlead_injection_plan",
+      payload: { niche: { id: input.niche.id, slug, name: input.niche.name, campaignId: input.niche.campaignId ?? input.niche.smartleadCampaignId ?? null }, leads: [], batchSize: input.batchSize ?? 50 },
+      reason: "Qualified leady prevysuju odoslane; po nacitani ready leadov priprav Smartlead upload payload.",
+      approvalRequired: false,
+    });
+  }
+  if (needsMoreDiscovery) {
+    nextToolCalls.push({
+      tool: "arcigy.build_daily_leadgen_runbook",
+      payload: { niche: { id: input.niche.id, slug, name: input.niche.name, region: nextRegion ?? activeRegion, campaignId: input.niche.campaignId ?? input.niche.smartleadCampaignId ?? null }, dailyLimit: dailyTarget, offer: input.offer, painPoint: input.painPoint, language: input.language ?? "sk" },
+      reason: "Target nebol naplneny a niche nie je vycerpany; priprav dalsi denny run pre dalsi region.",
+      approvalRequired: false,
+    });
+  }
+  nextToolCalls.push({
+    tool: "arcigy.get_leadgen_daily_report",
+    payload: { date: input.date },
+    reason: "Po zapise runu skontroluj denny report a stuck leady.",
+    approvalRequired: false,
+  });
+  const warnings: string[] = [];
+  if (!slug) warnings.push("Niche slug is missing and could not be inferred.");
+  if (stats.sentToSmartlead > stats.qualified) warnings.push("sentToSmartlead is higher than qualified; verify run stats before approval.");
+  if (stats.qualified > stats.enriched) warnings.push("qualified is higher than enriched; verify run stats before approval.");
+  const status: DailyLeadgenRunClosurePreview["status"] = !slug || !input.niche.name.trim()
+    ? "blocked"
+    : warnings.length || needsRepair || needsSmartleadUpload || exhaustedCandidate
+      ? "attention"
+      : "ready";
+  const rate = (num: number, denom: number) => denom > 0 ? Math.round((num / denom) * 100) : 0;
+  return {
+    mode: "daily-leadgen-run-closure-preview",
+    status,
+    summary: `Daily leadgen closure ${status}: ${stats.discovered} discovered, ${stats.enriched} enriched, ${stats.qualified} qualified, ${stats.sentToSmartlead} sent, ${stats.failed} failed. ${exhaustedCandidate ? "Niche vyzera vycerpany. " : ""}Ziadny zapis ani upload neprebehol.`,
+    niche: {
+      id: input.niche.id,
+      slug,
+      name: input.niche.name,
+      activeRegion,
+      nextRegion,
+      currentRegionIndex,
+      nextRegionIndex,
+      dailyTarget,
+      campaignId: input.niche.campaignId ?? input.niche.smartleadCampaignId ?? null,
+    },
+    stats,
+    rates: {
+      enrichmentRate: rate(stats.enriched, stats.discovered),
+      qualificationRate: rate(stats.qualified, stats.enriched),
+      sendRate: rate(stats.sentToSmartlead, stats.qualified),
+      targetFillRate: rate(stats.sentToSmartlead, dailyTarget),
+    },
+    decisions: { advanceRegion, markCompletedIfExhausted, exhaustedCandidate, needsMoreDiscovery, needsRepair, needsSmartleadUpload },
+    approvalPayloads: { recordLocalNicheRun },
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls),
     warnings,
   };
 }

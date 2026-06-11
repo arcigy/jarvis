@@ -30,6 +30,7 @@ import {
   buildLeadgenCampaignPipelinePreview,
   buildLeadgenAutopilotBatchPreview,
   buildRegionExpansionQueuePreview,
+  buildDailyLeadgenRunClosurePreview,
   buildPhoneEnrichmentQueuePreview,
   buildLeadSourceImportQueuePreview,
   buildLeadSourceBundlePreview,
@@ -1945,6 +1946,23 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         painPoint: optionalString(payload.painPoint),
         language: payload.language === "en" ? "en" : "sk",
         includeSmartleadSetup: payload.includeSmartleadSetup === true,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_daily_leadgen_run_closure_preview") {
+    writeJson(response, 200, {
+      result: buildDailyLeadgenRunClosurePreview({
+        niche: (payload.niche ?? {}) as Parameters<typeof buildDailyLeadgenRunClosurePreview>[0]["niche"],
+        stats: isRecord(payload.stats) ? payload.stats as Parameters<typeof buildDailyLeadgenRunClosurePreview>[0]["stats"] : {},
+        date: optionalString(payload.date),
+        workedAt: optionalString(payload.workedAt),
+        advanceRegion: payload.advanceRegion !== false,
+        markCompletedIfExhausted: payload.markCompletedIfExhausted !== false,
+        offer: optionalString(payload.offer),
+        painPoint: optionalString(payload.painPoint),
+        language: payload.language === "en" ? "en" : "sk",
+        batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
       }),
     });
     return;

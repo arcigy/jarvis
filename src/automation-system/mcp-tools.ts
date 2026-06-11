@@ -95,6 +95,7 @@ export type JarvisMcpToolName =
   | "arcigy.build_batch_niche_discovery_plan"
   | "arcigy.build_lead_discovery_matrix_preview"
   | "arcigy.build_leadgen_execution_queue_preview"
+  | "arcigy.build_daily_leadgen_run_closure_preview"
   | "arcigy.build_region_expansion_queue_preview"
   | "arcigy.draft_smartlead_campaign_sequence"
   | "arcigy.build_smartlead_sequence_work_packet_preview"
@@ -653,6 +654,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.build_leadgen_execution_queue_preview",
       description: "Zoradi denny leadgen execution queue cez niche, regiony, kvoty, discovery, enrichment a Smartlead handoff bez zapisu.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_daily_leadgen_run_closure_preview",
+      description: "Pripravi denny post-run ledger: discovered/enriched/qualified/sent/failed, region advance, exhaustion rozhodnutie a record_local_niche_run approval payload bez zapisu.",
       requiresApproval: false,
     },
     {

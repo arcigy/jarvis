@@ -612,6 +612,16 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       includeSmartleadSetup: true,
     };
   }
+  if (toolName === "arcigy.build_daily_leadgen_run_closure_preview") {
+    return {
+      niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", regions: ["Bratislava", "Trnava"], currentRegionIndex: 1, dailyTarget: 30, campaignId: "123456" },
+      stats: { discovered: 42, enriched: 36, qualified: 24, sentToSmartlead: 18, failed: 3 },
+      date: "2026-06-10",
+      workedAt: "2026-06-10T18:00:00.000Z",
+      offer: "AI asistent na odpovede a follow-up",
+      language: "sk",
+    };
+  }
   if (toolName === "arcigy.build_region_expansion_queue_preview") {
     return {
       regionPreset: "capitals",

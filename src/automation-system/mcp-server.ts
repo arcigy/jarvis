@@ -31,6 +31,7 @@ import {
   buildLeadgenCampaignPipelinePreview,
   buildLeadgenAutopilotBatchPreview,
   buildRegionExpansionQueuePreview,
+  buildDailyLeadgenRunClosurePreview,
   buildPhoneEnrichmentQueuePreview,
   buildLeadSourceImportQueuePreview,
   buildLeadSourceBundlePreview,
@@ -2751,6 +2752,40 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildLeadgenExecutionQueuePreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_daily_leadgen_run_closure_preview",
+    {
+      title: "Build daily leadgen run closure preview",
+      description: "Prepare a read-only daily leadgen post-run ledger: stats, rates, region advance, exhaustion decision, and approval payload for record_local_niche_run.",
+      inputSchema: {
+        niche: executionQueueNicheSchema,
+        stats: z.object({
+          discovered: z.number().int().min(0).optional(),
+          enriched: z.number().int().min(0).optional(),
+          qualified: z.number().int().min(0).optional(),
+          sentToSmartlead: z.number().int().min(0).optional(),
+          sent_to_smartlead: z.number().int().min(0).optional(),
+          failed: z.number().int().min(0).optional(),
+        }),
+        date: z.string().optional(),
+        workedAt: z.string().optional(),
+        advanceRegion: z.boolean().default(true),
+        markCompletedIfExhausted: z.boolean().default(true),
+        offer: z.string().optional(),
+        painPoint: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        batchSize: z.number().int().min(1).max(100).optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildDailyLeadgenRunClosurePreview(input))
   );
 
   server.registerTool(

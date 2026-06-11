@@ -20,6 +20,7 @@ import {
   buildLeadgenExecutionQueuePreview,
   buildLeadDiscoveryMatrixPreview,
   buildNicheLeadgenPlan,
+  buildDailyLeadgenRunClosurePreview,
   buildAiIntroQualityAuditPreview,
   buildFlaggedLeadReviewPreview,
   buildAiIntroCleanupPreview,
@@ -234,6 +235,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.build_batch_niche_discovery_plan",
     "arcigy.build_lead_discovery_matrix_preview",
     "arcigy.build_leadgen_execution_queue_preview",
+    "arcigy.build_daily_leadgen_run_closure_preview",
     "arcigy.build_region_expansion_queue_preview",
     "arcigy.draft_smartlead_campaign_sequence",
     "arcigy.build_smartlead_sequence_work_packet_preview",
@@ -497,6 +499,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.ok(paths.includes("/api/mcp/arcigy.build_local_lead_register_update_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.apply_local_lead_register_update"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_outreach_contact_selection_preview"));
+  assert.ok(paths.includes("/api/mcp/arcigy.build_daily_leadgen_run_closure_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_gmail_name_enrichment_queue_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_lead_identity_repair_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_lead_validation_scorecard_preview"));
@@ -1906,6 +1909,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_local_lead_register_update_preview" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.apply_local_lead_register_update" && call.approvalRequired === true));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_outreach_contact_selection_preview" && call.approvalRequired === false && Array.isArray(call.body.scrapedResults)));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_daily_leadgen_run_closure_preview" && call.approvalRequired === false && (call.body.stats as { sentToSmartlead?: number }).sentToSmartlead === 18));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_gmail_name_enrichment_queue_preview" && call.approvalRequired === false && call.body.accountEmail === "branislav.l@arcigy.group"));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_lead_identity_repair_preview" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_lead_validation_scorecard_preview" && call.approvalRequired === false && call.body.minScore === 70));
@@ -3486,6 +3490,32 @@ test("leadgen execution queue preview prioritizes daily niche work without write
   assert.ok(queue.nextToolCalls.some((call) => call.tool === "arcigy.run_leadgen_research_pipeline" && !call.approvalRequired));
   assert.ok(queue.nextToolCalls.some((call) => call.tool === "arcigy.build_smartlead_campaign_handoff_package_preview" && !call.approvalRequired));
   assert.match(queue.summary, /Ziadny scraping ani upload neprebehol/);
+});
+
+test("daily leadgen run closure preview prepares approval ledger without writing", () => {
+  const preview = buildDailyLeadgenRunClosurePreview({
+    niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", regions: ["Bratislava", "Trnava"], currentRegionIndex: 1, dailyTarget: 30, campaignId: "123456" },
+    stats: { discovered: 2, enriched: 2, qualified: 1, sentToSmartlead: 0, failed: 1 },
+    date: "2026-06-10",
+    workedAt: "2026-06-10T18:00:00.000Z",
+    offer: "AI asistent na dopyty",
+  });
+
+  assert.equal(preview.mode, "daily-leadgen-run-closure-preview");
+  assert.equal(preview.status, "attention");
+  assert.equal(preview.niche.activeRegion, "Trnava");
+  assert.equal(preview.niche.nextRegion, "Bratislava");
+  assert.equal(preview.decisions.exhaustedCandidate, true);
+  assert.equal(preview.decisions.needsRepair, true);
+  assert.equal(preview.decisions.needsSmartleadUpload, true);
+  assert.equal(preview.rates.enrichmentRate, 100);
+  assert.equal(preview.rates.sendRate, 0);
+  assert.equal(preview.approvalPayloads.recordLocalNicheRun.slug, "autoservisy");
+  assert.equal(preview.approvalPayloads.recordLocalNicheRun.approval.approved, true);
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.record_local_niche_run" && call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_lead_repair_queue_preview" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_smartlead_injection_plan" && !call.approvalRequired));
+  assert.match(preview.summary, /Ziadny zapis ani upload/);
 });
 
 test("region expansion queue preview skips visited regions and prepares discovery queues", () => {
