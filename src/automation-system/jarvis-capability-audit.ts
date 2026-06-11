@@ -233,6 +233,7 @@ const capabilityDefinitions: CapabilityDefinition[] = [
       "arcigy.prepare_smartlead_leads",
       "arcigy.run_leadgen_research_pipeline",
       "arcigy.get_smartlead_campaign_leads",
+      "arcigy.get_smartlead_email_accounts",
       "arcigy.preview_smartlead_lead_sync",
       "arcigy.get_smartlead_campaign_webhooks",
       "arcigy.upsert_smartlead_campaign_webhook",

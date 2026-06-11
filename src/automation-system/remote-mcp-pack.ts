@@ -1776,6 +1776,14 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Read Smartlead sender accounts and capacity payload",
+      tool: "arcigy.get_smartlead_email_accounts",
+      method: "POST",
+      url: toolUrl("arcigy.get_smartlead_email_accounts"),
+      body: { includeInactive: false, requestedDailyLimit: 80, campaignId: "123456" },
+      approvalRequired: false,
+    },
+    {
       label: "Preview Smartlead lead status sync without DB writes",
       tool: "arcigy.preview_smartlead_lead_sync",
       method: "POST",

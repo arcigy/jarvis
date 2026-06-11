@@ -51,6 +51,7 @@ export type JarvisMcpToolName =
   | "arcigy.get_smartlead_campaign_status"
   | "arcigy.get_smartlead_outreach_brief"
   | "arcigy.get_smartlead_campaign_leads"
+  | "arcigy.get_smartlead_email_accounts"
   | "arcigy.preview_smartlead_lead_sync"
   | "arcigy.get_smartlead_campaign_webhooks"
   | "arcigy.upsert_smartlead_campaign_webhook"
@@ -419,6 +420,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.get_smartlead_campaign_leads",
       description: "Read-only nacita leadov v Smartlead kampani s offset/limit pre audit alebo kontrolu importu.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.get_smartlead_email_accounts",
+      description: "Read-only nacita Smartlead sender ucty, warmup statusy a limity a pripravi sender-capacity preview payload.",
       requiresApproval: false,
     },
     {

@@ -17,6 +17,32 @@ export type SmartleadCampaignStatus = {
   statistics?: unknown;
 };
 
+export type SmartleadEmailAccount = {
+  id: string | number;
+  email: string;
+  status: "active" | "paused" | "error" | "warming" | "unknown";
+  warmupStatus: "active" | "paused" | "error" | "warming" | "unknown";
+  dailyLimit?: number;
+  sentToday?: number;
+  bounceRate?: number;
+  replyRate?: number;
+  reputationScore?: number;
+};
+
+export type SmartleadEmailAccountsResult = {
+  mode: "smartlead-email-accounts";
+  total: number;
+  usable: number;
+  accounts: SmartleadEmailAccount[];
+  capacityPreviewPayload: {
+    requestedDailyLimit?: number;
+    senderAccounts: SmartleadEmailAccount[];
+    campaignId?: string | number;
+  };
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+  summary: string;
+};
+
 export type SmartleadOutreachBriefInput = {
   campaignId?: string;
   periodLabel?: string;
@@ -256,6 +282,41 @@ export async function getSmartleadCampaignStatus(
   return {
     campaignId: input.campaignId,
     statistics,
+  };
+}
+
+export async function getSmartleadEmailAccounts(
+  input: { includeInactive?: boolean; requestedDailyLimit?: number; campaignId?: string | number } = {},
+  env: RuntimeEnv = process.env,
+  fetchImpl: FetchLike = fetch
+): Promise<SmartleadEmailAccountsResult> {
+  const apiKey = requireEnv(env, "SMARTLEAD_API_KEY");
+  const raw = await smartleadFetch<unknown>("/email-accounts", apiKey, fetchImpl);
+  const accounts = smartleadEmailAccountList(raw)
+    .map(normalizeSmartleadEmailAccount)
+    .filter((account): account is SmartleadEmailAccount => Boolean(account))
+    .filter((account) => input.includeInactive === true || !["paused", "error"].includes(account.status));
+  const usableAccounts = accounts.filter((account) => !["paused", "error"].includes(account.status) && !["paused", "error"].includes(account.warmupStatus));
+  const capacityPreviewPayload = {
+    requestedDailyLimit: input.requestedDailyLimit,
+    senderAccounts: accounts,
+    campaignId: input.campaignId,
+  };
+  return {
+    mode: "smartlead-email-accounts",
+    total: accounts.length,
+    usable: usableAccounts.length,
+    accounts,
+    capacityPreviewPayload,
+    nextToolCalls: [
+      {
+        tool: "arcigy.build_smartlead_sender_capacity_preview",
+        payload: capacityPreviewPayload,
+        reason: "Vypocitaj bezpecny denny limit kampane z live Smartlead sender accountov pred konfiguraciou alebo uploadom.",
+        approvalRequired: false,
+      },
+    ],
+    summary: `Smartlead sender accounts: ${usableAccounts.length}/${accounts.length} pouzitelnych. Ziadny zapis do Smartlead neprebehol.`,
   };
 }
 
@@ -910,11 +971,76 @@ function smartleadLeadList(value: unknown): Array<Record<string, unknown>> {
   return list.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object" && !Array.isArray(item)));
 }
 
+function smartleadEmailAccountList(value: unknown): Array<Record<string, unknown>> {
+  const list = Array.isArray(value)
+    ? value
+    : Array.isArray((value as { data?: unknown[] } | null)?.data)
+      ? (value as { data: unknown[] }).data
+      : Array.isArray((value as { email_accounts?: unknown[] } | null)?.email_accounts)
+        ? (value as { email_accounts: unknown[] }).email_accounts
+        : Array.isArray((value as { accounts?: unknown[] } | null)?.accounts)
+          ? (value as { accounts: unknown[] }).accounts
+          : [];
+  return list.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object" && !Array.isArray(item)));
+}
+
+function normalizeSmartleadEmailAccount(account: Record<string, unknown>): SmartleadEmailAccount | null {
+  const id = stringField(account, ["id", "email_account_id", "account_id"]);
+  const email = stringField(account, ["from_email", "email", "username", "sender_email"])?.toLowerCase();
+  if (!id || !email || !email.includes("@")) return null;
+  const warmup = objectField(account, "warmup_details", "warmup", "warmupStats");
+  const status = normalizeAccountStatus(stringField(account, ["status", "account_status", "connection_status"]));
+  const warmupStatus = normalizeAccountStatus(
+    stringField(warmup, ["status", "warmup_status", "state"]) ??
+    stringField(account, ["warmup_status", "warmupStatus"])
+  );
+  return {
+    id: Number.isFinite(Number(id)) ? Number(id) : id,
+    email,
+    status,
+    warmupStatus,
+    dailyLimit: numberField(account, ["daily_limit", "dailyLimit", "max_emails_per_day", "maxEmailsPerDay", "daily_sending_limit"]),
+    sentToday: numberField(account, ["sent_today", "sentToday", "daily_sent_count", "emails_sent_today", "sent_count_today"]),
+    bounceRate: numberField(account, ["bounce_rate", "bounceRate"]),
+    replyRate: numberField(account, ["reply_rate", "replyRate"]),
+    reputationScore: numberField(account, ["reputation_score", "reputationScore", "health_score", "score"]),
+  };
+}
+
+function objectField(record: Record<string, unknown>, ...keys: string[]): Record<string, unknown> {
+  for (const key of keys) {
+    const value = record[key];
+    if (value && typeof value === "object" && !Array.isArray(value)) return value as Record<string, unknown>;
+  }
+  return {};
+}
+
+function normalizeAccountStatus(value?: string): SmartleadEmailAccount["status"] {
+  const normalized = (value ?? "").trim().toLowerCase().replace(/[^a-z]/g, "");
+  if (["active", "connected", "healthy", "running", "enabled"].includes(normalized)) return "active";
+  if (["paused", "disabled", "inactive", "stopped"].includes(normalized)) return "paused";
+  if (["error", "failed", "disconnected", "bounced", "blocked"].includes(normalized)) return "error";
+  if (["warming", "warmup", "warmupactive", "inwarmup"].includes(normalized)) return "warming";
+  return "unknown";
+}
+
 function stringField(record: Record<string, unknown>, keys: string[]): string | undefined {
   for (const key of keys) {
     const value = record[key];
     if (typeof value === "string" && value.trim()) return value.trim();
     if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  }
+  return undefined;
+}
+
+function numberField(record: Record<string, unknown>, keys: string[]): number | undefined {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string" && value.trim()) {
+      const parsed = Number(value.replace("%", "").trim());
+      if (Number.isFinite(parsed)) return parsed;
+    }
   }
   return undefined;
 }

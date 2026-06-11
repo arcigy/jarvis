@@ -108,6 +108,7 @@ import {
   getSmartleadCampaignWebhooks,
   getSmartleadCampaignLeads,
   getSmartleadCampaignStatus,
+  getSmartleadEmailAccounts,
   getSmartleadMessageHistory,
   getSmartleadOutreachBrief,
   previewSmartleadLeadSync,
@@ -1395,6 +1396,16 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         campaignId: (payload.campaignId ?? "") as string | number,
         offset: typeof payload.offset === "number" ? payload.offset : undefined,
         limit: typeof payload.limit === "number" ? payload.limit : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.get_smartlead_email_accounts") {
+    writeJson(response, 200, {
+      result: await getSmartleadEmailAccounts({
+        includeInactive: payload.includeInactive === true,
+        requestedDailyLimit: typeof payload.requestedDailyLimit === "number" ? payload.requestedDailyLimit : undefined,
+        campaignId: typeof payload.campaignId === "string" || typeof payload.campaignId === "number" ? payload.campaignId : undefined,
       }),
     });
     return;

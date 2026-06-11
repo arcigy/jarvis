@@ -111,6 +111,7 @@ import {
   getSmartleadCampaignWebhooks,
   getSmartleadCampaignLeads,
   getSmartleadCampaignStatus,
+  getSmartleadEmailAccounts,
   getSmartleadMessageHistory,
   getSmartleadOutreachBrief,
   previewSmartleadLeadSync,
@@ -1500,6 +1501,26 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(await getSmartleadCampaignLeads(input))
+  );
+
+  server.registerTool(
+    "arcigy.get_smartlead_email_accounts",
+    {
+      title: "Smartlead email accounts",
+      description: "Fetch and normalize Smartlead sender email accounts, warmup status, limits, and a sender-capacity preview payload without writing.",
+      inputSchema: {
+        includeInactive: z.boolean().default(false),
+        requestedDailyLimit: z.number().int().min(1).max(500).optional(),
+        campaignId: z.union([z.string(), z.number()]).optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (input) => jsonResult(await getSmartleadEmailAccounts(input))
   );
 
   server.registerTool(

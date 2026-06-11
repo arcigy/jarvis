@@ -71,6 +71,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(names.includes("arcigy.get_smartlead_campaign_status"));
   assert.ok(names.includes("arcigy.get_smartlead_outreach_brief"));
   assert.ok(names.includes("arcigy.get_smartlead_campaign_leads"));
+  assert.ok(names.includes("arcigy.get_smartlead_email_accounts"));
   assert.ok(names.includes("arcigy.preview_smartlead_lead_sync"));
   assert.ok(names.includes("arcigy.get_smartlead_campaign_webhooks"));
   assert.ok(names.includes("arcigy.upsert_smartlead_campaign_webhook"));
@@ -435,6 +436,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.apply_local_lead_register_update" && call.approvalRequired === true));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_lead_identity_repair_preview" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_campaign_webhooks" && call.approvalRequired === false));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_email_accounts" && call.body.requestedDailyLimit === 80 && call.approvalRequired === false));
   assert.ok(
     pack.quickStartCalls.some(
       (call) =>

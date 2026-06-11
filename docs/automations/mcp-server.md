@@ -110,6 +110,7 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.get_smartlead_campaign_status`: reads Smartlead campaigns or campaign statistics.
 - `arcigy.get_smartlead_outreach_brief`: normalizes one Smartlead campaign, or aggregates recent campaign statistics when `campaignId` is omitted, into one Jarvis cold outreach briefing.
 - `arcigy.get_smartlead_campaign_leads`: read-only fetch of campaign leads with offset/limit for audit and import checks.
+- `arcigy.get_smartlead_email_accounts`: read-only fetch of Smartlead sender accounts, warmup statuses, limits, and a sender-capacity preview payload.
 - `arcigy.preview_smartlead_lead_sync`: read-only Smartlead status sync preview that returns local update candidates without writing to the database.
 - `arcigy.get_smartlead_campaign_webhooks`: read-only Smartlead webhook audit for a campaign before enabling AI replies or launch automation.
 - `arcigy.upsert_smartlead_campaign_webhook`: approval-required Smartlead write that adds or updates campaign webhook events such as `EMAIL_REPLY` and `LEAD_CATEGORY_UPDATED`.

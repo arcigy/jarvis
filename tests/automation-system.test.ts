@@ -100,6 +100,7 @@ import {
   getSmartleadCampaignWebhooks,
   getSmartleadCampaignLeads,
   getSmartleadCampaignStatus,
+  getSmartleadEmailAccounts,
   getSmartleadMessageHistory,
   getSmartleadOutreachBrief,
   previewSmartleadLeadSync,
@@ -180,6 +181,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.get_smartlead_campaign_status",
     "arcigy.get_smartlead_outreach_brief",
     "arcigy.get_smartlead_campaign_leads",
+    "arcigy.get_smartlead_email_accounts",
     "arcigy.preview_smartlead_lead_sync",
     "arcigy.get_smartlead_campaign_webhooks",
     "arcigy.upsert_smartlead_campaign_webhook",
@@ -473,6 +475,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.ok(paths.includes("/api/mcp/arcigy.build_lead_identity_repair_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.get_smartlead_campaign_webhooks"));
   assert.ok(paths.includes("/api/mcp/arcigy.upsert_smartlead_campaign_webhook"));
+  assert.ok(paths.includes("/api/mcp/arcigy.get_smartlead_email_accounts"));
   const operatorBriefing = document.paths["/api/mcp/arcigy.get_operator_briefing"] as OpenApiPathFixture;
   const attentionDigest = document.paths["/api/mcp/arcigy.get_proactive_attention_digest"] as OpenApiPathFixture;
   const completionScore = document.paths["/api/mcp/arcigy.get_production_completion_score"] as OpenApiPathFixture;
@@ -489,6 +492,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   const leadIdentityRepair = document.paths["/api/mcp/arcigy.build_lead_identity_repair_preview"] as OpenApiPathFixture;
   const smartleadWebhooks = document.paths["/api/mcp/arcigy.get_smartlead_campaign_webhooks"] as OpenApiPathFixture;
   const smartleadWebhookUpsert = document.paths["/api/mcp/arcigy.upsert_smartlead_campaign_webhook"] as OpenApiPathFixture;
+  const smartleadEmailAccounts = document.paths["/api/mcp/arcigy.get_smartlead_email_accounts"] as OpenApiPathFixture;
   const contractGenerate = document.paths["/api/mcp/arcigy.generate_contract_documents"] as OpenApiPathFixture;
   assert.equal(operatorBriefing.post.requestBody.content["application/json"].examples.quickStart.value.live, false);
   assert.equal(attentionDigest.post.requestBody.content["application/json"].examples.quickStart.value.syncGmail, false);
@@ -513,6 +517,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.equal(localLeadRegisterApply.post["x-arcigy-requiresApproval"], true);
   assert.equal(localLeadRegisterApply.post.requestBody.content["application/json"].examples.quickStart.value.approval.approved, true);
   assert.equal(smartleadWebhooks.post.requestBody.content["application/json"].examples.quickStart.value.campaignId, "123456");
+  assert.equal(smartleadEmailAccounts.post.requestBody.content["application/json"].examples.quickStart.value.requestedDailyLimit, 80);
   assert.equal(smartleadWebhookUpsert.post["x-arcigy-requiresApproval"], true);
   assert.equal(smartleadWebhookUpsert.post.requestBody.content["application/json"].examples.quickStart.value.approval.approved, true);
   assert.equal(contractGenerate.post["x-arcigy-requiresApproval"], true);
@@ -1849,6 +1854,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.apply_local_lead_register_update" && call.approvalRequired === true));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_lead_identity_repair_preview" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.preview_smartlead_lead_sync" && call.approvalRequired === false));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_email_accounts" && call.body.requestedDailyLimit === 80 && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_campaign_webhooks" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.upsert_smartlead_campaign_webhook" && call.approvalRequired === true));
   assert.ok(pack.quickStartCalls.some((call) => call.label === "Spustit remote MCP smoke proof"));
@@ -4706,6 +4712,38 @@ test("Smartlead campaign read helpers fetch leads and message history", async ()
   assert.equal(history.latestSentEmail?.email_stats_id, "stats-1");
   assert.equal(history.latestSentEmail?.reply_message_id, "msg-1");
   assert.equal(JSON.stringify(history).includes("smartlead-secret"), false);
+});
+
+test("Smartlead email accounts helper normalizes sender capacity input", async () => {
+  const calls: Array<{ url: string }> = [];
+  const fetchImpl = async (url: string) => {
+    calls.push({ url });
+    return {
+      ok: true,
+      json: async () => ({
+        data: [
+          { id: 1, from_email: "Andrej@Arcigy.Group", status: "ACTIVE", warmup_details: { status: "ACTIVE" }, daily_limit: 40, sent_today: 12, bounce_rate: "1.2", reputation_score: 92 },
+          { id: "2", from_email: "paused@arcigy.group", status: "PAUSED", warmup_details: { status: "PAUSED" }, daily_limit: 30 },
+        ],
+      }),
+    } as Response;
+  };
+
+  const result = await getSmartleadEmailAccounts(
+    { requestedDailyLimit: 60, campaignId: "123456" },
+    { SMARTLEAD_API_KEY: "smartlead-secret" },
+    fetchImpl as typeof fetch
+  );
+
+  assert.equal(calls[0].url, "https://server.smartlead.ai/api/v1/email-accounts?api_key=smartlead-secret");
+  assert.equal(result.mode, "smartlead-email-accounts");
+  assert.equal(result.total, 1);
+  assert.equal(result.usable, 1);
+  assert.equal(result.accounts[0].email, "andrej@arcigy.group");
+  assert.equal(result.accounts[0].dailyLimit, 40);
+  assert.equal(result.capacityPreviewPayload.requestedDailyLimit, 60);
+  assert.ok(result.nextToolCalls.some((call) => call.tool === "arcigy.build_smartlead_sender_capacity_preview" && !call.approvalRequired));
+  assert.equal(JSON.stringify(result).includes("smartlead-secret"), false);
 });
 
 test("Smartlead helper audits and upserts campaign webhooks", async () => {
