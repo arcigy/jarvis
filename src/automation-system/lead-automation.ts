@@ -1751,6 +1751,40 @@ export type WebsiteLeadEnrichmentPreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type LeadgenToSmartleadDispatchPreview = {
+  mode: "leadgen-to-smartlead-dispatch-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  totals: {
+    groups: number;
+    inputLeads: number;
+    uniqueLeads: number;
+    websitesToScrape: number;
+    introsToDraft: number;
+    aiIntroQueued: number;
+    readyForSmartlead: number;
+    uploadReady: number;
+    approvalPayloads: number;
+    manualReview: number;
+    rejected: number;
+    blockedGroups: number;
+    attentionGroups: number;
+    readyGroups: number;
+  };
+  groups: Array<{
+    order: number;
+    sourceName?: string;
+    niche: { id?: string; slug: string; name: string; campaignId?: string | number | null };
+    status: "ready" | "attention" | "blocked";
+    reason: string;
+    pipelinePreview: LeadgenCampaignPipelinePreview;
+    aiIntroQueue: BulkAiIntroWorkQueuePreview;
+    smartleadReadiness: SmartleadSendReadinessQueuePreview;
+  }>;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+  warnings: string[];
+};
+
 export type DailyLeadgenRunbook = {
   mode: "daily-leadgen-runbook";
   summary: string;
@@ -6951,6 +6985,160 @@ export function buildLeadgenCampaignPipelinePreview(input: {
     enrichmentPreview,
     smartleadPlan: enrichmentPreview.smartleadPlan,
     nextToolCalls,
+  };
+}
+
+export function buildLeadgenToSmartleadDispatchPreview(input: {
+  groups: Array<{
+    sourceName?: string;
+    niche: { id?: string; slug?: string; name: string; campaignId?: string | number | null; smartleadCampaignId?: string | number | null };
+    leads: Array<LeadCandidateInput & { scraped?: Partial<ScrapedWebsiteContacts>; intro?: Partial<LeadIntroDraft>; context?: string }>;
+    priority?: number;
+    dailyLimit?: number;
+    alreadySentToday?: number;
+    paused?: boolean;
+    campaignTag?: string;
+    defaultSource?: string;
+  }>;
+  offer?: string;
+  language?: "sk" | "en";
+  minScore?: number;
+  batchSize?: number;
+  aiIntroBatchSize?: number;
+  defaultDailyLimit?: number;
+  globalMaxUploads?: number;
+  maxNextCalls?: number;
+  maxContextChars?: number;
+}): LeadgenToSmartleadDispatchPreview {
+  const language = input.language ?? "sk";
+  const batchSize = Math.min(Math.max(Math.trunc(input.batchSize ?? 50), 1), 100);
+  const aiIntroBatchSize = Math.min(Math.max(Math.trunc(input.aiIntroBatchSize ?? 40), 1), 100);
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 100), 1), 200);
+  const nextToolCalls: LeadgenToSmartleadDispatchPreview["nextToolCalls"] = [];
+  const warnings: string[] = [];
+  const groups: LeadgenToSmartleadDispatchPreview["groups"] = input.groups.slice(0, 50).map((group, index) => {
+    const slug = group.niche.slug?.trim() || slugify(group.niche.name || group.sourceName || `leadgen-${index + 1}`);
+    const campaignId = group.niche.campaignId ?? group.niche.smartleadCampaignId ?? null;
+    const niche = { id: group.niche.id, slug, name: group.niche.name, campaignId };
+    const sourceName = group.sourceName ?? slug;
+    const pipelinePreview = buildLeadgenCampaignPipelinePreview({
+      leads: group.leads,
+      niche,
+      campaignTag: group.campaignTag ?? slug,
+      defaultSource: group.defaultSource ?? sourceName,
+      offer: input.offer,
+      language,
+      minScore: input.minScore,
+      batchSize,
+      maxNextCalls: Math.min(maxNextCalls, 50),
+    });
+    const aiIntroQueue = buildBulkAiIntroWorkQueuePreview({
+      groups: [{
+        sourceName,
+        niche: niche.name,
+        offer: input.offer,
+        language,
+        leads: pipelinePreview.leads,
+      }],
+      offer: input.offer,
+      language,
+      batchSize: aiIntroBatchSize,
+      maxBatches: 10,
+      maxContextChars: input.maxContextChars,
+    });
+    const readyLeads = pipelinePreview.enrichmentPreview.reviewQueue.ready.map((item) => item.lead);
+    const smartleadReadiness = buildSmartleadSendReadinessQueuePreview({
+      campaigns: [{
+        niche,
+        leads: readyLeads as Parameters<typeof buildSmartleadSendReadinessQueuePreview>[0]["campaigns"][number]["leads"],
+        priority: group.priority,
+        dailyLimit: group.dailyLimit,
+        alreadySentToday: group.alreadySentToday,
+        paused: group.paused,
+        defaultSource: group.defaultSource ?? sourceName,
+        campaignTag: group.campaignTag ?? slug,
+      }],
+      offer: input.offer,
+      language,
+      minScore: input.minScore,
+      batchSize,
+      defaultDailyLimit: input.defaultDailyLimit,
+      globalMaxUploads: input.globalMaxUploads,
+    });
+    if (!campaignId && readyLeads.length) warnings.push(`${niche.name} has ready leads but no Smartlead campaignId.`);
+    if (group.paused) warnings.push(`${niche.name} is paused.`);
+    const hasFollowUpWork = pipelinePreview.totals.websitesToScrape > 0
+      || pipelinePreview.totals.introsToDraft > 0
+      || aiIntroQueue.totals.queuedLeads > 0
+      || smartleadReadiness.totals.uploadReady > 0;
+    const status: LeadgenToSmartleadDispatchPreview["groups"][number]["status"] = group.leads.length === 0
+      ? "blocked"
+      : smartleadReadiness.status === "ready" && pipelinePreview.totals.websitesToScrape === 0 && pipelinePreview.totals.introsToDraft === 0
+        ? "ready"
+        : hasFollowUpWork
+          ? "attention"
+          : "blocked";
+    const reason = status === "ready"
+      ? `${smartleadReadiness.totals.uploadReady} leadov je pripravenych na Smartlead approval upload.`
+      : group.leads.length === 0
+        ? "No leads in dispatch group."
+        : `${pipelinePreview.totals.websitesToScrape} scrape, ${pipelinePreview.totals.introsToDraft} intro, ${smartleadReadiness.totals.uploadReady} upload-ready.`;
+    nextToolCalls.push({
+      tool: "arcigy.build_leadgen_campaign_pipeline_preview",
+      payload: {
+        leads: group.leads,
+        niche,
+        campaignTag: group.campaignTag ?? slug,
+        defaultSource: group.defaultSource ?? sourceName,
+        offer: input.offer,
+        language,
+        minScore: input.minScore,
+        batchSize,
+      },
+      reason: `Prepocitaj pipeline pre ${niche.name} po scrape/AI intro opravach.`,
+      approvalRequired: false,
+    });
+    for (const call of pipelinePreview.nextToolCalls) {
+      nextToolCalls.push({
+        tool: call.tool,
+        payload: call.payload,
+        reason: call.reason,
+        approvalRequired: call.tool === "arcigy.add_leads_to_smartlead_campaign",
+      });
+    }
+    nextToolCalls.push(...aiIntroQueue.nextToolCalls, ...smartleadReadiness.nextToolCalls);
+    return { order: index + 1, sourceName, niche, status, reason, pipelinePreview, aiIntroQueue, smartleadReadiness };
+  });
+  if (input.groups.length > groups.length) warnings.push("Dispatch groups were truncated to 50.");
+  const totals = {
+    groups: groups.length,
+    inputLeads: input.groups.reduce((sum, group) => sum + group.leads.length, 0),
+    uniqueLeads: groups.reduce((sum, group) => sum + group.pipelinePreview.totals.unique, 0),
+    websitesToScrape: groups.reduce((sum, group) => sum + group.pipelinePreview.totals.websitesToScrape, 0),
+    introsToDraft: groups.reduce((sum, group) => sum + group.pipelinePreview.totals.introsToDraft, 0),
+    aiIntroQueued: groups.reduce((sum, group) => sum + group.aiIntroQueue.totals.queuedLeads, 0),
+    readyForSmartlead: groups.reduce((sum, group) => sum + group.pipelinePreview.totals.readyForSmartlead, 0),
+    uploadReady: groups.reduce((sum, group) => sum + group.smartleadReadiness.totals.uploadReady, 0),
+    approvalPayloads: groups.reduce((sum, group) => sum + group.smartleadReadiness.totals.approvalPayloads, 0),
+    manualReview: groups.reduce((sum, group) => sum + group.pipelinePreview.totals.manualReview, 0),
+    rejected: groups.reduce((sum, group) => sum + group.pipelinePreview.totals.rejected, 0),
+    blockedGroups: groups.filter((group) => group.status === "blocked").length,
+    attentionGroups: groups.filter((group) => group.status === "attention").length,
+    readyGroups: groups.filter((group) => group.status === "ready").length,
+  };
+  const status: LeadgenToSmartleadDispatchPreview["status"] = totals.groups === 0 || totals.inputLeads === 0 || totals.blockedGroups === totals.groups
+    ? "blocked"
+    : totals.attentionGroups || totals.blockedGroups || totals.websitesToScrape || totals.introsToDraft || warnings.length
+      ? "attention"
+      : "ready";
+  return {
+    mode: "leadgen-to-smartlead-dispatch-preview",
+    status,
+    summary: `Leadgen to Smartlead dispatch ${status}: ${totals.websitesToScrape} scrape, ${totals.introsToDraft} AI intro, ${totals.uploadReady} upload-ready leadov, ${totals.approvalPayloads} approval payloadov. Ziadny fetch, zapis ani upload neprebehol.`,
+    totals,
+    groups,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls).slice(0, maxNextCalls),
+    warnings,
   };
 }
 

@@ -37,6 +37,7 @@ import {
   buildAiIntroImportPreview,
   buildLeadgenGapReport,
   buildLeadgenCampaignPipelinePreview,
+  buildLeadgenToSmartleadDispatchPreview,
   buildLeadgenAutopilotBatchPreview,
   buildRegionExpansionQueuePreview,
   buildLeadgenRunResumePreview,
@@ -273,6 +274,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.build_leadgen_db_status_preview",
     "arcigy.build_google_sheet_sync_preview",
     "arcigy.build_leadgen_campaign_pipeline_preview",
+    "arcigy.build_leadgen_to_smartlead_dispatch_preview",
     "arcigy.build_lead_source_import_queue_preview",
     "arcigy.build_lead_source_bundle_preview",
     "arcigy.build_lead_source_bundle_campaign_launch_preview",
@@ -516,6 +518,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.ok(paths.includes("/api/mcp/arcigy.build_lead_identity_repair_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_lead_validation_scorecard_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_company_short_name_preview"));
+  assert.ok(paths.includes("/api/mcp/arcigy.build_leadgen_to_smartlead_dispatch_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_bulk_smartlead_upload_queue_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_smartlead_send_readiness_queue_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_bulk_ai_intro_work_queue_preview"));
@@ -1931,6 +1934,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_lead_identity_repair_preview" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_lead_validation_scorecard_preview" && call.approvalRequired === false && call.body.minScore === 70));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_company_short_name_preview" && call.approvalRequired === false && Array.isArray(call.body.leads)));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_leadgen_to_smartlead_dispatch_preview" && call.approvalRequired === false && Array.isArray(call.body.groups)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_bulk_smartlead_upload_queue_preview" && call.approvalRequired === false && Array.isArray(call.body.campaigns)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_smartlead_send_readiness_queue_preview" && call.approvalRequired === false && Array.isArray(call.body.campaigns)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_bulk_ai_intro_work_queue_preview" && call.approvalRequired === false && Array.isArray(call.body.groups)));
@@ -3826,6 +3830,65 @@ test("leadgen campaign pipeline preview chains scrape intro enrichment and Smart
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_draft_lead_intros"));
   assert.equal(preview.smartleadPlan?.addLeadsApprovalPayload?.campaignId, "123456");
   assert.match(preview.summary, /Ziadny zapis ani upload/);
+});
+
+test("leadgen to Smartlead dispatch preview coordinates scrape intro and upload readiness", () => {
+  const preview = buildLeadgenToSmartleadDispatchPreview({
+    groups: [
+      {
+        sourceName: "autoservisy-ba",
+        niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456" },
+        priority: 1,
+        dailyLimit: 20,
+        alreadySentToday: 4,
+        leads: [
+          {
+            companyName: "Modelova Firma",
+            website: "https://modelovafirma.sk",
+            email: "jan@modelovafirma.sk",
+            firstName: "Jan",
+            lastName: "Novak",
+            personalizedIntro: "Zaujalo ma, ze servisujete firemne vozidla a mate jasne kontakty pre zakaznikov.",
+            customFields: { company_name_short: "Modelova" },
+          },
+          { companyName: "Needs Scrape", website: "https://needs-scrape.sk" },
+        ],
+      },
+      {
+        sourceName: "kuchyne-sk",
+        niche: { id: "niche-2", slug: "kuchyne", name: "Kuchynske studia" },
+        priority: 2,
+        leads: [
+          {
+            companyName: "Kuchyne Demo",
+            website: "https://kuchynedemo.sk",
+            email: "eva@kuchynedemo.sk",
+            firstName: "Eva",
+            lastName: "Hruba",
+            personalizedIntro: "Zaujalo ma, ze prepajate navrhy kuchyn so showroomom a realizaciou na mieru.",
+            customFields: { company_name_short: "Kuchyne Demo" },
+          },
+        ],
+      },
+    ],
+    offer: "AI asistent na dopyty",
+    minScore: 50,
+    batchSize: 25,
+    aiIntroBatchSize: 10,
+  });
+
+  assert.equal(preview.mode, "leadgen-to-smartlead-dispatch-preview");
+  assert.equal(preview.status, "attention");
+  assert.equal(preview.totals.groups, 2);
+  assert.equal(preview.totals.inputLeads, 3);
+  assert.ok(preview.totals.websitesToScrape >= 1);
+  assert.ok(preview.totals.aiIntroQueued >= 1);
+  assert.ok(preview.totals.uploadReady >= 1);
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_scrape_website_contacts" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_ai_intro_work_packet_preview" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.add_leads_to_smartlead_campaign" && call.approvalRequired));
+  assert.ok(preview.warnings.some((warning) => warning.includes("no Smartlead campaignId")));
+  assert.match(preview.summary, /Ziadny fetch, zapis ani upload/);
 });
 
 test("lead source import queue preview groups Google Maps leads before Smartlead import", () => {

@@ -1746,6 +1746,39 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Dispatch leadgen groups to scrape AI intro and Smartlead",
+      tool: "arcigy.build_leadgen_to_smartlead_dispatch_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_leadgen_to_smartlead_dispatch_preview"),
+      body: {
+        groups: [
+          {
+            sourceName: "autoservisy-ba",
+            niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456" },
+            priority: 1,
+            dailyLimit: 30,
+            alreadySentToday: 8,
+            leads: [
+              { companyName: "Modelova Firma", companyNameShort: "Modelova", website: "https://modelovafirma.sk", email: "jan@modelovafirma.sk", decisionMakerName: "Jan Novak", personalizedIntro: "Zaujalo ma, ze servisujete firemne vozidla a mate jasne kontakty pre zakaznikov." },
+              { companyName: "Needs Scrape", website: "https://needs-scrape.sk" },
+            ],
+          },
+          {
+            sourceName: "kuchyne-sk",
+            niche: { id: "niche-2", slug: "kuchyne", name: "Kuchynske studia" },
+            priority: 2,
+            leads: [{ companyName: "Kuchyne Demo", companyNameShort: "Kuchyne Demo", website: "https://kuchynedemo.sk", email: "eva@kuchynedemo.sk", personalizedIntro: "Zaujalo ma, ze prepajate navrhy kuchyn so showroomom a realizaciou na mieru." }],
+          },
+        ],
+        offer: "AI asistent na odpovede a follow-up",
+        language: "sk",
+        minScore: 70,
+        batchSize: 50,
+        aiIntroBatchSize: 40,
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Build lead source import queue preview",
       tool: "arcigy.build_lead_source_import_queue_preview",
       method: "POST",

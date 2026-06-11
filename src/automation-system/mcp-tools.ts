@@ -128,6 +128,7 @@ export type JarvisMcpToolName =
   | "arcigy.build_leadgen_db_status_preview"
   | "arcigy.build_google_sheet_sync_preview"
   | "arcigy.build_leadgen_campaign_pipeline_preview"
+  | "arcigy.build_leadgen_to_smartlead_dispatch_preview"
   | "arcigy.build_lead_source_import_queue_preview"
   | "arcigy.build_lead_source_bundle_preview"
   | "arcigy.build_lead_source_bundle_campaign_launch_preview"
@@ -824,6 +825,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.build_leadgen_campaign_pipeline_preview",
       description: "Z jedneho batchu leadov pripravi scrape, AI intro, enrichment a Smartlead next-step plan bez zapisu alebo uploadu.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_leadgen_to_smartlead_dispatch_preview",
+      description: "Z viac leadgen skupin pripravi jeden dispatch cez scrape/fetch, AI intra a Smartlead readiness/upload kroky bez zapisu alebo uploadu.",
       requiresApproval: false,
     },
     {

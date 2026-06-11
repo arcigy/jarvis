@@ -28,6 +28,7 @@ import {
   buildLeadgenDbStatusPreview,
   buildGoogleSheetSyncPreview,
   buildLeadgenCampaignPipelinePreview,
+  buildLeadgenToSmartleadDispatchPreview,
   buildLeadgenAutopilotBatchPreview,
   buildRegionExpansionQueuePreview,
   buildLeadgenRunResumePreview,
@@ -2453,6 +2454,23 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         minScore: typeof payload.minScore === "number" ? payload.minScore : undefined,
         batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
         maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_leadgen_to_smartlead_dispatch_preview") {
+    writeJson(response, 200, {
+      result: buildLeadgenToSmartleadDispatchPreview({
+        groups: (payload.groups ?? []) as Parameters<typeof buildLeadgenToSmartleadDispatchPreview>[0]["groups"],
+        offer: optionalString(payload.offer),
+        language: payload.language === "en" ? "en" : "sk",
+        minScore: typeof payload.minScore === "number" ? payload.minScore : undefined,
+        batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
+        aiIntroBatchSize: typeof payload.aiIntroBatchSize === "number" ? payload.aiIntroBatchSize : undefined,
+        defaultDailyLimit: typeof payload.defaultDailyLimit === "number" ? payload.defaultDailyLimit : undefined,
+        globalMaxUploads: typeof payload.globalMaxUploads === "number" ? payload.globalMaxUploads : undefined,
+        maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
+        maxContextChars: typeof payload.maxContextChars === "number" ? payload.maxContextChars : undefined,
       }),
     });
     return;

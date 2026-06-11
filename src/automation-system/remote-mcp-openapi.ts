@@ -1026,6 +1026,34 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       batchSize: 50,
     };
   }
+  if (toolName === "arcigy.build_leadgen_to_smartlead_dispatch_preview") {
+    return {
+      groups: [
+        {
+          sourceName: "autoservisy-ba",
+          niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456" },
+          priority: 1,
+          dailyLimit: 30,
+          alreadySentToday: 8,
+          leads: [
+            { companyName: "Modelova Firma", companyNameShort: "Modelova", website: "https://modelovafirma.sk", email: "jan@modelovafirma.sk", decisionMakerName: "Jan Novak", personalizedIntro: "Zaujalo ma, ze servisujete firemne vozidla a mate jasne kontakty pre zakaznikov." },
+            { companyName: "Needs Scrape", website: "https://needs-scrape.sk" },
+          ],
+        },
+        {
+          sourceName: "kuchyne-sk",
+          niche: { id: "niche-2", slug: "kuchyne", name: "Kuchynske studia" },
+          priority: 2,
+          leads: [{ companyName: "Kuchyne Demo", companyNameShort: "Kuchyne Demo", website: "https://kuchynedemo.sk", email: "eva@kuchynedemo.sk", personalizedIntro: "Zaujalo ma, ze prepajate navrhy kuchyn so showroomom a realizaciou na mieru." }],
+        },
+      ],
+      offer: "AI asistent na odpovede a follow-up",
+      language: "sk",
+      minScore: 70,
+      batchSize: 50,
+      aiIntroBatchSize: 40,
+    };
+  }
   if (toolName === "arcigy.build_lead_source_import_queue_preview") {
     return {
       sourceName: "kuchyne_sk_google_maps_2026-04-27.csv",

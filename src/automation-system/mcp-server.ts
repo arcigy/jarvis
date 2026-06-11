@@ -29,6 +29,7 @@ import {
   buildLeadgenDbStatusPreview,
   buildGoogleSheetSyncPreview,
   buildLeadgenCampaignPipelinePreview,
+  buildLeadgenToSmartleadDispatchPreview,
   buildLeadgenAutopilotBatchPreview,
   buildRegionExpansionQueuePreview,
   buildLeadgenRunResumePreview,
@@ -4024,6 +4025,49 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildLeadgenCampaignPipelinePreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_leadgen_to_smartlead_dispatch_preview",
+    {
+      title: "Build leadgen to Smartlead dispatch preview",
+      description: "Coordinate multiple lead groups from scrape/fetch through AI intro work and Smartlead send readiness without fetching, writing, or uploading.",
+      inputSchema: {
+        groups: z.array(z.object({
+          sourceName: z.string().optional(),
+          niche: z.object({
+            id: z.string().optional(),
+            slug: z.string().optional(),
+            name: z.string().min(1),
+            campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+            smartleadCampaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+          }),
+          leads: z.array(pipelineLeadSchema).min(0),
+          priority: z.number().int().min(1).max(99).optional(),
+          dailyLimit: z.number().int().min(1).max(500).optional(),
+          alreadySentToday: z.number().int().min(0).optional(),
+          paused: z.boolean().default(false),
+          campaignTag: z.string().optional(),
+          defaultSource: z.string().optional(),
+        })).min(1).max(50),
+        offer: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        minScore: z.number().int().min(0).max(100).default(70),
+        batchSize: z.number().int().min(1).max(100).default(50),
+        aiIntroBatchSize: z.number().int().min(1).max(100).default(40),
+        defaultDailyLimit: z.number().int().min(1).max(500).default(50),
+        globalMaxUploads: z.number().int().min(1).max(5000).default(500),
+        maxNextCalls: z.number().int().min(1).max(200).default(100),
+        maxContextChars: z.number().int().min(500).max(20_000).optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildLeadgenToSmartleadDispatchPreview(input as Parameters<typeof buildLeadgenToSmartleadDispatchPreview>[0]))
   );
 
   server.registerTool(
