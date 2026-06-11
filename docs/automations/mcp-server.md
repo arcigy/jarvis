@@ -67,6 +67,7 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.generate_contract_documents`: JSON intake form -> framework agreement + project appendix DOCX. Accepts either `inputJsonPath` or inline `intake`.
 - `arcigy.draft_contract_intake`: uses Gemini to draft contract intake JSON from a short business brief without generating documents.
 - `arcigy.draft_price_offer_intake`: uses Gemini to draft a price-offer JSON intake from a client/project brief without generating a document.
+- `arcigy.build_pricing_inventory_guard_preview`: read-only pricing MCP guard for product/service availability, discount cap, minimum total, and margin before preparing an offer.
 - `arcigy.build_pricing_proposal_preview`: read-only pricing calculator for offer line items, bulk/VIP/manual discounts, VAT, margin validation, and the next approved price-offer DOCX call.
 - `arcigy.build_service_capacity_preview`: read-only service capacity check before a quote, with low/missing capacity flags and a pricing-preview next call.
 - `arcigy.generate_price_offer_document`: approval-gated DOCX price offer generation from a filled `offer` JSON payload or `inputJsonPath`.

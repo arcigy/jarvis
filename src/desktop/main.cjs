@@ -668,7 +668,7 @@ const coreWebWorkflowSurfaces = [
   {
     id: "contract-workflow",
     title: "Contract automation workflow",
-    tools: ["arcigy.draft_contract_intake", "arcigy.generate_contract_documents", "arcigy.draft_price_offer_intake", "arcigy.build_pricing_proposal_preview", "arcigy.build_service_capacity_preview", "arcigy.generate_price_offer_document"],
+    tools: ["arcigy.draft_contract_intake", "arcigy.generate_contract_documents", "arcigy.draft_price_offer_intake", "arcigy.build_pricing_inventory_guard_preview", "arcigy.build_pricing_proposal_preview", "arcigy.build_service_capacity_preview", "arcigy.generate_price_offer_document"],
     approvalRequired: ["arcigy.generate_contract_documents", "arcigy.generate_price_offer_document"],
     proof: "Gemini intake drafts and approval-gated DOCX contract/price-offer generation are registered.",
   },
@@ -1197,7 +1197,7 @@ function jarvisCapabilityDefinitions() {
     {
       id: "contracts",
       title: "Universal Arcigy contract automation",
-      tools: ["arcigy.draft_contract_intake", "arcigy.generate_contract_documents", "arcigy.draft_price_offer_intake", "arcigy.build_pricing_proposal_preview", "arcigy.build_service_capacity_preview", "arcigy.generate_price_offer_document"],
+      tools: ["arcigy.draft_contract_intake", "arcigy.generate_contract_documents", "arcigy.draft_price_offer_intake", "arcigy.build_pricing_inventory_guard_preview", "arcigy.build_pricing_proposal_preview", "arcigy.build_service_capacity_preview", "arcigy.generate_price_offer_document"],
       approvalRequired: ["arcigy.generate_contract_documents", "arcigy.generate_price_offer_document"],
       evidence: ["contract-template-safety", "tests", "ui-smoke"],
       envKeys: ["gemini"],
@@ -3154,6 +3154,7 @@ function listWebMcpTools() {
     { name: "arcigy.generate_contract_documents", requiresApproval: true },
     { name: "arcigy.draft_contract_intake", requiresApproval: false },
     { name: "arcigy.draft_price_offer_intake", requiresApproval: false },
+    { name: "arcigy.build_pricing_inventory_guard_preview", requiresApproval: false },
     { name: "arcigy.build_pricing_proposal_preview", requiresApproval: false },
     { name: "arcigy.build_service_capacity_preview", requiresApproval: false },
     { name: "arcigy.generate_price_offer_document", requiresApproval: true },

@@ -838,6 +838,27 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Guard pricing against margin and inventory issues",
+      tool: "arcigy.build_pricing_inventory_guard_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_pricing_inventory_guard_preview"),
+      body: {
+        customerId: "VIP-123",
+        clientName: "Modelova Firma s.r.o.",
+        projectName: "Leadgen a follow-up automatizacia",
+        products: [
+          { productId: "setup", id: "setup", name: "Implementacia automatizacie", quantity: 1, unitPriceEur: 2000, unitCostEur: 900, availableQuantity: 3, minHealthyQuantity: 1, unitLabel: "slot" },
+          { productId: "monthly", id: "monthly", name: "Mesacna prevadzka", quantity: 12, unitPriceEur: 200, unitCostEur: 80, availableQuantity: 18, minHealthyQuantity: 3, unitLabel: "mesiac", recurring: true },
+        ],
+        manualDiscountPercent: 5,
+        minMarginPercent: 15,
+        minTotalEur: 100,
+        maxDiscountPercent: 30,
+        vip: true,
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Calculate pricing proposal before DOCX approval",
       tool: "arcigy.build_pricing_proposal_preview",
       method: "POST",

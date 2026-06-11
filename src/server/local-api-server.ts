@@ -122,7 +122,7 @@ import {
 } from "../automation-system/lead-automation.ts";
 import { buildContractGenerationCommand, getColdOutreachMcpAnswer, listJarvisMcpTools, localStateWriteToolNames } from "../automation-system/mcp-tools.ts";
 import { buildOperatorBriefing } from "../automation-system/operator-briefing.ts";
-import { buildPricingProposalPreview, buildServiceCapacityPreview, draftPriceOfferIntake } from "../automation-system/price-offer.ts";
+import { buildPricingInventoryGuardPreview, buildPricingProposalPreview, buildServiceCapacityPreview, draftPriceOfferIntake } from "../automation-system/price-offer.ts";
 import { buildProactiveAttentionDigest } from "../automation-system/proactive-attention-digest.ts";
 import { buildProductionCompletionScore, summarizeProductionCompletionScoreForVoice } from "../automation-system/production-completion-score.ts";
 import { buildProductionReadinessReport } from "../automation-system/production-readiness.ts";
@@ -1107,6 +1107,23 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         minTotalEur: optionalNumber(payload.minTotalEur),
         maxDiscountPercent: optionalNumber(payload.maxDiscountPercent),
         vip: payload.vip === true,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_pricing_inventory_guard_preview") {
+    writeJson(response, 200, {
+      result: buildPricingInventoryGuardPreview({
+        customerId: optionalString(payload.customerId),
+        clientName: optionalString(payload.clientName),
+        projectName: optionalString(payload.projectName),
+        products: Array.isArray(payload.products) ? payload.products as Parameters<typeof buildPricingInventoryGuardPreview>[0]["products"] : [],
+        manualDiscountPercent: typeof payload.manualDiscountPercent === "number" ? payload.manualDiscountPercent : undefined,
+        vip: typeof payload.vip === "boolean" ? payload.vip : undefined,
+        minMarginPercent: typeof payload.minMarginPercent === "number" ? payload.minMarginPercent : undefined,
+        minTotalEur: typeof payload.minTotalEur === "number" ? payload.minTotalEur : undefined,
+        maxDiscountPercent: typeof payload.maxDiscountPercent === "number" ? payload.maxDiscountPercent : undefined,
+        defaultMinHealthyQuantity: typeof payload.defaultMinHealthyQuantity === "number" ? payload.defaultMinHealthyQuantity : undefined,
       }),
     });
     return;

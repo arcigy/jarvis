@@ -134,6 +134,54 @@ export type ServiceCapacityPreview = {
   summary: string;
 };
 
+export type PricingInventoryGuardProduct = PricingProposalItem & {
+  productId?: string;
+  availableQuantity?: number;
+  minHealthyQuantity?: number;
+  unitLabel?: string;
+};
+
+export type PricingInventoryGuardPreview = {
+  mode: "pricing-inventory-guard-preview";
+  status: "ready" | "attention" | "blocked";
+  clientName: string | null;
+  projectName: string | null;
+  totals: {
+    products: number;
+    requestedQuantity: number;
+    subtotalEur: number;
+    netTotalEur: number;
+    marginPercent: number;
+    discountPercent: number;
+    inStock: number;
+    lowStock: number;
+    outOfStock: number;
+  };
+  products: Array<{
+    productId: string | null;
+    name: string;
+    requestedQuantity: number;
+    availableQuantity: number;
+    remainingQuantity: number;
+    unitLabel: string;
+    status: "in_stock" | "low_stock" | "out_of_stock";
+    message: string;
+  }>;
+  pricing: {
+    proposalId: string;
+    valid: boolean;
+    messages: string[];
+    discounts: PricingProposalPreview["discounts"];
+  };
+  nextToolCalls: Array<{
+    tool: "arcigy.build_pricing_proposal_preview";
+    approvalRequired: false;
+    payload: Record<string, unknown>;
+  }>;
+  warnings: string[];
+  summary: string;
+};
+
 export async function draftPriceOfferIntake(
   input: PriceOfferDraftInput,
   env: RuntimeEnv = process.env,
@@ -324,6 +372,105 @@ export function buildServiceCapacityPreview(input: ServiceCapacityPreviewInput):
         ]
       : [],
     summary: capacitySummary(status, services.length, blockedServices.length, lowCapacityServices.length),
+  };
+}
+
+export function buildPricingInventoryGuardPreview(input: {
+  customerId?: string;
+  clientName?: string;
+  projectName?: string;
+  products: PricingInventoryGuardProduct[];
+  manualDiscountPercent?: number;
+  vip?: boolean;
+  minMarginPercent?: number;
+  minTotalEur?: number;
+  maxDiscountPercent?: number;
+  defaultMinHealthyQuantity?: number;
+}): PricingInventoryGuardPreview {
+  if (!Array.isArray(input.products) || input.products.length === 0) {
+    throw new Error("At least one product is required.");
+  }
+  const proposal = buildPricingProposalPreview({
+    customerId: input.customerId,
+    clientName: input.clientName,
+    projectName: input.projectName,
+    items: input.products,
+    manualDiscountPercent: input.manualDiscountPercent,
+    vip: input.vip,
+    minMarginPercent: input.minMarginPercent,
+    minTotalEur: input.minTotalEur,
+    maxDiscountPercent: input.maxDiscountPercent,
+  });
+  const defaultMinHealthyQuantity = Math.max(0, Number.isFinite(Number(input.defaultMinHealthyQuantity)) ? Number(input.defaultMinHealthyQuantity) : 3);
+  const products = input.products.map((product) => {
+    const name = cleanText(product.name);
+    if (!name) throw new Error("Product name is required.");
+    const requestedQuantity = positiveNumber(product.quantity ?? 1, "product quantity");
+    const availableQuantity = Math.max(0, Number.isFinite(Number(product.availableQuantity)) ? Number(product.availableQuantity) : requestedQuantity);
+    const minHealthyQuantity = Math.max(0, Number.isFinite(Number(product.minHealthyQuantity)) ? Number(product.minHealthyQuantity) : defaultMinHealthyQuantity);
+    const remainingQuantity = roundMoney(availableQuantity - requestedQuantity);
+    const status: PricingInventoryGuardPreview["products"][number]["status"] = remainingQuantity < 0 ? "out_of_stock" : remainingQuantity < minHealthyQuantity ? "low_stock" : "in_stock";
+    const unitLabel = cleanText(product.unitLabel) ?? "ks";
+    return {
+      productId: cleanText(product.productId) ?? cleanText(product.id),
+      name,
+      requestedQuantity,
+      availableQuantity: roundMoney(availableQuantity),
+      remainingQuantity,
+      unitLabel,
+      status,
+      message: capacityMessage(status, name, remainingQuantity, unitLabel),
+    };
+  });
+  const warnings: string[] = [];
+  if (proposal.discounts.capped) warnings.push("Requested discount was capped by maxDiscountPercent.");
+  if (!proposal.validation.valid) warnings.push(...proposal.validation.messages);
+  const outOfStock = products.filter((product) => product.status === "out_of_stock").length;
+  const lowStock = products.filter((product) => product.status === "low_stock").length;
+  const inStock = products.filter((product) => product.status === "in_stock").length;
+  const status: PricingInventoryGuardPreview["status"] = outOfStock || !proposal.validation.valid ? "blocked" : lowStock || warnings.length ? "attention" : "ready";
+  return {
+    mode: "pricing-inventory-guard-preview",
+    status,
+    clientName: proposal.clientName,
+    projectName: proposal.projectName,
+    totals: {
+      products: products.length,
+      requestedQuantity: proposal.totals.quantity,
+      subtotalEur: proposal.totals.subtotalEur,
+      netTotalEur: proposal.totals.netTotalEur,
+      marginPercent: proposal.totals.marginPercent,
+      discountPercent: proposal.totals.discountPercent,
+      inStock,
+      lowStock,
+      outOfStock,
+    },
+    products,
+    pricing: {
+      proposalId: proposal.proposalId,
+      valid: proposal.validation.valid,
+      messages: proposal.validation.messages,
+      discounts: proposal.discounts,
+    },
+    nextToolCalls: status === "blocked"
+      ? []
+      : [{
+          tool: "arcigy.build_pricing_proposal_preview",
+          approvalRequired: false,
+          payload: {
+            customerId: input.customerId,
+            clientName: input.clientName,
+            projectName: input.projectName,
+            items: input.products,
+            manualDiscountPercent: proposal.discounts.appliedPercent,
+            vip: input.vip,
+            minMarginPercent: input.minMarginPercent,
+            minTotalEur: input.minTotalEur,
+            maxDiscountPercent: input.maxDiscountPercent,
+          },
+        }],
+    warnings,
+    summary: `Pricing inventory guard ${status}: ${products.length} produktov, ${outOfStock} out of stock, ${lowStock} low stock, marza ${proposal.totals.marginPercent.toFixed(1)}%, zlava ${proposal.totals.discountPercent.toFixed(1)}%. Ziadny dokument ani zapis neprebehol.`,
   };
 }
 

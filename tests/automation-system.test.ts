@@ -151,7 +151,7 @@ import { lookupPublicEmailProfile } from "../src/automation-system/public-profil
 import { buildOperatorBriefing } from "../src/automation-system/operator-briefing.ts";
 import { buildLeadgenDailyReport, buildLeadgenEveningSummary, buildLeadgenOpsDigest, buildLeadgenSlackReportPreview, selectNextNiche } from "../src/automation-system/leadgen-report.ts";
 import { sendSlackMessage } from "../src/automation-system/slack.ts";
-import { buildPricingProposalPreview, buildServiceCapacityPreview, draftPriceOfferIntake } from "../src/automation-system/price-offer.ts";
+import { buildPricingInventoryGuardPreview, buildPricingProposalPreview, buildServiceCapacityPreview, draftPriceOfferIntake } from "../src/automation-system/price-offer.ts";
 import { buildProactiveAttentionDigest } from "../src/automation-system/proactive-attention-digest.ts";
 import { buildGmailAiReplySafetyRunbookPreview, buildOutreachReplyTriagePreview, buildShowcaseReplyPreview, buildSmartleadReplyFollowupQueuePreview, classifyOutreachReply, previewGmailAiReply, previewSmartleadAiReply } from "../src/automation-system/reply-decision.ts";
 import { buildJarvisCapabilityAudit } from "../src/automation-system/jarvis-capability-audit.ts";
@@ -168,6 +168,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.generate_contract_documents",
     "arcigy.draft_contract_intake",
     "arcigy.draft_price_offer_intake",
+    "arcigy.build_pricing_inventory_guard_preview",
     "arcigy.build_pricing_proposal_preview",
     "arcigy.build_service_capacity_preview",
     "arcigy.generate_price_offer_document",
@@ -575,6 +576,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
     assert.ok(paths.includes("/api/mcp/arcigy.upsert_smartlead_campaign_webhook"));
     assert.ok(paths.includes("/api/mcp/arcigy.get_smartlead_email_accounts"));
     assert.ok(paths.includes("/api/mcp/arcigy.build_cold_outreach_monitor_runbook_preview"));
+    assert.ok(paths.includes("/api/mcp/arcigy.build_pricing_inventory_guard_preview"));
     assert.ok(paths.includes("/api/mcp/arcigy.build_pricing_proposal_preview"));
     assert.ok(paths.includes("/api/mcp/arcigy.build_service_capacity_preview"));
     assert.ok(paths.includes("/api/mcp/arcigy.build_smartlead_reply_followup_queue_preview"));
@@ -600,6 +602,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   const leadValidationScorecard = document.paths["/api/mcp/arcigy.build_lead_validation_scorecard_preview"] as OpenApiPathFixture;
   const companyShortName = document.paths["/api/mcp/arcigy.build_company_short_name_preview"] as OpenApiPathFixture;
   const icebreakerWriteback = document.paths["/api/mcp/arcigy.build_ai_icebreaker_writeback_preview"] as OpenApiPathFixture;
+  const pricingInventoryGuard = document.paths["/api/mcp/arcigy.build_pricing_inventory_guard_preview"] as OpenApiPathFixture;
   const smartleadWebhooks = document.paths["/api/mcp/arcigy.get_smartlead_campaign_webhooks"] as OpenApiPathFixture;
   const smartleadWebhookUpsert = document.paths["/api/mcp/arcigy.upsert_smartlead_campaign_webhook"] as OpenApiPathFixture;
   const smartleadEmailAccounts = document.paths["/api/mcp/arcigy.get_smartlead_email_accounts"] as OpenApiPathFixture;
@@ -630,6 +633,8 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.equal(icebreakerWriteback.post["x-arcigy-requiresApproval"], false);
   assert.equal(icebreakerWriteback.post.requestBody.content["application/json"].examples.quickStart.value.campaignId, "123456");
   assert.ok(typeof icebreakerWriteback.post.requestBody.content["application/json"].examples.quickStart.value.resultJsonText === "string");
+  assert.equal(pricingInventoryGuard.post.requestBody.content["application/json"].examples.quickStart.value.clientName, "Modelova Firma s.r.o.");
+  assert.ok(Array.isArray(pricingInventoryGuard.post.requestBody.content["application/json"].examples.quickStart.value.products));
   assert.equal(operatorBriefing.post.requestBody.content["application/json"].examples.quickStart.value.syncGmail, false);
   assert.equal(gmailSync.post.requestBody.content["application/json"].examples.quickStart.value.dryRun, true);
   assert.equal(gmailLeadContext.post.requestBody.content["application/json"].examples.quickStart.value.leadEmail, "lead@example.com");
@@ -2014,6 +2019,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_smartlead_message_history_audit_preview" && call.approvalRequired === false && Array.isArray(call.body.leads)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_gmail_outreach_readiness_preview" && call.approvalRequired === false && Array.isArray(call.body.accounts)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_gmail_ai_reply_safety_runbook_preview" && call.approvalRequired === false && Array.isArray(call.body.messages)));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_pricing_inventory_guard_preview" && call.approvalRequired === false && Array.isArray(call.body.products)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_campaign_webhooks" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_leadgen_db_status_preview" && call.approvalRequired === false && Array.isArray(call.body.blacklistDomains)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_leadgen_progress_watchdog_preview" && call.approvalRequired === false && call.body.targetReadyLeads === 50));
@@ -2371,6 +2377,42 @@ test("service capacity preview flags low capacity and prepares pricing next call
   assert.equal(preview.nextToolCalls[0].tool, "arcigy.build_pricing_proposal_preview");
   assert.equal(preview.nextToolCalls[0].approvalRequired, false);
   assert.equal((preview.nextToolCalls[0].payload.items as unknown[]).length, 2);
+});
+
+test("pricing inventory guard blocks unavailable products before pricing proposal", () => {
+  const ready = buildPricingInventoryGuardPreview({
+    customerId: "VIP-123",
+    clientName: "Modelova Firma s.r.o.",
+    projectName: "Leadgen a follow-up automatizacia",
+    products: [
+      { productId: "setup", name: "Implementacia automatizacie", quantity: 1, unitPriceEur: 2000, unitCostEur: 900, availableQuantity: 3, minHealthyQuantity: 1, unitLabel: "slot" },
+      { productId: "monthly", name: "Mesacna prevadzka", quantity: 12, unitPriceEur: 200, unitCostEur: 80, availableQuantity: 18, minHealthyQuantity: 3, unitLabel: "mesiac", recurring: true },
+    ],
+    manualDiscountPercent: 5,
+    vip: true,
+  });
+  const blocked = buildPricingInventoryGuardPreview({
+    clientName: "Modelova Firma s.r.o.",
+    projectName: "Risky discount",
+    products: [
+      { productId: "setup", name: "Implementacia automatizacie", quantity: 2, unitPriceEur: 100, unitCostEur: 95, availableQuantity: 1, unitLabel: "slot" },
+    ],
+    manualDiscountPercent: 40,
+    minMarginPercent: 15,
+    maxDiscountPercent: 30,
+  });
+
+  assert.equal(ready.mode, "pricing-inventory-guard-preview");
+  assert.equal(ready.status, "ready");
+  assert.equal(ready.totals.products, 2);
+  assert.equal(ready.totals.outOfStock, 0);
+  assert.equal(ready.pricing.valid, true);
+  assert.equal(ready.nextToolCalls[0].tool, "arcigy.build_pricing_proposal_preview");
+  assert.equal(ready.nextToolCalls[0].approvalRequired, false);
+  assert.equal(blocked.status, "blocked");
+  assert.equal(blocked.totals.outOfStock, 1);
+  assert.equal(blocked.nextToolCalls.length, 0);
+  assert.match(blocked.summary, /Ziadny dokument ani zapis/);
 });
 
 test("price offer generator creates a DOCX from the bundled template", () => {

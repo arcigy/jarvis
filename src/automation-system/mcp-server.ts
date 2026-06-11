@@ -127,7 +127,7 @@ import {
   identifyEmailMcpAnswer,
 } from "./mcp-tools.ts";
 import { buildOperatorBriefing } from "./operator-briefing.ts";
-import { buildPricingProposalPreview, buildServiceCapacityPreview, draftPriceOfferIntake } from "./price-offer.ts";
+import { buildPricingInventoryGuardPreview, buildPricingProposalPreview, buildServiceCapacityPreview, draftPriceOfferIntake } from "./price-offer.ts";
 import { buildProactiveAttentionDigest } from "./proactive-attention-digest.ts";
 import { buildProductionCompletionScore, summarizeProductionCompletionScoreForVoice } from "./production-completion-score.ts";
 import { buildProductionReadinessReport } from "./production-readiness.ts";
@@ -239,6 +239,45 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async ({ brief, baseOffer }) => jsonResult(await draftPriceOfferIntake({ brief, baseOffer }))
+  );
+
+  server.registerTool(
+    "arcigy.build_pricing_inventory_guard_preview",
+    {
+      title: "Build pricing inventory guard preview",
+      description: "Read-only pricing guard from the old pricing MCP: checks product availability, minimum total, discount cap, and margin before preparing a pricing proposal.",
+      inputSchema: {
+        customerId: z.string().optional(),
+        clientName: z.string().optional(),
+        projectName: z.string().optional(),
+        products: z.array(z.object({
+          productId: z.string().optional(),
+          id: z.string().optional(),
+          name: z.string().min(1),
+          quantity: z.number().positive().optional(),
+          unitPriceEur: z.number().nonnegative(),
+          unitCostEur: z.number().nonnegative().optional(),
+          category: z.string().optional(),
+          recurring: z.boolean().optional(),
+          availableQuantity: z.number().nonnegative().optional(),
+          minHealthyQuantity: z.number().nonnegative().optional(),
+          unitLabel: z.string().optional(),
+        })).min(1).max(100),
+        manualDiscountPercent: z.number().min(0).max(100).optional(),
+        vip: z.boolean().optional(),
+        minMarginPercent: z.number().min(0).max(100).optional(),
+        minTotalEur: z.number().nonnegative().optional(),
+        maxDiscountPercent: z.number().min(0).max(100).optional(),
+        defaultMinHealthyQuantity: z.number().nonnegative().optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildPricingInventoryGuardPreview(input))
   );
 
   server.registerTool(
