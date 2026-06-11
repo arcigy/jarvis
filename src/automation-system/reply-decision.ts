@@ -56,6 +56,17 @@ export type GmailAiReplyPreview = {
   summary: string;
 };
 
+export type ShowcaseReplyPreview = {
+  mode: "showcase-reply-preview";
+  action: "skip" | "prepare_showcase_reply";
+  reason: string;
+  classification?: OutreachReplyClassification;
+  emailBody?: string;
+  approvalPayload?: Record<string, unknown>;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; approvalRequired: boolean }>;
+  summary: string;
+};
+
 export type OutreachReplyTriageItemInput = {
   source: "smartlead" | "gmail";
   email: string;
@@ -239,6 +250,66 @@ export async function previewGmailAiReply(
   };
 }
 
+export function buildShowcaseReplyPreview(input: {
+  source?: "smartlead" | "gmail";
+  leadEmail: string;
+  leadName?: string;
+  replyBody: string;
+  campaignId?: string | number;
+  senderEmail?: string;
+  senderName?: string;
+  threadId?: string;
+  messageId?: string;
+  subject?: string;
+  history?: ReplyHistoryItem[];
+  aiRepliesActive?: boolean;
+  alreadySent?: boolean;
+}): ShowcaseReplyPreview {
+  const body = input.replyBody.trim();
+  if (!body) return showcaseSkip("Empty reply body.");
+  if (input.aiRepliesActive === false) return showcaseSkip("AI replies are paused.");
+  if (input.alreadySent === true) return showcaseSkip("Showcase reply already sent to this lead.");
+  if (hasOurReplyAfterLatestLead(input.history ?? [], input.senderEmail)) return showcaseSkip("Human-in-the-loop detected after latest lead reply.");
+
+  const classification = classifyOutreachReplyHeuristic(body, input.history ?? []);
+  if (classification.category !== "POSITIVE") return showcaseSkip(`Reply classified as ${classification.category}.`, classification);
+
+  const emailBody = buildDeterministicShowcaseReply(input.leadName, body);
+  const source = input.source ?? "smartlead";
+  const approvalPayload = source === "smartlead" && input.campaignId !== undefined
+    ? {
+        campaignId: input.campaignId,
+        email: input.leadEmail.trim().toLowerCase(),
+        emailBody,
+        approval: { approved: true },
+      }
+    : source === "gmail" && input.senderEmail && input.threadId && input.messageId
+      ? {
+          senderEmail: input.senderEmail,
+          toEmail: input.leadEmail.trim().toLowerCase(),
+          subject: input.subject ?? "",
+          threadId: input.threadId,
+          messageId: input.messageId,
+          emailBody,
+          approval: { approved: true },
+        }
+      : undefined;
+  const nextToolCalls = source === "smartlead" && approvalPayload
+    ? [{ tool: "arcigy.send_smartlead_thread_reply", payload: approvalPayload, approvalRequired: true }]
+    : [];
+
+  return {
+    mode: "showcase-reply-preview",
+    action: "prepare_showcase_reply",
+    reason: "Positive showcase interest detected.",
+    classification,
+    emailBody,
+    approvalPayload,
+    nextToolCalls,
+    summary: `Showcase reply prepared for ${input.leadEmail}. Nothing was sent; send only after approval.`,
+  };
+}
+
 export async function buildOutreachReplyTriagePreview(
   input: {
     replies: OutreachReplyTriageItemInput[];
@@ -347,6 +418,24 @@ function negativePattern(text: string): boolean {
   return /\b(nie|no thanks|not interested|nemam zaujem|nemame zaujem|nezaujima|nepotrebujem|nepotrebujeme|not relevant|irrelevant|unsubscribe|odhlasit|nepiste|stop|remove)\b/.test(text);
 }
 
+function buildDeterministicShowcaseReply(leadName?: string, replyBody?: string): string {
+  const surname = extractSurname(leadName) ?? extractSurnameFromSignature(replyBody ?? "");
+  const greeting = surname ? `Dobry den pan/pani ${surname},` : "Dobry den,";
+  return `${greeting}<br><br>posielam slubenu ukazku: <a href='https://www.arcigy.com/showcase'>https://www.arcigy.com/showcase</a>.`;
+}
+
+function extractSurname(name?: string): string | null {
+  if (!name?.trim()) return null;
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return parts.length >= 2 ? parts[parts.length - 1] : null;
+}
+
+function extractSurnameFromSignature(value: string): string | null {
+  const plain = stripHtml(value);
+  const match = /(?:s pozdravom|pozdravuje|regards)[,\s]+([A-Z][\p{L}'-]+)\s+([A-Z][\p{L}'-]+)/iu.exec(plain);
+  return match?.[2] ?? null;
+}
+
 function hasOurReplyAfterLatestLead(history: ReplyHistoryItem[], ourEmail?: string): boolean {
   const normalized = history.map((item) => ({ ...item, type: item.type?.toUpperCase() ?? "", body: item.email_body ?? item.body ?? "" }));
   const lastLeadIndex = normalized.reduce((last, item, index) => isLeadMessage(item, ourEmail) ? index : last, -1);
@@ -407,6 +496,10 @@ function smartleadSkip(reason: string, classification?: OutreachReplyClassificat
 
 function gmailSkip(reason: string, classification?: OutreachReplyClassification): GmailAiReplyPreview {
   return { mode: "gmail-ai-reply-preview", action: "skip", reason, classification, summary: `Gmail AI reply skipped: ${reason}` };
+}
+
+function showcaseSkip(reason: string, classification?: OutreachReplyClassification): ShowcaseReplyPreview {
+  return { mode: "showcase-reply-preview", action: "skip", reason, classification, nextToolCalls: [], summary: `Showcase reply skipped: ${reason}` };
 }
 
 function triageSkip(reply: OutreachReplyTriageItemInput, classificationResult: OutreachReplyClassification, reason: string): OutreachReplyTriagePreview["items"][number] {

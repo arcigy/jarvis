@@ -326,6 +326,17 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       maxReplies: 20,
     };
   }
+  if (toolName === "arcigy.build_showcase_reply_preview") {
+    return {
+      source: "smartlead",
+      leadEmail: "lead@example.com",
+      leadName: "Jan Novak",
+      replyBody: "Dobry den, poslite mi prosim ukazku.",
+      campaignId: "123456",
+      senderEmail: "andrej@arcigy.group",
+      history: [{ type: "EMAIL_SENT", email_body: "Dobry den, chcete vidiet ukazku?", from_email: "andrej@arcigy.group" }],
+    };
+  }
   if (toolName === "arcigy.preview_smartlead_ai_reply") {
     return {
       toEmail: "lead@example.com",

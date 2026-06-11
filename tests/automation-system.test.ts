@@ -121,7 +121,7 @@ import { buildLeadgenDailyReport, buildLeadgenEveningSummary, buildLeadgenOpsDig
 import { sendSlackMessage } from "../src/automation-system/slack.ts";
 import { buildPricingProposalPreview, buildServiceCapacityPreview, draftPriceOfferIntake } from "../src/automation-system/price-offer.ts";
 import { buildProactiveAttentionDigest } from "../src/automation-system/proactive-attention-digest.ts";
-import { buildOutreachReplyTriagePreview, classifyOutreachReply, previewGmailAiReply, previewSmartleadAiReply } from "../src/automation-system/reply-decision.ts";
+import { buildOutreachReplyTriagePreview, buildShowcaseReplyPreview, classifyOutreachReply, previewGmailAiReply, previewSmartleadAiReply } from "../src/automation-system/reply-decision.ts";
 import { buildJarvisCapabilityAudit } from "../src/automation-system/jarvis-capability-audit.ts";
 import { buildProductionCompletionScore, summarizeProductionCompletionScoreForVoice } from "../src/automation-system/production-completion-score.ts";
 import { jarvisAutomations } from "../src/automation-system/jarvis-automations.ts";
@@ -192,6 +192,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.get_smartlead_message_history",
     "arcigy.classify_outreach_reply",
     "arcigy.build_outreach_reply_triage_preview",
+    "arcigy.build_showcase_reply_preview",
     "arcigy.preview_smartlead_ai_reply",
     "arcigy.preview_gmail_ai_reply",
     "arcigy.draft_smartlead_thread_reply",
@@ -371,6 +372,7 @@ test("Jarvis capability audit maps the full requested production surface to evid
   assert.ok(remoteMcpCapability?.evidence.includes("production-evidence-tool-call"));
   assert.ok(audit.capabilities.some((item) => item.id === "contracts" && item.tools.includes("arcigy.build_pricing_proposal_preview") && item.tools.includes("arcigy.build_service_capacity_preview")));
   assert.ok(audit.capabilities.some((item) => item.id === "proactive-digest" && item.status === "ready" && item.tools.includes("arcigy.sync_gmail_recent_messages")));
+  assert.ok(audit.capabilities.some((item) => item.id === "lead-discovery" && item.tools.includes("arcigy.build_showcase_reply_preview")));
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.append_leads_to_google_sheet")));
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.replace_google_sheet_rows")));
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.label_gmail_thread")));
@@ -484,6 +486,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.ok(paths.includes("/api/mcp/arcigy.get_smartlead_email_accounts"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_pricing_proposal_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_service_capacity_preview"));
+  assert.ok(paths.includes("/api/mcp/arcigy.build_showcase_reply_preview"));
   const operatorBriefing = document.paths["/api/mcp/arcigy.get_operator_briefing"] as OpenApiPathFixture;
   const attentionDigest = document.paths["/api/mcp/arcigy.get_proactive_attention_digest"] as OpenApiPathFixture;
   const completionScore = document.paths["/api/mcp/arcigy.get_production_completion_score"] as OpenApiPathFixture;
@@ -504,6 +507,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   const smartleadEmailAccounts = document.paths["/api/mcp/arcigy.get_smartlead_email_accounts"] as OpenApiPathFixture;
   const pricingProposalPreview = document.paths["/api/mcp/arcigy.build_pricing_proposal_preview"] as OpenApiPathFixture;
   const serviceCapacityPreview = document.paths["/api/mcp/arcigy.build_service_capacity_preview"] as OpenApiPathFixture;
+  const showcaseReplyPreview = document.paths["/api/mcp/arcigy.build_showcase_reply_preview"] as OpenApiPathFixture;
   const contractGenerate = document.paths["/api/mcp/arcigy.generate_contract_documents"] as OpenApiPathFixture;
   assert.equal(operatorBriefing.post.requestBody.content["application/json"].examples.quickStart.value.live, false);
   assert.equal(attentionDigest.post.requestBody.content["application/json"].examples.quickStart.value.syncGmail, false);
@@ -535,6 +539,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.equal(pricingProposalPreview.post.requestBody.content["application/json"].examples.quickStart.value.clientName, "Modelova Firma s.r.o.");
   assert.equal(pricingProposalPreview.post.requestBody.content["application/json"].examples.quickStart.value.items.length, 2);
   assert.equal(serviceCapacityPreview.post.requestBody.content["application/json"].examples.quickStart.value.services.length, 3);
+  assert.equal(showcaseReplyPreview.post.requestBody.content["application/json"].examples.quickStart.value.leadEmail, "lead@example.com");
   assert.equal(contractGenerate.post["x-arcigy-requiresApproval"], true);
   assert.equal(contractGenerate.post.requestBody.content["application/json"].examples.quickStart.value.approval.approved, true);
   assert.equal(JSON.stringify(document).includes("<JARVIS_WEB_TOKEN>"), true);
@@ -4127,6 +4132,40 @@ test("outreach reply decision previews Smartlead and Gmail sends without writing
   assert.match(gmail.reason, /NEGATIVE/);
   assert.equal(humanHandled.action, "skip");
   assert.match(humanHandled.reason, /Human-in-the-loop/);
+});
+
+test("showcase reply preview prepares deterministic approval payload without Gemini", () => {
+  const preview = buildShowcaseReplyPreview({
+    source: "smartlead",
+    leadEmail: "lead@example.com",
+    leadName: "Jan Novak",
+    replyBody: "Dobry den, poslite mi prosim ukazku.",
+    campaignId: "123",
+    senderEmail: "andrej@arcigy.group",
+    history: [{ type: "EMAIL_SENT", email_body: "Dobry den, chcete vidiet ukazku?", from_email: "andrej@arcigy.group" }],
+  });
+  const skipped = buildShowcaseReplyPreview({
+    source: "smartlead",
+    leadEmail: "lead@example.com",
+    replyBody: "Poslite mi ukazku.",
+    campaignId: "123",
+    senderEmail: "andrej@arcigy.group",
+    history: [
+      { type: "EMAIL_SENT", email_body: "Chcete ukazku?", from_email: "andrej@arcigy.group" },
+      { type: "EMAIL_REPLY", email_body: "Ano.", from_email: "lead@example.com" },
+      { type: "EMAIL_SENT", email_body: "Manualne vybavene.", from_email: "andrej@arcigy.group" },
+    ],
+  });
+
+  assert.equal(preview.mode, "showcase-reply-preview");
+  assert.equal(preview.action, "prepare_showcase_reply");
+  assert.equal(preview.classification?.category, "POSITIVE");
+  assert.match(preview.emailBody ?? "", /arcigy\.com\/showcase/);
+  assert.equal(preview.nextToolCalls[0].tool, "arcigy.send_smartlead_thread_reply");
+  assert.equal(preview.nextToolCalls[0].approvalRequired, true);
+  assert.equal((preview.approvalPayload as { approval?: { approved?: boolean } }).approval?.approved, true);
+  assert.equal(skipped.action, "skip");
+  assert.match(skipped.reason, /Human-in-the-loop/);
 });
 
 test("outreach reply triage builds batch draft next steps without sending", async () => {

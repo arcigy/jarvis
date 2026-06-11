@@ -61,6 +61,7 @@ export type JarvisMcpToolName =
   | "arcigy.get_smartlead_message_history"
   | "arcigy.classify_outreach_reply"
   | "arcigy.build_outreach_reply_triage_preview"
+  | "arcigy.build_showcase_reply_preview"
   | "arcigy.preview_smartlead_ai_reply"
   | "arcigy.preview_gmail_ai_reply"
   | "arcigy.draft_smartlead_thread_reply"
@@ -474,6 +475,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.build_outreach_reply_triage_preview",
       description: "Read-only roztriedi viac outreach odpovedi naraz a pripravi bezpecne draft next-step payloady bez odoslania.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_showcase_reply_preview",
+      description: "Read-only pripravi kratku slovensku showcase odpoved s linkom pri jasnom pozitivnom zaujme, bez Gemini a bez odoslania.",
       requiresApproval: false,
     },
     {

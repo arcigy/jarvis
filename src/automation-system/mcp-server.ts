@@ -101,7 +101,7 @@ import { buildProductionCompletionScore, summarizeProductionCompletionScoreForVo
 import { buildProductionReadinessReport } from "./production-readiness.ts";
 import { getProductionVerificationEvidence } from "./production-verification-evidence.ts";
 import { lookupPublicEmailProfile } from "./public-profile.ts";
-import { buildOutreachReplyTriagePreview, classifyOutreachReply, previewGmailAiReply, previewSmartleadAiReply } from "./reply-decision.ts";
+import { buildOutreachReplyTriagePreview, buildShowcaseReplyPreview, classifyOutreachReply, previewGmailAiReply, previewSmartleadAiReply } from "./reply-decision.ts";
 import { buildRemoteMcpConnectionPack } from "./remote-mcp-pack.ts";
 import { runRemoteMcpSmoke } from "./remote-mcp-smoke.ts";
 import {
@@ -1760,6 +1760,36 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(await buildOutreachReplyTriagePreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_showcase_reply_preview",
+    {
+      title: "Build showcase reply preview",
+      description: "Deterministically prepare the short Slovak showcase-link reply for clear positive outreach replies, with human-in-loop and already-sent guards, without sending.",
+      inputSchema: {
+        source: z.enum(["smartlead", "gmail"]).optional(),
+        leadEmail: z.string().email(),
+        leadName: z.string().optional(),
+        replyBody: z.string().min(1),
+        campaignId: z.union([z.string(), z.number()]).optional(),
+        senderEmail: z.string().email().optional(),
+        senderName: z.string().optional(),
+        threadId: z.string().optional(),
+        messageId: z.string().optional(),
+        subject: z.string().optional(),
+        history: z.array(replyHistoryItemSchema).optional(),
+        aiRepliesActive: z.boolean().optional(),
+        alreadySent: z.boolean().optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildShowcaseReplyPreview(input))
   );
 
   server.registerTool(

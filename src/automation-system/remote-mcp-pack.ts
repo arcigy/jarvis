@@ -1873,6 +1873,22 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Prepare deterministic showcase reply without Gemini",
+      tool: "arcigy.build_showcase_reply_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_showcase_reply_preview"),
+      body: {
+        source: "smartlead",
+        leadEmail: "lead@example.com",
+        leadName: "Jan Novak",
+        replyBody: "Dobry den, poslite mi prosim ukazku.",
+        campaignId: "123456",
+        senderEmail: "andrej@arcigy.group",
+        history: [{ type: "EMAIL_SENT", email_body: "Dobry den, chcete vidiet ukazku?", from_email: "andrej@arcigy.group" }],
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Preview Smartlead AI reply webhook decision",
       tool: "arcigy.preview_smartlead_ai_reply",
       method: "POST",

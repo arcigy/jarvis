@@ -96,7 +96,7 @@ import { buildProductionCompletionScore, summarizeProductionCompletionScoreForVo
 import { buildProductionReadinessReport } from "../automation-system/production-readiness.ts";
 import { getProductionVerificationEvidence } from "../automation-system/production-verification-evidence.ts";
 import { lookupPublicEmailProfile } from "../automation-system/public-profile.ts";
-import { buildOutreachReplyTriagePreview, classifyOutreachReply, previewGmailAiReply, previewSmartleadAiReply } from "../automation-system/reply-decision.ts";
+import { buildOutreachReplyTriagePreview, buildShowcaseReplyPreview, classifyOutreachReply, previewGmailAiReply, previewSmartleadAiReply } from "../automation-system/reply-decision.ts";
 import { buildRemoteMcpOpenApiDocument } from "../automation-system/remote-mcp-openapi.ts";
 import { buildRemoteMcpConnectionPack } from "../automation-system/remote-mcp-pack.ts";
 import { runRemoteMcpSmoke } from "../automation-system/remote-mcp-smoke.ts";
@@ -1503,6 +1503,26 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         aiRepliesActive: typeof payload.aiRepliesActive === "boolean" ? payload.aiRepliesActive : undefined,
         useAiClassification: payload.useAiClassification === true,
         maxReplies: typeof payload.maxReplies === "number" ? payload.maxReplies : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_showcase_reply_preview") {
+    writeJson(response, 200, {
+      result: buildShowcaseReplyPreview({
+        source: payload.source === "gmail" ? "gmail" : "smartlead",
+        leadEmail: String(payload.leadEmail ?? payload.email ?? ""),
+        leadName: optionalString(payload.leadName),
+        replyBody: String(payload.replyBody ?? payload.emailBody ?? ""),
+        campaignId: (payload.campaignId ?? payload.campaign_id) as string | number | undefined,
+        senderEmail: optionalString(payload.senderEmail) ?? optionalString(payload.fromEmail),
+        senderName: optionalString(payload.senderName),
+        threadId: optionalString(payload.threadId),
+        messageId: optionalString(payload.messageId),
+        subject: optionalString(payload.subject),
+        history: Array.isArray(payload.history) ? payload.history as Parameters<typeof buildShowcaseReplyPreview>[0]["history"] : undefined,
+        aiRepliesActive: typeof payload.aiRepliesActive === "boolean" ? payload.aiRepliesActive : undefined,
+        alreadySent: typeof payload.alreadySent === "boolean" ? payload.alreadySent : undefined,
       }),
     });
     return;

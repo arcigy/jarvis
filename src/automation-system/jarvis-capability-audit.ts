@@ -241,6 +241,7 @@ const capabilityDefinitions: CapabilityDefinition[] = [
       "arcigy.get_smartlead_message_history",
       "arcigy.classify_outreach_reply",
       "arcigy.build_outreach_reply_triage_preview",
+      "arcigy.build_showcase_reply_preview",
       "arcigy.preview_smartlead_ai_reply",
       "arcigy.preview_gmail_ai_reply",
       "arcigy.get_gmail_lead_context",
