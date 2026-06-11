@@ -531,6 +531,40 @@ export type ColdOutreachMonitorRunbookPreview = {
   warnings: string[];
 };
 
+export type SmartleadCampaignAuditPreview = {
+  mode: "smartlead-campaign-audit-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  operatorBrief: string;
+  totals: {
+    campaigns: number;
+    active: number;
+    sent: number;
+    replies: number;
+    positiveReplies: number;
+    missingSequence: number;
+    missingSender: number;
+    missingWebhook: number;
+    variableIssues: number;
+    deliverabilityIssues: number;
+    unknownLocalMapping: number;
+  };
+  campaigns: Array<{
+    campaignId?: string | number;
+    name?: string;
+    status?: string;
+    localNiche?: string;
+    sent: number;
+    replies: number;
+    positiveReplies: number;
+    issues: string[];
+    health: "ready" | "attention" | "blocked";
+    nextAction: string;
+  }>;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+  warnings: string[];
+};
+
 export type GmailOutreachReadinessPreview = {
   mode: "gmail-outreach-readiness-preview";
   status: "ready" | "attention" | "blocked";
@@ -5643,6 +5677,230 @@ export function buildColdOutreachMonitorRunbookPreview(input: {
     totals,
     campaigns: campaignRows.map(({ bounced: _bounced, unsubscribed: _unsubscribed, negativeReplies: _negativeReplies, ...campaign }) => campaign),
     positiveReplies: positiveReplyItems,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls).slice(0, maxNextCalls),
+    warnings,
+  };
+}
+
+export function buildSmartleadCampaignAuditPreview(input: {
+  campaigns?: Array<Record<string, unknown> & {
+    id?: string | number;
+    campaignId?: string | number;
+    name?: string;
+    status?: string;
+    totalSentCount?: number;
+    total_sent_count?: number;
+    sent?: number;
+    uniqueRepliedCount?: number;
+    unique_replied_count?: number;
+    replies?: number;
+    positiveReplies?: number;
+    positive_replies?: number;
+    sequenceCount?: number;
+    sequence_count?: number;
+    emailAccountCount?: number;
+    email_account_count?: number;
+    webhookCount?: number;
+    webhook_count?: number;
+    bounceRate?: number;
+    bounce_rate?: number;
+    unsubscribeRate?: number;
+    unsubscribe_rate?: number;
+  }>;
+  localCampaigns?: Array<{ campaignId?: string | number; smartleadCampaignId?: string | number; nicheSlug?: string; nicheName?: string; owner?: string }>;
+  sequences?: Array<{ campaignId?: string | number; sequences?: unknown[]; sequenceCount?: number; usesCompanyName?: boolean; unresolvedVariables?: string[]; missingSignature?: boolean; missingPersonalizedIntro?: boolean }>;
+  webhooks?: Array<{ campaignId?: string | number; count?: number; eventTypes?: string[]; hasReplyWebhook?: boolean; hasCategoryWebhook?: boolean }>;
+  senderAccounts?: Array<{ campaignId?: string | number; count?: number; activeCount?: number; warmupIssues?: number; dailyLimit?: number }>;
+  includeStatsRefresh?: boolean;
+  includeContentQa?: boolean;
+  includeWebhookAudit?: boolean;
+  includeSenderAudit?: boolean;
+  maxNextCalls?: number;
+}): SmartleadCampaignAuditPreview {
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 30), 1), 100);
+  const localByCampaignId = new Map((input.localCampaigns ?? []).flatMap((item) => {
+    const id = String(item.campaignId ?? item.smartleadCampaignId ?? "");
+    return id ? [[id, item] as const] : [];
+  }));
+  const sequenceByCampaignId = new Map((input.sequences ?? []).flatMap((item) => {
+    const id = String(item.campaignId ?? "");
+    return id ? [[id, item] as const] : [];
+  }));
+  const webhookByCampaignId = new Map((input.webhooks ?? []).flatMap((item) => {
+    const id = String(item.campaignId ?? "");
+    return id ? [[id, item] as const] : [];
+  }));
+  const senderByCampaignId = new Map((input.senderAccounts ?? []).flatMap((item) => {
+    const id = String(item.campaignId ?? "");
+    return id ? [[id, item] as const] : [];
+  }));
+
+  const campaigns = (input.campaigns ?? []).map((campaign) => {
+    const campaignId = campaign.campaignId ?? campaign.id ?? stringField(campaign, "campaign_id");
+    const idKey = campaignId !== undefined ? String(campaignId) : "";
+    const local = idKey ? localByCampaignId.get(idKey) : undefined;
+    const sequence = idKey ? sequenceByCampaignId.get(idKey) : undefined;
+    const webhook = idKey ? webhookByCampaignId.get(idKey) : undefined;
+    const sender = idKey ? senderByCampaignId.get(idKey) : undefined;
+    const sent = metricNumber(campaign, "sent", "totalSentCount", "total_sent_count", "sent_count", "unique_sent_count");
+    const replies = metricNumber(campaign, "replies", "uniqueRepliedCount", "unique_replied_count", "reply_count", "unique_replied_count");
+    const positiveReplies = metricNumber(campaign, "positiveReplies", "positive_replies", "positive_reply_count", "interested_count");
+    const sequenceCount = sequence?.sequenceCount ?? (Array.isArray(sequence?.sequences) ? sequence.sequences.length : undefined) ?? metricNumber(campaign, "sequenceCount", "sequence_count", "sequences_count");
+    const senderCount = sender?.count ?? sender?.activeCount ?? metricNumber(campaign, "emailAccountCount", "email_account_count", "sender_count", "email_accounts_count");
+    const webhookCount = webhook?.count ?? metricNumber(campaign, "webhookCount", "webhook_count");
+    const bounceRate = numberField(campaign, "bounceRate", "bounce_rate") ?? 0;
+    const unsubscribeRate = numberField(campaign, "unsubscribeRate", "unsubscribe_rate") ?? 0;
+    const issues: string[] = [];
+    if (!campaignId) issues.push("missing_campaign_id");
+    if (!local) issues.push("unknown_local_mapping");
+    if (!sequenceCount) issues.push("missing_sequence");
+    if (sequence?.usesCompanyName || (sequence?.unresolvedVariables ?? []).length) issues.push("variable_issues");
+    if (sequence?.missingSignature) issues.push("missing_signature");
+    if (sequence?.missingPersonalizedIntro) issues.push("missing_personalized_intro");
+    if (!senderCount) issues.push("missing_sender");
+    if ((sender?.warmupIssues ?? 0) > 0) issues.push("sender_warmup_attention");
+    if (!webhookCount || webhook?.hasReplyWebhook === false || webhook?.hasCategoryWebhook === false) issues.push("missing_webhook");
+    if (bounceRate >= 5 || unsubscribeRate >= 2) issues.push("deliverability_attention");
+    if (sent > 0 && replies === 0) issues.push("sent_no_replies");
+    const health: SmartleadCampaignAuditPreview["campaigns"][number]["health"] = issues.some((issue) => issue === "missing_campaign_id" || issue === "missing_sequence" || issue === "missing_sender")
+      ? "blocked"
+      : issues.length
+        ? "attention"
+        : "ready";
+    const nextAction = issues.includes("missing_sequence") || issues.includes("variable_issues") || issues.includes("missing_signature") || issues.includes("missing_personalized_intro")
+      ? "Run campaign QA and sequence repair before more uploads."
+      : issues.includes("missing_sender") || issues.includes("sender_warmup_attention")
+        ? "Audit sender accounts and capacity before sending more."
+        : issues.includes("missing_webhook")
+          ? "Audit/upsert reply webhooks before AI reply automation."
+          : issues.includes("deliverability_attention")
+            ? "Run deliverability guard and reduce/pause if needed."
+            : sent > 0
+              ? "Refresh stats and monitor replies."
+              : "Fetch campaign content before launch decision.";
+    return {
+      campaignId,
+      name: campaign.name ?? stringField(campaign, "campaign_name", "name"),
+      status: campaign.status ?? stringField(campaign, "status"),
+      localNiche: local?.nicheName ?? local?.nicheSlug,
+      sent,
+      replies,
+      positiveReplies,
+      issues,
+      health,
+      nextAction,
+    };
+  });
+
+  const nextToolCalls: SmartleadCampaignAuditPreview["nextToolCalls"] = [];
+  for (const campaign of campaigns.filter((item) => item.campaignId).slice(0, Math.min(10, maxNextCalls))) {
+    if (input.includeStatsRefresh !== false) {
+      nextToolCalls.push({
+        tool: "arcigy.get_smartlead_outreach_brief",
+        payload: { campaignId: campaign.campaignId },
+        reason: `Refresh stats and Jarvis outreach brief for ${campaign.name ?? campaign.campaignId}.`,
+        approvalRequired: false,
+      });
+    }
+    if (input.includeWebhookAudit !== false && campaign.issues.includes("missing_webhook")) {
+      nextToolCalls.push({
+        tool: "arcigy.get_smartlead_campaign_webhooks",
+        payload: { campaignId: campaign.campaignId },
+        reason: "Read existing webhooks before preparing any approval-gated webhook upsert.",
+        approvalRequired: false,
+      });
+    }
+    if (input.includeSenderAudit !== false && (campaign.issues.includes("missing_sender") || campaign.issues.includes("sender_warmup_attention"))) {
+      nextToolCalls.push({
+        tool: "arcigy.get_smartlead_email_accounts",
+        payload: { campaignId: campaign.campaignId, includeInactive: true },
+        reason: "Read sender accounts, warmup, and daily limits before configuring campaign sending.",
+        approvalRequired: false,
+      });
+    }
+    if (input.includeContentQa !== false && campaign.issues.some((issue) => ["missing_sequence", "variable_issues", "missing_signature", "missing_personalized_intro"].includes(issue))) {
+      nextToolCalls.push({
+        tool: "arcigy.build_smartlead_campaign_qa_preview",
+        payload: { campaignId: campaign.campaignId, campaignName: campaign.name, sequences: [], leads: [] },
+        reason: "Validate sequence/content variables and lead payloads before launch or more uploads.",
+        approvalRequired: false,
+      });
+      if (campaign.issues.includes("variable_issues")) {
+        nextToolCalls.push({
+          tool: "arcigy.build_smartlead_sequence_variable_repair_preview",
+          payload: { campaignId: campaign.campaignId, sequences: [] },
+          reason: "Prepare company_name -> company_name_short subject/body variable repair without writing.",
+          approvalRequired: false,
+        });
+      }
+    }
+    if (campaign.issues.includes("deliverability_attention")) {
+      nextToolCalls.push({
+        tool: "arcigy.build_smartlead_deliverability_guard_preview",
+        payload: { campaignId: campaign.campaignId, metrics: { sent: campaign.sent, replied: campaign.replies } },
+        reason: "Check bounce/unsubscribe risk before additional uploads or sends.",
+        approvalRequired: false,
+      });
+    }
+    if (campaign.sent > 0) {
+      nextToolCalls.push({
+        tool: "arcigy.get_smartlead_campaign_leads",
+        payload: { campaignId: campaign.campaignId, offset: 0, limit: 100 },
+        reason: "Fetch lead statuses for reply/non-reply/call-list audit.",
+        approvalRequired: false,
+      });
+    }
+  }
+  if (campaigns.some((campaign) => campaign.sent > 0)) {
+    nextToolCalls.push({
+      tool: "arcigy.build_cold_outreach_monitor_runbook_preview",
+      payload: { campaigns: campaigns.filter((campaign) => campaign.sent > 0).slice(0, maxNextCalls), windowLabel: "smartlead-campaign-audit" },
+      reason: "Summarize active campaign stats into Jarvis cold outreach style.",
+      approvalRequired: false,
+    });
+  }
+
+  const totals = {
+    campaigns: campaigns.length,
+    active: campaigns.filter((campaign) => campaign.sent > 0 || /active|running/i.test(campaign.status ?? "")).length,
+    sent: sum(campaigns.map((campaign) => campaign.sent)),
+    replies: sum(campaigns.map((campaign) => campaign.replies)),
+    positiveReplies: sum(campaigns.map((campaign) => campaign.positiveReplies)),
+    missingSequence: campaigns.filter((campaign) => campaign.issues.includes("missing_sequence")).length,
+    missingSender: campaigns.filter((campaign) => campaign.issues.includes("missing_sender")).length,
+    missingWebhook: campaigns.filter((campaign) => campaign.issues.includes("missing_webhook")).length,
+    variableIssues: campaigns.filter((campaign) => campaign.issues.includes("variable_issues") || campaign.issues.includes("missing_personalized_intro") || campaign.issues.includes("missing_signature")).length,
+    deliverabilityIssues: campaigns.filter((campaign) => campaign.issues.includes("deliverability_attention")).length,
+    unknownLocalMapping: campaigns.filter((campaign) => campaign.issues.includes("unknown_local_mapping")).length,
+  };
+  const warnings: string[] = [];
+  if (!campaigns.length) warnings.push("No Smartlead campaign snapshot supplied; call get_smartlead_campaign_status first.");
+  if (totals.unknownLocalMapping) warnings.push("Some Smartlead campaigns do not map to local niches.");
+  if (totals.missingSequence || totals.variableIssues) warnings.push("Some campaigns need sequence/content QA before more uploads.");
+  if (totals.missingSender || totals.deliverabilityIssues) warnings.push("Some campaigns need sender/deliverability checks before sending.");
+  const status: SmartleadCampaignAuditPreview["status"] = !campaigns.length
+    ? "blocked"
+    : campaigns.some((campaign) => campaign.health === "blocked")
+      ? "blocked"
+      : campaigns.some((campaign) => campaign.health === "attention") || warnings.length
+        ? "attention"
+        : "ready";
+  const operatorBrief = [
+    `Nasiel som ${totals.campaigns} Smartlead kampani, z toho ${totals.active} aktivnych alebo s odoslanymi emailmi.`,
+    `Spolu odoslali ${totals.sent} emailov a maju ${totals.replies} odpovedi, z toho ${totals.positiveReplies} pozitivnych.`,
+    totals.missingSequence || totals.missingSender || totals.missingWebhook || totals.variableIssues
+      ? `Na opravu: ${totals.missingSequence} bez sekvencie, ${totals.missingSender} bez sendera, ${totals.missingWebhook} bez webhooku, ${totals.variableIssues} s problemom premennych/obsahu.`
+      : "Zakladna konfiguracia kampani vyzera pripravena.",
+    "Ziadny Smartlead update, webhook upsert, delete ani upload neprebehol.",
+  ].join(" ");
+
+  return {
+    mode: "smartlead-campaign-audit-preview",
+    status,
+    summary: `Smartlead campaign audit ${status}: ${totals.campaigns} campaigns, ${totals.active} active, ${totals.sent} sent, ${totals.replies} replies, ${totals.missingSequence} missing sequence, ${totals.missingSender} missing sender, ${totals.missingWebhook} missing webhook. Ziadny Smartlead zapis neprebehol.`,
+    operatorBrief,
+    totals,
+    campaigns,
     nextToolCalls: dedupeNextToolCalls(nextToolCalls).slice(0, maxNextCalls),
     warnings,
   };

@@ -1633,6 +1633,24 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Audit existing Smartlead campaigns",
+      tool: "arcigy.build_smartlead_campaign_audit_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_smartlead_campaign_audit_preview"),
+      body: {
+        campaigns: [
+          { id: "123456", name: "Kuchyne SK", status: "ACTIVE", total_sent_count: 240, unique_replied_count: 14, positive_replies: 5, sequence_count: 3, email_account_count: 2, webhook_count: 0, bounce_rate: 2.5 },
+          { id: "789000", name: "Autoservisy BA", status: "DRAFT", total_sent_count: 0, sequence_count: 0, email_account_count: 0 },
+        ],
+        localCampaigns: [{ campaignId: "123456", nicheSlug: "kuchyne", nicheName: "Kuchynske studia" }],
+        sequences: [{ campaignId: "123456", sequenceCount: 3, usesCompanyName: true, unresolvedVariables: ["company_name"] }],
+        webhooks: [{ campaignId: "123456", count: 0, hasReplyWebhook: false, hasCategoryWebhook: false }],
+        senderAccounts: [{ campaignId: "123456", count: 2, activeCount: 2, warmupIssues: 0, dailyLimit: 80 }],
+        maxNextCalls: 30,
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Build Smartlead backup plan before risky changes",
       tool: "arcigy.build_smartlead_campaign_backup_plan",
       method: "POST",

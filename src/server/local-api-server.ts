@@ -91,6 +91,7 @@ import {
   buildSmartleadSafeSyncRunbookPreview,
   buildSmartleadSenderCapacityPreview,
   buildSmartleadDeliverabilityGuardPreview,
+  buildSmartleadCampaignAuditPreview,
   buildColdOutreachCsvImportPreview,
   buildFullLeadgenPipelineRunbookPreview,
   dedupeLeadCandidates,
@@ -2386,6 +2387,23 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         minReplyRate: typeof payload.minReplyRate === "number" ? payload.minReplyRate : undefined,
         minOpenRate: typeof payload.minOpenRate === "number" ? payload.minOpenRate : undefined,
         minTimeBetweenEmailsMinutes: typeof payload.minTimeBetweenEmailsMinutes === "number" ? payload.minTimeBetweenEmailsMinutes : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_smartlead_campaign_audit_preview") {
+    writeJson(response, 200, {
+      result: buildSmartleadCampaignAuditPreview({
+        campaigns: Array.isArray(payload.campaigns) ? payload.campaigns as Parameters<typeof buildSmartleadCampaignAuditPreview>[0]["campaigns"] : undefined,
+        localCampaigns: Array.isArray(payload.localCampaigns) ? payload.localCampaigns as Parameters<typeof buildSmartleadCampaignAuditPreview>[0]["localCampaigns"] : undefined,
+        sequences: Array.isArray(payload.sequences) ? payload.sequences as Parameters<typeof buildSmartleadCampaignAuditPreview>[0]["sequences"] : undefined,
+        webhooks: Array.isArray(payload.webhooks) ? payload.webhooks as Parameters<typeof buildSmartleadCampaignAuditPreview>[0]["webhooks"] : undefined,
+        senderAccounts: Array.isArray(payload.senderAccounts) ? payload.senderAccounts as Parameters<typeof buildSmartleadCampaignAuditPreview>[0]["senderAccounts"] : undefined,
+        includeStatsRefresh: payload.includeStatsRefresh !== false,
+        includeContentQa: payload.includeContentQa !== false,
+        includeWebhookAudit: payload.includeWebhookAudit !== false,
+        includeSenderAudit: payload.includeSenderAudit !== false,
+        maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
       }),
     });
     return;

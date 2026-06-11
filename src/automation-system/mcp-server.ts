@@ -92,6 +92,7 @@ import {
   buildSmartleadSafeSyncRunbookPreview,
   buildSmartleadSenderCapacityPreview,
   buildSmartleadDeliverabilityGuardPreview,
+  buildSmartleadCampaignAuditPreview,
   buildColdOutreachCsvImportPreview,
   buildFullLeadgenPipelineRunbookPreview,
   dedupeLeadCandidates,
@@ -3871,6 +3872,62 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildSmartleadDeliverabilityGuardPreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_smartlead_campaign_audit_preview",
+    {
+      title: "Build Smartlead campaign audit preview",
+      description: "Read-only audit for existing Smartlead campaigns. Checks active/sent campaigns, local niche mapping, sequences, senders, webhooks, variables, deliverability flags, and safe next MCP calls without writing.",
+      inputSchema: {
+        campaigns: z.array(z.record(z.string(), z.unknown())).optional(),
+        localCampaigns: z.array(z.object({
+          campaignId: z.union([z.string(), z.number()]).optional(),
+          smartleadCampaignId: z.union([z.string(), z.number()]).optional(),
+          nicheSlug: z.string().optional(),
+          nicheName: z.string().optional(),
+          owner: z.string().optional(),
+        })).optional(),
+        sequences: z.array(z.object({
+          campaignId: z.union([z.string(), z.number()]).optional(),
+          sequences: z.array(z.unknown()).optional(),
+          sequenceCount: z.number().optional(),
+          usesCompanyName: z.boolean().optional(),
+          unresolvedVariables: z.array(z.string()).optional(),
+          missingSignature: z.boolean().optional(),
+          missingPersonalizedIntro: z.boolean().optional(),
+        })).optional(),
+        webhooks: z.array(z.object({
+          campaignId: z.union([z.string(), z.number()]).optional(),
+          count: z.number().optional(),
+          eventTypes: z.array(z.string()).optional(),
+          hasReplyWebhook: z.boolean().optional(),
+          hasCategoryWebhook: z.boolean().optional(),
+        })).optional(),
+        senderAccounts: z.array(z.object({
+          campaignId: z.union([z.string(), z.number()]).optional(),
+          count: z.number().optional(),
+          activeCount: z.number().optional(),
+          warmupIssues: z.number().optional(),
+          dailyLimit: z.number().optional(),
+        })).optional(),
+        includeStatsRefresh: z.boolean().default(true),
+        includeContentQa: z.boolean().default(true),
+        includeWebhookAudit: z.boolean().default(true),
+        includeSenderAudit: z.boolean().default(true),
+        maxNextCalls: z.number().int().min(1).max(100).default(30),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildSmartleadCampaignAuditPreview({
+      ...input,
+      campaigns: input.campaigns as Parameters<typeof buildSmartleadCampaignAuditPreview>[0]["campaigns"],
+    }))
   );
 
   server.registerTool(

@@ -91,6 +91,7 @@ import {
   buildSmartleadSafeSyncRunbookPreview,
   buildSmartleadSenderCapacityPreview,
   buildSmartleadDeliverabilityGuardPreview,
+  buildSmartleadCampaignAuditPreview,
   buildDailyLeadgenRunbook,
   buildFullLeadgenPipelineRunbookPreview,
   buildLeadCsvMappingPreview,
@@ -281,6 +282,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.build_smartlead_safe_sync_runbook_preview",
     "arcigy.build_smartlead_sender_capacity_preview",
     "arcigy.build_smartlead_deliverability_guard_preview",
+    "arcigy.build_smartlead_campaign_audit_preview",
     "arcigy.build_smartlead_campaign_backup_plan",
     "arcigy.build_smartlead_campaign_delete_safety_preview",
     "arcigy.build_smartlead_campaign_restore_plan",
@@ -558,6 +560,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
     assert.ok(paths.includes("/api/mcp/arcigy.build_bulk_ai_intro_work_queue_preview"));
     assert.ok(paths.includes("/api/mcp/arcigy.build_ai_icebreaker_writeback_preview"));
     assert.ok(paths.includes("/api/mcp/arcigy.build_smartlead_campaign_delete_safety_preview"));
+    assert.ok(paths.includes("/api/mcp/arcigy.build_smartlead_campaign_audit_preview"));
     assert.ok(paths.includes("/api/mcp/arcigy.get_smartlead_campaign_webhooks"));
     assert.ok(paths.includes("/api/mcp/arcigy.upsert_smartlead_campaign_webhook"));
     assert.ok(paths.includes("/api/mcp/arcigy.get_smartlead_email_accounts"));
@@ -1992,6 +1995,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_smartlead_local_reconciliation_preview" && call.approvalRequired === false && Array.isArray(call.body.localLeads)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_email_accounts" && call.body.requestedDailyLimit === 80 && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_cold_outreach_monitor_runbook_preview" && call.approvalRequired === false && Array.isArray(call.body.replyEvents)));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_smartlead_campaign_audit_preview" && call.approvalRequired === false && Array.isArray(call.body.campaigns)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_gmail_outreach_readiness_preview" && call.approvalRequired === false && Array.isArray(call.body.accounts)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_campaign_webhooks" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_leadgen_db_status_preview" && call.approvalRequired === false && Array.isArray(call.body.blacklistDomains)));
@@ -3399,6 +3403,37 @@ test("Smartlead deliverability guard recommends reduced sending before more uplo
   assert.ok(guard.nextToolCalls.some((call) => call.tool === "arcigy.get_smartlead_outreach_brief" && !call.approvalRequired));
   assert.ok(guard.nextToolCalls.some((call) => call.tool === "arcigy.configure_smartlead_campaign" && call.approvalRequired));
   assert.match(guard.summary, /Ziadny zapis ani upload/);
+});
+
+test("Smartlead campaign audit flags content sender webhook and mapping issues", () => {
+  const audit = buildSmartleadCampaignAuditPreview({
+    campaigns: [
+      { id: "123456", name: "Kuchyne SK", status: "ACTIVE", total_sent_count: 240, unique_replied_count: 14, positive_replies: 5, sequence_count: 3, email_account_count: 2, webhook_count: 0, bounce_rate: 2.5 },
+      { id: "789000", name: "Autoservisy BA", status: "DRAFT", total_sent_count: 0, sequence_count: 0, email_account_count: 0 },
+    ],
+    localCampaigns: [{ campaignId: "123456", nicheSlug: "kuchyne", nicheName: "Kuchynske studia" }],
+    sequences: [{ campaignId: "123456", sequenceCount: 3, usesCompanyName: true, unresolvedVariables: ["company_name"] }],
+    webhooks: [{ campaignId: "123456", count: 0, hasReplyWebhook: false, hasCategoryWebhook: false }],
+    senderAccounts: [{ campaignId: "123456", count: 2, activeCount: 2, warmupIssues: 0, dailyLimit: 80 }],
+  });
+
+  assert.equal(audit.mode, "smartlead-campaign-audit-preview");
+  assert.equal(audit.status, "blocked");
+  assert.equal(audit.totals.campaigns, 2);
+  assert.equal(audit.totals.active, 1);
+  assert.equal(audit.totals.sent, 240);
+  assert.equal(audit.totals.replies, 14);
+  assert.equal(audit.totals.missingSequence, 1);
+  assert.equal(audit.totals.missingSender, 1);
+  assert.equal(audit.totals.missingWebhook, 2);
+  assert.equal(audit.totals.variableIssues, 1);
+  assert.equal(audit.totals.unknownLocalMapping, 1);
+  assert.ok(audit.nextToolCalls.some((call) => call.tool === "arcigy.get_smartlead_outreach_brief" && !call.approvalRequired));
+  assert.ok(audit.nextToolCalls.some((call) => call.tool === "arcigy.get_smartlead_campaign_webhooks" && !call.approvalRequired));
+  assert.ok(audit.nextToolCalls.some((call) => call.tool === "arcigy.get_smartlead_email_accounts" && !call.approvalRequired));
+  assert.ok(audit.nextToolCalls.some((call) => call.tool === "arcigy.build_smartlead_sequence_variable_repair_preview" && !call.approvalRequired));
+  assert.ok(audit.nextToolCalls.some((call) => call.tool === "arcigy.build_cold_outreach_monitor_runbook_preview" && !call.approvalRequired));
+  assert.match(audit.summary, /Ziadny Smartlead zapis/);
 });
 
 test("Smartlead campaign backup plan protects campaigns before risky changes", () => {
