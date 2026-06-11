@@ -3208,6 +3208,7 @@ function listWebMcpTools() {
     { name: "arcigy.get_smartlead_message_history", requiresApproval: false },
     { name: "arcigy.classify_outreach_reply", requiresApproval: false },
     { name: "arcigy.build_outreach_reply_triage_preview", requiresApproval: false },
+    { name: "arcigy.build_smartlead_reply_followup_queue_preview", requiresApproval: false },
     { name: "arcigy.build_showcase_reply_preview", requiresApproval: false },
     { name: "arcigy.preview_smartlead_ai_reply", requiresApproval: false },
     { name: "arcigy.preview_gmail_ai_reply", requiresApproval: false },

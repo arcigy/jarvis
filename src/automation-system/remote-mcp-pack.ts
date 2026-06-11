@@ -2163,6 +2163,21 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Build Smartlead reply follow-up queue from webhooks",
+      tool: "arcigy.build_smartlead_reply_followup_queue_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_smartlead_reply_followup_queue_preview"),
+      body: {
+        events: [
+          { campaign_id: "123456", lead_email: "lead@example.com", event_type: "EMAIL_REPLY", email_body: "Dobry den, poslite mi prosim ukazku.", from_email: "andrej@arcigy.group", lead_name: "Jan Novak", category_name: "Interested" },
+        ],
+        aiRepliesActive: true,
+        useAiClassification: false,
+        maxEvents: 20,
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Prepare deterministic showcase reply without Gemini",
       tool: "arcigy.build_showcase_reply_preview",
       method: "POST",

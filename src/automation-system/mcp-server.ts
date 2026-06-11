@@ -118,7 +118,7 @@ import { buildProductionCompletionScore, summarizeProductionCompletionScoreForVo
 import { buildProductionReadinessReport } from "./production-readiness.ts";
 import { getProductionVerificationEvidence } from "./production-verification-evidence.ts";
 import { lookupPublicEmailProfile } from "./public-profile.ts";
-import { buildOutreachReplyTriagePreview, buildShowcaseReplyPreview, classifyOutreachReply, previewGmailAiReply, previewSmartleadAiReply } from "./reply-decision.ts";
+import { buildOutreachReplyTriagePreview, buildShowcaseReplyPreview, buildSmartleadReplyFollowupQueuePreview, classifyOutreachReply, previewGmailAiReply, previewSmartleadAiReply } from "./reply-decision.ts";
 import { buildRemoteMcpConnectionPack } from "./remote-mcp-pack.ts";
 import { runRemoteMcpSmoke } from "./remote-mcp-smoke.ts";
 import {
@@ -1777,6 +1777,64 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(await buildOutreachReplyTriagePreview(input))
+  );
+
+  const smartleadReplyFollowupEventSchema = z.object({
+    campaignId: z.union([z.string(), z.number()]).optional(),
+    campaign_id: z.union([z.string(), z.number()]).optional(),
+    email: z.string().email().optional(),
+    leadEmail: z.string().email().optional(),
+    lead_email: z.string().email().optional(),
+    toEmail: z.string().email().optional(),
+    to_email: z.string().email().optional(),
+    eventType: z.string().optional(),
+    event_type: z.string().optional(),
+    type: z.string().optional(),
+    replyBody: z.string().optional(),
+    emailBody: z.string().optional(),
+    email_body: z.string().optional(),
+    body: z.string().optional(),
+    latestLeadReply: z.string().optional(),
+    latest_lead_reply: z.string().optional(),
+    fromEmail: z.string().email().optional(),
+    from_email: z.string().email().optional(),
+    senderEmail: z.string().email().optional(),
+    sender_email: z.string().email().optional(),
+    leadName: z.string().optional(),
+    lead_name: z.string().optional(),
+    companyName: z.string().optional(),
+    company_name: z.string().optional(),
+    categoryName: z.string().optional(),
+    category_name: z.string().optional(),
+    history: z.array(replyHistoryItemSchema).optional(),
+    alreadyHandled: z.boolean().optional(),
+    alreadySent: z.boolean().optional(),
+    leadId: z.union([z.string(), z.number()]).optional(),
+    lead_id: z.union([z.string(), z.number()]).optional(),
+    webhookId: z.union([z.string(), z.number()]).optional(),
+    webhook_id: z.union([z.string(), z.number()]).optional(),
+    raw: z.record(z.string(), z.unknown()).optional(),
+  }).passthrough();
+
+  server.registerTool(
+    "arcigy.build_smartlead_reply_followup_queue_preview",
+    {
+      title: "Build Smartlead reply follow-up queue preview",
+      description: "Normalize raw Smartlead reply webhooks or exported reply rows into safe history fetch, AI reply preview, and draft next steps without sending.",
+      inputSchema: {
+        events: z.array(smartleadReplyFollowupEventSchema).min(1).max(100),
+        aiRepliesActive: z.boolean().optional(),
+        useAiClassification: z.boolean().default(false),
+        maxEvents: z.number().int().min(1).max(100).default(50),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (input) => jsonResult(await buildSmartleadReplyFollowupQueuePreview(input))
   );
 
   server.registerTool(

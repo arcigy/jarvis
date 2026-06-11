@@ -138,7 +138,7 @@ import { buildLeadgenDailyReport, buildLeadgenEveningSummary, buildLeadgenOpsDig
 import { sendSlackMessage } from "../src/automation-system/slack.ts";
 import { buildPricingProposalPreview, buildServiceCapacityPreview, draftPriceOfferIntake } from "../src/automation-system/price-offer.ts";
 import { buildProactiveAttentionDigest } from "../src/automation-system/proactive-attention-digest.ts";
-import { buildOutreachReplyTriagePreview, buildShowcaseReplyPreview, classifyOutreachReply, previewGmailAiReply, previewSmartleadAiReply } from "../src/automation-system/reply-decision.ts";
+import { buildOutreachReplyTriagePreview, buildShowcaseReplyPreview, buildSmartleadReplyFollowupQueuePreview, classifyOutreachReply, previewGmailAiReply, previewSmartleadAiReply } from "../src/automation-system/reply-decision.ts";
 import { buildJarvisCapabilityAudit } from "../src/automation-system/jarvis-capability-audit.ts";
 import { buildProductionCompletionScore, summarizeProductionCompletionScoreForVoice } from "../src/automation-system/production-completion-score.ts";
 import { jarvisAutomations } from "../src/automation-system/jarvis-automations.ts";
@@ -209,6 +209,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.get_smartlead_message_history",
     "arcigy.classify_outreach_reply",
     "arcigy.build_outreach_reply_triage_preview",
+    "arcigy.build_smartlead_reply_followup_queue_preview",
     "arcigy.build_showcase_reply_preview",
     "arcigy.preview_smartlead_ai_reply",
     "arcigy.preview_gmail_ai_reply",
@@ -406,7 +407,7 @@ test("Jarvis capability audit maps the full requested production surface to evid
   assert.ok(remoteMcpCapability?.evidence.includes("production-evidence-tool-call"));
   assert.ok(audit.capabilities.some((item) => item.id === "contracts" && item.tools.includes("arcigy.build_pricing_proposal_preview") && item.tools.includes("arcigy.build_service_capacity_preview")));
   assert.ok(audit.capabilities.some((item) => item.id === "proactive-digest" && item.status === "ready" && item.tools.includes("arcigy.sync_gmail_recent_messages")));
-  assert.ok(audit.capabilities.some((item) => item.id === "lead-discovery" && item.tools.includes("arcigy.build_showcase_reply_preview")));
+  assert.ok(audit.capabilities.some((item) => item.id === "lead-discovery" && item.tools.includes("arcigy.build_showcase_reply_preview") && item.tools.includes("arcigy.build_smartlead_reply_followup_queue_preview")));
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.append_leads_to_google_sheet")));
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.replace_google_sheet_rows")));
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.label_gmail_thread")));
@@ -532,9 +533,10 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.ok(paths.includes("/api/mcp/arcigy.get_smartlead_campaign_webhooks"));
   assert.ok(paths.includes("/api/mcp/arcigy.upsert_smartlead_campaign_webhook"));
   assert.ok(paths.includes("/api/mcp/arcigy.get_smartlead_email_accounts"));
-  assert.ok(paths.includes("/api/mcp/arcigy.build_pricing_proposal_preview"));
-  assert.ok(paths.includes("/api/mcp/arcigy.build_service_capacity_preview"));
-  assert.ok(paths.includes("/api/mcp/arcigy.build_showcase_reply_preview"));
+    assert.ok(paths.includes("/api/mcp/arcigy.build_pricing_proposal_preview"));
+    assert.ok(paths.includes("/api/mcp/arcigy.build_service_capacity_preview"));
+    assert.ok(paths.includes("/api/mcp/arcigy.build_smartlead_reply_followup_queue_preview"));
+    assert.ok(paths.includes("/api/mcp/arcigy.build_showcase_reply_preview"));
   const operatorBriefing = document.paths["/api/mcp/arcigy.get_operator_briefing"] as OpenApiPathFixture;
   const attentionDigest = document.paths["/api/mcp/arcigy.get_proactive_attention_digest"] as OpenApiPathFixture;
   const completionScore = document.paths["/api/mcp/arcigy.get_production_completion_score"] as OpenApiPathFixture;
@@ -558,6 +560,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   const smartleadEmailAccounts = document.paths["/api/mcp/arcigy.get_smartlead_email_accounts"] as OpenApiPathFixture;
   const pricingProposalPreview = document.paths["/api/mcp/arcigy.build_pricing_proposal_preview"] as OpenApiPathFixture;
   const serviceCapacityPreview = document.paths["/api/mcp/arcigy.build_service_capacity_preview"] as OpenApiPathFixture;
+  const smartleadReplyFollowupQueue = document.paths["/api/mcp/arcigy.build_smartlead_reply_followup_queue_preview"] as OpenApiPathFixture;
   const showcaseReplyPreview = document.paths["/api/mcp/arcigy.build_showcase_reply_preview"] as OpenApiPathFixture;
   const contractGenerate = document.paths["/api/mcp/arcigy.generate_contract_documents"] as OpenApiPathFixture;
   assert.equal(operatorBriefing.post.requestBody.content["application/json"].examples.quickStart.value.live, false);
@@ -599,6 +602,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.equal(pricingProposalPreview.post.requestBody.content["application/json"].examples.quickStart.value.clientName, "Modelova Firma s.r.o.");
   assert.equal(pricingProposalPreview.post.requestBody.content["application/json"].examples.quickStart.value.items.length, 2);
   assert.equal(serviceCapacityPreview.post.requestBody.content["application/json"].examples.quickStart.value.services.length, 3);
+  assert.equal(smartleadReplyFollowupQueue.post.requestBody.content["application/json"].examples.quickStart.value.events[0].lead_email, "lead@example.com");
   assert.equal(showcaseReplyPreview.post.requestBody.content["application/json"].examples.quickStart.value.leadEmail, "lead@example.com");
   assert.equal(contractGenerate.post["x-arcigy-requiresApproval"], true);
   assert.equal(contractGenerate.post.requestBody.content["application/json"].examples.quickStart.value.approval.approved, true);
@@ -4604,6 +4608,44 @@ test("outreach reply triage builds batch draft next steps without sending", asyn
   assert.equal(triage.nextToolCalls[0].approvalRequired, false);
   assert.equal((triage.nextToolCalls[0].payload as { email?: string }).email, "lead@example.com");
   assert.match(triage.summary, /Nic nebolo odoslane/);
+});
+
+test("Smartlead reply follow-up queue normalizes webhooks into safe preview and draft next steps", async () => {
+  const queue = await buildSmartleadReplyFollowupQueuePreview({
+    events: [
+      {
+        campaign_id: "123",
+        lead_email: "lead@example.com",
+        event_type: "EMAIL_REPLY",
+        email_body: "Dobry den, poslite mi prosim ukazku.",
+        from_email: "andrej@arcigy.group",
+        lead_name: "Jan Novak",
+        company_name: "Modelova Firma",
+        category_name: "Interested",
+      },
+      {
+        campaignId: "456",
+        email: "empty@example.com",
+        eventType: "EMAIL_REPLY",
+      },
+    ],
+    aiRepliesActive: true,
+    useAiClassification: false,
+  });
+
+  assert.equal(queue.mode, "smartlead-reply-followup-queue-preview");
+  assert.equal(queue.totals.events, 2);
+  assert.equal(queue.totals.readyToPreview, 1);
+  assert.equal(queue.totals.needsHistory, 1);
+  assert.equal(queue.totals.positive, 1);
+  assert.equal(queue.totals.draftCandidates, 1);
+  assert.equal(queue.items[0].recommendedAction, "draft_smartlead_reply");
+  assert.equal(queue.items[1].recommendedAction, "fetch_history");
+  assert.ok(queue.nextToolCalls.some((call) => call.tool === "arcigy.get_smartlead_message_history" && call.approvalRequired === false));
+  assert.ok(queue.nextToolCalls.some((call) => call.tool === "arcigy.preview_smartlead_ai_reply" && call.approvalRequired === false));
+  assert.ok(queue.nextToolCalls.some((call) => call.tool === "arcigy.draft_smartlead_thread_reply" && call.approvalRequired === false));
+  assert.equal(JSON.stringify(queue).includes("send_smartlead_thread_reply"), false);
+  assert.match(queue.summary, /Nothing was sent/);
 });
 
 test("lead discovery helpers call Serper, Google Places, and Google Sheets", async () => {

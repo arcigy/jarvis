@@ -61,6 +61,7 @@ export type JarvisMcpToolName =
   | "arcigy.get_smartlead_message_history"
   | "arcigy.classify_outreach_reply"
   | "arcigy.build_outreach_reply_triage_preview"
+  | "arcigy.build_smartlead_reply_followup_queue_preview"
   | "arcigy.build_showcase_reply_preview"
   | "arcigy.preview_smartlead_ai_reply"
   | "arcigy.preview_gmail_ai_reply"
@@ -492,6 +493,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.build_outreach_reply_triage_preview",
       description: "Read-only roztriedi viac outreach odpovedi naraz a pripravi bezpecne draft next-step payloady bez odoslania.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_smartlead_reply_followup_queue_preview",
+      description: "Read-only z raw Smartlead webhookov/exportov pripravi follow-up frontu: history fetch, AI reply preview a draft next-step bez odoslania.",
       requiresApproval: false,
     },
     {

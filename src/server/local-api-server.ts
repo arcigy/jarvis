@@ -113,7 +113,7 @@ import { buildProductionCompletionScore, summarizeProductionCompletionScoreForVo
 import { buildProductionReadinessReport } from "../automation-system/production-readiness.ts";
 import { getProductionVerificationEvidence } from "../automation-system/production-verification-evidence.ts";
 import { lookupPublicEmailProfile } from "../automation-system/public-profile.ts";
-import { buildOutreachReplyTriagePreview, buildShowcaseReplyPreview, classifyOutreachReply, previewGmailAiReply, previewSmartleadAiReply } from "../automation-system/reply-decision.ts";
+import { buildOutreachReplyTriagePreview, buildShowcaseReplyPreview, buildSmartleadReplyFollowupQueuePreview, classifyOutreachReply, previewGmailAiReply, previewSmartleadAiReply } from "../automation-system/reply-decision.ts";
 import { buildRemoteMcpOpenApiDocument } from "../automation-system/remote-mcp-openapi.ts";
 import { buildRemoteMcpConnectionPack } from "../automation-system/remote-mcp-pack.ts";
 import { runRemoteMcpSmoke } from "../automation-system/remote-mcp-smoke.ts";
@@ -1520,6 +1520,17 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         aiRepliesActive: typeof payload.aiRepliesActive === "boolean" ? payload.aiRepliesActive : undefined,
         useAiClassification: payload.useAiClassification === true,
         maxReplies: typeof payload.maxReplies === "number" ? payload.maxReplies : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_smartlead_reply_followup_queue_preview") {
+    writeJson(response, 200, {
+      result: await buildSmartleadReplyFollowupQueuePreview({
+        events: Array.isArray(payload.events) ? payload.events as Parameters<typeof buildSmartleadReplyFollowupQueuePreview>[0]["events"] : [],
+        aiRepliesActive: typeof payload.aiRepliesActive === "boolean" ? payload.aiRepliesActive : undefined,
+        useAiClassification: payload.useAiClassification === true,
+        maxEvents: typeof payload.maxEvents === "number" ? payload.maxEvents : undefined,
       }),
     });
     return;

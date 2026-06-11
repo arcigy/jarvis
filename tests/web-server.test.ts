@@ -659,6 +659,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(openApiBody.paths["/api/mcp/arcigy.build_bulk_smartlead_upload_queue_preview"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.build_smartlead_send_readiness_queue_preview"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.build_bulk_ai_intro_work_queue_preview"]);
+    assert.ok(openApiBody.paths["/api/mcp/arcigy.build_smartlead_reply_followup_queue_preview"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.get_smartlead_campaign_webhooks"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.upsert_smartlead_campaign_webhook"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.get_smartlead_email_accounts"]);
@@ -683,6 +684,7 @@ test("local web bridge serves UI and API health", async () => {
     const openApiSmartleadWebhooks = openApiBody.paths["/api/mcp/arcigy.get_smartlead_campaign_webhooks"] as OpenApiPathFixture;
     const openApiSmartleadWebhookUpsert = openApiBody.paths["/api/mcp/arcigy.upsert_smartlead_campaign_webhook"] as OpenApiPathFixture;
     const openApiSmartleadEmailAccounts = openApiBody.paths["/api/mcp/arcigy.get_smartlead_email_accounts"] as OpenApiPathFixture;
+    const openApiSmartleadReplyFollowupQueue = openApiBody.paths["/api/mcp/arcigy.build_smartlead_reply_followup_queue_preview"] as OpenApiPathFixture;
     const openApiPricingProposalPreview = openApiBody.paths["/api/mcp/arcigy.build_pricing_proposal_preview"] as OpenApiPathFixture;
     const openApiServiceCapacityPreview = openApiBody.paths["/api/mcp/arcigy.build_service_capacity_preview"] as OpenApiPathFixture;
     const openApiShowcaseReplyPreview = openApiBody.paths["/api/mcp/arcigy.build_showcase_reply_preview"] as OpenApiPathFixture;
@@ -710,6 +712,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(Array.isArray(openApiLeadIdentityRepair.post.requestBody.content["application/json"].examples.quickStart.value.leads));
     assert.equal(openApiSmartleadWebhooks.post.requestBody.content["application/json"].examples.quickStart.value.campaignId, "123456");
     assert.equal(openApiSmartleadEmailAccounts.post.requestBody.content["application/json"].examples.quickStart.value.requestedDailyLimit, 80);
+    assert.equal(openApiSmartleadReplyFollowupQueue.post.requestBody.content["application/json"].examples.quickStart.value.events[0].event_type, "EMAIL_REPLY");
     assert.equal(openApiPricingProposalPreview.post.requestBody.content["application/json"].examples.quickStart.value.clientName, "Modelova Firma s.r.o.");
     assert.equal(openApiPricingProposalPreview.post.requestBody.content["application/json"].examples.quickStart.value.items.length, 2);
     assert.equal(openApiServiceCapacityPreview.post.requestBody.content["application/json"].examples.quickStart.value.services.length, 3);

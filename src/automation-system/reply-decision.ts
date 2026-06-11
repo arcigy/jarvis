@@ -109,6 +109,71 @@ export type OutreachReplyTriagePreview = {
   warnings: string[];
 };
 
+export type SmartleadReplyFollowupEventInput = {
+  campaignId?: string | number;
+  campaign_id?: string | number;
+  email?: string;
+  leadEmail?: string;
+  lead_email?: string;
+  toEmail?: string;
+  to_email?: string;
+  eventType?: string;
+  event_type?: string;
+  type?: string;
+  replyBody?: string;
+  emailBody?: string;
+  email_body?: string;
+  body?: string;
+  latestLeadReply?: string;
+  latest_lead_reply?: string;
+  fromEmail?: string;
+  from_email?: string;
+  senderEmail?: string;
+  sender_email?: string;
+  leadName?: string;
+  lead_name?: string;
+  companyName?: string;
+  company_name?: string;
+  categoryName?: string;
+  category_name?: string;
+  history?: ReplyHistoryItem[];
+  alreadyHandled?: boolean;
+  alreadySent?: boolean;
+  leadId?: string | number;
+  lead_id?: string | number;
+  webhookId?: string | number;
+  webhook_id?: string | number;
+  raw?: Record<string, unknown>;
+};
+
+export type SmartleadReplyFollowupQueuePreview = {
+  mode: "smartlead-reply-followup-queue-preview";
+  summary: string;
+  totals: {
+    events: number;
+    readyToPreview: number;
+    needsHistory: number;
+    positive: number;
+    skipped: number;
+    manualReview: number;
+    draftCandidates: number;
+  };
+  items: Array<{
+    email?: string;
+    campaignId?: string | number;
+    eventType?: string;
+    leadName?: string;
+    companyName?: string;
+    category?: OutreachReplyCategory;
+    confidence?: OutreachReplyClassification["confidence"];
+    recommendedAction: "fetch_history" | "preview_ai_reply" | "draft_smartlead_reply" | "manual_review" | "skip";
+    reason: string;
+    nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; approvalRequired: boolean }>;
+  }>;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; approvalRequired: boolean }>;
+  warnings: string[];
+};
+
 const allowedSmartleadEventTypes = new Set(["EMAIL_REPLY", "LEAD_CATEGORY_UPDATED"]);
 
 export async function classifyOutreachReply(
@@ -382,6 +447,178 @@ export async function buildOutreachReplyTriagePreview(
   };
 }
 
+export async function buildSmartleadReplyFollowupQueuePreview(
+  input: {
+    events: SmartleadReplyFollowupEventInput[];
+    aiRepliesActive?: boolean;
+    useAiClassification?: boolean;
+    maxEvents?: number;
+  },
+  env: RuntimeEnv = process.env,
+  fetchImpl: FetchLike = fetch
+): Promise<SmartleadReplyFollowupQueuePreview> {
+  const maxEvents = Math.min(Math.max(Math.trunc(input.maxEvents ?? 50), 1), 100);
+  const events = input.events.slice(0, maxEvents);
+  const items: SmartleadReplyFollowupQueuePreview["items"] = [];
+  const warnings: string[] = [];
+
+  for (const event of events) {
+    const normalized = normalizeSmartleadReplyEvent(event);
+    const nextToolCalls: SmartleadReplyFollowupQueuePreview["nextToolCalls"] = [];
+    const eventType = normalized.eventType?.toUpperCase();
+    if (eventType && !allowedSmartleadEventTypes.has(eventType)) {
+      items.push({
+        email: normalized.email,
+        campaignId: normalized.campaignId,
+        eventType,
+        leadName: normalized.leadName,
+        companyName: normalized.companyName,
+        recommendedAction: "skip",
+        reason: `Event type ${eventType} ignored.`,
+        nextToolCalls,
+      });
+      continue;
+    }
+    if (input.aiRepliesActive === false || normalized.alreadyHandled || normalized.alreadySent) {
+      const reason = input.aiRepliesActive === false ? "AI replies are paused." : "Reply already handled or sent.";
+      items.push({
+        email: normalized.email,
+        campaignId: normalized.campaignId,
+        eventType,
+        leadName: normalized.leadName,
+        companyName: normalized.companyName,
+        recommendedAction: "skip",
+        reason,
+        nextToolCalls,
+      });
+      continue;
+    }
+    if (!normalized.email || normalized.campaignId === undefined) {
+      warnings.push("Smartlead reply event is missing email or campaignId.");
+      items.push({
+        email: normalized.email,
+        campaignId: normalized.campaignId,
+        eventType,
+        leadName: normalized.leadName,
+        companyName: normalized.companyName,
+        recommendedAction: "manual_review",
+        reason: "Missing email or campaignId; cannot fetch history or draft safely.",
+        nextToolCalls,
+      });
+      continue;
+    }
+
+    nextToolCalls.push({
+      tool: "arcigy.get_smartlead_message_history",
+      payload: { campaignId: normalized.campaignId, email: normalized.email },
+      approvalRequired: false,
+    });
+
+    if (!normalized.replyBody) {
+      items.push({
+        email: normalized.email,
+        campaignId: normalized.campaignId,
+        eventType,
+        leadName: normalized.leadName,
+        companyName: normalized.companyName,
+        recommendedAction: "fetch_history",
+        reason: "Missing latest reply body; fetch Smartlead message history before previewing an AI reply.",
+        nextToolCalls,
+      });
+      continue;
+    }
+
+    const previewPayload = {
+      toEmail: normalized.email,
+      campaignId: normalized.campaignId,
+      emailBody: normalized.replyBody,
+      eventType,
+      fromEmail: normalized.fromEmail,
+      leadName: normalized.leadName,
+      companyName: normalized.companyName,
+      categoryName: normalized.categoryName,
+      history: normalized.history,
+      aiRepliesActive: input.aiRepliesActive,
+      alreadySent: normalized.alreadySent,
+      generateDraft: false,
+      useAiClassification: input.useAiClassification === true,
+    };
+    nextToolCalls.push({
+      tool: "arcigy.preview_smartlead_ai_reply",
+      payload: previewPayload,
+      approvalRequired: false,
+    });
+
+    const classificationResult = await classifyOutreachReply(
+      { replyBody: normalized.replyBody, history: normalized.history, senderName: normalized.fromEmail, useAi: input.useAiClassification },
+      env,
+      fetchImpl
+    );
+    if (classificationResult.category !== "POSITIVE") {
+      items.push({
+        email: normalized.email,
+        campaignId: normalized.campaignId,
+        eventType,
+        leadName: normalized.leadName,
+        companyName: normalized.companyName,
+        category: classificationResult.category,
+        confidence: classificationResult.confidence,
+        recommendedAction: "preview_ai_reply",
+        reason: `Reply classified as ${classificationResult.category}; preview will skip drafting.`,
+        nextToolCalls,
+      });
+      continue;
+    }
+
+    nextToolCalls.push({
+      tool: "arcigy.draft_smartlead_thread_reply",
+      payload: {
+        campaignId: normalized.campaignId,
+        email: normalized.email,
+        leadName: normalized.leadName,
+        companyName: normalized.companyName,
+        positiveSignal: normalized.categoryName || normalized.replyBody,
+        latestLeadReply: normalized.replyBody,
+        senderEmail: normalized.fromEmail,
+        messageHistory: normalized.history,
+        language: "sk",
+      },
+      approvalRequired: false,
+    });
+    items.push({
+      email: normalized.email,
+      campaignId: normalized.campaignId,
+      eventType,
+      leadName: normalized.leadName,
+      companyName: normalized.companyName,
+      category: classificationResult.category,
+      confidence: classificationResult.confidence,
+      recommendedAction: "draft_smartlead_reply",
+      reason: "Positive Smartlead reply detected; prepare a draft only and require explicit send approval later.",
+      nextToolCalls,
+    });
+  }
+
+  const nextToolCalls = dedupeToolCalls(items.flatMap((item) => item.nextToolCalls));
+  const totals = {
+    events: items.length,
+    readyToPreview: items.filter((item) => item.nextToolCalls.some((call) => call.tool === "arcigy.preview_smartlead_ai_reply")).length,
+    needsHistory: items.filter((item) => item.recommendedAction === "fetch_history").length,
+    positive: items.filter((item) => item.category === "POSITIVE").length,
+    skipped: items.filter((item) => item.recommendedAction === "skip").length,
+    manualReview: items.filter((item) => item.recommendedAction === "manual_review").length,
+    draftCandidates: items.filter((item) => item.nextToolCalls.some((call) => call.tool === "arcigy.draft_smartlead_thread_reply")).length,
+  };
+  return {
+    mode: "smartlead-reply-followup-queue-preview",
+    summary: `Smartlead reply follow-up queue: ${totals.readyToPreview} ready to preview, ${totals.needsHistory} need history fetch, ${totals.draftCandidates} draft candidates, ${totals.manualReview} manual review. Nothing was sent.`,
+    totals,
+    items,
+    nextToolCalls,
+    warnings,
+  };
+}
+
 function classifyOutreachReplyHeuristic(replyBody: string, history: ReplyHistoryItem[]): OutreachReplyClassification {
   const text = normalizeText(replyBody);
   const historyText = normalizeText(formatHistory(history, "Arcigy"));
@@ -552,6 +789,64 @@ function buildPositiveReplyNextToolCall(reply: OutreachReplyTriageItemInput, bod
     },
     approvalRequired: false,
   };
+}
+
+function normalizeSmartleadReplyEvent(event: SmartleadReplyFollowupEventInput): {
+  campaignId?: string | number;
+  email?: string;
+  eventType?: string;
+  replyBody?: string;
+  fromEmail?: string;
+  leadName?: string;
+  companyName?: string;
+  categoryName?: string;
+  history?: ReplyHistoryItem[];
+  alreadyHandled?: boolean;
+  alreadySent?: boolean;
+} {
+  const raw = event.raw ?? {};
+  const value = (...keys: string[]) => {
+    for (const key of keys) {
+      const direct = (event as Record<string, unknown>)[key];
+      const nested = raw[key];
+      const picked = direct ?? nested;
+      if (typeof picked === "string" && picked.trim()) return picked.trim();
+      if (typeof picked === "number" && Number.isFinite(picked)) return picked;
+    }
+    return undefined;
+  };
+  const campaignId = value("campaignId", "campaign_id");
+  const emailValue = value("email", "leadEmail", "lead_email", "toEmail", "to_email");
+  return {
+    campaignId,
+    email: typeof emailValue === "string" ? emailValue.toLowerCase() : undefined,
+    eventType: stringFrom(value("eventType", "event_type", "type")),
+    replyBody: stringFrom(value("replyBody", "emailBody", "email_body", "body", "latestLeadReply", "latest_lead_reply")),
+    fromEmail: stringFrom(value("fromEmail", "from_email", "senderEmail", "sender_email")),
+    leadName: stringFrom(value("leadName", "lead_name")),
+    companyName: stringFrom(value("companyName", "company_name")),
+    categoryName: stringFrom(value("categoryName", "category_name")),
+    history: Array.isArray(event.history) ? event.history : undefined,
+    alreadyHandled: event.alreadyHandled === true,
+    alreadySent: event.alreadySent === true,
+  };
+}
+
+function stringFrom(value: string | number | undefined): string | undefined {
+  if (typeof value === "number") return String(value);
+  return value;
+}
+
+function dedupeToolCalls<T extends { tool: string; payload: Record<string, unknown>; approvalRequired: boolean }>(calls: T[]): T[] {
+  const seen = new Set<string>();
+  const result: T[] = [];
+  for (const call of calls) {
+    const key = `${call.tool}:${JSON.stringify(call.payload)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(call);
+  }
+  return result;
 }
 
 function parseCategory(value: string): OutreachReplyCategory | null {
