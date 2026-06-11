@@ -188,6 +188,7 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.build_google_sheet_sync_preview`: prepares a read-only Google Sheets sync plan from CSV/leads with headers, rows, clear/update ranges, and the approval payload for replacing a sheet.
 - `arcigy.build_leadgen_campaign_pipeline_preview`: chains a raw lead batch into website scrape needs, AI intro needs, enrichment scoring, manual review, and Smartlead next-step payloads without writing or uploading.
 - `arcigy.build_leadgen_to_smartlead_dispatch_preview`: coordinates multiple leadgen groups into one scrape/fetch, AI intro, validation, and Smartlead readiness dispatch without writing or uploading.
+- `arcigy.build_company_research_queue_preview`: turns company-name-only or partial leads into Google Places/Serper research, safe URL fetch, contact scrape, AI intro, and Smartlead dispatch next steps without executing.
 - `arcigy.build_lead_source_import_queue_preview`: turns Google Maps, CSV, Serper, or manual lead source rows into niche/campaign import queues with scrape, intro, review, and Smartlead audit next steps without writing or uploading.
 - `arcigy.build_lead_source_bundle_preview`: merges multiple CSV, JSON, and manual lead exports into one read-only leadgen runbook with scrape, AI intro, review, and Smartlead next steps.
 - `arcigy.build_lead_source_bundle_campaign_launch_preview`: turns a multi-source lead bundle into Smartlead campaign launch and handoff packages with approval-gated next steps, without writing or uploading.

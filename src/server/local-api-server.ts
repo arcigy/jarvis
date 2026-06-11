@@ -29,6 +29,7 @@ import {
   buildGoogleSheetSyncPreview,
   buildLeadgenCampaignPipelinePreview,
   buildLeadgenToSmartleadDispatchPreview,
+  buildCompanyResearchQueuePreview,
   buildLeadgenAutopilotBatchPreview,
   buildRegionExpansionQueuePreview,
   buildLeadgenRunResumePreview,
@@ -2471,6 +2472,30 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         globalMaxUploads: typeof payload.globalMaxUploads === "number" ? payload.globalMaxUploads : undefined,
         maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
         maxContextChars: typeof payload.maxContextChars === "number" ? payload.maxContextChars : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_company_research_queue_preview") {
+    writeJson(response, 200, {
+      result: buildCompanyResearchQueuePreview({
+        leads: (payload.leads ?? []) as Parameters<typeof buildCompanyResearchQueuePreview>[0]["leads"],
+        sourceName: optionalString(payload.sourceName),
+        niche: payload.niche as Parameters<typeof buildCompanyResearchQueuePreview>[0]["niche"],
+        defaultRegion: optionalString(payload.defaultRegion),
+        country: optionalString(payload.country),
+        offer: optionalString(payload.offer),
+        language: payload.language === "en" ? "en" : "sk",
+        includeGooglePlaces: payload.includeGooglePlaces !== false,
+        includeSerper: payload.includeSerper !== false,
+        includeFetch: payload.includeFetch !== false,
+        includeDispatch: payload.includeDispatch !== false,
+        minScore: typeof payload.minScore === "number" ? payload.minScore : undefined,
+        batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
+        maxSearches: typeof payload.maxSearches === "number" ? payload.maxSearches : undefined,
+        maxFetchUrls: typeof payload.maxFetchUrls === "number" ? payload.maxFetchUrls : undefined,
+        maxScrapeUrls: typeof payload.maxScrapeUrls === "number" ? payload.maxScrapeUrls : undefined,
+        maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
       }),
     });
     return;

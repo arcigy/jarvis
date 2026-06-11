@@ -1054,6 +1054,25 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       aiIntroBatchSize: 40,
     };
   }
+  if (toolName === "arcigy.build_company_research_queue_preview") {
+    return {
+      sourceName: "company-name-import",
+      niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456" },
+      defaultRegion: "Bratislava",
+      country: "SK",
+      leads: [
+        { companyName: "Modelova Firma", region: "Bratislava" },
+        { companyName: "Needs Contact", website: "https://needs-contact.sk" },
+        { companyName: "Ready Firma", website: "https://readyfirma.sk", email: "jan@readyfirma.sk" },
+      ],
+      offer: "AI asistent na odpovede a follow-up",
+      language: "sk",
+      includeGooglePlaces: true,
+      includeSerper: true,
+      includeFetch: true,
+      includeDispatch: true,
+    };
+  }
   if (toolName === "arcigy.build_lead_source_import_queue_preview") {
     return {
       sourceName: "kuchyne_sk_google_maps_2026-04-27.csv",

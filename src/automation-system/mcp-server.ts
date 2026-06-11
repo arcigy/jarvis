@@ -30,6 +30,7 @@ import {
   buildGoogleSheetSyncPreview,
   buildLeadgenCampaignPipelinePreview,
   buildLeadgenToSmartleadDispatchPreview,
+  buildCompanyResearchQueuePreview,
   buildLeadgenAutopilotBatchPreview,
   buildRegionExpansionQueuePreview,
   buildLeadgenRunResumePreview,
@@ -4068,6 +4069,52 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildLeadgenToSmartleadDispatchPreview(input as Parameters<typeof buildLeadgenToSmartleadDispatchPreview>[0]))
+  );
+
+  server.registerTool(
+    "arcigy.build_company_research_queue_preview",
+    {
+      title: "Build company research queue preview",
+      description: "Plan company-name research into Google Places/Serper search, safe URL fetches, contact scraping, AI intro work, and Smartlead dispatch without executing fetches, writes, or uploads.",
+      inputSchema: {
+        leads: z.array(pipelineLeadSchema.extend({
+          region: z.string().optional(),
+          city: z.string().optional(),
+          searchQuery: z.string().optional(),
+          googlePlaceId: z.string().optional(),
+          placeId: z.string().optional(),
+        })).min(0).max(1000),
+        sourceName: z.string().optional(),
+        niche: z.object({
+          id: z.string().optional(),
+          slug: z.string().optional(),
+          name: z.string().min(1),
+          campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+          smartleadCampaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+        }).optional(),
+        defaultRegion: z.string().optional(),
+        country: z.string().default("SK"),
+        offer: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        includeGooglePlaces: z.boolean().default(true),
+        includeSerper: z.boolean().default(true),
+        includeFetch: z.boolean().default(true),
+        includeDispatch: z.boolean().default(true),
+        minScore: z.number().int().min(0).max(100).default(70),
+        batchSize: z.number().int().min(1).max(100).default(50),
+        maxSearches: z.number().int().min(1).max(200).default(50),
+        maxFetchUrls: z.number().int().min(1).max(200).default(50),
+        maxScrapeUrls: z.number().int().min(1).max(200).default(50),
+        maxNextCalls: z.number().int().min(1).max(250).default(100),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildCompanyResearchQueuePreview(input as Parameters<typeof buildCompanyResearchQueuePreview>[0]))
   );
 
   server.registerTool(

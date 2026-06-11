@@ -38,6 +38,7 @@ import {
   buildLeadgenGapReport,
   buildLeadgenCampaignPipelinePreview,
   buildLeadgenToSmartleadDispatchPreview,
+  buildCompanyResearchQueuePreview,
   buildLeadgenAutopilotBatchPreview,
   buildRegionExpansionQueuePreview,
   buildLeadgenRunResumePreview,
@@ -275,6 +276,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.build_google_sheet_sync_preview",
     "arcigy.build_leadgen_campaign_pipeline_preview",
     "arcigy.build_leadgen_to_smartlead_dispatch_preview",
+    "arcigy.build_company_research_queue_preview",
     "arcigy.build_lead_source_import_queue_preview",
     "arcigy.build_lead_source_bundle_preview",
     "arcigy.build_lead_source_bundle_campaign_launch_preview",
@@ -519,6 +521,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.ok(paths.includes("/api/mcp/arcigy.build_lead_validation_scorecard_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_company_short_name_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_leadgen_to_smartlead_dispatch_preview"));
+  assert.ok(paths.includes("/api/mcp/arcigy.build_company_research_queue_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_bulk_smartlead_upload_queue_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_smartlead_send_readiness_queue_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_bulk_ai_intro_work_queue_preview"));
@@ -1935,6 +1938,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_lead_validation_scorecard_preview" && call.approvalRequired === false && call.body.minScore === 70));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_company_short_name_preview" && call.approvalRequired === false && Array.isArray(call.body.leads)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_leadgen_to_smartlead_dispatch_preview" && call.approvalRequired === false && Array.isArray(call.body.groups)));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_company_research_queue_preview" && call.approvalRequired === false && Array.isArray(call.body.leads)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_bulk_smartlead_upload_queue_preview" && call.approvalRequired === false && Array.isArray(call.body.campaigns)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_smartlead_send_readiness_queue_preview" && call.approvalRequired === false && Array.isArray(call.body.campaigns)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_bulk_ai_intro_work_queue_preview" && call.approvalRequired === false && Array.isArray(call.body.groups)));
@@ -3888,6 +3892,42 @@ test("leadgen to Smartlead dispatch preview coordinates scrape intro and upload 
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_ai_intro_work_packet_preview" && !call.approvalRequired));
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.add_leads_to_smartlead_campaign" && call.approvalRequired));
   assert.ok(preview.warnings.some((warning) => warning.includes("no Smartlead campaignId")));
+  assert.match(preview.summary, /Ziadny fetch, zapis ani upload/);
+});
+
+test("company research queue preview plans search fetch scrape intro and dispatch", () => {
+  const preview = buildCompanyResearchQueuePreview({
+    sourceName: "company-name-import",
+    niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456" },
+    defaultRegion: "Bratislava",
+    country: "SK",
+    leads: [
+      { companyName: "Modelova Firma", region: "Bratislava" },
+      { companyName: "Needs Contact", website: "https://needs-contact.sk" },
+      { companyName: "Ready Firma", website: "https://readyfirma.sk", email: "jan@readyfirma.sk" },
+      {},
+    ],
+    offer: "AI asistent na dopyty",
+    minScore: 50,
+  });
+
+  assert.equal(preview.mode, "company-research-queue-preview");
+  assert.equal(preview.status, "attention");
+  assert.equal(preview.totals.input, 4);
+  assert.equal(preview.totals.needsCompanySearch, 1);
+  assert.equal(preview.totals.needsContactScrape, 1);
+  assert.equal(preview.totals.needsIntro, 1);
+  assert.equal(preview.totals.manualReview, 1);
+  assert.ok(preview.searchQueries.some((query) => query.provider === "google_places"));
+  assert.ok(preview.searchQueries.some((query) => query.provider === "serper"));
+  assert.ok(preview.fetchUrls.includes("https://needs-contact.sk"));
+  assert.ok(preview.scrapeUrls.includes("https://needs-contact.sk"));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.search_google_places" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.search_serper" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_fetch_public_url_previews" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_scrape_website_contacts" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_ai_intro_work_packet_preview" && !call.approvalRequired));
+  assert.ok(preview.dispatchPreview);
   assert.match(preview.summary, /Ziadny fetch, zapis ani upload/);
 });
 

@@ -1785,6 +1785,40 @@ export type LeadgenToSmartleadDispatchPreview = {
   warnings: string[];
 };
 
+export type CompanyResearchQueuePreview = {
+  mode: "company-research-queue-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  source: { name?: string; niche?: { id?: string; slug: string; name: string; campaignId?: string | number | null }; defaultRegion?: string; country: string };
+  totals: {
+    input: number;
+    readyForDispatch: number;
+    needsCompanySearch: number;
+    needsContactScrape: number;
+    needsIntro: number;
+    manualReview: number;
+    searchQueries: number;
+    fetchUrls: number;
+    scrapeUrls: number;
+    dispatchGroups: number;
+  };
+  items: Array<{
+    lead: LeadCandidateInput & { region?: string; city?: string; searchQuery?: string };
+    status: "ready_for_dispatch" | "needs_company_search" | "needs_contact_scrape" | "needs_intro" | "manual_review";
+    reason: string;
+    searchQuery?: string;
+    placesQuery?: string;
+    fetchUrl?: string;
+    scrapeUrl?: string;
+  }>;
+  searchQueries: Array<{ query: string; provider: "google_places" | "serper"; leadIndex: number; reason: string }>;
+  fetchUrls: string[];
+  scrapeUrls: string[];
+  dispatchPreview?: LeadgenToSmartleadDispatchPreview;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+  warnings: string[];
+};
+
 export type DailyLeadgenRunbook = {
   mode: "daily-leadgen-runbook";
   summary: string;
@@ -7137,6 +7171,167 @@ export function buildLeadgenToSmartleadDispatchPreview(input: {
     summary: `Leadgen to Smartlead dispatch ${status}: ${totals.websitesToScrape} scrape, ${totals.introsToDraft} AI intro, ${totals.uploadReady} upload-ready leadov, ${totals.approvalPayloads} approval payloadov. Ziadny fetch, zapis ani upload neprebehol.`,
     totals,
     groups,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls).slice(0, maxNextCalls),
+    warnings,
+  };
+}
+
+export function buildCompanyResearchQueuePreview(input: {
+  leads: Array<LeadCandidateInput & { region?: string; city?: string; searchQuery?: string; googlePlaceId?: string; placeId?: string }>;
+  sourceName?: string;
+  niche?: { id?: string; slug?: string; name: string; campaignId?: string | number | null; smartleadCampaignId?: string | number | null };
+  defaultRegion?: string;
+  country?: string;
+  offer?: string;
+  language?: "sk" | "en";
+  includeGooglePlaces?: boolean;
+  includeSerper?: boolean;
+  includeFetch?: boolean;
+  includeDispatch?: boolean;
+  minScore?: number;
+  batchSize?: number;
+  maxSearches?: number;
+  maxFetchUrls?: number;
+  maxScrapeUrls?: number;
+  maxNextCalls?: number;
+}): CompanyResearchQueuePreview {
+  const country = (input.country ?? "SK").toUpperCase();
+  const language = input.language ?? "sk";
+  const includeGooglePlaces = input.includeGooglePlaces !== false;
+  const includeSerper = input.includeSerper !== false;
+  const includeFetch = input.includeFetch !== false;
+  const includeDispatch = input.includeDispatch !== false;
+  const maxSearches = Math.min(Math.max(Math.trunc(input.maxSearches ?? 50), 1), 200);
+  const maxFetchUrls = Math.min(Math.max(Math.trunc(input.maxFetchUrls ?? 50), 1), 200);
+  const maxScrapeUrls = Math.min(Math.max(Math.trunc(input.maxScrapeUrls ?? 50), 1), 200);
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 100), 1), 250);
+  const niche = input.niche
+    ? { id: input.niche.id, slug: input.niche.slug?.trim() || slugify(input.niche.name), name: input.niche.name, campaignId: input.niche.campaignId ?? input.niche.smartleadCampaignId ?? null }
+    : undefined;
+  const warnings: string[] = [];
+  const searchQueries: CompanyResearchQueuePreview["searchQueries"] = [];
+  const items: CompanyResearchQueuePreview["items"] = input.leads.map((lead, index) => {
+    const companyName = lead.companyName?.trim();
+    const website = lead.website?.trim();
+    const email = lead.email?.trim();
+    const intro = extractLeadIntro(lead);
+    const region = lead.region || lead.city || input.defaultRegion;
+    const queryBase = lead.searchQuery?.trim() || [companyName, region, country === "SK" ? "kontakt email" : "contact email"].filter(Boolean).join(" ");
+    if (!companyName && !website) {
+      return { lead, status: "manual_review", reason: "Missing company name and website." };
+    }
+    if (!website && companyName) {
+      const placesQuery = [companyName, region, country === "SK" ? "Slovensko" : country].filter(Boolean).join(" ");
+      if (includeGooglePlaces && searchQueries.length < maxSearches) {
+        searchQueries.push({ query: placesQuery, provider: "google_places", leadIndex: index, reason: "Find official website and business contact from company name." });
+      }
+      if (includeSerper && searchQueries.length < maxSearches) {
+        searchQueries.push({ query: queryBase, provider: "serper", leadIndex: index, reason: "Find website/contact page when Places does not return a usable site." });
+      }
+      return { lead, status: "needs_company_search", reason: "Missing website; search company first.", searchQuery: queryBase, placesQuery };
+    }
+    if (website && !email) {
+      return { lead, status: "needs_contact_scrape", reason: "Website exists but email is missing.", fetchUrl: website, scrapeUrl: website };
+    }
+    if (email && !intro) {
+      return { lead, status: "needs_intro", reason: "Contact exists but personalized intro is missing.", fetchUrl: website, scrapeUrl: website };
+    }
+    return { lead, status: "ready_for_dispatch", reason: "Lead has contact and personalized intro.", fetchUrl: website, scrapeUrl: website };
+  });
+  const fetchUrls = includeFetch
+    ? unique(items.map((item) => item.fetchUrl).filter((value): value is string => Boolean(value))).slice(0, maxFetchUrls)
+    : [];
+  const scrapeUrls = unique(items
+    .filter((item) => item.status === "needs_contact_scrape" || item.status === "needs_intro")
+    .map((item) => item.scrapeUrl)
+    .filter((value): value is string => Boolean(value)))
+    .slice(0, maxScrapeUrls);
+  const dispatchLeads = items
+    .filter((item) => item.status !== "manual_review" && item.status !== "needs_company_search")
+    .map((item) => item.lead);
+  const dispatchPreview = includeDispatch && niche && dispatchLeads.length
+    ? buildLeadgenToSmartleadDispatchPreview({
+        groups: [{
+          sourceName: input.sourceName ?? "company-research",
+          niche,
+          leads: dispatchLeads,
+          defaultSource: input.sourceName ?? "company-research",
+          campaignTag: niche.slug,
+        }],
+        offer: input.offer,
+        language,
+        minScore: input.minScore,
+        batchSize: input.batchSize,
+        maxNextCalls: Math.min(maxNextCalls, 100),
+      })
+    : undefined;
+  if (!niche && includeDispatch && dispatchLeads.length) warnings.push("Dispatch preview skipped because niche is missing.");
+  if (input.leads.length > items.length) warnings.push("Some leads were not processed.");
+  const nextToolCalls: CompanyResearchQueuePreview["nextToolCalls"] = [];
+  for (const query of searchQueries) {
+    nextToolCalls.push({
+      tool: query.provider === "google_places" ? "arcigy.search_google_places" : "arcigy.search_serper",
+      payload: query.provider === "google_places"
+        ? { query: query.query, maxResultCount: 10, languageCode: language, regionCode: country }
+        : { query: query.query, num: 10, gl: country.toLowerCase(), hl: language },
+      reason: query.reason,
+      approvalRequired: false,
+    });
+  }
+  if (fetchUrls.length) {
+    nextToolCalls.push({
+      tool: "arcigy.batch_fetch_public_url_previews",
+      payload: { urls: fetchUrls, maxUrls: fetchUrls.length, parseJson: false },
+      reason: "Fetch known websites before contact scrape so weak pages can be triaged safely.",
+      approvalRequired: false,
+    });
+  }
+  if (scrapeUrls.length) {
+    nextToolCalls.push({
+      tool: "arcigy.batch_scrape_website_contacts",
+      payload: { urls: scrapeUrls, includePriorityPages: true, maxPages: 5, maxSites: scrapeUrls.length },
+      reason: "Scrape websites/contact pages for missing emails, phones, and context.",
+      approvalRequired: false,
+    });
+  }
+  const introLeads = items.filter((item) => item.status === "needs_intro").map((item) => item.lead);
+  if (introLeads.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_ai_intro_work_packet_preview",
+      payload: { leads: introLeads, sourceName: input.sourceName ?? "company-research", niche: niche?.name, offer: input.offer, language, maxLeads: introLeads.length },
+      reason: "Prepare AI intro work packet for leads that already have contact data.",
+      approvalRequired: false,
+    });
+  }
+  if (dispatchPreview) nextToolCalls.push(...dispatchPreview.nextToolCalls);
+  const totals = {
+    input: input.leads.length,
+    readyForDispatch: items.filter((item) => item.status === "ready_for_dispatch").length,
+    needsCompanySearch: items.filter((item) => item.status === "needs_company_search").length,
+    needsContactScrape: items.filter((item) => item.status === "needs_contact_scrape").length,
+    needsIntro: items.filter((item) => item.status === "needs_intro").length,
+    manualReview: items.filter((item) => item.status === "manual_review").length,
+    searchQueries: searchQueries.length,
+    fetchUrls: fetchUrls.length,
+    scrapeUrls: scrapeUrls.length,
+    dispatchGroups: dispatchPreview?.totals.groups ?? 0,
+  };
+  const status: CompanyResearchQueuePreview["status"] = totals.input === 0 || (totals.manualReview === totals.input && totals.input > 0)
+    ? "blocked"
+    : totals.needsCompanySearch || totals.needsContactScrape || totals.needsIntro || totals.manualReview || warnings.length
+      ? "attention"
+      : "ready";
+  return {
+    mode: "company-research-queue-preview",
+    status,
+    summary: `Company research queue ${status}: ${totals.needsCompanySearch} company search, ${totals.fetchUrls} fetch, ${totals.scrapeUrls} scrape, ${totals.needsIntro} AI intro, ${totals.readyForDispatch} ready. Ziadny fetch, zapis ani upload neprebehol.`,
+    source: { name: input.sourceName, niche, defaultRegion: input.defaultRegion, country },
+    totals,
+    items,
+    searchQueries,
+    fetchUrls,
+    scrapeUrls,
+    dispatchPreview,
     nextToolCalls: dedupeNextToolCalls(nextToolCalls).slice(0, maxNextCalls),
     warnings,
   };
