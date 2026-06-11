@@ -50,6 +50,7 @@ import {
   buildWebsiteScrapeQualityAuditPreview,
   batchDraftLeadIntros,
   buildAiIntroQualityAuditPreview,
+  buildFlaggedLeadReviewPreview,
   buildAiIntroCleanupPreview,
   buildAiIntroWorkPacketPreview,
   buildAiIntroImportPreview,
@@ -4328,6 +4329,40 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildAiIntroQualityAuditPreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_flagged_lead_review_preview",
+    {
+      title: "Build flagged lead review preview",
+      description: "Turn flagged AI intro CSV/leads into a read-only review queue with rescrape, redraft, identity repair, reject, or icebreaker writeback next steps.",
+      inputSchema: {
+        leads: z.array(leadCandidateSchema.extend({
+          id: z.string().optional(),
+          raw: z.record(z.string(), z.string()).optional(),
+          decisionMakerName: z.string().optional(),
+          decision_maker_name: z.string().optional(),
+          icebreaker_sentence: z.string().optional(),
+          reviewNote: z.string().optional(),
+          verification_notes: z.string().optional(),
+          note: z.string().optional(),
+        }).passthrough()).optional(),
+        csvText: z.string().optional(),
+        delimiter: z.enum([",", ";"]).optional(),
+        sourceName: z.string().optional(),
+        offer: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+        maxNextCalls: z.number().int().min(1).max(100).default(40),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildFlaggedLeadReviewPreview(input))
   );
 
   server.registerTool(

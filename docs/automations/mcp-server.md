@@ -198,6 +198,7 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.draft_lead_intro`: Gemini draft of one short personalized cold outreach intro for a lead.
 - `arcigy.batch_draft_lead_intros`: Gemini batch draft of personalized cold outreach intros for multiple leads without sending or writing.
 - `arcigy.build_ai_intro_quality_audit_preview`: checks AI intros before Smartlead for missing, generic, short, placeholder, greeting, or weakly grounded text and prepares safe redraft calls.
+- `arcigy.build_flagged_lead_review_preview`: turns flagged AI intro CSV/leads into a read-only review queue for rescrape, redraft, identity repair, reject, or writeback preview.
 - `arcigy.build_ai_intro_work_packet_preview`: prepares a read-only Markdown/JSON work packet for ChatGPT or Claude to fill missing icebreakers, validates returned intros, and prepares cleanup/audit/export next steps without DB writes.
 - `arcigy.build_ai_intro_import_preview`: parses ChatGPT/Claude JSON or CSV icebreaker results, matches them to work-packet leads, validates them, and prepares cleanup/audit/export/Smartlead next steps without DB writes.
 - `arcigy.build_ai_icebreaker_writeback_preview`: validates AI icebreaker JSON by lead ID, detects duplicates/placeholders/unknown leads, merges valid intros back onto leads, and prepares cleanup/QA/Smartlead steps without DB writes.

@@ -21,6 +21,7 @@ import {
   buildLeadDiscoveryMatrixPreview,
   buildNicheLeadgenPlan,
   buildAiIntroQualityAuditPreview,
+  buildFlaggedLeadReviewPreview,
   buildAiIntroCleanupPreview,
   buildLeadBatchQaPreview,
   buildLeadIdentityRepairPreview,
@@ -274,6 +275,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.draft_lead_intro",
     "arcigy.batch_draft_lead_intros",
     "arcigy.build_ai_intro_quality_audit_preview",
+    "arcigy.build_flagged_lead_review_preview",
     "arcigy.build_ai_intro_work_packet_preview",
     "arcigy.build_ai_intro_import_preview",
     "arcigy.build_ai_icebreaker_writeback_preview",
@@ -1899,6 +1901,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_lead_validation_scorecard_preview" && call.approvalRequired === false && call.body.minScore === 70));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_company_short_name_preview" && call.approvalRequired === false && Array.isArray(call.body.leads)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_ai_icebreaker_writeback_preview" && call.approvalRequired === false && typeof call.body.resultJsonText === "string"));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_flagged_lead_review_preview" && call.approvalRequired === false && typeof call.body.csvText === "string"));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.lookup_public_email_profile" && call.body.email === "jan.novak@example.com" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.preview_smartlead_lead_sync" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_email_accounts" && call.body.requestedDailyLimit === 80 && call.approvalRequired === false));
@@ -4728,6 +4731,37 @@ test("AI intro quality audit flags weak intros and prepares redrafts", () => {
   assert.ok(audit.nextToolCalls.some((call) => call.tool === "arcigy.batch_draft_lead_intros" && !call.approvalRequired));
   assert.ok(audit.nextToolCalls.some((call) => call.tool === "arcigy.build_lead_repair_queue_preview" && !call.approvalRequired));
   assert.match(audit.summary, /Ziadny email ani zapis neprebehol/);
+});
+
+test("flagged lead review routes old AI control CSV to repair next steps", () => {
+  const preview = buildFlaggedLeadReviewPreview({
+    sourceName: "flagged_leads_na_kontrolu.csv",
+    campaignId: "123456",
+    offer: "AI asistent na dopyty.",
+    csvText: [
+      "ID,Webova stranka,Povodny nazov firmy,Skrateny nazov,Meno Decision Makera,Priezvisko/Oslovenie (variable),AI Pochvala (Icebreaker),Poznamka pre kontrolu",
+      "lead-1,https://ready.sk,Ready Studio,Ready Studio,Jan,Novak,Zaujalo ma ze mate showroom kuchyn na mieru.,Specific decision maker and website content found.",
+      "lead-2,https://needs-context.sk,Needs Context,Needs Context,,,Naozaj ma zaujalo ze poskytujete kvalitne sluzby.,No website content was provided, so decision maker and specific business facts could not be identified.",
+      "lead-3,https://needs-name.sk,Needs Name,Needs Name,,,Zaujalo ma ze mate servis vozidiel.,Decision maker's name not found on the provided contact page content.",
+      "lead-4,https://linkedin.com/company/bad,Bad Portal,Bad Portal,,,Kratke AI intro.,No website content was provided.",
+    ].join("\n"),
+  });
+
+  assert.equal(preview.mode, "flagged-lead-review-preview");
+  assert.equal(preview.status, "attention");
+  assert.equal(preview.source.parsedFromCsv, 4);
+  assert.equal(preview.totals.input, 4);
+  assert.equal(preview.totals.readyWriteback, 1);
+  assert.equal(preview.totals.needsRescrape, 1);
+  assert.equal(preview.totals.needsIdentityReview, 1);
+  assert.equal(preview.totals.rejected, 1);
+  assert.equal(preview.readyIcebreakers[0].id, "lead-1");
+  assert.ok(preview.items.find((item) => item.id === "lead-2")?.issues.includes("no_website_content"));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_scrape_website_contacts" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_ai_intro_work_packet_preview" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_lead_identity_repair_preview" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_ai_icebreaker_writeback_preview" && !call.approvalRequired));
+  assert.match(preview.summary, /Ziadny DB zapis ani upload/);
 });
 
 test("AI intro work packet preview prepares Claude task and validates returned intros", () => {

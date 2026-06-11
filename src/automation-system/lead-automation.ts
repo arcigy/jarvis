@@ -102,6 +102,34 @@ export type AiIntroQualityAuditPreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type FlaggedLeadReviewPreview = {
+  mode: "flagged-lead-review-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  source: { name?: string; parsedFromCsv: number };
+  totals: {
+    input: number;
+    readyWriteback: number;
+    needsRescrape: number;
+    needsRedraft: number;
+    needsIdentityReview: number;
+    rejected: number;
+    missingDecisionMaker: number;
+    noWebsiteContent: number;
+    genericIntro: number;
+  };
+  items: Array<{
+    id?: string;
+    lead: LeadCandidateInput & { id?: string; raw?: Record<string, string>; evidenceText?: string };
+    note?: string;
+    status: "ready_writeback" | "rescrape" | "redraft" | "identity_review" | "reject";
+    issues: string[];
+    nextAction: string;
+  }>;
+  readyIcebreakers: Array<{ id: string; icebreaker: string }>;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type AiIntroCleanupPreview = {
   mode: "ai-intro-cleanup-preview";
   status: "ready" | "attention" | "blocked";
@@ -1905,6 +1933,117 @@ export function buildAiIntroQualityAuditPreview(input: {
     totals,
     items,
     redraftInputs,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls),
+  };
+}
+
+export function buildFlaggedLeadReviewPreview(input: {
+  leads?: Array<LeadCandidateInput & {
+    id?: string;
+    raw?: Record<string, string>;
+    decisionMakerName?: string;
+    decision_maker_name?: string;
+    icebreaker_sentence?: string;
+    reviewNote?: string;
+    verification_notes?: string;
+    note?: string;
+  }>;
+  csvText?: string;
+  delimiter?: "," | ";";
+  sourceName?: string;
+  offer?: string;
+  language?: "sk" | "en";
+  campaignId?: string | number | null;
+  maxNextCalls?: number;
+}): FlaggedLeadReviewPreview {
+  const parsed = input.csvText?.trim() ? parseLeadsCsv({ csvText: input.csvText, delimiter: input.delimiter }) : undefined;
+  const leads = [...(input.leads ?? []), ...(parsed?.leads ?? [])].map(normalizeFlaggedLead);
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 40), 1), 100);
+  const items: FlaggedLeadReviewPreview["items"] = leads.map((lead) => {
+    const id = flaggedLeadField(lead, "id", "ID");
+    const note = flaggedLeadField(lead, "reviewNote", "verification_notes", "note", "notes", "Poznámka pre kontrolu", "Poznamka pre kontrolu");
+    const intro = extractLeadIntro(lead);
+    const issues = flaggedLeadIssues(lead, note);
+    const status: FlaggedLeadReviewPreview["items"][number]["status"] = issues.includes("missing_website") || issues.includes("blocked_website")
+      ? "reject"
+      : issues.includes("no_website_content")
+        ? "rescrape"
+        : issues.some((issue) => ["missing_intro", "generic_intro", "weak_ai_evidence"].includes(issue))
+          ? "redraft"
+          : issues.includes("missing_decision_maker")
+            ? "identity_review"
+            : "ready_writeback";
+    const nextAction = status === "reject"
+      ? "Vyrad alebo oprav URL pred dalsim enrichmentom."
+      : status === "rescrape"
+        ? "Znovu scrapni web alebo kontaktne podstranky a potom redraftni AI intro."
+        : status === "redraft"
+          ? "Vrat lead do AI intro work packetu s lepsim kontextom."
+          : status === "identity_review"
+            ? "Dopln decision makera alebo oslovenie cez identity/register repair."
+            : "Moze ist do icebreaker writeback preview a nasledne Smartlead QA.";
+    return { id, lead: { ...lead, id }, note, status, issues, nextAction };
+  });
+
+  const readyItems = items.filter((item) => item.status === "ready_writeback" && item.id && extractLeadIntro(item.lead));
+  const rescrapeUrls = unique(items.filter((item) => item.status === "rescrape" && item.lead.website).map((item) => item.lead.website as string)).slice(0, maxNextCalls);
+  const redraftLeads = items.filter((item) => item.status === "redraft" || item.status === "rescrape").map((item) => item.lead).slice(0, maxNextCalls);
+  const identityLeads = items.filter((item) => item.status === "identity_review" || item.issues.includes("missing_decision_maker")).map((item) => item.lead).slice(0, maxNextCalls);
+  const readyLeads = readyItems.map((item) => item.lead).slice(0, maxNextCalls);
+  const readyIcebreakers = readyItems.map((item) => ({ id: item.id as string, icebreaker: extractLeadIntro(item.lead) as string })).slice(0, maxNextCalls);
+  const nextToolCalls: FlaggedLeadReviewPreview["nextToolCalls"] = [];
+  if (rescrapeUrls.length) {
+    nextToolCalls.push({
+      tool: "arcigy.batch_scrape_website_contacts",
+      payload: { urls: rescrapeUrls, includePriorityPages: true, maxPages: 4, maxSites: rescrapeUrls.length },
+      reason: "Flagged poznamky hovoria, ze AI nemalo webovy obsah alebo konkrétne fakty.",
+      approvalRequired: false,
+    });
+  }
+  if (redraftLeads.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_ai_intro_work_packet_preview",
+      payload: { leads: redraftLeads, sourceName: input.sourceName ?? "flagged-leads-review", offer: input.offer, language: input.language ?? "sk", maxLeads: redraftLeads.length },
+      reason: "Genericke alebo slabo podlozene AI pochvaly vrat do work packetu na opravu.",
+      approvalRequired: false,
+    });
+  }
+  if (identityLeads.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_lead_identity_repair_preview",
+      payload: { leads: identityLeads, defaultSource: input.sourceName ?? "flagged-leads-review", maxNextCalls },
+      reason: "Leady bez decision makera alebo oslovenia potrebuju identity repair pred Smartleadom.",
+      approvalRequired: false,
+    });
+  }
+  if (readyLeads.length && readyIcebreakers.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_ai_icebreaker_writeback_preview",
+      payload: { leads: readyLeads, icebreakers: readyIcebreakers, sourceName: input.sourceName ?? "flagged-leads-review", offer: input.offer, language: input.language ?? "sk", campaignId: input.campaignId },
+      reason: "Ready flagged leady priprav na writeback preview a naslednu Smartlead kontrolu.",
+      approvalRequired: false,
+    });
+  }
+  const totals = {
+    input: items.length,
+    readyWriteback: items.filter((item) => item.status === "ready_writeback").length,
+    needsRescrape: items.filter((item) => item.status === "rescrape").length,
+    needsRedraft: items.filter((item) => item.status === "redraft").length,
+    needsIdentityReview: items.filter((item) => item.status === "identity_review").length,
+    rejected: items.filter((item) => item.status === "reject").length,
+    missingDecisionMaker: items.filter((item) => item.issues.includes("missing_decision_maker")).length,
+    noWebsiteContent: items.filter((item) => item.issues.includes("no_website_content")).length,
+    genericIntro: items.filter((item) => item.issues.includes("generic_intro")).length,
+  };
+  const status: FlaggedLeadReviewPreview["status"] = totals.input === 0 ? "blocked" : totals.needsRescrape || totals.needsRedraft || totals.needsIdentityReview || totals.rejected ? "attention" : "ready";
+  return {
+    mode: "flagged-lead-review-preview",
+    status,
+    summary: `Flagged lead review ${status}: ${totals.input} leadov, ${totals.readyWriteback} ready writeback, ${totals.needsRescrape} rescrape, ${totals.needsRedraft} redraft, ${totals.needsIdentityReview} identity review, ${totals.rejected} reject. Ziadny DB zapis ani upload neprebehol.`,
+    source: { name: input.sourceName, parsedFromCsv: parsed?.leads.length ?? 0 },
+    totals,
+    items,
+    readyIcebreakers,
     nextToolCalls: dedupeNextToolCalls(nextToolCalls),
   };
 }
@@ -9014,6 +9153,57 @@ function introQualityIssues(
     if (matches < minEvidenceTerms) issues.push("weak_evidence_grounding");
   }
   return issues;
+}
+
+function normalizeFlaggedLead(lead: LeadCandidateInput & { raw?: Record<string, string> }): LeadCandidateInput & { id?: string; raw?: Record<string, string>; evidenceText?: string } {
+  const record = lead as LeadCandidateInput & { evidenceText?: string };
+  const id = flaggedLeadField(lead, "id", "ID");
+  const website = flaggedLeadField(lead, "website", "Webová stránka", "Webova stranka", "web", "url");
+  const companyName = flaggedLeadField(lead, "companyName", "Skrátený názov", "Skrateny nazov", "Pôvodný názov firmy", "Povodny nazov firmy", "company", "company_name");
+  const firstName = flaggedLeadField(lead, "firstName", "Meno Decision Makera", "decision_maker_name", "meno");
+  const lastName = flaggedLeadField(lead, "lastName", "Priezvisko/Oslovenie (variable)", "decision_maker_last_name", "last_name");
+  const personalizedIntro = flaggedLeadField(lead, "personalizedIntro", "AI Pochvala (Icebreaker)", "icebreaker_sentence", "icebreaker", "personalized_intro");
+  const note = flaggedLeadField(lead, "Poznámka pre kontrolu", "Poznamka pre kontrolu", "verification_notes", "reviewNote", "note");
+  return {
+    ...lead,
+    id,
+    website: website ? normalizeWebsiteValue(website) : lead.website,
+    companyName: companyName ?? lead.companyName,
+    firstName: firstName ?? lead.firstName,
+    lastName: lastName ?? lead.lastName,
+    personalizedIntro: personalizedIntro ?? lead.personalizedIntro,
+    evidenceText: record.evidenceText ?? note,
+    customFields: {
+      ...lead.customFields,
+      lead_id: id ?? lead.customFields?.lead_id,
+      review_note: note ?? lead.customFields?.review_note,
+      decision_maker_name: firstName ?? lead.customFields?.decision_maker_name,
+      decision_maker_last_name: lastName ?? lead.customFields?.decision_maker_last_name,
+      icebreaker_sentence: personalizedIntro ?? lead.customFields?.icebreaker_sentence,
+    },
+  };
+}
+
+function flaggedLeadField(lead: LeadCandidateInput & { raw?: Record<string, string> }, ...aliases: string[]): string | undefined {
+  return sheetLeadValue(lead, ...aliases);
+}
+
+function flaggedLeadIssues(lead: LeadCandidateInput & { raw?: Record<string, string>; evidenceText?: string }, note?: string): string[] {
+  const issues = new Set<string>();
+  const noteText = (note ?? "").toLowerCase();
+  const intro = extractLeadIntro(lead);
+  const website = lead.website;
+  if (!website) issues.add("missing_website");
+  if (website && defaultDiscoveryBlacklistDomains("sk").includes(normalizeDomain(website))) issues.add("blocked_website");
+  if (!stringField(lead, "firstName", "lastName") && !stringField(lead.customFields ?? {}, "decision_maker_name", "decision_maker_last_name")) issues.add("missing_decision_maker");
+  if (/no specific decision maker|decision maker[^.]{0,80}(not found|not available|could not be identified)|name not found|owner[^.]{0,80}not found|ceo[^.]{0,80}not found|founder[^.]{0,80}not found|majitel[^.]{0,80}nenajdeny|konatel[^.]{0,80}nenajdeny|no individual names/i.test(note ?? "")) issues.add("missing_decision_maker");
+  if (/no website content|website content was not provided|content was not provided|provided website content|beyond the url|no content/i.test(note ?? "")) issues.add("no_website_content");
+  if (/general compliment|generic compliment|domain name|company name|inferred/i.test(note ?? "")) issues.add("weak_ai_evidence");
+  for (const issue of introQualityIssues(intro, importantIntroTerms(introEvidenceText(lead)), 0, lead)) issues.add(issue);
+  if (intro && /naozaj ma zaujalo|v dnesnej dobe|mimoriadne dolezite|klucova|cenne/i.test(intro.normalize("NFD").replace(/[\u0300-\u036f]/g, "")) && noteText.includes("not provided")) {
+    issues.add("generic_intro");
+  }
+  return [...issues];
 }
 
 function cleanupAiIntroSentence(intro: string | undefined, decisionMakerName?: string, salutationLastName?: string): { cleanedIntro?: string; changed: boolean; changes: string[] } {

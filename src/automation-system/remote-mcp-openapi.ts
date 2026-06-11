@@ -1068,6 +1068,15 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       minEvidenceTerms: 1,
     };
   }
+  if (toolName === "arcigy.build_flagged_lead_review_preview") {
+    return {
+      sourceName: "flagged_leads_na_kontrolu.csv",
+      campaignId: "123456",
+      offer: "AI asistent na dopyty a follow-up.",
+      language: "sk",
+      csvText: "ID,Webova stranka,Povodny nazov firmy,Skrateny nazov,Meno Decision Makera,Priezvisko/Oslovenie (variable),AI Pochvala (Icebreaker),Poznamka pre kontrolu\nlead-1,https://ready.sk,Ready Studio,Ready Studio,Jan,Novak,Zaujalo ma ze mate showroom kuchyn na mieru.,Specific decision maker and website content found.\nlead-2,https://needs-context.sk,Needs Context,Needs Context,,,Naozaj ma zaujalo ze poskytujete kvalitne sluzby.,No website content was provided, so decision maker and specific business facts could not be identified.",
+    };
+  }
   if (toolName === "arcigy.build_ai_intro_work_packet_preview") {
     return {
       sourceName: "prep-for-ai-kuchyne",

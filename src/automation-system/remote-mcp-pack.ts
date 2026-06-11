@@ -2065,6 +2065,20 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Review flagged AI intro leads",
+      tool: "arcigy.build_flagged_lead_review_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_flagged_lead_review_preview"),
+      body: {
+        sourceName: "flagged_leads_na_kontrolu.csv",
+        campaignId: "123456",
+        offer: "AI asistent na dopyty a follow-up.",
+        language: "sk",
+        csvText: "ID,Webova stranka,Povodny nazov firmy,Skrateny nazov,Meno Decision Makera,Priezvisko/Oslovenie (variable),AI Pochvala (Icebreaker),Poznamka pre kontrolu\nlead-1,https://ready.sk,Ready Studio,Ready Studio,Jan,Novak,Zaujalo ma ze mate showroom kuchyn na mieru.,Specific decision maker and website content found.\nlead-2,https://needs-context.sk,Needs Context,Needs Context,,,Naozaj ma zaujalo ze poskytujete kvalitne sluzby.,No website content was provided, so decision maker and specific business facts could not be identified.",
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Build AI intro work packet for ChatGPT or Claude",
       tool: "arcigy.build_ai_intro_work_packet_preview",
       method: "POST",

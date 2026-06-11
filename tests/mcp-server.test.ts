@@ -159,6 +159,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(names.includes("arcigy.draft_lead_intro"));
   assert.ok(names.includes("arcigy.batch_draft_lead_intros"));
   assert.ok(names.includes("arcigy.build_ai_intro_quality_audit_preview"));
+  assert.ok(names.includes("arcigy.build_flagged_lead_review_preview"));
   assert.ok(names.includes("arcigy.build_ai_intro_work_packet_preview"));
   assert.ok(names.includes("arcigy.build_ai_intro_import_preview"));
   assert.ok(names.includes("arcigy.build_ai_icebreaker_writeback_preview"));
@@ -477,6 +478,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   );
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_ai_intro_import_preview" && call.approvalRequired === false && typeof call.body.resultJsonText === "string"));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_ai_icebreaker_writeback_preview" && call.approvalRequired === false && typeof call.body.resultJsonText === "string"));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_flagged_lead_review_preview" && call.approvalRequired === false && typeof call.body.csvText === "string"));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_showcase_reply_preview" && call.approvalRequired === false && call.body.leadEmail === "lead@example.com"));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.send_approved_outreach_reply" && call.approvalRequired === true));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_google_sheet_sync_preview" && call.approvalRequired === false && typeof call.body.csvText === "string"));

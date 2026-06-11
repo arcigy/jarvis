@@ -919,6 +919,7 @@ test("local web bridge serves UI and API health", async () => {
     );
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_ai_intro_import_preview" && typeof call.body.resultJsonText === "string"));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_ai_icebreaker_writeback_preview" && call.approvalRequired === false && typeof call.body.resultJsonText === "string"));
+    assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_flagged_lead_review_preview" && call.approvalRequired === false && typeof call.body.csvText === "string"));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_showcase_reply_preview" && call.approvalRequired === false && call.body.leadEmail === "lead@example.com"));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_company_short_name_preview" && call.approvalRequired === false && Array.isArray(call.body.leads)));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_leadgen_db_status_preview" && call.approvalRequired === false && Array.isArray(call.body.resumeStates)));
