@@ -18,6 +18,7 @@ import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerpe
 import {
   buildBatchNicheDiscoveryPlan,
   buildLeadgenExecutionQueuePreview,
+  buildLeadDiscoveryMatrixPreview,
   buildNicheLeadgenPlan,
   buildAiIntroQualityAuditPreview,
   batchScrapeWebsiteContacts,
@@ -178,6 +179,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.build_smartlead_nonreply_call_list_preview",
     "arcigy.build_niche_leadgen_plan",
     "arcigy.build_batch_niche_discovery_plan",
+    "arcigy.build_lead_discovery_matrix_preview",
     "arcigy.build_leadgen_execution_queue_preview",
     "arcigy.build_region_expansion_queue_preview",
     "arcigy.draft_smartlead_campaign_sequence",
@@ -1467,7 +1469,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 109 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 110 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -2950,6 +2952,32 @@ test("batch niche discovery plan prepares regional runbooks and read-only next c
   assert.ok(plan.nextToolCalls.some((call) => call.tool === "arcigy.run_leadgen_research_pipeline" && call.approvalRequired === false));
   assert.ok(plan.nextToolCalls.every((call) => call.tool !== "arcigy.add_leads_to_smartlead_campaign"));
   assert.match(plan.summary, /Ziadny scraping ani upload neprebehol/);
+});
+
+test("lead discovery matrix preview builds keyword region query slots safely", () => {
+  const matrix = buildLeadDiscoveryMatrixPreview({
+    niches: [
+      { id: "niche-1", slug: "fotovoltaika", name: "Fotovoltaika", keywords: ["fotovoltaika", "solarne panely"], regions: ["Bratislava", "Trnava"], campaignId: "123456", targetCount: 30, priority: 1 },
+    ],
+    maxRegionsPerNiche: 2,
+    maxKeywordsPerNiche: 2,
+    targetPerRegion: 25,
+    country: "sk",
+    existingDomains: ["https://example.sk/path"],
+  });
+
+  assert.equal(matrix.mode, "lead-discovery-matrix-preview");
+  assert.equal(matrix.status, "attention");
+  assert.equal(matrix.totals.niches, 1);
+  assert.equal(matrix.totals.matrixRows, 4);
+  assert.equal(matrix.totals.mapsQueries, 4);
+  assert.equal(matrix.totals.serperQueries, 4);
+  assert.equal(matrix.totals.targetLeads, 60);
+  assert.equal(matrix.niches[0].rows[0].mapsQuery.includes("Slovensko"), true);
+  assert.ok(matrix.niches[0].blacklistDomains.includes("zivefirmy.sk"));
+  assert.ok(matrix.nextToolCalls.some((call) => call.tool === "arcigy.discover_leads" && !call.approvalRequired));
+  assert.ok(matrix.nextToolCalls.some((call) => call.tool === "arcigy.build_lead_source_import_queue_preview" && !call.approvalRequired));
+  assert.match(matrix.summary, /Ziadne API volanie, scrape ani upload/);
 });
 
 test("leadgen execution queue preview prioritizes daily niche work without writes", () => {

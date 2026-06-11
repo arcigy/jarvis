@@ -849,6 +849,27 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Build keyword-region lead discovery matrix",
+      tool: "arcigy.build_lead_discovery_matrix_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_lead_discovery_matrix_preview"),
+      body: {
+        niches: [
+          { id: "niche-1", slug: "fotovoltaika", name: "Fotovoltaika", keywords: ["fotovoltaika", "solarne panely", "montaz fotovoltaiky"], regions: ["Bratislava", "Trnava"], campaignId: "123456", targetCount: 30, priority: 1 },
+        ],
+        defaultRegions: ["Bratislava", "Trnava", "Nitra"],
+        maxRegionsPerNiche: 3,
+        maxKeywordsPerNiche: 5,
+        targetPerRegion: 25,
+        country: "sk",
+        language: "sk",
+        useMaps: true,
+        useSerper: true,
+        existingDomains: ["example.sk"],
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Build today's leadgen execution queue",
       tool: "arcigy.build_leadgen_execution_queue_preview",
       method: "POST",

@@ -21,6 +21,7 @@ import { appendRowsToGoogleSheet, discoverLeads, searchGooglePlaces, searchSerpe
 import {
   buildBatchNicheDiscoveryPlan,
   buildLeadgenExecutionQueuePreview,
+  buildLeadDiscoveryMatrixPreview,
   buildNicheLeadgenPlan,
   buildLeadgenGapReport,
   buildLeadgenCampaignPipelinePreview,
@@ -2017,6 +2018,36 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildBatchNicheDiscoveryPlan(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_lead_discovery_matrix_preview",
+    {
+      title: "Build lead discovery matrix preview",
+      description: "Create a keyword-region Google Maps and Serper discovery matrix with blacklist, dedupe, and next MCP calls before scraping or Smartlead import.",
+      inputSchema: {
+        niches: z.array(batchNicheSchema.extend({ targetCount: z.number().int().min(1).max(500).optional(), priority: z.number().int().min(1).max(99).optional() })).min(1).max(50),
+        defaultRegions: z.array(z.string()).optional(),
+        maxNiches: z.number().int().min(1).max(50).default(10),
+        maxRegionsPerNiche: z.number().int().min(1).max(80).default(8),
+        maxKeywordsPerNiche: z.number().int().min(1).max(50).default(8),
+        targetPerRegion: z.number().int().min(1).max(500).default(25),
+        country: z.string().default("sk"),
+        language: z.string().default("sk"),
+        useMaps: z.boolean().default(true),
+        useSerper: z.boolean().default(true),
+        existingDomains: z.array(z.string()).optional(),
+        blacklistDomains: z.array(z.string()).optional(),
+        blacklistKeywords: z.array(z.string()).optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildLeadDiscoveryMatrixPreview(input))
   );
 
   server.registerTool(

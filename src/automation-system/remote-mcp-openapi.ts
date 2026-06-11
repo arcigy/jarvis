@@ -453,6 +453,22 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       language: "sk",
     };
   }
+  if (toolName === "arcigy.build_lead_discovery_matrix_preview") {
+    return {
+      niches: [
+        { id: "niche-1", slug: "fotovoltaika", name: "Fotovoltaika", keywords: ["fotovoltaika", "solarne panely", "montaz fotovoltaiky"], regions: ["Bratislava", "Trnava"], campaignId: "123456", targetCount: 30, priority: 1 },
+      ],
+      defaultRegions: ["Bratislava", "Trnava", "Nitra"],
+      maxRegionsPerNiche: 3,
+      maxKeywordsPerNiche: 5,
+      targetPerRegion: 25,
+      country: "sk",
+      language: "sk",
+      useMaps: true,
+      useSerper: true,
+      existingDomains: ["example.sk"],
+    };
+  }
   if (toolName === "arcigy.build_leadgen_execution_queue_preview") {
     return {
       date: "2026-06-10",

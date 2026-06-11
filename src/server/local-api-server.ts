@@ -20,6 +20,7 @@ import { buildLeadgenDailyReport, buildLeadgenEveningSummary, buildLeadgenOpsDig
 import {
   buildBatchNicheDiscoveryPlan,
   buildLeadgenExecutionQueuePreview,
+  buildLeadDiscoveryMatrixPreview,
   buildNicheLeadgenPlan,
   buildLeadgenGapReport,
   buildLeadgenCampaignPipelinePreview,
@@ -1578,6 +1579,26 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         painPoint: optionalString(payload.painPoint),
         language: payload.language === "en" ? "en" : "sk",
         includeSmartleadSetup: payload.includeSmartleadSetup === true,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_lead_discovery_matrix_preview") {
+    writeJson(response, 200, {
+      result: buildLeadDiscoveryMatrixPreview({
+        niches: (payload.niches ?? []) as Parameters<typeof buildLeadDiscoveryMatrixPreview>[0]["niches"],
+        defaultRegions: Array.isArray(payload.defaultRegions) ? payload.defaultRegions.map(String) : undefined,
+        maxNiches: typeof payload.maxNiches === "number" ? payload.maxNiches : undefined,
+        maxRegionsPerNiche: typeof payload.maxRegionsPerNiche === "number" ? payload.maxRegionsPerNiche : undefined,
+        maxKeywordsPerNiche: typeof payload.maxKeywordsPerNiche === "number" ? payload.maxKeywordsPerNiche : undefined,
+        targetPerRegion: typeof payload.targetPerRegion === "number" ? payload.targetPerRegion : undefined,
+        country: optionalString(payload.country),
+        language: optionalString(payload.language),
+        useMaps: payload.useMaps !== false,
+        useSerper: payload.useSerper !== false,
+        existingDomains: Array.isArray(payload.existingDomains) ? payload.existingDomains.map(String) : undefined,
+        blacklistDomains: Array.isArray(payload.blacklistDomains) ? payload.blacklistDomains.map(String) : undefined,
+        blacklistKeywords: Array.isArray(payload.blacklistKeywords) ? payload.blacklistKeywords.map(String) : undefined,
       }),
     });
     return;

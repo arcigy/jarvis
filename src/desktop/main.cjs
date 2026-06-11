@@ -3045,6 +3045,7 @@ function listWebMcpTools() {
     { name: "arcigy.build_smartlead_nonreply_call_list_preview", requiresApproval: false },
     { name: "arcigy.build_niche_leadgen_plan", requiresApproval: false },
     { name: "arcigy.build_batch_niche_discovery_plan", requiresApproval: false },
+    { name: "arcigy.build_lead_discovery_matrix_preview", requiresApproval: false },
     { name: "arcigy.build_leadgen_execution_queue_preview", requiresApproval: false },
     { name: "arcigy.build_region_expansion_queue_preview", requiresApproval: false },
     { name: "arcigy.draft_smartlead_campaign_sequence", requiresApproval: false },

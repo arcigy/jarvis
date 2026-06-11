@@ -165,6 +165,7 @@ const capabilityDefinitions: CapabilityDefinition[] = [
       "arcigy.build_smartlead_nonreply_call_list_preview",
       "arcigy.build_niche_leadgen_plan",
       "arcigy.build_batch_niche_discovery_plan",
+      "arcigy.build_lead_discovery_matrix_preview",
       "arcigy.build_leadgen_execution_queue_preview",
       "arcigy.build_region_expansion_queue_preview",
       "arcigy.select_next_niche",

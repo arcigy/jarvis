@@ -953,6 +953,41 @@ export type BatchNicheDiscoveryPlan = {
   warnings: string[];
 };
 
+export type LeadDiscoveryMatrixPreview = {
+  mode: "lead-discovery-matrix-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  totals: {
+    niches: number;
+    regions: number;
+    keywords: number;
+    matrixRows: number;
+    mapsQueries: number;
+    serperQueries: number;
+    estimatedSearchCalls: number;
+    targetLeads: number;
+  };
+  niches: Array<{
+    niche: { id?: string; slug: string; name: string; campaignId?: string | number | null };
+    regions: string[];
+    keywords: string[];
+    blacklistDomains: string[];
+    blacklistKeywords: string[];
+    targetPerRegion: number;
+    rows: Array<{
+      region: string;
+      keyword: string;
+      mapsQuery: string;
+      serperQuery: string;
+      targetCount: number;
+      priority: number;
+    }>;
+  }>;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+  safetyGates: string[];
+  warnings: string[];
+};
+
 export type LeadgenExecutionQueuePreview = {
   mode: "leadgen-execution-queue-preview";
   summary: string;
@@ -4470,6 +4505,132 @@ export function buildBatchNicheDiscoveryPlan(input: {
   };
 }
 
+export function buildLeadDiscoveryMatrixPreview(input: {
+  niches: Array<{ id?: string; slug?: string; name: string; keywords?: string[]; regions?: string[]; campaignId?: string | number | null; smartleadCampaignId?: string | number | null; targetCount?: number; priority?: number }>;
+  defaultRegions?: string[];
+  maxNiches?: number;
+  maxRegionsPerNiche?: number;
+  maxKeywordsPerNiche?: number;
+  targetPerRegion?: number;
+  country?: string;
+  language?: string;
+  useMaps?: boolean;
+  useSerper?: boolean;
+  existingDomains?: string[];
+  blacklistDomains?: string[];
+  blacklistKeywords?: string[];
+}): LeadDiscoveryMatrixPreview {
+  const maxNiches = Math.min(Math.max(Math.trunc(input.maxNiches ?? 10), 1), 50);
+  const maxRegionsPerNiche = Math.min(Math.max(Math.trunc(input.maxRegionsPerNiche ?? 8), 1), 80);
+  const maxKeywordsPerNiche = Math.min(Math.max(Math.trunc(input.maxKeywordsPerNiche ?? 8), 1), 50);
+  const targetPerRegion = Math.min(Math.max(Math.trunc(input.targetPerRegion ?? 25), 1), 500);
+  const useMaps = input.useMaps !== false;
+  const useSerper = input.useSerper !== false;
+  const country = input.country ?? "sk";
+  const language = input.language ?? "sk";
+  const defaultRegions = input.defaultRegions?.length ? input.defaultRegions : slovakiaCapitalRegions;
+  const globalBlacklistDomains = unique([...(input.blacklistDomains ?? []), ...defaultDiscoveryBlacklistDomains(country)]);
+  const existingDomains = new Set((input.existingDomains ?? []).map(normalizeDomain).filter(Boolean));
+  const warnings: string[] = [];
+
+  const niches = input.niches.slice(0, maxNiches).flatMap((source, sourceIndex) => {
+    const slug = source.slug?.trim() || slugify(source.name);
+    if (!source.name.trim() || !slug) {
+      warnings.push(`Skipped niche with missing name/slug at index ${sourceIndex}.`);
+      return [];
+    }
+    const plan = buildNicheLeadgenPlan({ niche: slug || source.name, region: undefined, customKeywords: source.keywords });
+    const keywords = unique([...(source.keywords ?? []), ...plan.mapsQueries, ...plan.serperQueries])
+      .map((keyword) => keyword.trim())
+      .filter(Boolean)
+      .slice(0, maxKeywordsPerNiche);
+    const regions = (source.regions?.length ? source.regions : defaultRegions).slice(0, maxRegionsPerNiche);
+    const blacklistKeywords = unique([...(input.blacklistKeywords ?? []), ...plan.blacklistKeywords]);
+    const rows: LeadDiscoveryMatrixPreview["niches"][number]["rows"] = [];
+    for (const [regionIndex, region] of regions.entries()) {
+      for (const [keywordIndex, keyword] of keywords.entries()) {
+        const queryBase = `${keyword} ${region}`.trim();
+        rows.push({
+          region,
+          keyword,
+          mapsQuery: `${queryBase} ${country.toUpperCase() === "SK" ? "Slovensko" : country}`.trim(),
+          serperQuery: country.toLowerCase() === "au" ? `"${keyword}" "${region}" contact email` : `"${keyword}" "${region}" kontakt email`,
+          targetCount: source.targetCount ?? targetPerRegion,
+          priority: (source.priority ?? 5) * 100 + regionIndex * 10 + keywordIndex,
+        });
+      }
+    }
+    return [{
+      niche: { id: source.id, slug, name: source.name, campaignId: source.campaignId ?? source.smartleadCampaignId ?? null },
+      regions,
+      keywords,
+      blacklistDomains: globalBlacklistDomains,
+      blacklistKeywords,
+      targetPerRegion: source.targetCount ?? targetPerRegion,
+      rows: rows.sort((a, b) => a.priority - b.priority),
+    }];
+  });
+
+  const matrixRows = niches.reduce((sum, niche) => sum + niche.rows.length, 0);
+  const nextToolCalls: LeadDiscoveryMatrixPreview["nextToolCalls"] = [];
+  for (const niche of niches) {
+    const firstRows = niche.rows.slice(0, 5);
+    for (const row of firstRows) {
+      nextToolCalls.push({
+        tool: "arcigy.discover_leads",
+        payload: {
+          query: useSerper ? row.serperQuery : row.mapsQuery,
+          placesQuery: useMaps ? row.mapsQuery : undefined,
+          maxResults: row.targetCount,
+          country,
+          language,
+        },
+        reason: `Discovery slot pre ${niche.niche.name} / ${row.region} / ${row.keyword}.`,
+        approvalRequired: false,
+      });
+    }
+    nextToolCalls.push({
+      tool: "arcigy.build_lead_source_import_queue_preview",
+      payload: {
+        sourceName: `${niche.niche.slug}-discovery-matrix`,
+        sourceType: "google_maps",
+        niches: [{ id: niche.niche.id, slug: niche.niche.slug, name: niche.niche.name, campaignId: niche.niche.campaignId ?? null }],
+        blacklistDomains: globalBlacklistDomains,
+        blacklistKeywords: niche.blacklistKeywords,
+      },
+      reason: "Po discovery zoskup leady podla niche, odfiltruj blacklist a priprav scrape/AI intro/Smartlead import.",
+      approvalRequired: false,
+    });
+  }
+
+  const targetLeads = niches.reduce((sum, niche) => sum + niche.regions.length * niche.targetPerRegion, 0);
+  const status: LeadDiscoveryMatrixPreview["status"] = !niches.length ? "blocked" : warnings.length || existingDomains.size > 0 ? "attention" : "ready";
+  return {
+    mode: "lead-discovery-matrix-preview",
+    status,
+    summary: `Lead discovery matrix: ${niches.length} niche, ${matrixRows} query slotov, target ${targetLeads} leadov. Ziadne API volanie, scrape ani upload neprebehli.`,
+    totals: {
+      niches: niches.length,
+      regions: unique(niches.flatMap((niche) => niche.regions)).length,
+      keywords: unique(niches.flatMap((niche) => niche.keywords)).length,
+      matrixRows,
+      mapsQueries: useMaps ? matrixRows : 0,
+      serperQueries: useSerper ? matrixRows : 0,
+      estimatedSearchCalls: (useMaps ? matrixRows : 0) + (useSerper ? matrixRows : 0),
+      targetLeads,
+    },
+    niches,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls),
+    safetyGates: [
+      "Najprv spustaj len read-only discovery sloty po malych batchoch.",
+      "Dedupe domeny proti existingDomains pred scrape/importom.",
+      "Blacklistuj katalogy, social siete, job portaly a marketplace vysledky pred AI intro.",
+      "Po discovery pouzi lead_source_import_queue_preview a az potom scrape, AI intro audit a Smartlead approval upload.",
+    ],
+    warnings,
+  };
+}
+
 export function buildLeadgenExecutionQueuePreview(input: {
   niches: Array<{
     id?: string;
@@ -5819,6 +5980,23 @@ function normalizeDomain(value: string): string {
   } catch {
     return clean.replace(/^www\./i, "").split("/")[0];
   }
+}
+
+function defaultDiscoveryBlacklistDomains(country: string): string[] {
+  const common = [
+    "facebook.com",
+    "instagram.com",
+    "linkedin.com",
+    "youtube.com",
+    "google.com",
+    "maps.google.com",
+    "wikipedia.org",
+    "openstreetmap.org",
+  ];
+  if (country.toLowerCase() === "au") {
+    return unique([...common, "yellowpages.com.au", "truelocal.com.au", "hipages.com.au", "oneflare.com.au", "houzz.com.au", "airtasker.com"]);
+  }
+  return unique([...common, "zivefirmy.sk", "firmy.sk", "zlatestranky.sk", "azet.sk", "bazos.sk", "heureka.sk", "alza.sk"]);
 }
 
 function slugify(value: string): string {
