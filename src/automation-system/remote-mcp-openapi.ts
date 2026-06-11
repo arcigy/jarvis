@@ -405,6 +405,17 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
   if (toolName === "arcigy.discover_leads") return { query: "automation agency Bratislava", maxResults: 5 };
   if (toolName === "arcigy.scrape_website_contacts") return { url: "https://example.com", includePriorityPages: true, maxPages: 4 };
   if (toolName === "arcigy.batch_scrape_website_contacts") return { urls: ["https://example.com", "https://example.org"], includePriorityPages: true, maxPages: 4, maxSites: 10 };
+  if (toolName === "arcigy.build_website_scrape_quality_audit_preview") {
+    return {
+      scrapedResults: [
+        { url: "https://ready.sk", finalUrl: "https://ready.sk/kontakt", title: "Ready Studio", textPreview: "Kuchyne na mieru, showroom a navrhy interierov pre byty a domy.", emails: ["info@ready.sk", "jan@ready.sk"], phones: ["+421 900 111 222"], internalLinks: ["https://ready.sk/kontakt", "https://ready.sk/o-nas"] },
+        { url: "https://weak.sk", title: "Weak", textPreview: "Domov", emails: [], phones: [], internalLinks: [] },
+      ],
+      leads: [{ companyName: "Ready Studio", website: "https://ready.sk" }],
+      offer: "AI asistent na dopyty a follow-up",
+      language: "sk",
+    };
+  }
   if (toolName === "arcigy.enrich_slovak_company_register") return { companyName: "Modelova Firma s.r.o." };
   if (toolName === "arcigy.build_slovak_register_batch_preview") {
     return {

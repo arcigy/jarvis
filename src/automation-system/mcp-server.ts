@@ -42,6 +42,7 @@ import {
   buildSmartleadHistorySuppressionPreview,
   buildSmartleadNonreplyCallListPreview,
   batchScrapeWebsiteContacts,
+  buildWebsiteScrapeQualityAuditPreview,
   batchDraftLeadIntros,
   buildAiIntroQualityAuditPreview,
   buildAiIntroCleanupPreview,
@@ -1777,6 +1778,43 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(await batchScrapeWebsiteContacts(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_website_scrape_quality_audit_preview",
+    {
+      title: "Build website scrape quality audit preview",
+      description: "Audit supplied website/contact scrape results, select preferred emails/phones/context, flag weak scrapes, and prepare rescrape, AI intro, and enrichment merge next steps without fetching or writing.",
+      inputSchema: {
+        scrapedResults: z.array(z.object({
+          url: z.string().optional(),
+          finalUrl: z.string().optional(),
+          title: z.string().optional(),
+          description: z.string().optional(),
+          textPreview: z.string().optional(),
+          emails: z.array(z.string()).optional(),
+          phones: z.array(z.string()).optional(),
+          internalLinks: z.array(z.string()).optional(),
+          fetchedAt: z.string().optional(),
+        }).partial()).optional(),
+        batch: z.object({
+          results: z.array(z.object({}).passthrough()).optional(),
+          failures: z.array(z.object({ url: z.string(), error: z.string() })).optional(),
+        }).partial().optional(),
+        leads: z.array(z.object({}).passthrough()).optional(),
+        minTextChars: z.number().int().min(40).max(2000).default(180),
+        maxNextCalls: z.number().int().min(1).max(200).default(50),
+        offer: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildWebsiteScrapeQualityAuditPreview(input as Parameters<typeof buildWebsiteScrapeQualityAuditPreview>[0]))
   );
 
   server.registerTool(

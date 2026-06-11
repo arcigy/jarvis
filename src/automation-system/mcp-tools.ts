@@ -62,6 +62,7 @@ export type JarvisMcpToolName =
   | "arcigy.discover_leads"
   | "arcigy.scrape_website_contacts"
   | "arcigy.batch_scrape_website_contacts"
+  | "arcigy.build_website_scrape_quality_audit_preview"
   | "arcigy.enrich_slovak_company_register"
   | "arcigy.build_slovak_register_batch_preview"
   | "arcigy.build_slovak_salutation_preview"
@@ -452,6 +453,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.batch_scrape_website_contacts",
       description: "Batch read-only scrape viacerych webov pre emaily, telefony a text preview s per-site error reportom bez zapisu.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_website_scrape_quality_audit_preview",
+      description: "Skontroluje kvalitu website scrape vysledkov, vyberie preferovane emaily/telefony/kontext a pripravi rescrape, AI intro a merge kroky bez fetchu alebo zapisu.",
       requiresApproval: false,
     },
     {

@@ -24,6 +24,36 @@ export type BatchScrapedWebsiteContacts = {
   summary: string;
 };
 
+export type WebsiteScrapeQualityAuditPreview = {
+  mode: "website-scrape-quality-audit-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  totals: {
+    input: number;
+    ready: number;
+    needsRescrape: number;
+    manualReview: number;
+    contactsFound: number;
+    phonesFound: number;
+    preferredEmails: number;
+    shortText: number;
+    failures: number;
+  };
+  items: Array<{
+    scrape: Partial<ScrapedWebsiteContacts>;
+    status: "ready" | "needs_rescrape" | "manual_review";
+    issues: string[];
+    preferredEmail?: string;
+    preferredPhone?: string;
+    evidenceText: string;
+    internalPriorityLinks: string[];
+    icoCandidates: string[];
+  }>;
+  enrichedLeads: Array<LeadCandidateInput & { scraped?: Partial<ScrapedWebsiteContacts>; evidenceText?: string }>;
+  rescrapeUrls: string[];
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type LeadIntroInput = {
   companyName: string;
   website?: string;
@@ -1895,6 +1925,112 @@ export function buildPhoneEnrichmentQueuePreview(input: {
     enrichedLeads,
     scrapeUrls,
     exportPreview,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls),
+  };
+}
+
+export function buildWebsiteScrapeQualityAuditPreview(input: {
+  scrapedResults?: Array<Partial<ScrapedWebsiteContacts>>;
+  batch?: Partial<BatchScrapedWebsiteContacts>;
+  leads?: LeadCandidateInput[];
+  minTextChars?: number;
+  maxNextCalls?: number;
+  offer?: string;
+  language?: "sk" | "en";
+}): WebsiteScrapeQualityAuditPreview {
+  const scrapedResults = [...(input.scrapedResults ?? []), ...(input.batch?.results ?? [])];
+  const failures = input.batch?.failures ?? [];
+  const minTextChars = Math.min(Math.max(Math.trunc(input.minTextChars ?? 180), 40), 2000);
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 50), 1), 200);
+  const items: WebsiteScrapeQualityAuditPreview["items"] = scrapedResults.map((scrape) => {
+    const emails = unique((scrape.emails ?? []).map((email) => email.trim()).filter(Boolean));
+    const preferredEmail = preferBusinessEmail(emails);
+    const preferredPhone = scrape.phones?.find((phone) => phone.trim());
+    const evidenceText = [scrape.title, scrape.description, scrape.textPreview].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+    const internalPriorityLinks = unique((scrape.internalLinks ?? []).filter(isPriorityLink)).slice(0, 10);
+    const icoCandidates = unique(evidenceText.match(/\b\d{8}\b/g) ?? []).slice(0, 5);
+    const issues: string[] = [];
+    if (!emails.length) issues.push("missing_email");
+    if (emails.length && !preferredEmail) issues.push("only_generic_email");
+    if (!preferredPhone) issues.push("missing_phone");
+    if (evidenceText.length < minTextChars) issues.push("short_text");
+    if (!internalPriorityLinks.length) issues.push("missing_priority_links");
+    const status = issues.includes("missing_email") || issues.includes("short_text")
+      ? "needs_rescrape" as const
+      : issues.length
+        ? "manual_review" as const
+        : "ready" as const;
+    return { scrape, status, issues, preferredEmail, preferredPhone, evidenceText, internalPriorityLinks, icoCandidates };
+  });
+  const enrichedLeads = items.map((item) => {
+    const matchedLead = (input.leads ?? []).find((lead) => scrapeMatchesLead(item.scrape, lead));
+    return {
+      ...(matchedLead ?? {}),
+      website: matchedLead?.website ?? item.scrape.url ?? item.scrape.finalUrl,
+      email: matchedLead?.email ?? item.preferredEmail,
+      phone: matchedLead?.phone ?? item.preferredPhone,
+      scraped: item.scrape,
+      evidenceText: item.evidenceText,
+      customFields: {
+        ...matchedLead?.customFields,
+        preferred_email_source: item.scrape.finalUrl ?? item.scrape.url,
+        scrape_quality_issues: item.issues.join(","),
+        ico_candidates: item.icoCandidates.join(","),
+      },
+    };
+  });
+  const rescrapeUrls = unique([
+    ...items.filter((item) => item.status === "needs_rescrape").map((item) => item.scrape.url ?? item.scrape.finalUrl).filter((value): value is string => Boolean(value)),
+    ...failures.map((failure) => failure.url),
+  ]).slice(0, maxNextCalls);
+  const introLeads = enrichedLeads
+    .filter((lead) => lead.companyName && lead.email && lead.evidenceText && !extractLeadIntro(lead))
+    .slice(0, maxNextCalls);
+  const nextToolCalls: WebsiteScrapeQualityAuditPreview["nextToolCalls"] = [];
+  if (rescrapeUrls.length) {
+    nextToolCalls.push({
+      tool: "arcigy.batch_scrape_website_contacts",
+      payload: { urls: rescrapeUrls, includePriorityPages: true, maxPages: 5, maxSites: rescrapeUrls.length },
+      reason: "Scrape vysledky su kratke, bez emailu alebo predchadzajuce URL zlyhali; zopakuj hlbsi contact/about scrape.",
+      approvalRequired: false,
+    });
+  }
+  if (introLeads.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_ai_intro_work_packet_preview",
+      payload: { leads: introLeads, offer: input.offer, language: input.language ?? "sk", maxLeads: introLeads.length },
+      reason: "Pouzi kvalitny scrape text ako podklad na personalizovane AI intra.",
+      approvalRequired: false,
+    });
+  }
+  if (enrichedLeads.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_lead_enrichment_merge_preview",
+      payload: { leads: input.leads ?? enrichedLeads, scrapedResults, minScore: 70, maxNextCalls },
+      reason: "Zluc preferovane kontakty a scrape kontext spat do leadov pred review/Smartlead.",
+      approvalRequired: false,
+    });
+  }
+  const totals = {
+    input: scrapedResults.length,
+    ready: items.filter((item) => item.status === "ready").length,
+    needsRescrape: items.filter((item) => item.status === "needs_rescrape").length,
+    manualReview: items.filter((item) => item.status === "manual_review").length,
+    contactsFound: items.filter((item) => item.preferredEmail).length,
+    phonesFound: items.filter((item) => item.preferredPhone).length,
+    preferredEmails: items.filter((item) => item.preferredEmail && !isGenericEmail(item.preferredEmail)).length,
+    shortText: items.filter((item) => item.issues.includes("short_text")).length,
+    failures: failures.length,
+  };
+  const status: WebsiteScrapeQualityAuditPreview["status"] = totals.input === 0 && totals.failures === 0 ? "blocked" : totals.needsRescrape || totals.manualReview || totals.failures ? "attention" : "ready";
+  return {
+    mode: "website-scrape-quality-audit-preview",
+    status,
+    summary: `Website scrape audit ${status}: ${totals.ready} ready, ${totals.needsRescrape} na rescrape, ${totals.contactsFound} s preferovanym emailom, ${totals.phonesFound} s telefonom, ${totals.failures} zlyhani. Ziadny fetch ani zapis neprebehol.`,
+    totals,
+    items,
+    enrichedLeads,
+    rescrapeUrls,
     nextToolCalls: dedupeNextToolCalls(nextToolCalls),
   };
 }
@@ -6816,6 +6952,10 @@ function leadgenStatusTotals(rows: Array<{
     failed: rows.filter((row) => row.failed).length,
     orphan: rows.filter((row) => row.orphan).length,
   };
+}
+
+function preferBusinessEmail(emails: string[]): string | undefined {
+  return emails.find((email) => !isGenericEmail(email)) ?? emails[0];
 }
 
 function introEvidenceText(lead: LeadCandidateInput & { scraped?: Partial<ScrapedWebsiteContacts>; context?: string; evidenceText?: string }): string {

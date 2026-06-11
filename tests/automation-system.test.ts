@@ -39,6 +39,7 @@ import {
   buildLeadRepairQueuePreview,
   buildPhoneEnrichmentQueuePreview,
   buildLeadgenStatusBoardPreview,
+  buildWebsiteScrapeQualityAuditPreview,
   buildSlovakRegisterBatchPreview,
   buildSlovakSalutationPreview,
   buildOrphanLeadAssignmentPreview,
@@ -180,6 +181,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.discover_leads",
     "arcigy.scrape_website_contacts",
     "arcigy.batch_scrape_website_contacts",
+    "arcigy.build_website_scrape_quality_audit_preview",
     "arcigy.enrich_slovak_company_register",
     "arcigy.build_slovak_register_batch_preview",
     "arcigy.build_slovak_salutation_preview",
@@ -1487,7 +1489,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 119 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 120 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -3898,6 +3900,44 @@ test("batch website contact scraper summarizes successes and failures", async ()
   assert.equal(batch.totals.emailsFound, 1);
   assert.equal(batch.results[0].emails[0], "owner@good.example");
   assert.match(batch.failures[0].error, /Website fetch failed: 500/);
+});
+
+test("website scrape quality audit selects preferred contacts and plans rescrape", () => {
+  const preview = buildWebsiteScrapeQualityAuditPreview({
+    scrapedResults: [
+      {
+        url: "https://ready.sk",
+        finalUrl: "https://ready.sk/kontakt",
+        title: "Ready Studio",
+        textPreview: "Kuchyne na mieru, showroom a navrhy interierov pre byty a domy.",
+        emails: ["info@ready.sk", "jan@ready.sk"],
+        phones: ["+421 900 111 222"],
+        internalLinks: ["https://ready.sk/kontakt", "https://ready.sk/o-nas"],
+      },
+      { url: "https://weak.sk", title: "Weak", textPreview: "Domov", emails: [], phones: [], internalLinks: [] },
+    ],
+    batch: { failures: [{ url: "https://failed.sk", error: "timeout" }] },
+    leads: [{ companyName: "Ready Studio", website: "https://ready.sk" }],
+    minTextChars: 40,
+    offer: "AI follow-up",
+  });
+
+  assert.equal(preview.mode, "website-scrape-quality-audit-preview");
+  assert.equal(preview.status, "attention");
+  assert.equal(preview.totals.input, 2);
+  assert.equal(preview.totals.ready, 1);
+  assert.equal(preview.totals.needsRescrape, 1);
+  assert.equal(preview.totals.contactsFound, 1);
+  assert.equal(preview.totals.preferredEmails, 1);
+  assert.equal(preview.totals.failures, 1);
+  assert.equal(preview.items[0].preferredEmail, "jan@ready.sk");
+  assert.ok(preview.rescrapeUrls.includes("https://weak.sk"));
+  assert.ok(preview.rescrapeUrls.includes("https://failed.sk"));
+  assert.equal(preview.enrichedLeads[0].email, "jan@ready.sk");
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_scrape_website_contacts" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_ai_intro_work_packet_preview" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_lead_enrichment_merge_preview" && !call.approvalRequired));
+  assert.match(preview.summary, /Ziadny fetch ani zapis/);
 });
 
 test("public URL fetch preview redacts secrets and blocks private hosts", async () => {

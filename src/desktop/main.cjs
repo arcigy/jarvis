@@ -3037,6 +3037,7 @@ function listWebMcpTools() {
     { name: "arcigy.discover_leads", requiresApproval: false },
     { name: "arcigy.scrape_website_contacts", requiresApproval: false },
     { name: "arcigy.batch_scrape_website_contacts", requiresApproval: false },
+    { name: "arcigy.build_website_scrape_quality_audit_preview", requiresApproval: false },
     { name: "arcigy.enrich_slovak_company_register", requiresApproval: false },
     { name: "arcigy.build_slovak_register_batch_preview", requiresApproval: false },
     { name: "arcigy.build_slovak_salutation_preview", requiresApproval: false },

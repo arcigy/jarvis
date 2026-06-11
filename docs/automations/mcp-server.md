@@ -121,6 +121,7 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.build_url_intelligence_queue_preview`: turns raw URLs and partial leads into fetch, contact scrape, AI intro, repair, and Smartlead import queue next steps without writes.
 - `arcigy.scrape_website_contacts`: read-only website/contact-page fetcher for emails, phones, links, title, description, and text preview.
 - `arcigy.batch_scrape_website_contacts`: read-only batch website/contact-page scraping with per-site success/error reporting.
+- `arcigy.build_website_scrape_quality_audit_preview`: audits supplied scrape results, selects preferred emails/phones/context, flags weak scrapes, and prepares rescrape, AI intro, and enrichment merge next steps without fetching or writing.
 - `arcigy.enrich_slovak_company_register`: read-only ORSR lookup by ICO or company name for company, address, executives, and source URL.
 - `arcigy.build_slovak_register_batch_preview`: builds a batch ORSR/register enrichment queue for leads with ICO/name lookups, repair checks, and merge next steps without writes.
 - `arcigy.build_slovak_salutation_preview`: builds Slovak `pan`/`pani` Smartlead custom fields like `last_name_with_salutation` and `greeting` for a lead batch without writes.

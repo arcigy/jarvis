@@ -41,6 +41,7 @@ import {
   buildSmartleadHistorySuppressionPreview,
   buildSmartleadNonreplyCallListPreview,
   batchScrapeWebsiteContacts,
+  buildWebsiteScrapeQualityAuditPreview,
   batchDraftLeadIntros,
   buildAiIntroQualityAuditPreview,
   buildAiIntroCleanupPreview,
@@ -1479,6 +1480,20 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         includePriorityPages: payload.includePriorityPages !== false,
         maxPages: typeof payload.maxPages === "number" ? payload.maxPages : undefined,
         maxSites: typeof payload.maxSites === "number" ? payload.maxSites : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_website_scrape_quality_audit_preview") {
+    writeJson(response, 200, {
+      result: buildWebsiteScrapeQualityAuditPreview({
+        scrapedResults: Array.isArray(payload.scrapedResults) ? payload.scrapedResults as Parameters<typeof buildWebsiteScrapeQualityAuditPreview>[0]["scrapedResults"] : undefined,
+        batch: isRecord(payload.batch) ? payload.batch as Parameters<typeof buildWebsiteScrapeQualityAuditPreview>[0]["batch"] : undefined,
+        leads: Array.isArray(payload.leads) ? payload.leads as Parameters<typeof buildWebsiteScrapeQualityAuditPreview>[0]["leads"] : undefined,
+        minTextChars: typeof payload.minTextChars === "number" ? payload.minTextChars : undefined,
+        maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
+        offer: optionalString(payload.offer),
+        language: payload.language === "en" ? "en" : "sk",
       }),
     });
     return;
