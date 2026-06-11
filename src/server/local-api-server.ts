@@ -37,6 +37,7 @@ import {
   buildOrphanLeadAssignmentPreview,
   buildUrlIntelligenceQueuePreview,
   buildLeadRepairQueuePreview,
+  buildGmailNameEnrichmentQueuePreview,
   buildLeadIdentityRepairPreview,
   buildLeadValidationScorecardPreview,
   buildSlovakRegisterBatchPreview,
@@ -1743,6 +1744,24 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         defaultSource: optionalString(payload.defaultSource),
         campaignId: typeof payload.campaignId === "string" || typeof payload.campaignId === "number" || payload.campaignId === null ? payload.campaignId : undefined,
         includeSmartleadPreview: payload.includeSmartleadPreview !== false,
+        maxItems: typeof payload.maxItems === "number" ? payload.maxItems : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_gmail_name_enrichment_queue_preview") {
+    writeJson(response, 200, {
+      result: buildGmailNameEnrichmentQueuePreview({
+        leads: Array.isArray(payload.leads) ? payload.leads as Parameters<typeof buildGmailNameEnrichmentQueuePreview>[0]["leads"] : [],
+        gmailNameHints: Array.isArray(payload.gmailNameHints) ? payload.gmailNameHints as Parameters<typeof buildGmailNameEnrichmentQueuePreview>[0]["gmailNameHints"] : undefined,
+        sourceName: optionalString(payload.sourceName),
+        accountEmail: optionalString(payload.accountEmail),
+        defaultSource: optionalString(payload.defaultSource),
+        campaignId: typeof payload.campaignId === "string" || typeof payload.campaignId === "number" || payload.campaignId === null ? payload.campaignId : undefined,
+        offer: optionalString(payload.offer),
+        language: payload.language === "en" ? "en" : "sk",
+        includeEmailInference: payload.includeEmailInference !== false,
+        maxLookups: typeof payload.maxLookups === "number" ? payload.maxLookups : undefined,
         maxItems: typeof payload.maxItems === "number" ? payload.maxItems : undefined,
       }),
     });

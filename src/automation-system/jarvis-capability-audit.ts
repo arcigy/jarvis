@@ -171,6 +171,7 @@ const capabilityDefinitions: CapabilityDefinition[] = [
       "arcigy.apply_local_lead_register_update",
       "arcigy.build_slovak_register_batch_preview",
       "arcigy.build_slovak_salutation_preview",
+      "arcigy.build_gmail_name_enrichment_queue_preview",
       "arcigy.build_lead_identity_repair_preview",
       "arcigy.score_lead_quality",
       "arcigy.build_lead_validation_scorecard_preview",

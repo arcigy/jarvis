@@ -1097,6 +1097,40 @@ export type SlovakSalutationPreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type GmailNameEnrichmentQueuePreview = {
+  mode: "gmail-name-enrichment-queue-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  source: { name?: string; accountEmail?: string };
+  totals: {
+    input: number;
+    unique: number;
+    duplicates: number;
+    alreadyNamed: number;
+    hintsApplied: number;
+    inferredFromPersonalEmail: number;
+    needsGmailLookup: number;
+    missingEmail: number;
+    unresolved: number;
+    salutationReady: number;
+    introsToDraft: number;
+  };
+  items: Array<{
+    lead: LeadRepairQueueLead;
+    email?: string;
+    status: "already_named" | "hint_applied" | "inferred_from_personal_email" | "needs_gmail_lookup" | "missing_email" | "unresolved";
+    displayName?: string;
+    firstName?: string;
+    lastName?: string;
+    issues: string[];
+  }>;
+  lookupQueue: Array<{ email: string; accountEmail?: string; lead: LeadRepairQueueLead; reason: string }>;
+  enhancedLeads: LeadRepairQueueLead[];
+  salutationPreview: SlovakSalutationPreview;
+  introInputs: LeadIntroInput[];
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type OrphanLeadAssignmentPreview = {
   mode: "orphan-lead-assignment-preview";
   status: "ready" | "attention" | "blocked";
@@ -6824,6 +6858,143 @@ export function buildSlovakSalutationPreview(input: {
   };
 }
 
+export function buildGmailNameEnrichmentQueuePreview(input: {
+  leads: LeadRepairQueueLead[];
+  gmailNameHints?: Array<{ email: string; displayName?: string; name?: string; fromHeader?: string; toHeader?: string; source?: string }>;
+  sourceName?: string;
+  accountEmail?: string;
+  defaultSource?: string;
+  campaignId?: string | number | null;
+  offer?: string;
+  language?: "sk" | "en";
+  includeEmailInference?: boolean;
+  maxLookups?: number;
+  maxItems?: number;
+}): GmailNameEnrichmentQueuePreview {
+  const maxItems = Math.min(Math.max(Math.trunc(input.maxItems ?? 300), 1), 1000);
+  const maxLookups = Math.min(Math.max(Math.trunc(input.maxLookups ?? 40), 1), 120);
+  const normalized = input.leads.slice(0, maxItems).map((lead) => normalizePipelineLead(lead, input.sourceName, input.defaultSource) as LeadRepairQueueLead);
+  const deduped = dedupeLeadCandidates({ leads: normalized });
+  const hintByEmail = new Map((input.gmailNameHints ?? []).map((hint) => [hint.email.trim().toLowerCase(), hint]));
+  const items: GmailNameEnrichmentQueuePreview["items"] = [];
+  const lookupQueue: GmailNameEnrichmentQueuePreview["lookupQueue"] = [];
+  const enhancedLeads: LeadRepairQueueLead[] = [];
+
+  for (const lead of deduped.unique as LeadRepairQueueLead[]) {
+    const email = lead.email?.trim().toLowerCase();
+    const existingName = decisionMakerForLead(lead) ?? stringField(lead.customFields ?? {}, "decision_maker_name", "decision_maker_full_name");
+    const issues: string[] = [];
+    if (!email) {
+      issues.push("missing_email");
+      items.push({ lead, status: "missing_email", issues });
+      continue;
+    }
+    if (existingName && !looksLikeBusinessAlias(existingName)) {
+      const split = splitNameForSalutation(existingName, lead);
+      enhancedLeads.push(applyDecisionMakerNameToLead(lead, existingName, split.firstName, split.lastName, input.sourceName ?? "existing-name"));
+      items.push({ lead, email, status: "already_named", displayName: existingName, firstName: split.firstName, lastName: split.lastName, issues });
+      continue;
+    }
+    const hintName = cleanGmailDisplayName(gmailHintDisplayName(hintByEmail.get(email)), email);
+    if (hintName) {
+      const split = splitName(hintName);
+      const enriched = applyDecisionMakerNameToLead(lead, hintName, split.firstName, split.lastName, input.sourceName ?? "gmail-name-hint");
+      enhancedLeads.push(enriched);
+      items.push({ lead: enriched, email, status: "hint_applied", displayName: hintName, firstName: split.firstName, lastName: split.lastName, issues });
+      continue;
+    }
+    if (input.includeEmailInference !== false) {
+      const inferred = inferPersonNameFromEmail(email, lead.companyName, lead.website);
+      if (inferred.fullName && inferred.confidence !== "low") {
+        const split = splitName(inferred.fullName);
+        const enriched = applyDecisionMakerNameToLead(lead, inferred.fullName, split.firstName, split.lastName, "personal-email");
+        enhancedLeads.push(enriched);
+        items.push({ lead: enriched, email, status: "inferred_from_personal_email", displayName: inferred.fullName, firstName: split.firstName, lastName: split.lastName, issues: [`email_inference_${inferred.confidence}`] });
+        continue;
+      }
+    }
+    issues.push("name_not_found");
+    lookupQueue.push({ email, accountEmail: input.accountEmail, lead, reason: "Lead nema decision maker meno; skus Gmail display-name historiu a public email profile hint." });
+    items.push({ lead, email, status: "needs_gmail_lookup", issues });
+  }
+
+  const salutationPreview = buildSlovakSalutationPreview({
+    leads: enhancedLeads,
+    defaultSource: input.defaultSource ?? "gmail-name-enrichment",
+    campaignId: input.campaignId,
+    includeSmartleadPreview: true,
+    maxItems,
+  });
+  const introInputs = enhancedLeads
+    .filter((lead) => !lead.personalizedIntro && lead.companyName)
+    .map((lead) => ({
+      companyName: lead.companyName as string,
+      website: lead.website,
+      context: stringField(lead.customFields ?? {}, "context_preview") ?? lead.context,
+      offer: input.offer,
+      language: input.language ?? "sk",
+    }))
+    .slice(0, maxLookups);
+  const nextToolCalls: GmailNameEnrichmentQueuePreview["nextToolCalls"] = [];
+  for (const lookup of lookupQueue.slice(0, maxLookups)) {
+    nextToolCalls.push({
+      tool: "arcigy.get_gmail_lead_context",
+      payload: { leadEmail: lookup.email, accountEmail: lookup.accountEmail, maxMessages: 5, includeBody: false },
+      reason: "Najdi display name pre lead email v Gmail historii bez zapisu.",
+      approvalRequired: false,
+    });
+    nextToolCalls.push({
+      tool: "arcigy.lookup_public_email_profile",
+      payload: { email: lookup.email, companyName: lookup.lead.companyName, website: lookup.lead.website, sourceName: input.sourceName ?? "gmail-name-enrichment" },
+      reason: "Ak Gmail nema meno, skus verejny profilovy hint pre identitu leadu.",
+      approvalRequired: false,
+    });
+  }
+  if (enhancedLeads.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_slovak_salutation_preview",
+      payload: { leads: enhancedLeads, defaultSource: input.defaultSource ?? "gmail-name-enrichment", campaignId: input.campaignId },
+      reason: "Z doplnenych mien priprav pan/pani a Smartlead custom fields.",
+      approvalRequired: false,
+    });
+  }
+  if (introInputs.length) {
+    nextToolCalls.push({
+      tool: "arcigy.batch_draft_lead_intros",
+      payload: { leads: introInputs, offer: input.offer, language: input.language ?? "sk", maxLeads: introInputs.length },
+      reason: "Po doplneni mien priprav chybajuce AI intra pre cold outreach.",
+      approvalRequired: false,
+    });
+  }
+  const totals = {
+    input: normalized.length,
+    unique: deduped.unique.length,
+    duplicates: deduped.duplicates.length,
+    alreadyNamed: items.filter((item) => item.status === "already_named").length,
+    hintsApplied: items.filter((item) => item.status === "hint_applied").length,
+    inferredFromPersonalEmail: items.filter((item) => item.status === "inferred_from_personal_email").length,
+    needsGmailLookup: lookupQueue.length,
+    missingEmail: items.filter((item) => item.status === "missing_email").length,
+    unresolved: items.filter((item) => item.status === "needs_gmail_lookup" || item.status === "missing_email" || item.status === "unresolved").length,
+    salutationReady: salutationPreview.totals.enriched,
+    introsToDraft: introInputs.length,
+  };
+  const status: GmailNameEnrichmentQueuePreview["status"] = totals.input === 0 ? "blocked" : totals.unresolved > 0 ? "attention" : "ready";
+  return {
+    mode: "gmail-name-enrichment-queue-preview",
+    status,
+    summary: `Gmail name enrichment queue ${status}: ${totals.alreadyNamed} uz malo meno, ${totals.hintsApplied} doplnenych z hintov, ${totals.inferredFromPersonalEmail} z personal emailu, ${totals.needsGmailLookup} potrebuje Gmail lookup. Ziadny zapis ani odoslanie neprebehlo.`,
+    source: { name: input.sourceName, accountEmail: input.accountEmail },
+    totals,
+    items,
+    lookupQueue,
+    enhancedLeads,
+    salutationPreview,
+    introInputs,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls),
+  };
+}
+
 export function buildOrphanLeadAssignmentPreview(input: {
   leads?: LeadSourceImportQueueLead[];
   csvText?: string;
@@ -9752,6 +9923,47 @@ function unresolvedTemplateVariables(value: string): string[] {
 function splitName(value?: string): { firstName?: string; lastName?: string } {
   const parts = value?.split(/\s+/).filter(Boolean) ?? [];
   return { firstName: parts[0], lastName: parts.slice(1).join(" ") || undefined };
+}
+
+function gmailHintDisplayName(hint?: { email: string; displayName?: string; name?: string; fromHeader?: string; toHeader?: string }): string | undefined {
+  if (!hint) return undefined;
+  return hint.displayName ?? hint.name ?? extractDisplayNameForEmail(hint.fromHeader, hint.email) ?? extractDisplayNameForEmail(hint.toHeader, hint.email);
+}
+
+function extractDisplayNameForEmail(header: string | undefined, email: string): string | undefined {
+  if (!header) return undefined;
+  const target = email.trim().toLowerCase();
+  for (const part of header.split(",")) {
+    const match = part.match(/"?([^"<]+)"?\s*<([^>]+)>/);
+    if (match?.[2]?.trim().toLowerCase() === target) return match[1]?.trim();
+  }
+  return undefined;
+}
+
+function cleanGmailDisplayName(value: string | undefined, email: string): string | undefined {
+  const name = value?.replace(/\s+/g, " ").trim();
+  if (!name || name.includes("@") || looksLikeBusinessAlias(name)) return undefined;
+  if (normalizeNameToken(name) === normalizeNameToken(email.split("@")[0])) return undefined;
+  const parts = name.split(/\s+/).filter(Boolean).filter((part) => !/^[._\-+]+$/.test(part));
+  if (!parts.length || parts.length > 5) return undefined;
+  return parts.map((part) => part.replace(/^["']|["']$/g, "")).join(" ");
+}
+
+function applyDecisionMakerNameToLead(lead: LeadRepairQueueLead, fullName: string, firstName?: string, lastName?: string, source?: string): LeadRepairQueueLead {
+  return {
+    ...lead,
+    firstName: lead.firstName ?? firstName,
+    lastName: lead.lastName ?? lastName,
+    decisionMakerName: lead.decisionMakerName ?? fullName,
+    decision_maker_name: lead.decision_maker_name ?? fullName,
+    customFields: {
+      ...lead.customFields,
+      decision_maker_name: fullName,
+      decision_maker_first_name: firstName,
+      decision_maker_last_name: lastName,
+      identity_source: source,
+    },
+  };
 }
 
 function splitNameForSalutation(value: string | undefined, lead: LeadRepairQueueLead): { firstName?: string; lastName?: string } {

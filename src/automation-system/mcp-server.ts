@@ -38,6 +38,7 @@ import {
   buildOrphanLeadAssignmentPreview,
   buildUrlIntelligenceQueuePreview,
   buildLeadRepairQueuePreview,
+  buildGmailNameEnrichmentQueuePreview,
   buildLeadIdentityRepairPreview,
   buildLeadValidationScorecardPreview,
   buildSlovakRegisterBatchPreview,
@@ -2316,6 +2317,41 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildSlovakSalutationPreview(input as Parameters<typeof buildSlovakSalutationPreview>[0]))
+  );
+
+  server.registerTool(
+    "arcigy.build_gmail_name_enrichment_queue_preview",
+    {
+      title: "Build Gmail name enrichment queue preview",
+      description: "Prepare a read-only batch plan to recover decision-maker names from Gmail display names, public email hints, and personal email patterns before salutation, intro, and Smartlead prep.",
+      inputSchema: {
+        leads: z.array(z.object({}).passthrough()).min(1).max(1000),
+        gmailNameHints: z.array(z.object({
+          email: z.string(),
+          displayName: z.string().optional(),
+          name: z.string().optional(),
+          fromHeader: z.string().optional(),
+          toHeader: z.string().optional(),
+          source: z.string().optional(),
+        })).optional(),
+        sourceName: z.string().optional(),
+        accountEmail: z.string().optional(),
+        defaultSource: z.string().optional(),
+        campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+        offer: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        includeEmailInference: z.boolean().default(true),
+        maxLookups: z.number().int().min(1).max(120).default(40),
+        maxItems: z.number().int().min(1).max(1000).default(300),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildGmailNameEnrichmentQueuePreview(input as Parameters<typeof buildGmailNameEnrichmentQueuePreview>[0]))
   );
 
   server.registerTool(

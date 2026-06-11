@@ -485,6 +485,20 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       ],
     };
   }
+  if (toolName === "arcigy.build_gmail_name_enrichment_queue_preview") {
+    return {
+      sourceName: "reverse-gmail-lookup",
+      accountEmail: "branislav.l@arcigy.group",
+      campaignId: "123456",
+      leads: [
+        { companyName: "Ready Studio", email: "jan.novak@ready.sk", website: "https://ready.sk" },
+        { companyName: "Needs Gmail", email: "lead@needs-gmail.sk", website: "https://needs-gmail.sk" },
+      ],
+      gmailNameHints: [{ email: "lead@needs-gmail.sk", fromHeader: "\"Peter Hrasko\" <lead@needs-gmail.sk>" }],
+      offer: "AI asistent na dopyty a follow-up",
+      language: "sk",
+    };
+  }
   if (toolName === "arcigy.build_lead_identity_repair_preview") {
     return {
       sourceName: "kuchyne-sk",

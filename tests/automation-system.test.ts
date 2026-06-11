@@ -49,6 +49,7 @@ import {
   buildWebsiteScrapeQualityAuditPreview,
   buildSlovakRegisterBatchPreview,
   buildSlovakSalutationPreview,
+  buildGmailNameEnrichmentQueuePreview,
   buildOrphanLeadAssignmentPreview,
   buildNicheOpsDashboardPreview,
   buildColdOutreachCsvImportPreview,
@@ -219,6 +220,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.apply_local_lead_register_update",
     "arcigy.build_slovak_register_batch_preview",
     "arcigy.build_slovak_salutation_preview",
+    "arcigy.build_gmail_name_enrichment_queue_preview",
     "arcigy.build_lead_identity_repair_preview",
     "arcigy.score_lead_quality",
     "arcigy.build_lead_validation_scorecard_preview",
@@ -492,6 +494,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.ok(paths.includes("/api/mcp/arcigy.label_gmail_thread"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_local_lead_register_update_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.apply_local_lead_register_update"));
+  assert.ok(paths.includes("/api/mcp/arcigy.build_gmail_name_enrichment_queue_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_lead_identity_repair_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_lead_validation_scorecard_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_company_short_name_preview"));
@@ -1899,6 +1902,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.record_local_niche_run" && call.approvalRequired === true));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_local_lead_register_update_preview" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.apply_local_lead_register_update" && call.approvalRequired === true));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_gmail_name_enrichment_queue_preview" && call.approvalRequired === false && call.body.accountEmail === "branislav.l@arcigy.group"));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_lead_identity_repair_preview" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_lead_validation_scorecard_preview" && call.approvalRequired === false && call.body.minScore === 70));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_company_short_name_preview" && call.approvalRequired === false && Array.isArray(call.body.leads)));
@@ -3988,6 +3992,38 @@ test("lead identity repair preview infers names and prepares safe next steps", (
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_slovak_salutation_preview" && !call.approvalRequired));
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_manual_review_queue" && !call.approvalRequired));
   assert.match(preview.summary, /Ziadny zapis ani upload/);
+});
+
+test("Gmail name enrichment queue prepares reverse lookup and salutation steps", () => {
+  const preview = buildGmailNameEnrichmentQueuePreview({
+    sourceName: "reverse-gmail-lookup",
+    accountEmail: "branislav.l@arcigy.group",
+    campaignId: "123456",
+    offer: "AI asistent na dopyty.",
+    leads: [
+      { companyName: "Existing Name", email: "jan@existing.sk", decisionMakerName: "Jan Novak", personalizedIntro: "Vsimol som si vas showroom." },
+      { companyName: "Hinted Lead", email: "lead@hinted.sk", website: "https://hinted.sk" },
+      { companyName: "Personal Email", email: "eva.horakova@personal.sk", website: "https://personal.sk" },
+      { companyName: "Needs Gmail", email: "info@needs-gmail.sk", website: "https://needs-gmail.sk" },
+      { companyName: "Missing Email", website: "https://missing-email.sk" },
+    ],
+    gmailNameHints: [{ email: "lead@hinted.sk", fromHeader: "\"Peter Hrasko\" <lead@hinted.sk>" }],
+  });
+
+  assert.equal(preview.mode, "gmail-name-enrichment-queue-preview");
+  assert.equal(preview.status, "attention");
+  assert.equal(preview.totals.alreadyNamed, 1);
+  assert.equal(preview.totals.hintsApplied, 1);
+  assert.equal(preview.totals.inferredFromPersonalEmail, 1);
+  assert.equal(preview.totals.needsGmailLookup, 1);
+  assert.equal(preview.totals.missingEmail, 1);
+  assert.ok(preview.enhancedLeads.some((lead) => lead.customFields?.decision_maker_name === "Peter Hrasko"));
+  assert.ok(preview.salutationPreview.enhancedLeads.some((lead) => lead.customFields?.last_name_with_salutation === "pan Hrasko"));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.get_gmail_lead_context" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.lookup_public_email_profile" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_slovak_salutation_preview" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_draft_lead_intros" && !call.approvalRequired));
+  assert.match(preview.summary, /Ziadny zapis ani odoslanie/);
 });
 
 test("public email profile lookup returns Gravatar hints without writes", async () => {

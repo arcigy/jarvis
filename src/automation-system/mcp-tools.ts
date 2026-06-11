@@ -82,6 +82,7 @@ export type JarvisMcpToolName =
   | "arcigy.apply_local_lead_register_update"
   | "arcigy.build_slovak_register_batch_preview"
   | "arcigy.build_slovak_salutation_preview"
+  | "arcigy.build_gmail_name_enrichment_queue_preview"
   | "arcigy.build_lead_identity_repair_preview"
   | "arcigy.score_lead_quality"
   | "arcigy.build_lead_validation_scorecard_preview"
@@ -586,6 +587,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.build_slovak_salutation_preview",
       description: "Pripravi pan/pani oslovenia a Smartlead custom fields last_name_with_salutation/greeting pre batch leadov bez zapisu.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_gmail_name_enrichment_queue_preview",
+      description: "Pripravi batch obnovu decision-maker mien z Gmail display-name historie, public email hintov a personal email patternov pred salutation/intro/Smartlead krokmi.",
       requiresApproval: false,
     },
     {

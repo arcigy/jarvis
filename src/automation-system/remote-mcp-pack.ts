@@ -1032,6 +1032,25 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Recover decision-maker names from Gmail history",
+      tool: "arcigy.build_gmail_name_enrichment_queue_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_gmail_name_enrichment_queue_preview"),
+      body: {
+        sourceName: "reverse-gmail-lookup",
+        accountEmail: "branislav.l@arcigy.group",
+        campaignId: "123456",
+        leads: [
+          { companyName: "Ready Studio", email: "jan.novak@ready.sk", website: "https://ready.sk" },
+          { companyName: "Needs Gmail", email: "lead@needs-gmail.sk", website: "https://needs-gmail.sk" },
+        ],
+        gmailNameHints: [{ email: "lead@needs-gmail.sk", fromHeader: "\"Peter Hrasko\" <lead@needs-gmail.sk>" }],
+        offer: "AI asistent na dopyty a follow-up",
+        language: "sk",
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Repair lead identity fields before Smartlead",
       tool: "arcigy.build_lead_identity_repair_preview",
       method: "POST",
