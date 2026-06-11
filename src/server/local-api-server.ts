@@ -59,6 +59,7 @@ import {
   buildSmartleadSenderCapacityPreview,
   buildSmartleadDeliverabilityGuardPreview,
   buildColdOutreachCsvImportPreview,
+  buildFullLeadgenPipelineRunbookPreview,
   dedupeLeadCandidates,
   draftNicheSmartleadCampaignSetup,
   draftLeadIntro,
@@ -2224,6 +2225,29 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         painPoint: optionalString(payload.painPoint),
         language: payload.language === "en" ? "en" : "sk",
         includeSmartleadSetup: payload.includeSmartleadSetup === true,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_full_leadgen_pipeline_runbook_preview") {
+    writeJson(response, 200, {
+      result: buildFullLeadgenPipelineRunbookPreview({
+        niche: (payload.niche ?? {}) as Parameters<typeof buildFullLeadgenPipelineRunbookPreview>[0]["niche"],
+        leads: Array.isArray(payload.leads) ? payload.leads as Parameters<typeof buildFullLeadgenPipelineRunbookPreview>[0]["leads"] : undefined,
+        scrapedResults: Array.isArray(payload.scrapedResults) ? payload.scrapedResults as Parameters<typeof buildFullLeadgenPipelineRunbookPreview>[0]["scrapedResults"] : undefined,
+        completedIntros: Array.isArray(payload.completedIntros) ? payload.completedIntros as Parameters<typeof buildFullLeadgenPipelineRunbookPreview>[0]["completedIntros"] : undefined,
+        offer: optionalString(payload.offer),
+        painPoint: optionalString(payload.painPoint),
+        language: payload.language === "en" ? "en" : "sk",
+        targetCount: typeof payload.targetCount === "number" ? payload.targetCount : undefined,
+        dailyLimit: typeof payload.dailyLimit === "number" ? payload.dailyLimit : undefined,
+        batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
+        minScore: typeof payload.minScore === "number" ? payload.minScore : undefined,
+        maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
+        clientId: (payload.clientId ?? null) as string | number | null,
+        emailAccountIds: Array.isArray(payload.emailAccountIds) ? (payload.emailAccountIds as Array<string | number>) : undefined,
+        webhookUrl: optionalString(payload.webhookUrl),
+        senderAccounts: Array.isArray(payload.senderAccounts) ? payload.senderAccounts as Parameters<typeof buildFullLeadgenPipelineRunbookPreview>[0]["senderAccounts"] : undefined,
       }),
     });
     return;

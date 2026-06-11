@@ -202,6 +202,7 @@ const capabilityDefinitions: CapabilityDefinition[] = [
       "arcigy.build_niche_ops_dashboard_preview",
       "arcigy.build_cold_outreach_csv_import_preview",
       "arcigy.build_daily_leadgen_runbook",
+      "arcigy.build_full_leadgen_pipeline_runbook_preview",
       "arcigy.build_leadgen_gap_report",
       "arcigy.build_lead_csv_mapping_preview",
       "arcigy.parse_leads_csv",

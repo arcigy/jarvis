@@ -1223,6 +1223,51 @@ export type DailyLeadgenRunbook = {
   safetyGates: string[];
 };
 
+export type FullLeadgenPipelineRunbookPreview = {
+  mode: "full-leadgen-pipeline-runbook-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  source: {
+    niche: { id?: string; slug: string; name: string; region?: string; campaignId?: string | number | null };
+    language: "sk" | "en";
+    offer?: string;
+    hasInputLeads: boolean;
+    hasScrapeResults: boolean;
+  };
+  target: { discoveryCount: number; dailyLimit: number; batchSize: number; minScore: number };
+  totals: {
+    inputLeads: number;
+    unique: number;
+    readyForSmartlead: number;
+    websitesToScrape: number;
+    introsToDraft: number;
+    scrapeReady: number;
+    scrapeNeedsRescrape: number;
+    qaIssues: number;
+    approvalSteps: number;
+    phases: number;
+  };
+  phases: Array<{
+    order: number;
+    key: string;
+    tool: string;
+    payload: Record<string, unknown>;
+    purpose: string;
+    status: "ready" | "needs_input" | "approval_required" | "blocked";
+    writes: boolean;
+    approvalRequired: boolean;
+  }>;
+  previews: {
+    discoveryRunbook: DailyLeadgenRunbook;
+    pipelinePreview?: LeadgenCampaignPipelinePreview;
+    scrapeAudit?: WebsiteScrapeQualityAuditPreview;
+    introWorkPacket?: AiIntroWorkPacketPreview;
+    handoffPackage?: SmartleadCampaignHandoffPackagePreview;
+  };
+  safetyGates: string[];
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type BatchNicheDiscoveryPlan = {
   mode: "batch-niche-discovery-plan";
   summary: string;
@@ -5802,6 +5847,261 @@ export function buildDailyLeadgenRunbook(input: {
       "Manual review leady exportuj alebo oprav pred importom.",
       "Nikdy neber approval.approved=true ako implicitny suhlas bez operatora.",
     ],
+  };
+}
+
+export function buildFullLeadgenPipelineRunbookPreview(input: {
+  niche: { id?: string; slug?: string; name: string; keywords?: string[]; region?: string; campaignId?: string | number | null; smartleadCampaignId?: string | number | null };
+  leads?: Array<LeadCandidateInput & { scraped?: Partial<ScrapedWebsiteContacts>; intro?: Partial<LeadIntroDraft>; context?: string }>;
+  scrapedResults?: Array<Partial<ScrapedWebsiteContacts>>;
+  completedIntros?: Array<{ id: string; icebreaker?: string; personalizedIntro?: string }>;
+  offer?: string;
+  painPoint?: string;
+  language?: "sk" | "en";
+  targetCount?: number;
+  dailyLimit?: number;
+  batchSize?: number;
+  minScore?: number;
+  maxNextCalls?: number;
+  clientId?: string | number | null;
+  emailAccountIds?: Array<string | number>;
+  webhookUrl?: string;
+  senderAccounts?: SmartleadSenderAccountInput[];
+}): FullLeadgenPipelineRunbookPreview {
+  const language = input.language ?? "sk";
+  const minScore = Math.min(Math.max(Math.trunc(input.minScore ?? 70), 0), 100);
+  const batchSize = Math.min(Math.max(Math.trunc(input.batchSize ?? 50), 1), 100);
+  const dailyLimit = Math.min(Math.max(Math.trunc(input.dailyLimit ?? 30), 1), 250);
+  const targetCount = Math.min(Math.max(Math.trunc(input.targetCount ?? Math.ceil(dailyLimit * 1.5)), dailyLimit), 500);
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 30), 1), 100);
+  const niche = {
+    id: input.niche.id,
+    slug: input.niche.slug?.trim() || slugify(input.niche.name),
+    name: input.niche.name,
+    region: input.niche.region,
+    campaignId: input.niche.campaignId ?? input.niche.smartleadCampaignId ?? null,
+  };
+  const discoveryRunbook = buildDailyLeadgenRunbook({
+    niche: { ...niche, keywords: input.niche.keywords },
+    targetCount,
+    dailyLimit,
+    batchSize,
+    offer: input.offer,
+    painPoint: input.painPoint,
+    language,
+    includeSmartleadSetup: !niche.campaignId,
+  });
+  const pipelinePreview = input.leads?.length
+    ? buildLeadgenCampaignPipelinePreview({
+        leads: input.leads,
+        niche,
+        campaignTag: niche.slug,
+        defaultSource: "full-pipeline-runbook",
+        offer: input.offer,
+        language,
+        minScore,
+        batchSize,
+        maxNextCalls,
+      })
+    : undefined;
+  const scrapeAudit = input.scrapedResults?.length
+    ? buildWebsiteScrapeQualityAuditPreview({
+        scrapedResults: input.scrapedResults,
+        leads: input.leads,
+        minTextChars: 180,
+        maxNextCalls,
+        offer: input.offer,
+        language,
+      })
+    : undefined;
+  const introCandidates = pipelinePreview?.leads
+    .filter((lead) => !lead.personalizedIntro && (lead.companyName || lead.website))
+    .slice(0, maxNextCalls);
+  const introWorkPacket = introCandidates?.length
+    ? buildAiIntroWorkPacketPreview({
+        leads: introCandidates,
+        sourceName: "full-pipeline-runbook",
+        niche: niche.slug,
+        offer: input.offer,
+        language,
+        maxLeads: maxNextCalls,
+        completedIntros: input.completedIntros,
+      })
+    : undefined;
+  const readyLeads = pipelinePreview?.enrichmentPreview.reviewQueue.ready.map((item) => item.lead) ?? [];
+  const handoffPackage = readyLeads.length
+    ? buildSmartleadCampaignHandoffPackagePreview({
+        niche,
+        leads: readyLeads,
+        offer: input.offer,
+        painPoint: input.painPoint,
+        language,
+        clientId: input.clientId,
+        emailAccountIds: input.emailAccountIds,
+        webhookUrl: input.webhookUrl,
+        batchSize,
+        senderAccounts: input.senderAccounts,
+        requestedDailyLimit: dailyLimit,
+      })
+    : undefined;
+  const phases: FullLeadgenPipelineRunbookPreview["phases"] = [
+    {
+      order: 1,
+      key: "discovery",
+      tool: "arcigy.discover_leads",
+      payload: {
+        query: discoveryRunbook.queryPlan.mapsQueries[0] ?? `${niche.name} ${niche.region ?? "Slovensko"}`.trim(),
+        placesQuery: discoveryRunbook.queryPlan.mapsQueries[0] ?? `${niche.name} ${niche.region ?? "Slovensko"}`.trim(),
+        maxResults: targetCount,
+      },
+      purpose: "Najdi nove firmy pre niche cez Google Places/Serper.",
+      status: "ready",
+      writes: false,
+      approvalRequired: false,
+    },
+  ];
+  if (pipelinePreview) {
+    phases.push({
+      order: phases.length + 1,
+      key: "pipeline-audit",
+      tool: "arcigy.build_leadgen_campaign_pipeline_preview",
+      payload: { leads: input.leads, niche, offer: input.offer, language, minScore, batchSize, maxNextCalls },
+      purpose: "Zdeduplikuj leady, zisti chybajuce web scrape/AI intra a prepocitaj Smartlead pripravenost.",
+      status: "ready",
+      writes: false,
+      approvalRequired: false,
+    });
+  } else {
+    phases.push({
+      order: phases.length + 1,
+      key: "pipeline-audit",
+      tool: "arcigy.build_leadgen_campaign_pipeline_preview",
+      payload: { leads: [], niche, offer: input.offer, language, minScore, batchSize, maxNextCalls },
+      purpose: "Spusti po discovery, ked budes mat leady.",
+      status: "needs_input",
+      writes: false,
+      approvalRequired: false,
+    });
+  }
+  if (pipelinePreview?.websitesToScrape.length) {
+    phases.push({
+      order: phases.length + 1,
+      key: "website-scrape",
+      tool: "arcigy.batch_scrape_website_contacts",
+      payload: { urls: pipelinePreview.websitesToScrape, includePriorityPages: true, maxPages: 4, maxSites: pipelinePreview.websitesToScrape.length },
+      purpose: "Vytiahni kontaktne emaily, telefony a kontext z webov, ktore este nemaju email.",
+      status: "ready",
+      writes: false,
+      approvalRequired: false,
+    });
+  }
+  phases.push({
+    order: phases.length + 1,
+    key: "scrape-quality",
+    tool: "arcigy.build_website_scrape_quality_audit_preview",
+    payload: { scrapedResults: input.scrapedResults ?? [], leads: input.leads ?? [], offer: input.offer, language, maxNextCalls },
+    purpose: "Po web scrape vyber preferovane emaily/telefony a posli slabe weby na rescrape.",
+    status: scrapeAudit ? (scrapeAudit.status === "blocked" ? "blocked" : "ready") : "needs_input",
+    writes: false,
+    approvalRequired: false,
+  });
+  if (introWorkPacket) {
+    phases.push({
+      order: phases.length + 1,
+      key: "ai-intro-work",
+      tool: "arcigy.build_ai_intro_work_packet_preview",
+      payload: { leads: introCandidates, sourceName: "full-pipeline-runbook", niche: niche.slug, offer: input.offer, language, maxLeads: maxNextCalls },
+      purpose: "Priprav Markdown/JSON balik pre ChatGPT alebo Claude na doplnenie konkretnych AI intr.",
+      status: introWorkPacket.status === "blocked" ? "blocked" : "ready",
+      writes: false,
+      approvalRequired: false,
+    });
+  }
+  phases.push({
+    order: phases.length + 1,
+    key: "enrichment-merge",
+    tool: "arcigy.build_lead_enrichment_merge_preview",
+    payload: { leads: input.leads ?? [], scrapedResults: input.scrapedResults ?? [], intros: input.completedIntros ?? [], niche, minScore, batchSize },
+    purpose: "Spoj povodne leady, scrape vysledky a hotove intra do jedneho hodnoteneho batchu.",
+    status: input.leads?.length && (input.scrapedResults?.length || input.completedIntros?.length) ? "ready" : "needs_input",
+    writes: false,
+    approvalRequired: false,
+  });
+  if (handoffPackage) {
+    phases.push({
+      order: phases.length + 1,
+      key: "smartlead-handoff",
+      tool: "arcigy.build_smartlead_campaign_handoff_package_preview",
+      payload: { niche, leads: readyLeads, offer: input.offer, painPoint: input.painPoint, language, batchSize, emailAccountIds: input.emailAccountIds, webhookUrl: input.webhookUrl },
+      purpose: "Priprav QA, sender capacity a approval payloady pred Smartlead uploadom.",
+      status: handoffPackage.status === "blocked" ? "blocked" : "ready",
+      writes: false,
+      approvalRequired: false,
+    });
+  }
+  for (const call of handoffPackage?.nextToolCalls ?? []) {
+    if (call.approvalRequired) {
+      phases.push({
+        order: phases.length + 1,
+        key: `approval-${phases.length}`,
+        tool: call.tool,
+        payload: call.payload,
+        purpose: call.reason,
+        status: "approval_required",
+        writes: true,
+        approvalRequired: true,
+      });
+    }
+  }
+  const nextToolCalls = dedupeNextToolCalls(
+    phases.map((phase) => ({
+      tool: phase.tool,
+      payload: phase.payload,
+      reason: phase.purpose,
+      approvalRequired: phase.approvalRequired,
+    }))
+  ).slice(0, maxNextCalls);
+  const approvalSteps = phases.filter((phase) => phase.approvalRequired).length;
+  const qaIssues = handoffPackage?.operatorChecklist.filter((item) => item.status !== "ready").length ?? 0;
+  const status: FullLeadgenPipelineRunbookPreview["status"] =
+    phases.some((phase) => phase.status === "blocked") || (pipelinePreview && pipelinePreview.totals.input > 0 && pipelinePreview.totals.readyForSmartlead === 0 && !pipelinePreview.websitesToScrape.length && !pipelinePreview.introInputs.length)
+      ? "blocked"
+      : phases.some((phase) => phase.status === "needs_input") || qaIssues > 0
+        ? "attention"
+        : "ready";
+  return {
+    mode: "full-leadgen-pipeline-runbook-preview",
+    status,
+    summary: `Full leadgen pipeline runbook: ${status}, ${pipelinePreview?.totals.readyForSmartlead ?? 0} ready do Smartlead, ${pipelinePreview?.totals.websitesToScrape ?? 0} webov na scrape, ${pipelinePreview?.totals.introsToDraft ?? 0} AI intr, ${approvalSteps} approval krokov. Ziadny zapis ani upload neprebehol.`,
+    source: {
+      niche,
+      language,
+      offer: input.offer,
+      hasInputLeads: Boolean(input.leads?.length),
+      hasScrapeResults: Boolean(input.scrapedResults?.length),
+    },
+    target: { discoveryCount: targetCount, dailyLimit, batchSize, minScore },
+    totals: {
+      inputLeads: input.leads?.length ?? 0,
+      unique: pipelinePreview?.totals.unique ?? 0,
+      readyForSmartlead: pipelinePreview?.totals.readyForSmartlead ?? 0,
+      websitesToScrape: pipelinePreview?.totals.websitesToScrape ?? 0,
+      introsToDraft: pipelinePreview?.totals.introsToDraft ?? 0,
+      scrapeReady: scrapeAudit?.totals.ready ?? 0,
+      scrapeNeedsRescrape: scrapeAudit?.totals.needsRescrape ?? 0,
+      qaIssues,
+      approvalSteps,
+      phases: phases.length,
+    },
+    phases,
+    previews: { discoveryRunbook, pipelinePreview, scrapeAudit, introWorkPacket, handoffPackage },
+    safetyGates: [
+      "Discovery, scrape, AI intro a QA fazy su read-only.",
+      "Do Smartlead sa posielaju iba ready leady po explicitnom approval payloade.",
+      "Po kazdom scrape alebo AI intro kroku spusti merge/QA preview znovu.",
+      "Ak sender capacity alebo QA vrati attention/blocked, najprv oprav kampan a limity.",
+    ],
+    nextToolCalls,
   };
 }
 

@@ -60,6 +60,7 @@ import {
   buildSmartleadSenderCapacityPreview,
   buildSmartleadDeliverabilityGuardPreview,
   buildColdOutreachCsvImportPreview,
+  buildFullLeadgenPipelineRunbookPreview,
   dedupeLeadCandidates,
   draftNicheSmartleadCampaignSetup,
   draftLeadIntro,
@@ -3323,6 +3324,51 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildDailyLeadgenRunbook(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_full_leadgen_pipeline_runbook_preview",
+    {
+      title: "Build full leadgen pipeline runbook preview",
+      description: "Compose a read-only full leadgen runbook for a niche: discovery, website scrape/fetch, scrape quality audit, AI intro work packet, enrichment merge, QA, and Smartlead handoff/approval steps.",
+      inputSchema: {
+        niche: z.object({
+          id: z.string().optional(),
+          slug: z.string().optional(),
+          name: z.string().min(1),
+          keywords: z.array(z.string()).optional(),
+          region: z.string().optional(),
+          campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+          smartleadCampaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+        }),
+        leads: z.array(z.object({}).passthrough()).optional(),
+        scrapedResults: z.array(z.object({}).passthrough()).optional(),
+        completedIntros: z.array(z.object({
+          id: z.string(),
+          icebreaker: z.string().optional(),
+          personalizedIntro: z.string().optional(),
+        })).optional(),
+        offer: z.string().optional(),
+        painPoint: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        targetCount: z.number().int().min(1).max(500).optional(),
+        dailyLimit: z.number().int().min(1).max(250).optional(),
+        batchSize: z.number().int().min(1).max(100).optional(),
+        minScore: z.number().int().min(0).max(100).default(70),
+        maxNextCalls: z.number().int().min(1).max(100).default(30),
+        clientId: z.union([z.string(), z.number(), z.null()]).optional(),
+        emailAccountIds: z.array(z.union([z.string(), z.number()])).optional(),
+        webhookUrl: z.string().url().optional(),
+        senderAccounts: z.array(z.object({}).passthrough()).optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildFullLeadgenPipelineRunbookPreview(input as Parameters<typeof buildFullLeadgenPipelineRunbookPreview>[0]))
   );
 
   const leadCandidateSchema = z.object({

@@ -1598,6 +1598,26 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Build full leadgen pipeline runbook",
+      tool: "arcigy.build_full_leadgen_pipeline_runbook_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_full_leadgen_pipeline_runbook_preview"),
+      body: {
+        niche: { id: "niche-1", slug: "kuchyne", name: "Kuchynske studia", keywords: ["kuchyne na mieru", "kuchynske studio"], region: "Bratislava", campaignId: "123456" },
+        leads: [
+          { companyName: "Ready Studio", website: "https://ready.sk", email: "jan@ready.sk", personalizedIntro: "Vsimol som si vase realizacie kuchyn." },
+          { companyName: "Needs Contact", website: "https://needs-contact.sk" },
+        ],
+        scrapedResults: [{ url: "https://needs-contact.sk", title: "Needs Contact", textPreview: "Kuchyne na mieru, showroom a realizacie.", emails: ["info@needs-contact.sk"], phones: ["+421 900 111 222"] }],
+        offer: "AI asistent na dopyty a follow-up",
+        language: "sk",
+        dailyLimit: 30,
+        targetCount: 60,
+        minScore: 70,
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Preview lead CSV column mapping",
       tool: "arcigy.build_lead_csv_mapping_preview",
       method: "POST",

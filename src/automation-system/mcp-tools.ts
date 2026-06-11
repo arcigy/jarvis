@@ -107,6 +107,7 @@ export type JarvisMcpToolName =
   | "arcigy.build_niche_ops_dashboard_preview"
   | "arcigy.build_cold_outreach_csv_import_preview"
   | "arcigy.build_daily_leadgen_runbook"
+  | "arcigy.build_full_leadgen_pipeline_runbook_preview"
   | "arcigy.build_lead_csv_mapping_preview"
   | "arcigy.parse_leads_csv"
   | "arcigy.filter_blacklisted_leads"
@@ -678,6 +679,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.build_daily_leadgen_runbook",
       description: "Vytvori denny leadgen runbook s presnymi dalsimi MCP volaniami od discovery cez enrichment az po schvaleny Smartlead upload.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_full_leadgen_pipeline_runbook_preview",
+      description: "Zlozi full leadgen runbook pre niche: discovery, fetch/scrape, scrape audit, AI intro balik, merge, QA a Smartlead handoff bez zapisu.",
       requiresApproval: false,
     },
     {
