@@ -217,6 +217,7 @@ const capabilityDefinitions: CapabilityDefinition[] = [
       "arcigy.build_leadgen_campaign_pipeline_preview",
       "arcigy.build_leadgen_to_smartlead_dispatch_preview",
       "arcigy.build_company_research_queue_preview",
+      "arcigy.build_research_results_import_preview",
       "arcigy.build_leadgen_status_board_preview",
       "arcigy.build_leadgen_db_status_preview",
       "arcigy.build_google_sheet_sync_preview",

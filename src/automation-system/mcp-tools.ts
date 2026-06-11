@@ -130,6 +130,7 @@ export type JarvisMcpToolName =
   | "arcigy.build_leadgen_campaign_pipeline_preview"
   | "arcigy.build_leadgen_to_smartlead_dispatch_preview"
   | "arcigy.build_company_research_queue_preview"
+  | "arcigy.build_research_results_import_preview"
   | "arcigy.build_lead_source_import_queue_preview"
   | "arcigy.build_lead_source_bundle_preview"
   | "arcigy.build_lead_source_bundle_campaign_launch_preview"
@@ -836,6 +837,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.build_company_research_queue_preview",
       description: "Z nazvov firiem a ciastocnych leadov pripravi Google Places/Serper research, safe fetch, contact scrape, AI intro a Smartlead dispatch kroky bez vykonania.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_research_results_import_preview",
+      description: "Z Google Places/Serper vysledkov vytvori lead candidates, vyhodi blacklist/duplicitne domeny a pripravi company research aj import queue bez zapisu.",
       requiresApproval: false,
     },
     {

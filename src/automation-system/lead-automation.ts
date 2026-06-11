@@ -1819,6 +1819,34 @@ export type CompanyResearchQueuePreview = {
   warnings: string[];
 };
 
+export type ResearchResultsImportPreview = {
+  mode: "research-results-import-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  source: { name?: string; type: "google_places" | "serper" | "mixed"; defaultRegion?: string; country: string };
+  totals: {
+    rawResults: number;
+    normalizedLeads: number;
+    blocked: number;
+    duplicateDomains: number;
+    withWebsite: number;
+    withEmail: number;
+    companyResearchItems: number;
+    importGroups: number;
+    readyForSmartlead: number;
+    websitesToScrape: number;
+    introsToDraft: number;
+    unassigned: number;
+  };
+  leads: LeadSourceImportQueueLead[];
+  blocked: ReturnType<typeof filterBlacklistedLeads>["blocked"];
+  duplicates: Array<{ lead: LeadSourceImportQueueLead; duplicateOf: string; reason: string }>;
+  companyResearchPreview: CompanyResearchQueuePreview;
+  importQueuePreview?: LeadSourceImportQueuePreview;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+  warnings: string[];
+};
+
 export type DailyLeadgenRunbook = {
   mode: "daily-leadgen-runbook";
   summary: string;
@@ -7337,6 +7365,117 @@ export function buildCompanyResearchQueuePreview(input: {
   };
 }
 
+export function buildResearchResultsImportPreview(input: {
+  sourceName?: string;
+  sourceType?: "google_places" | "serper" | "mixed";
+  results?: Array<Record<string, unknown>>;
+  placesResults?: Array<Record<string, unknown>>;
+  serperResults?: Array<Record<string, unknown>>;
+  niche?: { id?: string; slug?: string; name: string; campaignId?: string | number | null; smartleadCampaignId?: string | number | null; aliases?: string[] };
+  defaultRegion?: string;
+  country?: string;
+  blacklistDomains?: string[];
+  blacklistKeywords?: string[];
+  existingDomains?: string[];
+  offer?: string;
+  language?: "sk" | "en";
+  minScore?: number;
+  batchSize?: number;
+  maxResults?: number;
+  maxNextCalls?: number;
+}): ResearchResultsImportPreview {
+  const sourceType = input.sourceType ?? (input.placesResults?.length && input.serperResults?.length ? "mixed" : input.placesResults?.length ? "google_places" : input.serperResults?.length ? "serper" : "mixed");
+  const country = (input.country ?? "SK").toUpperCase();
+  const maxResults = Math.min(Math.max(Math.trunc(input.maxResults ?? 500), 1), 5000);
+  const rawRows = [...(input.results ?? []), ...(input.placesResults ?? []), ...(input.serperResults ?? [])].slice(0, maxResults);
+  const defaultNiche = input.niche
+    ? { id: input.niche.id, slug: input.niche.slug?.trim() || slugify(input.niche.name), name: input.niche.name, campaignId: input.niche.campaignId ?? input.niche.smartleadCampaignId ?? null }
+    : undefined;
+  const mapped = rawRows.map((row, index) => mapResearchResultRow(row, sourceType, input.sourceName, defaultNiche, input.defaultRegion, index));
+  const filtered = filterBlacklistedLeads({ leads: mapped, domains: input.blacklistDomains, keywords: input.blacklistKeywords });
+  const existingDomains = new Set((input.existingDomains ?? []).map(normalizeDomain).filter(Boolean));
+  const seenDomains = new Map<string, LeadSourceImportQueueLead>();
+  const duplicates: ResearchResultsImportPreview["duplicates"] = [];
+  const leads: LeadSourceImportQueueLead[] = [];
+  for (const lead of filtered.allowed as LeadSourceImportQueueLead[]) {
+    const domain = lead.website ? normalizeDomain(lead.website) : "";
+    if (domain && (existingDomains.has(domain) || seenDomains.has(domain))) {
+      duplicates.push({ lead, duplicateOf: domain, reason: existingDomains.has(domain) ? "domain already exists" : "duplicate domain in research results" });
+      continue;
+    }
+    if (domain) seenDomains.set(domain, lead);
+    leads.push(lead);
+  }
+  const companyResearchPreview = buildCompanyResearchQueuePreview({
+    leads,
+    sourceName: input.sourceName ?? "research-results",
+    niche: defaultNiche,
+    defaultRegion: input.defaultRegion,
+    country,
+    offer: input.offer,
+    language: input.language,
+    minScore: input.minScore,
+    batchSize: input.batchSize,
+    maxNextCalls: input.maxNextCalls,
+  });
+  const importQueuePreview = defaultNiche
+    ? buildLeadSourceImportQueuePreview({
+        sourceName: input.sourceName ?? "research-results",
+        sourceType: sourceType === "google_places" ? "google_maps" : sourceType === "serper" ? "serper" : "manual",
+        leads,
+        defaultNiche,
+        niches: [{ ...defaultNiche, aliases: input.niche?.aliases }],
+        blacklistDomains: input.blacklistDomains,
+        blacklistKeywords: input.blacklistKeywords,
+        offer: input.offer,
+        language: input.language,
+        minScore: input.minScore,
+        batchSize: input.batchSize,
+        maxNextCalls: input.maxNextCalls,
+      })
+    : undefined;
+  const warnings: string[] = [];
+  if (rawRows.length >= maxResults) warnings.push("Research results were truncated by maxResults.");
+  if (!defaultNiche) warnings.push("Import queue grouping skipped because niche is missing.");
+  const totals = {
+    rawResults: rawRows.length,
+    normalizedLeads: leads.length,
+    blocked: filtered.blocked.length,
+    duplicateDomains: duplicates.length,
+    withWebsite: leads.filter((lead) => lead.website).length,
+    withEmail: leads.filter((lead) => lead.email).length,
+    companyResearchItems: companyResearchPreview.totals.input,
+    importGroups: importQueuePreview?.totals.groups ?? 0,
+    readyForSmartlead: importQueuePreview?.totals.readyForSmartlead ?? 0,
+    websitesToScrape: companyResearchPreview.totals.scrapeUrls,
+    introsToDraft: companyResearchPreview.totals.needsIntro,
+    unassigned: importQueuePreview?.totals.unassigned ?? (defaultNiche ? 0 : leads.length),
+  };
+  const status: ResearchResultsImportPreview["status"] = totals.rawResults === 0 || totals.normalizedLeads === 0
+    ? "blocked"
+    : totals.blocked || totals.duplicateDomains || totals.websitesToScrape || totals.introsToDraft || totals.unassigned || warnings.length
+      ? "attention"
+      : "ready";
+  const nextToolCalls = dedupeNextToolCalls([
+    ...companyResearchPreview.nextToolCalls,
+    ...(importQueuePreview?.nextToolCalls ?? []),
+  ]).slice(0, Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 100), 1), 250));
+  return {
+    mode: "research-results-import-preview",
+    status,
+    summary: `Research results import ${status}: ${totals.normalizedLeads}/${totals.rawResults} leadov, ${totals.websitesToScrape} scrape, ${totals.introsToDraft} AI intro, ${totals.readyForSmartlead} ready do Smartlead. Ziadny zapis ani upload neprebehol.`,
+    source: { name: input.sourceName, type: sourceType, defaultRegion: input.defaultRegion, country },
+    totals,
+    leads,
+    blocked: filtered.blocked,
+    duplicates,
+    companyResearchPreview,
+    importQueuePreview,
+    nextToolCalls,
+    warnings,
+  };
+}
+
 export function buildColdOutreachCsvImportPreview(input: {
   csvText: string;
   delimiter?: "," | ";";
@@ -10692,6 +10831,64 @@ function mapJsonLeadRow(row: Record<string, unknown>): LeadSourceImportQueueLead
     context: stringField(row, "context", "textPreview", "text_preview", "description"),
     customFields: custom,
   };
+}
+
+function mapResearchResultRow(
+  row: Record<string, unknown>,
+  sourceType: "google_places" | "serper" | "mixed",
+  sourceName?: string,
+  niche?: { id?: string; slug: string; name: string; campaignId?: string | number | null },
+  defaultRegion?: string,
+  index?: number
+): LeadSourceImportQueueLead {
+  const base = mapJsonLeadRow(row);
+  const website = base.website
+    ?? normalizeResearchWebsite(stringField(row, "websiteUri", "website_uri", "link", "url", "formattedUrl", "domain", "displayLink"));
+  const companyName = base.companyName
+    ?? stringField(row, "displayName", "title", "name", "businessName", "business_name");
+  const address = stringField(row, "formattedAddress", "formatted_address", "address", "vicinity");
+  const context = [
+    base.context,
+    stringField(row, "snippet", "description", "editorialSummary", "editorial_summary", "primaryTypeDisplayName", "types"),
+    address,
+  ].filter(Boolean).join(" ").trim() || undefined;
+  const phone = base.phone ?? stringField(row, "nationalPhoneNumber", "national_phone_number", "internationalPhoneNumber", "international_phone_number");
+  const placeId = base.placeId ?? stringField(row, "id", "place_id", "placeId", "googlePlaceId");
+  const customFields = {
+    ...base.customFields,
+    source_name: sourceName,
+    source_type: sourceType,
+    research_result_index: index,
+    research_address: address,
+    google_place_id: placeId,
+    niche_slug: base.nicheSlug ?? niche?.slug,
+    niche_name: base.nicheName ?? niche?.name,
+  };
+  return {
+    ...base,
+    companyName,
+    website,
+    phone,
+    source: base.source ?? sourceName ?? sourceType,
+    context,
+    nicheSlug: base.nicheSlug ?? niche?.slug,
+    nicheName: base.nicheName ?? niche?.name,
+    campaignId: base.campaignId ?? niche?.campaignId,
+    smartleadCampaignId: base.smartleadCampaignId ?? niche?.campaignId,
+    placeId,
+    rating: base.rating ?? numberField(row, "rating"),
+    reviewCount: base.reviewCount ?? numberField(row, "userRatingCount", "user_rating_count", "reviewCount", "reviews"),
+    customFields,
+    ...(defaultRegion ? { region: defaultRegion } : {}),
+  } as LeadSourceImportQueueLead & { region?: string };
+}
+
+function normalizeResearchWebsite(value?: string): string | undefined {
+  if (!value?.trim()) return undefined;
+  const clean = value.trim();
+  if (/^https?:\/\//i.test(clean)) return normalizeWebsiteValue(clean);
+  if (/^[a-z0-9.-]+\.[a-z]{2,}(\/.*)?$/i.test(clean)) return normalizeWebsiteValue(clean);
+  return undefined;
 }
 
 function primitiveCustomFields(row: Record<string, unknown>): Record<string, string | number | boolean | null | undefined> {

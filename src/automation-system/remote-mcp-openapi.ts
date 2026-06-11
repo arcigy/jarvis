@@ -1073,6 +1073,25 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       includeDispatch: true,
     };
   }
+  if (toolName === "arcigy.build_research_results_import_preview") {
+    return {
+      sourceName: "autoservisy-places-serper",
+      sourceType: "mixed",
+      niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456", aliases: ["autoservis", "pneuservis"] },
+      defaultRegion: "Bratislava",
+      country: "SK",
+      placesResults: [
+        { displayName: "Modelova Firma", websiteUri: "https://modelovafirma.sk", formattedAddress: "Bratislava", nationalPhoneNumber: "+421 900 111 222", rating: 4.7, userRatingCount: 38 },
+      ],
+      serperResults: [
+        { title: "Needs Contact Autoservis", link: "https://needs-contact.sk", snippet: "Autoservis a pneuservis v Bratislave." },
+      ],
+      existingDomains: ["old-domain.sk"],
+      blacklistDomains: ["facebook.com"],
+      offer: "AI asistent na odpovede a follow-up",
+      language: "sk",
+    };
+  }
   if (toolName === "arcigy.build_lead_source_import_queue_preview") {
     return {
       sourceName: "kuchyne_sk_google_maps_2026-04-27.csv",

@@ -31,6 +31,7 @@ import {
   buildLeadgenCampaignPipelinePreview,
   buildLeadgenToSmartleadDispatchPreview,
   buildCompanyResearchQueuePreview,
+  buildResearchResultsImportPreview,
   buildLeadgenAutopilotBatchPreview,
   buildRegionExpansionQueuePreview,
   buildLeadgenRunResumePreview,
@@ -4115,6 +4116,47 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildCompanyResearchQueuePreview(input as Parameters<typeof buildCompanyResearchQueuePreview>[0]))
+  );
+
+  server.registerTool(
+    "arcigy.build_research_results_import_preview",
+    {
+      title: "Build research results import preview",
+      description: "Normalize Google Places and Serper search results into lead candidates, remove blacklisted/duplicate domains, and prepare company research plus lead source import queues without writing or uploading.",
+      inputSchema: {
+        sourceName: z.string().optional(),
+        sourceType: z.enum(["google_places", "serper", "mixed"]).default("mixed"),
+        results: z.array(z.record(z.string(), z.unknown())).optional(),
+        placesResults: z.array(z.record(z.string(), z.unknown())).optional(),
+        serperResults: z.array(z.record(z.string(), z.unknown())).optional(),
+        niche: z.object({
+          id: z.string().optional(),
+          slug: z.string().optional(),
+          name: z.string().min(1),
+          campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+          smartleadCampaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+          aliases: z.array(z.string()).optional(),
+        }).optional(),
+        defaultRegion: z.string().optional(),
+        country: z.string().default("SK"),
+        blacklistDomains: z.array(z.string()).optional(),
+        blacklistKeywords: z.array(z.string()).optional(),
+        existingDomains: z.array(z.string()).optional(),
+        offer: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        minScore: z.number().int().min(0).max(100).default(70),
+        batchSize: z.number().int().min(1).max(100).default(50),
+        maxResults: z.number().int().min(1).max(5000).default(500),
+        maxNextCalls: z.number().int().min(1).max(250).default(100),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildResearchResultsImportPreview(input as Parameters<typeof buildResearchResultsImportPreview>[0]))
   );
 
   server.registerTool(

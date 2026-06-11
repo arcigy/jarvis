@@ -1803,6 +1803,30 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Import Places and Serper research results",
+      tool: "arcigy.build_research_results_import_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_research_results_import_preview"),
+      body: {
+        sourceName: "autoservisy-places-serper",
+        sourceType: "mixed",
+        niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456", aliases: ["autoservis", "pneuservis"] },
+        defaultRegion: "Bratislava",
+        country: "SK",
+        placesResults: [
+          { displayName: "Modelova Firma", websiteUri: "https://modelovafirma.sk", formattedAddress: "Bratislava", nationalPhoneNumber: "+421 900 111 222", rating: 4.7, userRatingCount: 38 },
+        ],
+        serperResults: [
+          { title: "Needs Contact Autoservis", link: "https://needs-contact.sk", snippet: "Autoservis a pneuservis v Bratislave." },
+        ],
+        existingDomains: ["old-domain.sk"],
+        blacklistDomains: ["facebook.com"],
+        offer: "AI asistent na odpovede a follow-up",
+        language: "sk",
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Build lead source import queue preview",
       tool: "arcigy.build_lead_source_import_queue_preview",
       method: "POST",

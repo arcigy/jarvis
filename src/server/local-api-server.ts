@@ -30,6 +30,7 @@ import {
   buildLeadgenCampaignPipelinePreview,
   buildLeadgenToSmartleadDispatchPreview,
   buildCompanyResearchQueuePreview,
+  buildResearchResultsImportPreview,
   buildLeadgenAutopilotBatchPreview,
   buildRegionExpansionQueuePreview,
   buildLeadgenRunResumePreview,
@@ -2495,6 +2496,30 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         maxSearches: typeof payload.maxSearches === "number" ? payload.maxSearches : undefined,
         maxFetchUrls: typeof payload.maxFetchUrls === "number" ? payload.maxFetchUrls : undefined,
         maxScrapeUrls: typeof payload.maxScrapeUrls === "number" ? payload.maxScrapeUrls : undefined,
+        maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_research_results_import_preview") {
+    writeJson(response, 200, {
+      result: buildResearchResultsImportPreview({
+        sourceName: optionalString(payload.sourceName),
+        sourceType: ["google_places", "serper", "mixed"].includes(String(payload.sourceType)) ? payload.sourceType as Parameters<typeof buildResearchResultsImportPreview>[0]["sourceType"] : undefined,
+        results: Array.isArray(payload.results) ? payload.results as Array<Record<string, unknown>> : undefined,
+        placesResults: Array.isArray(payload.placesResults) ? payload.placesResults as Array<Record<string, unknown>> : undefined,
+        serperResults: Array.isArray(payload.serperResults) ? payload.serperResults as Array<Record<string, unknown>> : undefined,
+        niche: payload.niche as Parameters<typeof buildResearchResultsImportPreview>[0]["niche"],
+        defaultRegion: optionalString(payload.defaultRegion),
+        country: optionalString(payload.country),
+        blacklistDomains: Array.isArray(payload.blacklistDomains) ? payload.blacklistDomains.map(String) : undefined,
+        blacklistKeywords: Array.isArray(payload.blacklistKeywords) ? payload.blacklistKeywords.map(String) : undefined,
+        existingDomains: Array.isArray(payload.existingDomains) ? payload.existingDomains.map(String) : undefined,
+        offer: optionalString(payload.offer),
+        language: payload.language === "en" ? "en" : "sk",
+        minScore: typeof payload.minScore === "number" ? payload.minScore : undefined,
+        batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
+        maxResults: typeof payload.maxResults === "number" ? payload.maxResults : undefined,
         maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
       }),
     });
