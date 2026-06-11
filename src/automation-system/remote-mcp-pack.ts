@@ -1689,6 +1689,21 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Clean AI intros before Smartlead",
+      tool: "arcigy.build_ai_intro_cleanup_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_ai_intro_cleanup_preview"),
+      body: {
+        campaignId: "123456",
+        defaultSource: "kuchyne-sk",
+        leads: [
+          { companyName: "Ready Studio", website: "https://ready.sk", email: "jan@ready.sk", decisionMakerName: "Jan Novak", personalizedIntro: "Dobry den pan Novak, zaujalo ma, ze robite kuchyne na mieru." },
+          { companyName: "Needs Redraft", website: "https://redraft.sk", email: "info@redraft.sk", personalizedIntro: "Kratke AI intro." },
+        ],
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Live enrich website leads before Smartlead",
       tool: "arcigy.enrich_website_leads_preview",
       method: "POST",

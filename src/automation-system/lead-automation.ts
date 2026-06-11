@@ -71,6 +71,34 @@ export type AiIntroQualityAuditPreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type AiIntroCleanupPreview = {
+  mode: "ai-intro-cleanup-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  totals: {
+    input: number;
+    cleaned: number;
+    unchanged: number;
+    needsRedraft: number;
+    removedGreeting: number;
+    removedName: number;
+    normalizedPrefix: number;
+    smartleadReady: number;
+  };
+  items: Array<{
+    lead: LeadCandidateInput & { decisionMakerName?: string; decision_maker_name?: string; customFields?: Record<string, string | number | boolean | null | undefined>; context?: string; evidenceText?: string };
+    status: "cleaned" | "unchanged" | "needs_redraft";
+    originalIntro?: string;
+    cleanedIntro?: string;
+    changes: string[];
+    issues: string[];
+  }>;
+  cleanedLeads: PreparedSmartleadLeadInput[];
+  redraftInputs: LeadIntroInput[];
+  smartleadPrepared: ReturnType<typeof prepareSmartleadLeads>;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type PreparedSmartleadLeadInput = {
   email: string;
   companyName?: string;
@@ -1342,6 +1370,100 @@ export function buildAiIntroQualityAuditPreview(input: {
     totals,
     items,
     redraftInputs,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls),
+  };
+}
+
+export function buildAiIntroCleanupPreview(input: {
+  leads: Array<LeadCandidateInput & { decisionMakerName?: string; decision_maker_name?: string; customFields?: Record<string, string | number | boolean | null | undefined>; scraped?: Partial<ScrapedWebsiteContacts>; context?: string; evidenceText?: string }>;
+  offer?: string;
+  language?: "sk" | "en";
+  defaultSource?: string;
+  campaignId?: string | number | null;
+  maxRedrafts?: number;
+}): AiIntroCleanupPreview {
+  const maxRedrafts = Math.min(Math.max(Math.trunc(input.maxRedrafts ?? 50), 1), 200);
+  const items: AiIntroCleanupPreview["items"] = input.leads.map((lead) => {
+    const originalIntro = extractLeadIntro(lead);
+    const decisionMaker = decisionMakerForLead(lead as LeadRepairQueueLead) ?? stringField(lead.customFields ?? {}, "decision_maker_name", "decision_maker_full_name");
+    const salutationLastName = stringField(lead.customFields ?? {}, "last_name_with_salutation", "decision_maker_last_name");
+    const cleanup = cleanupAiIntroSentence(originalIntro, decisionMaker, salutationLastName);
+    const issues = introQualityIssues(cleanup.cleanedIntro, importantIntroTerms(introEvidenceText(lead)), 0, lead);
+    const needsRedraft = !cleanup.cleanedIntro || issues.some((issue) => ["missing_intro", "intro_too_short", "intro_has_placeholder", "generic_intro"].includes(issue));
+    const status = needsRedraft ? "needs_redraft" as const : cleanup.changed ? "cleaned" as const : "unchanged" as const;
+    return { lead, status, originalIntro, cleanedIntro: cleanup.cleanedIntro, changes: cleanup.changes, issues };
+  });
+  const cleanedLeads: PreparedSmartleadLeadInput[] = items
+    .filter((item) => item.status !== "needs_redraft" && item.cleanedIntro && item.lead.email)
+    .map((item) => ({
+      email: item.lead.email as string,
+      companyName: item.lead.companyName,
+      firstName: item.lead.firstName,
+      lastName: item.lead.lastName,
+      website: item.lead.website,
+      phone: item.lead.phone,
+      source: item.lead.source ?? input.defaultSource,
+      personalizedIntro: item.cleanedIntro,
+      customFields: {
+        ...item.lead.customFields,
+        personalized_intro: item.cleanedIntro,
+        icebreaker_sentence: item.cleanedIntro,
+      },
+    }));
+  const redraftInputs = items
+    .filter((item) => item.status === "needs_redraft" && item.lead.companyName)
+    .slice(0, maxRedrafts)
+    .map((item) => ({
+      companyName: String(item.lead.companyName),
+      website: item.lead.website,
+      context: introEvidenceText(item.lead).slice(0, 1200) || item.lead.context,
+      offer: input.offer,
+      language: input.language ?? "sk",
+    }));
+  const smartleadPrepared = prepareSmartleadLeads({ leads: cleanedLeads, defaultSource: input.defaultSource ?? "ai-intro-cleanup" });
+  const nextToolCalls: AiIntroCleanupPreview["nextToolCalls"] = [];
+  if (redraftInputs.length) {
+    nextToolCalls.push({
+      tool: "arcigy.batch_draft_lead_intros",
+      payload: { leads: redraftInputs, offer: input.offer, language: input.language ?? "sk", maxLeads: Math.min(redraftInputs.length, 50) },
+      reason: "Tieto intra sa nedaju bezpecne vycistit; priprav nove AI intra bez pozdravu a mena.",
+      approvalRequired: false,
+    });
+  }
+  nextToolCalls.push({
+    tool: "arcigy.build_ai_intro_quality_audit_preview",
+    payload: { leads: cleanedLeads, offer: input.offer, language: input.language ?? "sk" },
+    reason: "Po cleanup-e znovu skontroluj kvalitu intro viet pred importom.",
+    approvalRequired: false,
+  });
+  if (input.campaignId && smartleadPrepared.leadList.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_smartlead_import_audit_preview",
+      payload: { campaignId: input.campaignId, leads: smartleadPrepared.leadList },
+      reason: "Pred uploadom over duplicitne a uz existujuce leady v Smartlead kampani.",
+      approvalRequired: false,
+    });
+  }
+  const totals = {
+    input: input.leads.length,
+    cleaned: items.filter((item) => item.status === "cleaned").length,
+    unchanged: items.filter((item) => item.status === "unchanged").length,
+    needsRedraft: items.filter((item) => item.status === "needs_redraft").length,
+    removedGreeting: items.filter((item) => item.changes.includes("removed_greeting")).length,
+    removedName: items.filter((item) => item.changes.includes("removed_decision_maker")).length,
+    normalizedPrefix: items.filter((item) => item.changes.includes("normalized_prefix")).length,
+    smartleadReady: smartleadPrepared.leadList.length,
+  };
+  const status: AiIntroCleanupPreview["status"] = totals.input === 0 ? "blocked" : totals.needsRedraft > 0 ? "attention" : "ready";
+  return {
+    mode: "ai-intro-cleanup-preview",
+    status,
+    summary: `AI intro cleanup: ${totals.cleaned} vycistenych, ${totals.unchanged} bez zmeny, ${totals.needsRedraft} na redraft, ${totals.smartleadReady} ready pre Smartlead. Ziadny zapis ani upload neprebehol.`,
+    totals,
+    items,
+    cleanedLeads,
+    redraftInputs,
+    smartleadPrepared,
     nextToolCalls: dedupeNextToolCalls(nextToolCalls),
   };
 }
@@ -5691,6 +5813,56 @@ function introQualityIssues(
     if (matches < minEvidenceTerms) issues.push("weak_evidence_grounding");
   }
   return issues;
+}
+
+function cleanupAiIntroSentence(intro: string | undefined, decisionMakerName?: string, salutationLastName?: string): { cleanedIntro?: string; changed: boolean; changes: string[] } {
+  const changes: string[] = [];
+  if (!intro?.trim()) return { cleanedIntro: undefined, changed: false, changes };
+  let cleaned = intro.replace(/\s+/g, " ").trim();
+  const beforeGreeting = cleaned;
+  cleaned = cleaned
+    .replace(/^(dobry den|dobrý deň|ahoj|zdravim|zdravím|hello|hi|dear)(?:\s+[^,]{1,60})?,?\s*/iu, "")
+    .replace(/^(vazeny|vazena|vážený|vážená)\s+[^,]{1,80},?\s*/iu, "");
+  if (cleaned !== beforeGreeting) changes.push("removed_greeting");
+  if (cleaned !== beforeGreeting && decisionMakerName && beforeGreeting.toLowerCase().includes(decisionMakerName.toLowerCase().split(/\s+/).slice(-1)[0] ?? "")) {
+    changes.push("removed_decision_maker");
+  }
+
+  const beforeName = cleaned;
+  for (const value of [decisionMakerName, salutationLastName].filter((item): item is string => Boolean(item?.trim()))) {
+    cleaned = cleaned.replace(new RegExp(`${escapeRegex(value.trim())},?\\s*`, "iu"), "");
+    const surname = value.trim().split(/\s+/).filter(Boolean).slice(-1)[0];
+    if (surname) cleaned = cleaned.replace(new RegExp(`(?:pan|pani|pán)\\s+${escapeRegex(surname)},?\\s*`, "iu"), "");
+  }
+  if (cleaned !== beforeName && !changes.includes("removed_decision_maker")) changes.push("removed_decision_maker");
+
+  cleaned = cleaned
+    .replace(/\s+,/g, ",")
+    .replace(/\s+\./g, ".")
+    .replace(/^\s*[,.-]\s*/, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  const beforePrefix = cleaned;
+  if (/^zaujalo?\s+ma\b/iu.test(cleaned)) {
+    cleaned = cleaned.replace(/^zaujalo?\s+ma\b/iu, "Zaujalo ma");
+  } else if (/^vsimol\s+som\s+si\b/iu.test(normalizeNameToken(cleaned))) {
+    cleaned = cleaned.replace(/^vsimol\s+som\s+si\b/iu, "Vsimol som si");
+  } else if (/^(ze|že)\s+/iu.test(cleaned)) {
+    cleaned = `Zaujalo ma, ze ${cleaned.replace(/^(ze|že)\s+/iu, "")}`;
+  } else if (!/^(zaujalo ma|vsimol som si|paci sa mi|pači sa mi|oceňujem|ocenujem)\b/iu.test(cleaned)) {
+    cleaned = `Zaujalo ma, ze ${cleaned}`;
+  }
+  if (cleaned !== beforePrefix) changes.push("normalized_prefix");
+
+  cleaned = cleaned.replace(/^Zaujalo ma,\s*ze\s*(ze|že)\s+/iu, "Zaujalo ma, ze ").replace(/\s{2,}/g, " ").trim();
+  if (!cleaned) return { cleanedIntro: undefined, changed: changes.length > 0, changes };
+  cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+  return { cleanedIntro: cleaned, changed: cleaned !== intro.trim(), changes };
+}
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function leadRepairIssues(lead: LeadRepairQueueLead, duplicateKeys: Set<string>): string[] {

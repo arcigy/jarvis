@@ -42,6 +42,7 @@ import {
   batchScrapeWebsiteContacts,
   batchDraftLeadIntros,
   buildAiIntroQualityAuditPreview,
+  buildAiIntroCleanupPreview,
   buildManualReviewPickupPlan,
   buildManualReviewQueue,
   buildSmartleadCampaignLaunchPreview,
@@ -3341,6 +3342,39 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildAiIntroQualityAuditPreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_ai_intro_cleanup_preview",
+    {
+      title: "Build AI intro cleanup preview",
+      description: "Deterministically remove greetings, decision-maker names, and salutation text from personalized intros, then prepare redraft or Smartlead audit next steps without writes.",
+      inputSchema: {
+        leads: z.array(leadCandidateSchema.extend({
+          decisionMakerName: z.string().optional(),
+          decision_maker_name: z.string().optional(),
+          context: z.string().optional(),
+          evidenceText: z.string().optional(),
+          scraped: z.object({
+            textPreview: z.string().optional(),
+            emails: z.array(z.string()).optional(),
+            phones: z.array(z.string()).optional(),
+          }).optional(),
+        }).passthrough()).min(1).max(1000),
+        offer: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        defaultSource: z.string().optional(),
+        campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+        maxRedrafts: z.number().int().min(1).max(200).default(50),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildAiIntroCleanupPreview(input))
   );
 
   server.registerTool(

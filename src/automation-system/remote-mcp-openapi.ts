@@ -847,6 +847,16 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       minEvidenceTerms: 1,
     };
   }
+  if (toolName === "arcigy.build_ai_intro_cleanup_preview") {
+    return {
+      campaignId: "123456",
+      defaultSource: "kuchyne-sk",
+      leads: [
+        { companyName: "Ready Studio", website: "https://ready.sk", email: "jan@ready.sk", decisionMakerName: "Jan Novak", personalizedIntro: "Dobry den pan Novak, zaujalo ma, ze robite kuchyne na mieru." },
+        { companyName: "Needs Redraft", website: "https://redraft.sk", email: "info@redraft.sk", personalizedIntro: "Kratke AI intro." },
+      ],
+    };
+  }
   if (toolName === "arcigy.enrich_website_leads_preview") {
     return {
       leads: [

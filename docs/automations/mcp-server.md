@@ -168,6 +168,7 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.draft_lead_intro`: Gemini draft of one short personalized cold outreach intro for a lead.
 - `arcigy.batch_draft_lead_intros`: Gemini batch draft of personalized cold outreach intros for multiple leads without sending or writing.
 - `arcigy.build_ai_intro_quality_audit_preview`: checks AI intros before Smartlead for missing, generic, short, placeholder, greeting, or weakly grounded text and prepares safe redraft calls.
+- `arcigy.build_ai_intro_cleanup_preview`: deterministically removes greetings, decision-maker names, and salutation text from AI intros, then prepares redraft or Smartlead audit steps without writes.
 - `arcigy.enrich_website_leads_preview`: live read-only batch enrichment that scrapes lead websites, drafts AI intros, and prepares pipeline/Smartlead launch previews without writing.
 - `arcigy.prepare_smartlead_leads`: normalizes selected leads into Smartlead `lead_list` payload without writing.
 - `arcigy.run_leadgen_research_pipeline`: read-only discovery + optional website scraping + optional Gemini intro drafts for Smartlead-ready research.

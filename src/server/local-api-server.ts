@@ -41,6 +41,7 @@ import {
   batchScrapeWebsiteContacts,
   batchDraftLeadIntros,
   buildAiIntroQualityAuditPreview,
+  buildAiIntroCleanupPreview,
   buildManualReviewPickupPlan,
   buildManualReviewQueue,
   buildSmartleadCampaignLaunchPreview,
@@ -2223,6 +2224,19 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         minEvidenceTerms: typeof payload.minEvidenceTerms === "number" ? payload.minEvidenceTerms : undefined,
         maxRedrafts: typeof payload.maxRedrafts === "number" ? payload.maxRedrafts : undefined,
         maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_ai_intro_cleanup_preview") {
+    writeJson(response, 200, {
+      result: buildAiIntroCleanupPreview({
+        leads: Array.isArray(payload.leads) ? payload.leads as Parameters<typeof buildAiIntroCleanupPreview>[0]["leads"] : [],
+        offer: optionalString(payload.offer),
+        language: payload.language === "en" ? "en" : "sk",
+        defaultSource: optionalString(payload.defaultSource),
+        campaignId: typeof payload.campaignId === "string" || typeof payload.campaignId === "number" || payload.campaignId === null ? payload.campaignId : undefined,
+        maxRedrafts: typeof payload.maxRedrafts === "number" ? payload.maxRedrafts : undefined,
       }),
     });
     return;

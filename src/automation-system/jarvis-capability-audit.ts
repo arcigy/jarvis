@@ -205,6 +205,7 @@ const capabilityDefinitions: CapabilityDefinition[] = [
       "arcigy.draft_lead_intro",
       "arcigy.batch_draft_lead_intros",
       "arcigy.build_ai_intro_quality_audit_preview",
+      "arcigy.build_ai_intro_cleanup_preview",
       "arcigy.enrich_website_leads_preview",
       "arcigy.prepare_smartlead_leads",
       "arcigy.run_leadgen_research_pipeline",
