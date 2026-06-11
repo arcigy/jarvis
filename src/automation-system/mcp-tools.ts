@@ -97,6 +97,7 @@ export type JarvisMcpToolName =
   | "arcigy.build_smartlead_sequence_work_packet_preview"
   | "arcigy.preview_smartlead_email_rendering"
   | "arcigy.build_smartlead_sequence_variable_repair_preview"
+  | "arcigy.build_company_short_name_preview"
   | "arcigy.build_lead_batch_qa_preview"
   | "arcigy.preview_manual_review_pickup"
   | "arcigy.build_smartlead_injection_plan"
@@ -655,6 +656,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.build_smartlead_sequence_variable_repair_preview",
       description: "Prepise Smartlead subject premenne z company_name na company_name_short a pripravi schvalovaci configure payload bez zapisu.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_company_short_name_preview",
+      description: "Normalizuje kratky nazov firmy pre Smartlead custom_fields.company_name_short bez DB zapisu alebo uploadu.",
       requiresApproval: false,
     },
     {

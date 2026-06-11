@@ -624,6 +624,17 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       leads: [{ email: "jan.novak@example.com", company_name: "Modelova Firma", custom_fields: { company_name_short: "Modelova Firma", personalized_intro: "Kratke AI intro." } }],
     };
   }
+  if (toolName === "arcigy.build_company_short_name_preview") {
+    return {
+      sourceName: "kuchyne-na-mieru",
+      defaultSource: "lead-enricher",
+      leads: [
+        { email: "jan@arcistudio.sk", companyName: "ARCI Studio, s.r.o.", officialCompanyName: "ARCI Studio, s.r.o.", website: "https://arcistudio.sk" },
+        { email: "info@novak-kuchyne.sk", official_company_name: "Novak kuchyne spol. s r.o.", website: "https://novak-kuchyne.sk" },
+      ],
+      maxNextCalls: 25,
+    };
+  }
   if (toolName === "arcigy.build_lead_batch_qa_preview") {
     return {
       campaignTag: "kuchyne-na-mieru",

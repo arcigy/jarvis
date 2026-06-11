@@ -76,6 +76,7 @@ import {
   enrichSlovakCompanyRegister,
   filterBlacklistedLeads,
   buildDailyLeadgenRunbook,
+  buildCompanyShortNamePreview,
   buildLeadCsvMappingPreview,
   parseLeadsCsv,
   previewSmartleadEmailRendering,
@@ -2901,6 +2902,32 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildSmartleadSequenceVariableRepairPreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_company_short_name_preview",
+    {
+      title: "Build company short name preview",
+      description: "Normalize legal company names into short CRM/Smartlead-friendly names and prepare read-only next calls without DB writes.",
+      inputSchema: {
+        leads: z.array(manualReviewPickupLeadSchema.extend({
+          company_name_short: z.string().optional(),
+          official_company_name: z.string().optional(),
+          originalName: z.string().optional(),
+          original_name: z.string().optional(),
+        })).min(1).max(1000),
+        sourceName: z.string().optional(),
+        defaultSource: z.string().optional(),
+        maxNextCalls: z.number().int().min(1).max(500).default(100),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildCompanyShortNamePreview(input))
   );
 
   server.registerTool(

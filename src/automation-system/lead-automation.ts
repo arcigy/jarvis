@@ -256,6 +256,32 @@ export type LeadBatchQaPreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type CompanyShortNamePreview = {
+  mode: "company-short-name-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  source: { name?: string; defaultSource?: string };
+  totals: {
+    input: number;
+    normalized: number;
+    unchanged: number;
+    missingSourceName: number;
+    derivedFromDomain: number;
+    smartleadReady: number;
+  };
+  items: Array<{
+    lead: LeadCandidateInput & { companyNameShort?: string; company_name_short?: string; officialCompanyName?: string; official_company_name?: string; originalName?: string; original_name?: string };
+    status: "normalized" | "unchanged" | "missing_source_name";
+    source: "current" | "official" | "company" | "original" | "domain" | "email";
+    originalName?: string;
+    companyNameShort?: string;
+    issues: string[];
+  }>;
+  normalizedLeads: PreparedSmartleadLeadInput[];
+  smartleadPrepared: ReturnType<typeof prepareSmartleadLeads>;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type LeadIdentityRepairPreview = {
   mode: "lead-identity-repair-preview";
   status: "ready" | "attention" | "blocked";
@@ -1874,6 +1900,112 @@ export function buildAiIntroCleanupPreview(input: {
     items,
     cleanedLeads,
     redraftInputs,
+    smartleadPrepared,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls),
+  };
+}
+
+export function buildCompanyShortNamePreview(input: {
+  leads: Array<LeadCandidateInput & { companyNameShort?: string; company_name_short?: string; officialCompanyName?: string; official_company_name?: string; originalName?: string; original_name?: string }>;
+  sourceName?: string;
+  defaultSource?: string;
+  maxNextCalls?: number;
+}): CompanyShortNamePreview {
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 100), 1), 500);
+  const items: CompanyShortNamePreview["items"] = input.leads.map((lead) => {
+    const custom = lead.customFields ?? {};
+    const website = lead.website ?? stringField(custom, "website", "domain");
+    const current = stringField(lead, "companyNameShort", "company_name_short") ?? stringField(custom, "company_name_short", "companyNameShort");
+    const official = stringField(lead, "officialCompanyName", "official_company_name") ?? stringField(custom, "official_company_name", "officialCompanyName");
+    const original = stringField(lead, "originalName", "original_name") ?? stringField(custom, "original_name", "originalName");
+    const company = lead.companyName ?? stringField(custom, "company_name", "companyName", "company");
+    const candidates: Array<{ value?: string; source: CompanyShortNamePreview["items"][number]["source"] }> = [
+      { value: current, source: "current" },
+      { value: official, source: "official" },
+      { value: company, source: "company" },
+      { value: original, source: "original" },
+      { value: brandFromWebsite(website), source: "domain" },
+      { value: brandFromEmail(lead.email), source: "email" },
+    ];
+    const selected = candidates.find((candidate) => candidate.value?.trim());
+    const fallback = company ?? official ?? original ?? selected?.value;
+    const companyNameShort = cleanUniversalCompanyShortName(selected?.value, website, fallback);
+    const existingComparable = normalizeNameToken(current ?? "");
+    const nextComparable = normalizeNameToken(companyNameShort ?? "");
+    const issues: string[] = [];
+    if (!selected?.value) issues.push("missing_source_name");
+    if (selected?.source === "domain" || selected?.source === "email") issues.push("derived_from_domain");
+    if (current && existingComparable !== nextComparable) issues.push("company_short_cleaned");
+    const status: CompanyShortNamePreview["items"][number]["status"] = !companyNameShort
+      ? "missing_source_name"
+      : current && existingComparable === nextComparable
+        ? "unchanged"
+        : "normalized";
+    return {
+      lead,
+      status,
+      source: selected?.source ?? "domain",
+      originalName: selected?.value,
+      companyNameShort,
+      issues,
+    };
+  });
+  const normalizedLeads: PreparedSmartleadLeadInput[] = items
+    .filter((item) => item.companyNameShort)
+    .map((item) => {
+      const lead = item.lead;
+      return {
+        email: lead.email ?? "",
+        companyName: lead.companyName ?? item.originalName ?? item.companyNameShort,
+        firstName: lead.firstName,
+        lastName: lead.lastName,
+        website: lead.website,
+        phone: lead.phone,
+        source: input.defaultSource ?? input.sourceName ?? lead.source,
+        personalizedIntro: lead.personalizedIntro,
+        customFields: {
+          ...lead.customFields,
+          company_name_short: item.companyNameShort,
+          companyNameShort: item.companyNameShort,
+          company_short_name_source: item.source,
+          source_name: input.sourceName ?? lead.customFields?.source_name,
+        },
+      };
+    });
+  const smartleadPrepared = prepareSmartleadLeads({ leads: normalizedLeads, defaultSource: input.defaultSource ?? input.sourceName ?? "company-short-name-preview" });
+  const nextLeads = normalizedLeads.slice(0, maxNextCalls);
+  const nextToolCalls: CompanyShortNamePreview["nextToolCalls"] = [];
+  if (nextLeads.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_lead_batch_qa_preview",
+      payload: { leads: nextLeads, defaultSource: input.defaultSource ?? input.sourceName ?? "company-short-name-preview", maxNextCalls },
+      reason: "Po normalizacii company_short skontrolovat emaily, AI intro a pripravenost na Smartlead.",
+      approvalRequired: false,
+    });
+    nextToolCalls.push({
+      tool: "arcigy.prepare_smartlead_leads",
+      payload: { leads: nextLeads, defaultSource: input.defaultSource ?? input.sourceName ?? "company-short-name-preview" },
+      reason: "Pripravit Smartlead lead_list s vyplnenym custom_fields.company_name_short bez uploadu.",
+      approvalRequired: false,
+    });
+  }
+  const totals = {
+    input: input.leads.length,
+    normalized: items.filter((item) => item.status === "normalized").length,
+    unchanged: items.filter((item) => item.status === "unchanged").length,
+    missingSourceName: items.filter((item) => item.status === "missing_source_name").length,
+    derivedFromDomain: items.filter((item) => item.issues.includes("derived_from_domain")).length,
+    smartleadReady: smartleadPrepared.leadList.length,
+  };
+  const status: CompanyShortNamePreview["status"] = totals.input === 0 || totals.missingSourceName === totals.input ? "blocked" : totals.missingSourceName > 0 ? "attention" : "ready";
+  return {
+    mode: "company-short-name-preview",
+    status,
+    summary: `Company short-name preview ${status}: ${totals.normalized} normalizovanych, ${totals.unchanged} bez zmeny, ${totals.missingSourceName} bez zdrojoveho nazvu, ${totals.smartleadReady} ready pre Smartlead. Ziadny zapis ani upload neprebehol.`,
+    source: { name: input.sourceName, defaultSource: input.defaultSource },
+    totals,
+    items,
+    normalizedLeads,
     smartleadPrepared,
     nextToolCalls: dedupeNextToolCalls(nextToolCalls),
   };
@@ -8429,6 +8561,23 @@ function cleanLeadCompanyShort(value: string | undefined, website?: string, fall
   return raw.replace(/^[,\-/:.\s]+|[,\-/:.\s]+$/g, "").trim() || fallback;
 }
 
+function cleanUniversalCompanyShortName(value: string | undefined, website?: string, fallbackName?: string): string | undefined {
+  const fallback = fallbackName?.trim() || brandFromWebsite(website);
+  let raw = value?.replace(/\s+/g, " ").trim() || fallback;
+  if (!raw) return undefined;
+  raw = raw
+    .replace(/\b(spol\.?\s*s\s*r\.?\s*o\.?|s\.?\s*r\.?\s*o\.?|a\.?\s*s\.?|v\.?\s*o\.?\s*s\.?|k\.?\s*s\.?|o\.?\s*z\.?|n\.?\s*o\.?|dru[zž]stvo|se)\b\.?/giu, "")
+    .replace(/\b(ltd|limited|gmbh|inc|llc)\b\.?/giu, "")
+    .replace(/\b(oficialne stranky|ofici[aá]lne str[aá]nky|uvod|kontakt|eshop|shop|web|homepage)\b/giu, "")
+    .replace(/[|:]\s*(vyroba|v[yý]roba|realizace|realiz[aá]cia|sluzby|slu[zž]by|kontakt).*$/iu, "")
+    .replace(/[^\p{L}\p{N}\s.&-]/gu, " ")
+    .replace(/\s+/g, " ")
+    .replace(/^[,\-/:.&\s]+|[,\-/:.&\s]+$/g, "")
+    .trim();
+  const cleaned = cleanLeadCompanyShort(raw, website, fallback);
+  return cleaned?.replace(/\s+/g, " ").trim() || fallback;
+}
+
 function brandFromWebsite(website: string | undefined): string | undefined {
   if (!website) return undefined;
   const domain = normalizeWebsiteIdentity(website);
@@ -8436,6 +8585,12 @@ function brandFromWebsite(website: string | undefined): string | undefined {
   const cleaned = raw?.replace(/\b(kuchyne|kuchyn|truhlarstvi|stolarstvi|nabytek|interiery|studio)\b/gi, "").replace(/\s+/g, " ").trim();
   const brand = cleaned && cleaned.length >= 3 ? cleaned : raw;
   return brand ? brand.replace(/\b\w/g, (char) => char.toUpperCase()) : undefined;
+}
+
+function brandFromEmail(email: string | undefined): string | undefined {
+  const domain = email?.split("@")[1]?.trim();
+  if (!domain || /(gmail|googlemail|outlook|hotmail|icloud|yahoo|azet|zoznam|centrum|post|seznam)\./i.test(domain)) return undefined;
+  return brandFromWebsite(`https://${domain}`);
 }
 
 function leadRepairIssues(lead: LeadRepairQueueLead, duplicateKeys: Set<string>): string[] {

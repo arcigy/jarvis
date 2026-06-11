@@ -75,6 +75,7 @@ import {
   enrichSlovakCompanyRegister,
   filterBlacklistedLeads,
   buildDailyLeadgenRunbook,
+  buildCompanyShortNamePreview,
   buildLeadCsvMappingPreview,
   parseLeadsCsv,
   previewSmartleadEmailRendering,
@@ -1960,6 +1961,17 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         replacementVariable: optionalString(payload.replacementVariable),
         includeConfigurePayload: payload.includeConfigurePayload !== false,
         leads: Array.isArray(payload.leads) ? payload.leads as Parameters<typeof buildSmartleadSequenceVariableRepairPreview>[0]["leads"] : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_company_short_name_preview") {
+    writeJson(response, 200, {
+      result: buildCompanyShortNamePreview({
+        leads: (payload.leads ?? []) as Parameters<typeof buildCompanyShortNamePreview>[0]["leads"],
+        sourceName: optionalString(payload.sourceName),
+        defaultSource: optionalString(payload.defaultSource),
+        maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
       }),
     });
     return;

@@ -55,6 +55,7 @@ import {
   buildSmartleadCampaignLaunchPreview,
   buildSmartleadCampaignQaPreview,
   buildSmartleadSequenceVariableRepairPreview,
+  buildCompanyShortNamePreview,
   buildSmartleadCampaignHandoffPackagePreview,
   buildSmartleadCampaignBackupPlan,
   buildSmartleadCampaignRestorePlan,
@@ -228,6 +229,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.build_smartlead_sequence_work_packet_preview",
     "arcigy.preview_smartlead_email_rendering",
     "arcigy.build_smartlead_sequence_variable_repair_preview",
+    "arcigy.build_company_short_name_preview",
     "arcigy.build_lead_batch_qa_preview",
     "arcigy.preview_manual_review_pickup",
     "arcigy.build_smartlead_injection_plan",
@@ -481,6 +483,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.ok(paths.includes("/api/mcp/arcigy.build_local_lead_register_update_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.apply_local_lead_register_update"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_lead_identity_repair_preview"));
+  assert.ok(paths.includes("/api/mcp/arcigy.build_company_short_name_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.get_smartlead_campaign_webhooks"));
   assert.ok(paths.includes("/api/mcp/arcigy.upsert_smartlead_campaign_webhook"));
   assert.ok(paths.includes("/api/mcp/arcigy.get_smartlead_email_accounts"));
@@ -502,6 +505,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   const localLeadRegisterPreview = document.paths["/api/mcp/arcigy.build_local_lead_register_update_preview"] as OpenApiPathFixture;
   const localLeadRegisterApply = document.paths["/api/mcp/arcigy.apply_local_lead_register_update"] as OpenApiPathFixture;
   const leadIdentityRepair = document.paths["/api/mcp/arcigy.build_lead_identity_repair_preview"] as OpenApiPathFixture;
+  const companyShortName = document.paths["/api/mcp/arcigy.build_company_short_name_preview"] as OpenApiPathFixture;
   const smartleadWebhooks = document.paths["/api/mcp/arcigy.get_smartlead_campaign_webhooks"] as OpenApiPathFixture;
   const smartleadWebhookUpsert = document.paths["/api/mcp/arcigy.upsert_smartlead_campaign_webhook"] as OpenApiPathFixture;
   const smartleadEmailAccounts = document.paths["/api/mcp/arcigy.get_smartlead_email_accounts"] as OpenApiPathFixture;
@@ -521,6 +525,9 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.equal(localNicheRun.post.requestBody.content["application/json"].examples.quickStart.value.approval.approved, true);
   assert.equal(leadIdentityRepair.post["x-arcigy-requiresApproval"], false);
   assert.ok(Array.isArray(leadIdentityRepair.post.requestBody.content["application/json"].examples.quickStart.value.leads));
+  assert.equal(companyShortName.post["x-arcigy-requiresApproval"], false);
+  assert.equal(companyShortName.post.requestBody.content["application/json"].examples.quickStart.value.sourceName, "kuchyne-na-mieru");
+  assert.ok(Array.isArray(companyShortName.post.requestBody.content["application/json"].examples.quickStart.value.leads));
   assert.equal(operatorBriefing.post.requestBody.content["application/json"].examples.quickStart.value.syncGmail, false);
   assert.equal(gmailSync.post.requestBody.content["application/json"].examples.quickStart.value.dryRun, true);
   assert.equal(gmailLeadContext.post.requestBody.content["application/json"].examples.quickStart.value.leadEmail, "lead@example.com");
@@ -1873,6 +1880,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_local_lead_register_update_preview" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.apply_local_lead_register_update" && call.approvalRequired === true));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_lead_identity_repair_preview" && call.approvalRequired === false));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_company_short_name_preview" && call.approvalRequired === false && Array.isArray(call.body.leads)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.lookup_public_email_profile" && call.body.email === "jan.novak@example.com" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.preview_smartlead_lead_sync" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_email_accounts" && call.body.requestedDailyLimit === 80 && call.approvalRequired === false));
@@ -5295,6 +5303,36 @@ test("Smartlead sequence variable repair preview rewrites subject variables safe
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.configure_smartlead_campaign" && call.approvalRequired));
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_smartlead_campaign_qa_preview" && !call.approvalRequired));
   assert.match(preview.summary, /Ziadny Smartlead zapis/);
+});
+
+test("company short name preview normalizes legal company names before Smartlead", () => {
+  const preview = buildCompanyShortNamePreview({
+    sourceName: "kuchyne-na-mieru",
+    defaultSource: "lead-enricher",
+    leads: [
+      {
+        email: "jan@arcistudio.sk",
+        companyName: "ARCI Studio, s.r.o.",
+        officialCompanyName: "ARCI Studio, s.r.o.",
+        website: "https://arcistudio.sk",
+      },
+      {
+        email: "info@novak-kuchyne.sk",
+        official_company_name: "Novak kuchyne spol. s r.o.",
+        website: "https://novak-kuchyne.sk",
+      },
+    ],
+  });
+
+  assert.equal(preview.mode, "company-short-name-preview");
+  assert.equal(preview.status, "ready");
+  assert.equal(preview.totals.normalized, 2);
+  assert.equal(preview.normalizedLeads[0].customFields?.company_name_short, "ARCI Studio");
+  assert.equal(preview.normalizedLeads[1].customFields?.company_name_short, "Novak kuchyne");
+  assert.equal(preview.smartleadPrepared.leadList.length, 2);
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_lead_batch_qa_preview" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.prepare_smartlead_leads" && !call.approvalRequired));
+  assert.match(preview.summary, /Ziadny zapis ani upload/);
 });
 
 test("lead batch QA preview cleans and blocks risky leads before Smartlead", () => {

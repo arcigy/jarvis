@@ -154,6 +154,7 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.build_smartlead_sequence_work_packet_preview`: prepares an AI work packet for Smartlead sequences, validates returned JSON, and proposes QA/render/repair/configure steps without writing.
 - `arcigy.preview_smartlead_email_rendering`: renders Smartlead sequence variants for selected leads, substitutes variables, and reports unresolved placeholders without sending.
 - `arcigy.build_smartlead_sequence_variable_repair_preview`: rewrites Smartlead sequence subjects from `company_name` to `company_name_short` and prepares an approval-gated configure payload without writing.
+- `arcigy.build_company_short_name_preview`: normalizes official company names into `custom_fields.company_name_short` before AI intro cleanup, QA, and Smartlead import without writing.
 - `arcigy.build_lead_batch_qa_preview`: runs a pre-Smartlead lead batch QA pass for blocked source domains, low-quality emails, company short names, cleaned AI intros, and repair next steps without DB writes.
 - `arcigy.preview_manual_review_pickup`: previews manual-review-pickup by filtering reviewed unsent leads, qualifying them, grouping by niche, and preparing injection plans without writes.
 - `arcigy.build_smartlead_injection_plan`: prepares Smartlead `lead_list` batches and the approval payload for `arcigy.add_leads_to_smartlead_campaign` without uploading.

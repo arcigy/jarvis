@@ -1169,6 +1169,22 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Normalize company short names",
+      tool: "arcigy.build_company_short_name_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_company_short_name_preview"),
+      body: {
+        sourceName: "kuchyne-na-mieru",
+        defaultSource: "lead-enricher",
+        leads: [
+          { email: "jan@arcistudio.sk", companyName: "ARCI Studio, s.r.o.", officialCompanyName: "ARCI Studio, s.r.o.", website: "https://arcistudio.sk" },
+          { email: "info@novak-kuchyne.sk", official_company_name: "Novak kuchyne spol. s r.o.", website: "https://novak-kuchyne.sk" },
+        ],
+        maxNextCalls: 25,
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Run lead batch QA before Smartlead",
       tool: "arcigy.build_lead_batch_qa_preview",
       method: "POST",
