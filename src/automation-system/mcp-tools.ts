@@ -37,6 +37,7 @@ export type JarvisMcpToolName =
   | "arcigy.get_leadgen_daily_report"
   | "arcigy.get_leadgen_evening_summary"
   | "arcigy.build_leadgen_slack_report_preview"
+  | "arcigy.send_slack_message"
   | "arcigy.build_leadgen_ops_digest"
   | "arcigy.select_next_niche"
   | "arcigy.generate_ai_reply"
@@ -338,6 +339,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
       name: "arcigy.build_leadgen_slack_report_preview",
       description: "Pripravi Slack Block Kit payload pre denny leadgen report a ovladacie tlacidla bez odoslania do Slacku.",
       requiresApproval: false,
+    },
+    {
+      name: "arcigy.send_slack_message",
+      description: "Po explicitnom schvaleni odosle text alebo Block Kit payload do Slacku cez bot token alebo webhook.",
+      requiresApproval: true,
     },
     {
       name: "arcigy.build_leadgen_ops_digest",

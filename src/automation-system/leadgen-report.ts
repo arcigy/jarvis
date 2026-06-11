@@ -140,6 +140,14 @@ export function buildLeadgenSlackReportPreview(input: LeadgenSlackReportPreviewI
     text: "Arcigy Daily Report",
     blocks,
     controls: report.controls,
+    nextToolCalls: [
+      {
+        tool: "arcigy.send_slack_message",
+        payload: { text: "Arcigy Daily Report", blocks },
+        reason: "Po kontrole preview odoslat leadgen report do Slacku.",
+        approvalRequired: true,
+      },
+    ],
     summary: `Slack preview pripraveny: ${report.outreach.metrics.contacted} odoslanych, ${report.stuckLeadCount} stuck leadov. Ziadne odoslanie neprebehlo.`,
   };
 }

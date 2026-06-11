@@ -112,6 +112,7 @@ import { answerJarvisIntent, resolveJarvisIntentFromTranscript } from "../src/au
 import { buildProductionReadinessReport } from "../src/automation-system/production-readiness.ts";
 import { buildOperatorBriefing } from "../src/automation-system/operator-briefing.ts";
 import { buildLeadgenDailyReport, buildLeadgenEveningSummary, buildLeadgenOpsDigest, buildLeadgenSlackReportPreview, selectNextNiche } from "../src/automation-system/leadgen-report.ts";
+import { sendSlackMessage } from "../src/automation-system/slack.ts";
 import { draftPriceOfferIntake } from "../src/automation-system/price-offer.ts";
 import { buildProactiveAttentionDigest } from "../src/automation-system/proactive-attention-digest.ts";
 import { buildOutreachReplyTriagePreview, classifyOutreachReply, previewGmailAiReply, previewSmartleadAiReply } from "../src/automation-system/reply-decision.ts";
@@ -161,6 +162,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.get_leadgen_daily_report",
     "arcigy.get_leadgen_evening_summary",
     "arcigy.build_leadgen_slack_report_preview",
+    "arcigy.send_slack_message",
     "arcigy.build_leadgen_ops_digest",
     "arcigy.select_next_niche",
     "arcigy.generate_ai_reply",
@@ -353,6 +355,7 @@ test("Jarvis capability audit maps the full requested production surface to evid
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.append_leads_to_google_sheet")));
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.replace_google_sheet_rows")));
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.label_gmail_thread")));
+  assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.send_slack_message")));
   assert.doesNotMatch(JSON.stringify(audit), /AIza|GOCSPX|1\/\/|postgresql:\/\/|redis:\/\//);
 
   const score = buildProductionCompletionScore({ readiness, productionEvidence, capabilityAudit: audit, env, generatedAt: "2026-06-09T00:00:00.000Z" });
@@ -442,12 +445,14 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.ok(paths.includes("/api/mcp/arcigy.get_production_verification_evidence"));
   assert.ok(paths.includes("/api/mcp/arcigy.get_production_completion_score"));
   assert.ok(paths.includes("/api/mcp/arcigy.get_jarvis_capability_audit"));
+  assert.ok(paths.includes("/api/mcp/arcigy.send_slack_message"));
   assert.ok(paths.includes("/api/mcp/arcigy.get_gmail_lead_context"));
   assert.ok(paths.includes("/api/mcp/arcigy.get_gmail_unread_triage"));
   assert.ok(paths.includes("/api/mcp/arcigy.label_gmail_thread"));
   const operatorBriefing = document.paths["/api/mcp/arcigy.get_operator_briefing"] as OpenApiPathFixture;
   const attentionDigest = document.paths["/api/mcp/arcigy.get_proactive_attention_digest"] as OpenApiPathFixture;
   const completionScore = document.paths["/api/mcp/arcigy.get_production_completion_score"] as OpenApiPathFixture;
+  const slackSend = document.paths["/api/mcp/arcigy.send_slack_message"] as OpenApiPathFixture;
   const gmailSync = document.paths["/api/mcp/arcigy.sync_gmail_recent_messages"] as OpenApiPathFixture;
   const gmailLeadContext = document.paths["/api/mcp/arcigy.get_gmail_lead_context"] as OpenApiPathFixture;
   const gmailUnreadTriage = document.paths["/api/mcp/arcigy.get_gmail_unread_triage"] as OpenApiPathFixture;
@@ -456,6 +461,8 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.equal(operatorBriefing.post.requestBody.content["application/json"].examples.quickStart.value.live, false);
   assert.equal(attentionDigest.post.requestBody.content["application/json"].examples.quickStart.value.syncGmail, false);
   assert.equal(completionScore.post.requestBody.content["application/json"].examples.quickStart.value.live, false);
+  assert.equal(slackSend.post["x-arcigy-requiresApproval"], true);
+  assert.equal(slackSend.post.requestBody.content["application/json"].examples.quickStart.value.approval.approved, true);
   assert.equal(operatorBriefing.post.requestBody.content["application/json"].examples.quickStart.value.syncGmail, false);
   assert.equal(gmailSync.post.requestBody.content["application/json"].examples.quickStart.value.dryRun, true);
   assert.equal(gmailLeadContext.post.requestBody.content["application/json"].examples.quickStart.value.leadEmail, "lead@example.com");
@@ -518,6 +525,7 @@ test("remote MCP smoke checks every response for bearer token leaks", async () =
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.export_leads_csv") ||
       url.endsWith("/api/mcp/arcigy.label_gmail_thread") ||
+      url.endsWith("/api/mcp/arcigy.send_slack_message") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet") ||
       url.endsWith("/api/mcp/arcigy.replace_google_sheet_rows") ||
       url.endsWith("/api/mcp/arcigy.add_leads_to_smartlead_campaign") ||
@@ -644,6 +652,7 @@ test("remote MCP smoke requires quick-start approval policy parity", async () =>
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.label_gmail_thread") ||
+      url.endsWith("/api/mcp/arcigy.send_slack_message") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet") ||
       url.endsWith("/api/mcp/arcigy.replace_google_sheet_rows")
     ) {
@@ -705,6 +714,7 @@ test("remote MCP smoke requires exact MCP call parity in quick-starts", async ()
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.label_gmail_thread") ||
+      url.endsWith("/api/mcp/arcigy.send_slack_message") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet") ||
       url.endsWith("/api/mcp/arcigy.replace_google_sheet_rows")
     ) {
@@ -786,6 +796,7 @@ test("remote MCP smoke blocks generic secret patterns in response bodies", async
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.label_gmail_thread") ||
+      url.endsWith("/api/mcp/arcigy.send_slack_message") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet") ||
       url.endsWith("/api/mcp/arcigy.replace_google_sheet_rows")
     ) {
@@ -2834,11 +2845,34 @@ test("leadgen Slack preview and ops digest produce safe next MCP calls", () => {
   assert.equal(slack.mode, "leadgen-slack-report-preview");
   assert.equal(slack.text, "Arcigy Daily Report");
   assert.ok(slack.blocks.some((block) => block.type === "actions"));
+  assert.ok(slack.nextToolCalls.some((call) => call.tool === "arcigy.send_slack_message" && call.approvalRequired));
   assert.equal(ops.mode, "leadgen-ops-digest");
   assert.equal(ops.status.stuckLeadCount, 1);
   assert.ok(ops.nextToolCalls.some((call) => call.tool === "arcigy.build_daily_leadgen_runbook"));
   assert.ok(ops.nextToolCalls.some((call) => call.tool === "arcigy.preview_manual_review_pickup"));
   assert.ok(ops.nextToolCalls.some((call) => call.tool === "arcigy.get_approval_queue"));
+});
+
+test("Slack helper sends an approved webhook message without leaking secrets", async () => {
+  const calls: Array<{ url: string; body?: unknown }> = [];
+  const fetchImpl = async (url: string | URL | Request, init?: RequestInit) => {
+    const target = String(url);
+    calls.push({ url: target, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+    return new Response("ok", { status: 200 });
+  };
+
+  const result = await sendSlackMessage(
+    { text: "Arcigy Daily Report", blocks: [{ type: "section", text: { type: "mrkdwn", text: "*Ready*" } }] },
+    { SLACK_WEBHOOK_URL: "https://hooks.slack.com/services/T000/B000/secret" },
+    fetchImpl as typeof fetch
+  );
+
+  assert.equal(result.mode, "slack-message-send");
+  assert.equal(result.provider, "webhook");
+  assert.equal(result.blockCount, 1);
+  assert.equal(calls[0].url, "https://hooks.slack.com/services/T000/B000/secret");
+  assert.deepEqual(calls[0].body, { text: "Arcigy Daily Report", blocks: [{ type: "section", text: { type: "mrkdwn", text: "*Ready*" } }] });
+  assert.equal(JSON.stringify(result).includes("secret"), false);
 });
 
 test("manual review pickup builds Smartlead injection and campaign setup drafts", () => {

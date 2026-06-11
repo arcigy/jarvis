@@ -57,6 +57,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(names.includes("arcigy.get_leadgen_daily_report"));
   assert.ok(names.includes("arcigy.get_leadgen_evening_summary"));
   assert.ok(names.includes("arcigy.build_leadgen_slack_report_preview"));
+  assert.ok(names.includes("arcigy.send_slack_message"));
   assert.ok(names.includes("arcigy.build_leadgen_ops_digest"));
   assert.ok(names.includes("arcigy.select_next_niche"));
   assert.ok(names.includes("arcigy.generate_ai_reply"));
@@ -279,6 +280,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.append_leads_to_google_sheet")));
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.replace_google_sheet_rows")));
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.label_gmail_thread")));
+  assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.send_slack_message")));
   assert.doesNotMatch(JSON.stringify(audit), /AIza|GOCSPX|1\/\/|postgresql:\/\/|redis:\/\//);
 
   const voiceAuditResult = await client.callTool({
@@ -363,6 +365,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(pack.tools.approvalRequired.includes("arcigy.generate_contract_documents"));
   assert.ok(pack.tools.approvalRequired.includes("arcigy.send_approved_outreach_reply"));
   assert.ok(pack.tools.approvalRequired.includes("arcigy.label_gmail_thread"));
+  assert.ok(pack.tools.approvalRequired.includes("arcigy.send_slack_message"));
   assert.ok(pack.tools.localStateWrite.includes("arcigy.sync_gmail_recent_messages"));
   assert.ok(pack.tools.localStateWrite.includes("arcigy.prepare_positive_outreach_reply"));
   assert.ok(pack.tools.localStateWrite.includes("arcigy.ingest_client_message"));
@@ -416,6 +419,14 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.sync_gmail_recent_messages" && call.body.dryRun === true));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_gmail_lead_context" && call.approvalRequired === false && call.body.leadEmail === "lead@example.com"));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_gmail_unread_triage" && call.approvalRequired === false && call.body.query === "is:unread category:primary"));
+  assert.ok(
+    pack.quickStartCalls.some(
+      (call) =>
+        call.tool === "arcigy.send_slack_message" &&
+        call.approvalRequired === true &&
+        (call.body.approval as { approved?: boolean } | undefined)?.approved === true
+    )
+  );
   assert.ok(
     pack.quickStartCalls.some(
       (call) =>

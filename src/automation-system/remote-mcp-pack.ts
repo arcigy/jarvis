@@ -687,6 +687,19 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Send approved Slack report",
+      tool: "arcigy.send_slack_message",
+      method: "POST",
+      url: toolUrl("arcigy.send_slack_message"),
+      body: {
+        channel: "#leadgen",
+        text: "Arcigy Daily Report",
+        blocks: [{ type: "section", text: { type: "mrkdwn", text: "*Leadgen report ready.*" } }],
+        approval: { approved: true },
+      },
+      approvalRequired: true,
+    },
+    {
       label: "Build leadgen ops digest and next MCP calls",
       tool: "arcigy.build_leadgen_ops_digest",
       method: "POST",

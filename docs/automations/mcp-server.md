@@ -96,6 +96,7 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.get_leadgen_daily_report`: builds a daily leadgen report from campaign stats, stuck/manual-review leads, and system settings without sending Slack.
 - `arcigy.get_leadgen_evening_summary`: builds an evening outreach summary from sent, reply, positive-reply counts, and recent reply signals.
 - `arcigy.build_leadgen_slack_report_preview`: prepares a Slack Block Kit daily leadgen report and control buttons without sending to Slack.
+- `arcigy.send_slack_message`: approval-required Slack write that sends a text or Block Kit payload through the configured Slack bot token or webhook.
 - `arcigy.build_leadgen_ops_digest`: combines daily/evening reports, niche rotation, stuck leads, and safe next MCP calls for leadgen operations.
 - `arcigy.select_next_niche`: previews the next niche-manager niche/region selection without advancing the database index.
 - `arcigy.generate_ai_reply`: uses Gemini to draft a client reply without sending it.

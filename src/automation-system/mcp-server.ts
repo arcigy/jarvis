@@ -18,6 +18,7 @@ import { handleJarvisVoiceEvent, type JarvisVoiceSession } from "./jarvis-voice.
 import { buildJarvisCapabilityAudit, summarizeJarvisCapabilityAuditForVoice } from "./jarvis-capability-audit.ts";
 import { buildLeadgenDailyReport, buildLeadgenEveningSummary, buildLeadgenOpsDigest, buildLeadgenSlackReportPreview, selectNextNiche } from "./leadgen-report.ts";
 import { appendRowsToGoogleSheet, discoverLeads, replaceGoogleSheetRows, searchGooglePlaces, searchSerper } from "./lead-discovery.ts";
+import { sendSlackMessage } from "./slack.ts";
 import {
   buildBatchNicheDiscoveryPlan,
   buildLeadgenExecutionQueuePreview,
@@ -1092,6 +1093,30 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildLeadgenSlackReportPreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.send_slack_message",
+    {
+      title: "Send Slack message",
+      description: "Approval-required Slack write. Sends a text or Block Kit payload through the configured Slack bot token or webhook.",
+      inputSchema: {
+        channel: z.string().optional(),
+        text: z.string().min(1),
+        blocks: z.array(z.unknown()).optional(),
+        approval: approvalSchema,
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (input) => {
+      requireExplicitApproval("arcigy.send_slack_message", input);
+      return jsonResult(await sendSlackMessage(input));
+    }
   );
 
   server.registerTool(

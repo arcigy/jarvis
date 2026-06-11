@@ -232,6 +232,7 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       settings: { leadgenActive: true, aiRepliesActive: true },
     };
   }
+  if (toolName === "arcigy.send_slack_message") return { channel: "#leadgen", text: "Arcigy Daily Report", blocks: [{ type: "section", text: { type: "mrkdwn", text: "*Leadgen report ready.*" } }], approval: { approved: true } };
   if (toolName === "arcigy.build_leadgen_ops_digest") {
     return {
       periodLabel: "dnes",

@@ -17,6 +17,7 @@ import { containsWakeWord, extractCommandAfterWakeWord, type JarvisVoiceSession 
 import { buildJarvisCapabilityAudit, summarizeJarvisCapabilityAuditForVoice } from "../automation-system/jarvis-capability-audit.ts";
 import { appendRowsToGoogleSheet, discoverLeads, replaceGoogleSheetRows, searchGooglePlaces, searchSerper } from "../automation-system/lead-discovery.ts";
 import { buildLeadgenDailyReport, buildLeadgenEveningSummary, buildLeadgenOpsDigest, buildLeadgenSlackReportPreview, selectNextNiche } from "../automation-system/leadgen-report.ts";
+import { sendSlackMessage } from "../automation-system/slack.ts";
 import {
   buildBatchNicheDiscoveryPlan,
   buildLeadgenExecutionQueuePreview,
@@ -1229,6 +1230,16 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         settings: payload.settings as Parameters<typeof buildLeadgenSlackReportPreview>[0]["settings"],
       }),
     });
+    return;
+  }
+  if (name === "arcigy.send_slack_message") {
+    const result = await sendSlackMessage({
+      channel: optionalString(payload.channel),
+      text: String(payload.text ?? ""),
+      blocks: Array.isArray(payload.blocks) ? payload.blocks : undefined,
+    });
+    addAuditEvent("arcigy.send_slack_message", "sent", { channel: payload.channel, text: payload.text, blockCount: Array.isArray(payload.blocks) ? payload.blocks.length : 0 }, result, true);
+    writeJson(response, 200, { result });
     return;
   }
   if (name === "arcigy.build_leadgen_ops_digest") {
