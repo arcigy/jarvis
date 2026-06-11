@@ -144,6 +144,9 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.send_approved_outreach_reply",
     "arcigy.identify_email",
     "arcigy.upsert_local_person",
+    "arcigy.upsert_local_niche",
+    "arcigy.get_local_niche_queue",
+    "arcigy.record_local_niche_run",
     "arcigy.add_client_need_signal",
     "arcigy.ingest_client_message",
     "arcigy.get_client_need_alerts",
@@ -363,6 +366,8 @@ test("Jarvis capability audit maps the full requested production surface to evid
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.replace_google_sheet_rows")));
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.label_gmail_thread")));
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.send_slack_message")));
+  assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.upsert_local_niche")));
+  assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.record_local_niche_run")));
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.apply_local_lead_register_update")));
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.upsert_smartlead_campaign_webhook")));
   assert.doesNotMatch(JSON.stringify(audit), /AIza|GOCSPX|1\/\/|postgresql:\/\/|redis:\/\//);
@@ -455,6 +460,9 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.ok(paths.includes("/api/mcp/arcigy.get_production_completion_score"));
   assert.ok(paths.includes("/api/mcp/arcigy.get_jarvis_capability_audit"));
   assert.ok(paths.includes("/api/mcp/arcigy.send_slack_message"));
+  assert.ok(paths.includes("/api/mcp/arcigy.upsert_local_niche"));
+  assert.ok(paths.includes("/api/mcp/arcigy.get_local_niche_queue"));
+  assert.ok(paths.includes("/api/mcp/arcigy.record_local_niche_run"));
   assert.ok(paths.includes("/api/mcp/arcigy.get_gmail_lead_context"));
   assert.ok(paths.includes("/api/mcp/arcigy.get_gmail_unread_triage"));
   assert.ok(paths.includes("/api/mcp/arcigy.label_gmail_thread"));
@@ -466,6 +474,9 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   const attentionDigest = document.paths["/api/mcp/arcigy.get_proactive_attention_digest"] as OpenApiPathFixture;
   const completionScore = document.paths["/api/mcp/arcigy.get_production_completion_score"] as OpenApiPathFixture;
   const slackSend = document.paths["/api/mcp/arcigy.send_slack_message"] as OpenApiPathFixture;
+  const localNicheUpsert = document.paths["/api/mcp/arcigy.upsert_local_niche"] as OpenApiPathFixture;
+  const localNicheQueue = document.paths["/api/mcp/arcigy.get_local_niche_queue"] as OpenApiPathFixture;
+  const localNicheRun = document.paths["/api/mcp/arcigy.record_local_niche_run"] as OpenApiPathFixture;
   const gmailSync = document.paths["/api/mcp/arcigy.sync_gmail_recent_messages"] as OpenApiPathFixture;
   const gmailLeadContext = document.paths["/api/mcp/arcigy.get_gmail_lead_context"] as OpenApiPathFixture;
   const gmailUnreadTriage = document.paths["/api/mcp/arcigy.get_gmail_unread_triage"] as OpenApiPathFixture;
@@ -480,6 +491,11 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.equal(completionScore.post.requestBody.content["application/json"].examples.quickStart.value.live, false);
   assert.equal(slackSend.post["x-arcigy-requiresApproval"], true);
   assert.equal(slackSend.post.requestBody.content["application/json"].examples.quickStart.value.approval.approved, true);
+  assert.equal(localNicheUpsert.post["x-arcigy-requiresApproval"], true);
+  assert.equal(localNicheUpsert.post.requestBody.content["application/json"].examples.quickStart.value.approval.approved, true);
+  assert.equal(localNicheQueue.post.requestBody.content["application/json"].examples.quickStart.value.status, "active");
+  assert.equal(localNicheRun.post["x-arcigy-requiresApproval"], true);
+  assert.equal(localNicheRun.post.requestBody.content["application/json"].examples.quickStart.value.approval.approved, true);
   assert.equal(operatorBriefing.post.requestBody.content["application/json"].examples.quickStart.value.syncGmail, false);
   assert.equal(gmailSync.post.requestBody.content["application/json"].examples.quickStart.value.dryRun, true);
   assert.equal(gmailLeadContext.post.requestBody.content["application/json"].examples.quickStart.value.leadEmail, "lead@example.com");
@@ -547,6 +563,8 @@ test("remote MCP smoke checks every response for bearer token leaks", async () =
       url.endsWith("/api/mcp/arcigy.upsert_smartlead_campaign_webhook") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
+      url.endsWith("/api/mcp/arcigy.upsert_local_niche") ||
+      url.endsWith("/api/mcp/arcigy.record_local_niche_run") ||
       url.endsWith("/api/mcp/arcigy.apply_local_lead_register_update") ||
       url.endsWith("/api/mcp/arcigy.export_leads_csv") ||
       url.endsWith("/api/mcp/arcigy.label_gmail_thread") ||
@@ -1818,6 +1836,9 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_leadgen_daily_report" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_leadgen_evening_summary" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.select_next_niche" && call.approvalRequired === false));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.upsert_local_niche" && call.approvalRequired === true));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_local_niche_queue" && call.approvalRequired === false));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.record_local_niche_run" && call.approvalRequired === true));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_local_lead_register_update_preview" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.apply_local_lead_register_update" && call.approvalRequired === true));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.preview_smartlead_lead_sync" && call.approvalRequired === false));
@@ -5695,6 +5716,46 @@ test("local SQLite CLI persists people and need signals", () => {
 
   assert.equal(match.reason, "exact_email_match");
   assert.equal(match.openNeedSignals[0].summary, "chce nový report pre cold outreach");
+});
+
+test("local SQLite CLI tracks niche queue and daily run stats", () => {
+  const dir = mkdtempSync(join(tmpdir(), "jarvis-niche-db-"));
+  const dbPath = join(dir, "jarvis.db");
+  const python = process.env.JARVIS_PYTHON || "python";
+
+  const niche = runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "upsert-niche",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify({
+      slug: "kuchyne",
+      name: "Kuchynske studia",
+      keywords: ["kuchyne na mieru"],
+      regions: ["Bratislava", "Trnava"],
+      dailyTarget: 25,
+      smartleadCampaignId: "123456",
+    }),
+  ]);
+  assert.equal(niche.activeRegion, "Bratislava");
+
+  const queue = runPythonJson(python, ["scripts/jarvis_local_db.py", "list-niche-queue", "--db", dbPath, "--payload", JSON.stringify({ limit: 5 })]);
+  assert.equal(queue.activeNiche.slug, "kuchyne");
+  assert.ok(queue.nextToolCalls.some((call: { tool: string }) => call.tool === "arcigy.discover_leads"));
+
+  const recorded = runPythonJson(python, [
+    "scripts/jarvis_local_db.py",
+    "record-niche-run",
+    "--db",
+    dbPath,
+    "--payload",
+    JSON.stringify({ slug: "kuchyne", stats: { discovered: 40, enriched: 30, qualified: 18, sentToSmartlead: 18, failed: 2 } }),
+  ]);
+
+  assert.equal(recorded.niche.currentRegionIndex, 1);
+  assert.equal(recorded.niche.activeRegion, "Trnava");
+  assert.equal(recorded.stats.sentToSmartlead, 18);
 });
 
 test("local SQLite CLI lists open need alerts", () => {

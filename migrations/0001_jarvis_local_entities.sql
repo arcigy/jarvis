@@ -78,3 +78,34 @@ CREATE TABLE IF NOT EXISTS jarvis_automation_events (
   approved_at TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS local_niches (
+  id TEXT PRIMARY KEY,
+  slug TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'paused', 'completed', 'archived')),
+  tier INTEGER NOT NULL DEFAULT 1,
+  keywords_json TEXT NOT NULL DEFAULT '[]',
+  regions_json TEXT NOT NULL DEFAULT '[]',
+  current_region_index INTEGER NOT NULL DEFAULT 0,
+  daily_target INTEGER NOT NULL DEFAULT 50,
+  smartlead_campaign_id TEXT,
+  data_json TEXT NOT NULL DEFAULT '{}',
+  last_worked_at TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_local_niches_status_worked ON local_niches(status, last_worked_at, tier);
+
+CREATE TABLE IF NOT EXISTS local_niche_stats (
+  niche_id TEXT NOT NULL REFERENCES local_niches(id) ON DELETE CASCADE,
+  date TEXT NOT NULL,
+  discovered INTEGER NOT NULL DEFAULT 0,
+  enriched INTEGER NOT NULL DEFAULT 0,
+  qualified INTEGER NOT NULL DEFAULT 0,
+  sent_to_smartlead INTEGER NOT NULL DEFAULT 0,
+  failed INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (niche_id, date)
+);

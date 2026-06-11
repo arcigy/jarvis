@@ -133,6 +133,156 @@ def upsert_person(db_path: Path, payload: dict[str, Any]) -> dict[str, Any]:
     return row_to_person(row)
 
 
+def upsert_niche(db_path: Path, payload: dict[str, Any]) -> dict[str, Any]:
+    init_db(db_path)
+    slug = str(required(payload, "slug")).strip().lower()
+    niche_id = payload.get("id") or f"niche_{uuid.uuid4().hex}"
+    keywords = [str(item).strip() for item in payload.get("keywords") or [] if str(item).strip()]
+    regions = [str(item).strip() for item in payload.get("regions") or [] if str(item).strip()]
+    if not keywords:
+        raise ValueError("keywords must contain at least one item")
+    if not regions:
+        raise ValueError("regions must contain at least one item")
+    conn = connect(db_path)
+    conn.execute(
+        """
+        insert into local_niches
+          (id, slug, name, status, tier, keywords_json, regions_json, current_region_index, daily_target, smartlead_campaign_id, data_json, updated_at)
+        values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        on conflict(slug) do update set
+          name=excluded.name,
+          status=excluded.status,
+          tier=excluded.tier,
+          keywords_json=excluded.keywords_json,
+          regions_json=excluded.regions_json,
+          current_region_index=excluded.current_region_index,
+          daily_target=excluded.daily_target,
+          smartlead_campaign_id=excluded.smartlead_campaign_id,
+          data_json=excluded.data_json,
+          updated_at=CURRENT_TIMESTAMP
+        """,
+        (
+            niche_id,
+            slug,
+            payload.get("name") or slug,
+            payload.get("status", "active"),
+            int(payload.get("tier", 1)),
+            json.dumps(keywords, ensure_ascii=False),
+            json.dumps(regions, ensure_ascii=False),
+            max(0, int(payload.get("currentRegionIndex", 0))),
+            max(1, int(payload.get("dailyTarget", 50))),
+            payload.get("smartleadCampaignId"),
+            safe_data_json(payload.get("data") or {}),
+        ),
+    )
+    conn.commit()
+    row = conn.execute("select * from local_niches where slug = ?", (slug,)).fetchone()
+    return row_to_niche(row)
+
+
+def list_niche_queue(db_path: Path, payload: dict[str, Any]) -> dict[str, Any]:
+    init_db(db_path)
+    limit = max(1, min(int(payload.get("limit", 20)), 100))
+    status = payload.get("status", "active")
+    conn = connect(db_path)
+    rows = [
+        row
+        for row in conn.execute(
+            """
+            select n.*,
+              coalesce(s.discovered, 0) as today_discovered,
+              coalesce(s.enriched, 0) as today_enriched,
+              coalesce(s.qualified, 0) as today_qualified,
+              coalesce(s.sent_to_smartlead, 0) as today_sent_to_smartlead,
+              coalesce(s.failed, 0) as today_failed
+            from local_niches n
+            left join local_niche_stats s on s.niche_id = n.id and s.date = date('now')
+            where n.status = ?
+            order by (n.last_worked_at is null) asc, n.last_worked_at desc, n.tier asc, n.created_at asc
+            limit ?
+            """,
+            (status, limit),
+        )
+    ]
+    niches = [row_to_niche(row, include_today=True) for row in rows]
+    active = niches[0] if niches else None
+    return {
+        "mode": "local-niche-queue",
+        "count": len(niches),
+        "activeNiche": active,
+        "niches": niches,
+        "summary": build_niche_queue_summary(active, len(niches)),
+        "nextToolCalls": build_niche_next_calls(active),
+    }
+
+
+def record_niche_run(db_path: Path, payload: dict[str, Any]) -> dict[str, Any]:
+    init_db(db_path)
+    slug = payload.get("slug")
+    niche_id = payload.get("nicheId")
+    if not slug and not niche_id:
+        raise ValueError("slug or nicheId is required")
+    stats = payload.get("stats") or {}
+    today = payload.get("date") or datetime.now(timezone.utc).date().isoformat()
+    conn = connect(db_path)
+    row = conn.execute(
+        "select * from local_niches where id = ? or slug = ?",
+        (niche_id, slug),
+    ).fetchone()
+    if row is None:
+        raise ValueError("niche not found")
+    niche = row_to_niche(row)
+    regions = niche["regions"]
+    old_index = int(niche["currentRegionIndex"])
+    advance = payload.get("advanceRegion", True) is not False
+    new_index = old_index + 1 if advance and regions else old_index
+    discovered = int(stats.get("discovered", 0))
+    enriched = int(stats.get("enriched", 0))
+    qualified = int(stats.get("qualified", 0))
+    sent = int(stats.get("sentToSmartlead", stats.get("sent_to_smartlead", 0)))
+    failed = int(stats.get("failed", 0))
+    should_complete = (
+        payload.get("markCompletedIfExhausted", True) is not False
+        and regions
+        and discovered < max(1, int(niche["dailyTarget"]) * 0.1)
+        and new_index >= len(regions)
+    )
+    status = "completed" if should_complete else niche["status"]
+    conn.execute(
+        """
+        insert into local_niche_stats (niche_id, date, discovered, enriched, qualified, sent_to_smartlead, failed, updated_at)
+        values (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        on conflict(niche_id, date) do update set
+          discovered=local_niche_stats.discovered + excluded.discovered,
+          enriched=local_niche_stats.enriched + excluded.enriched,
+          qualified=local_niche_stats.qualified + excluded.qualified,
+          sent_to_smartlead=local_niche_stats.sent_to_smartlead + excluded.sent_to_smartlead,
+          failed=local_niche_stats.failed + excluded.failed,
+          updated_at=CURRENT_TIMESTAMP
+        """,
+        (niche["id"], today, discovered, enriched, qualified, sent, failed),
+    )
+    conn.execute(
+        """
+        update local_niches
+        set current_region_index = ?, status = ?, last_worked_at = ?, updated_at = CURRENT_TIMESTAMP
+        where id = ?
+        """,
+        (new_index, status, payload.get("workedAt") or datetime.now(timezone.utc).isoformat(), niche["id"]),
+    )
+    conn.commit()
+    updated = conn.execute("select * from local_niches where id = ?", (niche["id"],)).fetchone()
+    stats_row = conn.execute("select * from local_niche_stats where niche_id = ? and date = ?", (niche["id"], today)).fetchone()
+    return {
+        "mode": "local-niche-run-recorded",
+        "niche": row_to_niche(updated),
+        "stats": row_to_niche_stats(stats_row),
+        "advanced": advance,
+        "completed": should_complete,
+        "summary": f"Jarvis zaznamenal niche run pre {niche['slug']}: discovered {discovered}, qualified {qualified}, sent {sent}. Region index {old_index} -> {new_index}.",
+    }
+
+
 def add_need_signal(db_path: Path, payload: dict[str, Any]) -> dict[str, Any]:
     init_db(db_path)
     signal_id = payload.get("id") or f"need_{uuid.uuid4().hex}"
@@ -1013,6 +1163,93 @@ def row_to_person(row: sqlite3.Row) -> dict[str, Any]:
     }
 
 
+def row_to_niche(row: sqlite3.Row, include_today: bool = False) -> dict[str, Any]:
+    regions = json.loads(row["regions_json"] or "[]")
+    index = int(row["current_region_index"] or 0)
+    active_region = regions[index % len(regions)] if regions else None
+    result = {
+        "id": row["id"],
+        "slug": row["slug"],
+        "name": row["name"],
+        "status": row["status"],
+        "tier": row["tier"],
+        "keywords": json.loads(row["keywords_json"] or "[]"),
+        "regions": regions,
+        "currentRegionIndex": index,
+        "activeRegion": active_region,
+        "dailyTarget": row["daily_target"],
+        "smartleadCampaignId": row["smartlead_campaign_id"],
+        "lastWorkedAt": row["last_worked_at"],
+        "data": json.loads(row["data_json"] or "{}"),
+    }
+    if include_today:
+        result["today"] = {
+            "discovered": row["today_discovered"],
+            "enriched": row["today_enriched"],
+            "qualified": row["today_qualified"],
+            "sentToSmartlead": row["today_sent_to_smartlead"],
+            "failed": row["today_failed"],
+        }
+    return result
+
+
+def row_to_niche_stats(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "nicheId": row["niche_id"],
+        "date": row["date"],
+        "discovered": row["discovered"],
+        "enriched": row["enriched"],
+        "qualified": row["qualified"],
+        "sentToSmartlead": row["sent_to_smartlead"],
+        "failed": row["failed"],
+        "updatedAt": row["updated_at"],
+    }
+
+
+def build_niche_queue_summary(active: dict[str, Any] | None, count: int) -> str:
+    if not active:
+        return "Jarvis local niche queue: ziadny aktivny niche nie je pripraveny."
+    return (
+        "Jarvis local niche queue: "
+        f"{count} aktivnych niche. Dalsi je {active['name']} ({active['activeRegion']}), "
+        f"daily target {active['dailyTarget']}."
+    )
+
+
+def build_niche_next_calls(active: dict[str, Any] | None) -> list[dict[str, Any]]:
+    if not active:
+        return []
+    query = f"{', '.join(active['keywords'])} {active['activeRegion']}".strip()
+    calls = [
+        {
+            "tool": "arcigy.discover_leads",
+            "payload": {
+                "query": query,
+                "placesQuery": query,
+                "maxResults": min(max(int(active["dailyTarget"]) * 2, 10), 200),
+            },
+            "reason": "Najdi kandidatov pre aktualny niche/region bez zapisu.",
+            "approvalRequired": False,
+        },
+        {
+            "tool": "arcigy.build_leadgen_campaign_pipeline_preview",
+            "payload": {
+                "niche": {
+                    "slug": active["slug"],
+                    "name": active["name"],
+                    "keywords": active["keywords"],
+                    "region": active["activeRegion"],
+                    "dailyTarget": active["dailyTarget"],
+                    "smartleadCampaignId": active["smartleadCampaignId"],
+                }
+            },
+            "reason": "Priprav cely scrape -> AI intro -> Smartlead preview runbook pre vybrany niche.",
+            "approvalRequired": False,
+        },
+    ]
+    return calls
+
+
 def row_to_need_signal(row: sqlite3.Row) -> dict[str, Any]:
     return {
         "id": row["id"],
@@ -1207,6 +1444,9 @@ def main() -> None:
         choices=[
             "init",
             "upsert-person",
+            "upsert-niche",
+            "list-niche-queue",
+            "record-niche-run",
             "add-need-signal",
             "add-cold-event",
             "cold-brief",
@@ -1234,6 +1474,12 @@ def main() -> None:
             result = init_db(args.db)
         elif args.command == "upsert-person":
             result = upsert_person(args.db, load_payload(args.payload))
+        elif args.command == "upsert-niche":
+            result = upsert_niche(args.db, load_payload(args.payload))
+        elif args.command == "list-niche-queue":
+            result = list_niche_queue(args.db, load_payload(args.payload))
+        elif args.command == "record-niche-run":
+            result = record_niche_run(args.db, load_payload(args.payload))
         elif args.command == "add-need-signal":
             result = add_need_signal(args.db, load_payload(args.payload))
         elif args.command == "add-cold-event":

@@ -1115,6 +1115,42 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
     writeJson(response, 200, { result: runDbTool("upsert-person", payload) });
     return;
   }
+  if (name === "arcigy.upsert_local_niche") {
+    const result = runDbTool("upsert-niche", {
+      id: payload.id,
+      slug: payload.slug,
+      name: payload.name,
+      status: payload.status ?? "active",
+      tier: payload.tier ?? 1,
+      keywords: Array.isArray(payload.keywords) ? payload.keywords : [],
+      regions: Array.isArray(payload.regions) ? payload.regions : [],
+      currentRegionIndex: payload.currentRegionIndex ?? 0,
+      dailyTarget: payload.dailyTarget ?? 50,
+      smartleadCampaignId: payload.smartleadCampaignId,
+      data: isRecord(payload.data) ? payload.data : {},
+    });
+    addAuditEvent("arcigy.upsert_local_niche", "updated", { slug: payload.slug, name: payload.name, status: payload.status }, result, true);
+    writeJson(response, 200, { result });
+    return;
+  }
+  if (name === "arcigy.get_local_niche_queue") {
+    writeJson(response, 200, { result: runDbTool("list-niche-queue", { status: payload.status ?? "active", limit: payload.limit ?? 20 }) });
+    return;
+  }
+  if (name === "arcigy.record_local_niche_run") {
+    const result = runDbTool("record-niche-run", {
+      slug: payload.slug,
+      nicheId: payload.nicheId,
+      date: payload.date,
+      workedAt: payload.workedAt,
+      advanceRegion: payload.advanceRegion !== false,
+      markCompletedIfExhausted: payload.markCompletedIfExhausted !== false,
+      stats: isRecord(payload.stats) ? payload.stats : {},
+    });
+    addAuditEvent("arcigy.record_local_niche_run", "recorded", { slug: payload.slug, nicheId: payload.nicheId, stats: payload.stats }, result, true);
+    writeJson(response, 200, { result });
+    return;
+  }
   if (name === "arcigy.add_client_need_signal") {
     writeJson(response, 200, { result: runDbTool("add-need-signal", payload) });
     return;

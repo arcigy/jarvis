@@ -125,6 +125,8 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(manifest.toolPolicy.approvalRequired.includes("arcigy.send_approved_outreach_reply"));
     assert.ok(manifest.toolPolicy.approvalRequired.includes("arcigy.label_gmail_thread"));
     assert.ok(manifest.toolPolicy.approvalRequired.includes("arcigy.send_slack_message"));
+    assert.ok(manifest.toolPolicy.approvalRequired.includes("arcigy.upsert_local_niche"));
+    assert.ok(manifest.toolPolicy.approvalRequired.includes("arcigy.record_local_niche_run"));
     assert.ok(manifest.toolPolicy.approvalRequired.includes("arcigy.apply_local_lead_register_update"));
     assert.ok(manifest.toolPolicy.approvalRequired.includes("arcigy.upsert_smartlead_campaign_webhook"));
     assert.ok(manifest.toolPolicy.localStateWrite.includes("arcigy.sync_gmail_recent_messages"));
@@ -136,6 +138,8 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.send_approved_outreach_reply" && tool.approval.required === true && tool.approval.field === "approval.approved"));
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.label_gmail_thread" && tool.approval.required === true && tool.approval.field === "approval.approved"));
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.send_slack_message" && tool.approval.required === true && tool.approval.field === "approval.approved"));
+    assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.upsert_local_niche" && tool.approval.required === true && tool.approval.field === "approval.approved"));
+    assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.record_local_niche_run" && tool.approval.required === true && tool.approval.field === "approval.approved"));
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.apply_local_lead_register_update" && tool.approval.required === true && tool.approval.field === "approval.approved"));
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.upsert_smartlead_campaign_webhook" && tool.approval.required === true && tool.approval.field === "approval.approved"));
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.get_smartlead_outreach_brief" && tool.method === "POST"));
@@ -570,6 +574,8 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(capabilityAuditBody.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.replace_google_sheet_rows")));
     assert.ok(capabilityAuditBody.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.label_gmail_thread")));
     assert.ok(capabilityAuditBody.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.send_slack_message")));
+    assert.ok(capabilityAuditBody.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.upsert_local_niche")));
+    assert.ok(capabilityAuditBody.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.record_local_niche_run")));
     assert.ok(capabilityAuditBody.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.apply_local_lead_register_update")));
     assert.ok(capabilityAuditBody.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.upsert_smartlead_campaign_webhook")));
     assert.equal(JSON.stringify(capabilityAuditBody).includes(syntheticGoogleKey), false);
@@ -632,6 +638,9 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(openApiBody.paths["/api/mcp/arcigy.get_production_completion_score"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.get_jarvis_capability_audit"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.send_slack_message"]);
+    assert.ok(openApiBody.paths["/api/mcp/arcigy.upsert_local_niche"]);
+    assert.ok(openApiBody.paths["/api/mcp/arcigy.get_local_niche_queue"]);
+    assert.ok(openApiBody.paths["/api/mcp/arcigy.record_local_niche_run"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.get_gmail_lead_context"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.get_gmail_unread_triage"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.label_gmail_thread"]);
@@ -643,6 +652,9 @@ test("local web bridge serves UI and API health", async () => {
     const openApiAttentionDigest = openApiBody.paths["/api/mcp/arcigy.get_proactive_attention_digest"] as OpenApiPathFixture;
     const openApiCompletionScore = openApiBody.paths["/api/mcp/arcigy.get_production_completion_score"] as OpenApiPathFixture;
     const openApiSlackSend = openApiBody.paths["/api/mcp/arcigy.send_slack_message"] as OpenApiPathFixture;
+    const openApiLocalNicheUpsert = openApiBody.paths["/api/mcp/arcigy.upsert_local_niche"] as OpenApiPathFixture;
+    const openApiLocalNicheQueue = openApiBody.paths["/api/mcp/arcigy.get_local_niche_queue"] as OpenApiPathFixture;
+    const openApiLocalNicheRun = openApiBody.paths["/api/mcp/arcigy.record_local_niche_run"] as OpenApiPathFixture;
     const openApiGmailSync = openApiBody.paths["/api/mcp/arcigy.sync_gmail_recent_messages"] as OpenApiPathFixture;
     const openApiGmailLeadContext = openApiBody.paths["/api/mcp/arcigy.get_gmail_lead_context"] as OpenApiPathFixture;
     const openApiGmailUnreadTriage = openApiBody.paths["/api/mcp/arcigy.get_gmail_unread_triage"] as OpenApiPathFixture;
@@ -655,6 +667,11 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(openApiCompletionScore.post.requestBody.content["application/json"].examples.quickStart.value.live, false);
     assert.equal(openApiSlackSend.post["x-arcigy-requiresApproval"], true);
     assert.equal(openApiSlackSend.post.requestBody.content["application/json"].examples.quickStart.value.approval.approved, true);
+    assert.equal(openApiLocalNicheUpsert.post["x-arcigy-requiresApproval"], true);
+    assert.equal(openApiLocalNicheUpsert.post.requestBody.content["application/json"].examples.quickStart.value.approval.approved, true);
+    assert.equal(openApiLocalNicheQueue.post.requestBody.content["application/json"].examples.quickStart.value.status, "active");
+    assert.equal(openApiLocalNicheRun.post["x-arcigy-requiresApproval"], true);
+    assert.equal(openApiLocalNicheRun.post.requestBody.content["application/json"].examples.quickStart.value.approval.approved, true);
     assert.equal(openApiAttentionDigest.post.requestBody.content["application/json"].examples.quickStart.value.syncGmail, false);
     assert.equal(openApiOperator.post.requestBody.content["application/json"].examples.quickStart.value.syncGmail, false);
     assert.equal(openApiGmailSync.post.requestBody.content["application/json"].examples.quickStart.value.dryRun, true);
@@ -805,6 +822,8 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(remotePackBody.tools.approvalRequired.includes("arcigy.send_approved_outreach_reply"));
     assert.ok(remotePackBody.tools.approvalRequired.includes("arcigy.label_gmail_thread"));
     assert.ok(remotePackBody.tools.approvalRequired.includes("arcigy.send_slack_message"));
+    assert.ok(remotePackBody.tools.approvalRequired.includes("arcigy.upsert_local_niche"));
+    assert.ok(remotePackBody.tools.approvalRequired.includes("arcigy.record_local_niche_run"));
     assert.ok(remotePackBody.tools.approvalRequired.includes("arcigy.apply_local_lead_register_update"));
     assert.ok(remotePackBody.tools.approvalRequired.includes("arcigy.upsert_smartlead_campaign_webhook"));
     assert.ok(remotePackBody.tools.localStateWrite.includes("arcigy.sync_gmail_recent_messages"));
@@ -839,6 +858,9 @@ test("local web bridge serves UI and API health", async () => {
       )
     );
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_outreach_brief" && !("campaignId" in call.body)));
+    assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.upsert_local_niche" && call.approvalRequired === true));
+    assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_local_niche_queue" && call.approvalRequired === false));
+    assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.record_local_niche_run" && call.approvalRequired === true));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_local_lead_register_update_preview" && call.approvalRequired === false));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.apply_local_lead_register_update" && call.approvalRequired === true));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_campaign_webhooks" && call.approvalRequired === false));

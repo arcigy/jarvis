@@ -85,6 +85,9 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.identify_email`: exact email/domain identity lookup with open need signals.
 - `arcigy.get_local_memory_snapshot`: returns a secret-safe read-only snapshot of local people, email activity, client needs, and audit events.
 - `arcigy.export_local_memory_snapshot`: writes a redacted local memory snapshot JSON file inside the repository after explicit confirmation.
+- `arcigy.upsert_local_niche`: approval-required local SQLite write that creates or updates a leadgen niche with keywords, regions, target, and optional Smartlead campaign id.
+- `arcigy.get_local_niche_queue`: read-only local leadgen queue that returns the active niche/region and safe next MCP calls.
+- `arcigy.record_local_niche_run`: approval-required local SQLite write that records daily niche stats, advances the region index, and can mark exhausted niches completed.
 - `arcigy.get_system_health`: checks runtime configuration without exposing secrets.
 - `arcigy.run_integration_diagnostics`: runs configured checks or explicit live read-only probes, including Postgres TCP and Redis PING.
 - `arcigy.get_production_readiness`: summarizes production readiness, blockers, next actions, MCP tool count, approval locks, and optional live diagnostics.

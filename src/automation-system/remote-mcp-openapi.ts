@@ -256,6 +256,9 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
   if (toolName === "arcigy.get_client_need_alerts") return { status: "new", limit: 10 };
   if (toolName === "arcigy.get_audit_events") return { limit: 20 };
   if (toolName === "arcigy.get_local_memory_snapshot") return { limit: 10 };
+  if (toolName === "arcigy.upsert_local_niche") return { slug: "kuchyne", name: "Kuchynske studia", keywords: ["kuchyne na mieru"], regions: ["Bratislava", "Trnava"], dailyTarget: 25, smartleadCampaignId: "123456", approval: { approved: true } };
+  if (toolName === "arcigy.get_local_niche_queue") return { status: "active", limit: 10 };
+  if (toolName === "arcigy.record_local_niche_run") return { slug: "kuchyne", stats: { discovered: 40, enriched: 30, qualified: 18, sentToSmartlead: 18, failed: 2 }, approval: { approved: true } };
   if (toolName === "arcigy.draft_contract_intake") return { brief: "Klient potrebuje webovu aplikaciu pre lead intake, reporting a klientsku evidenciu." };
   if (toolName === "arcigy.draft_price_offer_intake") return { brief: "Klient Modelova Firma chce automatizovat dopyty, setup 2000 EUR, mesacne 200 EUR, ciel je usetrit obchodnikovi 8 hodin tyzdenne." };
   if (toolName === "arcigy.generate_price_offer_document") {

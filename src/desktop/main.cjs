@@ -1302,6 +1302,9 @@ function jarvisCapabilityDefinitions() {
         "arcigy.search_serper",
         "arcigy.search_google_places",
         "arcigy.discover_leads",
+        "arcigy.upsert_local_niche",
+        "arcigy.get_local_niche_queue",
+        "arcigy.record_local_niche_run",
         "arcigy.build_local_lead_register_update_preview",
         "arcigy.apply_local_lead_register_update",
         "arcigy.scrape_website_contacts",
@@ -1317,7 +1320,7 @@ function jarvisCapabilityDefinitions() {
         "arcigy.append_leads_to_google_sheet",
         "arcigy.replace_google_sheet_rows",
       ],
-      approvalRequired: ["arcigy.apply_local_lead_register_update", "arcigy.upsert_smartlead_campaign_webhook", "arcigy.add_leads_to_smartlead_campaign", "arcigy.append_leads_to_google_sheet", "arcigy.replace_google_sheet_rows"],
+      approvalRequired: ["arcigy.upsert_local_niche", "arcigy.record_local_niche_run", "arcigy.apply_local_lead_register_update", "arcigy.upsert_smartlead_campaign_webhook", "arcigy.add_leads_to_smartlead_campaign", "arcigy.append_leads_to_google_sheet", "arcigy.replace_google_sheet_rows"],
       evidence: ["tests", "doctor-live"],
       envKeys: ["serper", "googleMaps", "gemini", "smartlead", "googleSheets"],
     },
@@ -1331,6 +1334,8 @@ function jarvisCapabilityDefinitions() {
         "arcigy.approve_prepared_outreach_reply",
         "arcigy.send_approved_outreach_reply",
         "arcigy.update_client_need_status",
+        "arcigy.upsert_local_niche",
+        "arcigy.record_local_niche_run",
         "arcigy.apply_local_lead_register_update",
         "arcigy.export_local_memory_snapshot",
         "arcigy.send_slack_message",
@@ -1471,7 +1476,7 @@ async function getRemoteMcpPack(payload = {}) {
       "Call MCP tools with POST JSON to mcpToolCallPattern.",
       "Use the bearer auth header placeholder; the real token must be supplied by the operator and is never returned by this pack.",
       "Use tunnel.statusUrl to inspect public tunnel URLs from the redacted secure-tunnel log. Browser-launched tunnel start requires a strong JARVIS_WEB_TOKEN.",
-      "Treat generate_contract_documents, generate_price_offer_document, approve_prepared_outreach_reply, send_approved_outreach_reply, send_smartlead_thread_reply, upsert_smartlead_campaign_webhook, apply_local_lead_register_update, update_client_need_status, export_leads_csv, create_smartlead_campaign, configure_smartlead_campaign, add_leads_to_smartlead_campaign, append_leads_to_google_sheet, and replace_google_sheet_rows as approval-gated actions.",
+      "Treat generate_contract_documents, generate_price_offer_document, approve_prepared_outreach_reply, send_approved_outreach_reply, send_smartlead_thread_reply, upsert_smartlead_campaign_webhook, upsert_local_niche, record_local_niche_run, apply_local_lead_register_update, update_client_need_status, export_leads_csv, create_smartlead_campaign, configure_smartlead_campaign, add_leads_to_smartlead_campaign, append_leads_to_google_sheet, and replace_google_sheet_rows as approval-gated actions.",
       "Treat localStateWrite tools as local memory writes. Prefer dryRun: true for sync_gmail_recent_messages before ingesting messages.",
       "Use get_operator_briefing for a Jarvis-style daily status before making recommendations.",
     ],
@@ -1719,6 +1724,8 @@ const localStateWriteTools = new Set([
   "arcigy.add_cold_outreach_event",
   "arcigy.prepare_positive_outreach_reply",
   "arcigy.upsert_local_person",
+  "arcigy.upsert_local_niche",
+  "arcigy.record_local_niche_run",
   "arcigy.add_client_need_signal",
   "arcigy.ingest_client_message",
   "arcigy.update_client_need_status",
@@ -1864,6 +1871,30 @@ function buildRemoteMcpQuickStartCalls(baseUrl) {
       method: "POST",
       url: toolUrl("arcigy.export_local_memory_snapshot"),
       body: { outputPath: "generated/local-memory/local-memory-snapshot.json", limit: 10, approval: { approved: true } },
+      approvalRequired: true,
+    },
+    {
+      label: "Seed or update a local leadgen niche",
+      tool: "arcigy.upsert_local_niche",
+      method: "POST",
+      url: toolUrl("arcigy.upsert_local_niche"),
+      body: { slug: "kuchyne", name: "Kuchynske studia", keywords: ["kuchyne na mieru"], regions: ["Bratislava", "Trnava"], dailyTarget: 25, smartleadCampaignId: "123456", approval: { approved: true } },
+      approvalRequired: true,
+    },
+    {
+      label: "Read local leadgen niche queue",
+      tool: "arcigy.get_local_niche_queue",
+      method: "POST",
+      url: toolUrl("arcigy.get_local_niche_queue"),
+      body: { status: "active", limit: 10 },
+      approvalRequired: false,
+    },
+    {
+      label: "Record approved local niche run",
+      tool: "arcigy.record_local_niche_run",
+      method: "POST",
+      url: toolUrl("arcigy.record_local_niche_run"),
+      body: { slug: "kuchyne", stats: { discovered: 40, enriched: 30, qualified: 18, sentToSmartlead: 18, failed: 2 }, approval: { approved: true } },
       approvalRequired: true,
     },
     {
@@ -2410,6 +2441,8 @@ async function checkApprovalGates(baseUrl, token, topLevelApproved) {
     ["arcigy.send_approved_outreach_reply", { preparedEventId: "smoke-prepared-reply" }],
     ["arcigy.update_client_need_status", { needSignalId: "smoke-client-need", status: "resolved" }],
     ["arcigy.export_local_memory_snapshot", { outputPath: "generated/local-memory/smoke.json" }],
+    ["arcigy.upsert_local_niche", { slug: "smoke-niche", name: "Smoke Niche", keywords: ["smoke"], regions: ["Bratislava"] }],
+    ["arcigy.record_local_niche_run", { slug: "smoke-niche", stats: { discovered: 1 } }],
     ["arcigy.apply_local_lead_register_update", { primaryEmail: "smoke@example.com", data: { ico: "12345678" } }],
     ["arcigy.export_leads_csv", { outputPath: "generated/leads/smoke.csv", leads: [{ email: "smoke@example.com" }] }],
     ["arcigy.append_leads_to_google_sheet", { rows: [["Smoke", "https://example.com"]] }],
@@ -2577,6 +2610,8 @@ function hasSafeOpenApiExample(toolName, value) {
   if (toolName === "arcigy.identify_email") return typeof value.email === "string" && value.email.includes("@");
   if (toolName === "arcigy.generate_contract_documents") return value.approval?.approved === true && typeof value.intake === "object";
   if (toolName === "arcigy.generate_price_offer_document") return value.approval?.approved === true && typeof value.offer === "object";
+  if (toolName === "arcigy.upsert_local_niche") return value.approval?.approved === true && Array.isArray(value.keywords);
+  if (toolName === "arcigy.record_local_niche_run") return value.approval?.approved === true && typeof value.stats === "object";
   if (toolName === "arcigy.apply_local_lead_register_update") return value.approval?.approved === true && typeof value.primaryEmail === "string";
   if (toolName === "arcigy.export_leads_csv") return value.approval?.approved === true && Array.isArray(value.leads);
   if (toolName === "arcigy.append_leads_to_google_sheet") return value.approval?.approved === true && Array.isArray(value.rows);
@@ -3058,6 +3093,9 @@ function listWebMcpTools() {
     { name: "arcigy.send_approved_outreach_reply", requiresApproval: true },
     { name: "arcigy.identify_email", requiresApproval: false },
     { name: "arcigy.upsert_local_person", requiresApproval: false },
+    { name: "arcigy.upsert_local_niche", requiresApproval: true },
+    { name: "arcigy.get_local_niche_queue", requiresApproval: false },
+    { name: "arcigy.record_local_niche_run", requiresApproval: true },
     { name: "arcigy.add_client_need_signal", requiresApproval: false },
     { name: "arcigy.ingest_client_message", requiresApproval: false },
     { name: "arcigy.get_client_need_alerts", requiresApproval: false },

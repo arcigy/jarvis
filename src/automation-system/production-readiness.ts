@@ -185,6 +185,8 @@ function buildLaunchChecklist(
     "arcigy.generate_price_offer_document",
     "arcigy.approve_prepared_outreach_reply",
     "arcigy.send_approved_outreach_reply",
+    "arcigy.upsert_local_niche",
+    "arcigy.record_local_niche_run",
     "arcigy.apply_local_lead_register_update",
     "arcigy.export_leads_csv",
     "arcigy.send_smartlead_thread_reply",

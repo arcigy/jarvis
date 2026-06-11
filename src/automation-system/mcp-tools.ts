@@ -16,6 +16,9 @@ export type JarvisMcpToolName =
   | "arcigy.approve_prepared_outreach_reply"
   | "arcigy.send_approved_outreach_reply"
   | "arcigy.upsert_local_person"
+  | "arcigy.upsert_local_niche"
+  | "arcigy.get_local_niche_queue"
+  | "arcigy.record_local_niche_run"
   | "arcigy.add_client_need_signal"
   | "arcigy.ingest_client_message"
   | "arcigy.get_client_need_alerts"
@@ -149,6 +152,8 @@ export const localStateWriteToolNames = new Set<JarvisMcpToolName>([
   "arcigy.add_cold_outreach_event",
   "arcigy.prepare_positive_outreach_reply",
   "arcigy.upsert_local_person",
+  "arcigy.upsert_local_niche",
+  "arcigy.record_local_niche_run",
   "arcigy.add_client_need_signal",
   "arcigy.ingest_client_message",
   "arcigy.update_client_need_status",
@@ -239,6 +244,21 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
       name: "arcigy.upsert_local_person",
       description: "Vytvori alebo aktualizuje lokalneho klienta, lead alebo kontakt podla emailu.",
       requiresApproval: false,
+    },
+    {
+      name: "arcigy.upsert_local_niche",
+      description: "Po schvaleni vytvori alebo aktualizuje lokalny leadgen niche s keywordmi, regionmi, dennym targetom a Smartlead campaignId.",
+      requiresApproval: true,
+    },
+    {
+      name: "arcigy.get_local_niche_queue",
+      description: "Read-only nacita aktivnu lokalnu niche queue, aktualny region a dalsie safe MCP kroky pre leadgen.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.record_local_niche_run",
+      description: "Po schvaleni zapise denny niche run, inkrementuje region index a volitelne oznaci vycerpany niche ako completed.",
+      requiresApproval: true,
     },
     {
       name: "arcigy.add_client_need_signal",

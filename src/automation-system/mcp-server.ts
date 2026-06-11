@@ -459,6 +459,94 @@ export function createJarvisMcpServer(): McpServer {
   );
 
   server.registerTool(
+    "arcigy.upsert_local_niche",
+    {
+      title: "Upsert local niche",
+      description: "Approval-required local SQLite write. Creates or updates a leadgen niche with keywords, regions, target, and Smartlead campaign id.",
+      inputSchema: {
+        dbPath: z.string().optional(),
+        id: z.string().optional(),
+        slug: z.string().min(1),
+        name: z.string().min(1),
+        status: z.enum(["active", "paused", "completed", "archived"]).default("active"),
+        tier: z.number().int().min(1).max(10).default(1),
+        keywords: z.array(z.string().min(1)).min(1),
+        regions: z.array(z.string().min(1)).min(1),
+        currentRegionIndex: z.number().int().min(0).default(0),
+        dailyTarget: z.number().int().min(1).max(1000).default(50),
+        smartleadCampaignId: z.union([z.string(), z.number()]).optional(),
+        data: z.record(z.string(), z.unknown()).optional(),
+        approval: approvalSchema,
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async ({ dbPath, approval: _approval, ...payload }) => {
+      requireExplicitApproval("arcigy.upsert_local_niche", { approval: _approval });
+      return jsonDbTool("upsert-niche", payload, dbPath);
+    }
+  );
+
+  server.registerTool(
+    "arcigy.get_local_niche_queue",
+    {
+      title: "Get local niche queue",
+      description: "Read-only local leadgen niche queue with active region and next safe MCP calls.",
+      inputSchema: {
+        dbPath: z.string().optional(),
+        status: z.enum(["active", "paused", "completed", "archived"]).default("active"),
+        limit: z.number().int().min(1).max(100).default(20),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async ({ dbPath, ...payload }) => jsonDbTool("list-niche-queue", payload, dbPath)
+  );
+
+  server.registerTool(
+    "arcigy.record_local_niche_run",
+    {
+      title: "Record local niche run",
+      description: "Approval-required local SQLite write. Records daily niche run stats and advances the region index.",
+      inputSchema: {
+        dbPath: z.string().optional(),
+        slug: z.string().optional(),
+        nicheId: z.string().optional(),
+        date: z.string().optional(),
+        workedAt: z.string().optional(),
+        advanceRegion: z.boolean().default(true),
+        markCompletedIfExhausted: z.boolean().default(true),
+        stats: z.object({
+          discovered: z.number().int().min(0).default(0),
+          enriched: z.number().int().min(0).default(0),
+          qualified: z.number().int().min(0).default(0),
+          sentToSmartlead: z.number().int().min(0).default(0),
+          failed: z.number().int().min(0).default(0),
+        }).default({ discovered: 0, enriched: 0, qualified: 0, sentToSmartlead: 0, failed: 0 }),
+        approval: approvalSchema,
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false,
+      },
+    },
+    async ({ dbPath, approval: _approval, ...payload }) => {
+      requireExplicitApproval("arcigy.record_local_niche_run", { approval: _approval });
+      return jsonDbTool("record-niche-run", payload, dbPath);
+    }
+  );
+
+  server.registerTool(
     "arcigy.add_client_need_signal",
     {
       title: "Add client need signal",
@@ -4370,6 +4458,9 @@ function resolveOptionalRepoPath(value: unknown, label: string): string | undefi
 function jsonDbTool(
   command:
     | "upsert-person"
+    | "upsert-niche"
+    | "list-niche-queue"
+    | "record-niche-run"
     | "add-need-signal"
     | "add-cold-event"
     | "cold-brief"
@@ -4393,6 +4484,9 @@ function jsonDbTool(
 function runDbCommand(
   command:
     | "upsert-person"
+    | "upsert-niche"
+    | "list-niche-queue"
+    | "record-niche-run"
     | "add-need-signal"
     | "add-cold-event"
     | "cold-brief"
