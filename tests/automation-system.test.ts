@@ -12,7 +12,7 @@ import { draftContractIntake, parseJsonObject } from "../src/automation-system/c
 import { runIntegrationDiagnostics } from "../src/automation-system/diagnostics.ts";
 import { getIntegrationHealth } from "../src/automation-system/env.ts";
 import { buildClientReplyPrompt, buildPositiveOutreachReplyPrompt, generateGeminiText } from "../src/automation-system/gemini.ts";
-import { defaultGmailSyncQuery, encodeGmailRawMessage, fetchGmailLeadContext, fetchGmailUnreadTriage, listRecentGmailMessageEvents, parseFromHeader, refreshGoogleAccessToken, sendGmailTextMessage } from "../src/automation-system/gmail.ts";
+import { defaultGmailSyncQuery, encodeGmailRawMessage, fetchGmailLeadContext, fetchGmailUnreadTriage, labelGmailThread, listRecentGmailMessageEvents, parseFromHeader, refreshGoogleAccessToken, sendGmailTextMessage } from "../src/automation-system/gmail.ts";
 import { batchFetchPublicUrlPreviews, fetchPublicUrlPreview } from "../src/automation-system/http-fetch.ts";
 import { appendRowsToGoogleSheet, discoverLeads, replaceGoogleSheetRows, searchGooglePlaces, searchSerper } from "../src/automation-system/lead-discovery.ts";
 import {
@@ -167,6 +167,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.sync_gmail_recent_messages",
     "arcigy.get_gmail_lead_context",
     "arcigy.get_gmail_unread_triage",
+    "arcigy.label_gmail_thread",
     "arcigy.get_smartlead_campaign_status",
     "arcigy.get_smartlead_outreach_brief",
     "arcigy.get_smartlead_campaign_leads",
@@ -351,6 +352,7 @@ test("Jarvis capability audit maps the full requested production surface to evid
   assert.ok(audit.capabilities.some((item) => item.id === "proactive-digest" && item.status === "ready" && item.tools.includes("arcigy.sync_gmail_recent_messages")));
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.append_leads_to_google_sheet")));
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.replace_google_sheet_rows")));
+  assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.label_gmail_thread")));
   assert.doesNotMatch(JSON.stringify(audit), /AIza|GOCSPX|1\/\/|postgresql:\/\/|redis:\/\//);
 
   const score = buildProductionCompletionScore({ readiness, productionEvidence, capabilityAudit: audit, env, generatedAt: "2026-06-09T00:00:00.000Z" });
@@ -442,12 +444,14 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.ok(paths.includes("/api/mcp/arcigy.get_jarvis_capability_audit"));
   assert.ok(paths.includes("/api/mcp/arcigy.get_gmail_lead_context"));
   assert.ok(paths.includes("/api/mcp/arcigy.get_gmail_unread_triage"));
+  assert.ok(paths.includes("/api/mcp/arcigy.label_gmail_thread"));
   const operatorBriefing = document.paths["/api/mcp/arcigy.get_operator_briefing"] as OpenApiPathFixture;
   const attentionDigest = document.paths["/api/mcp/arcigy.get_proactive_attention_digest"] as OpenApiPathFixture;
   const completionScore = document.paths["/api/mcp/arcigy.get_production_completion_score"] as OpenApiPathFixture;
   const gmailSync = document.paths["/api/mcp/arcigy.sync_gmail_recent_messages"] as OpenApiPathFixture;
   const gmailLeadContext = document.paths["/api/mcp/arcigy.get_gmail_lead_context"] as OpenApiPathFixture;
   const gmailUnreadTriage = document.paths["/api/mcp/arcigy.get_gmail_unread_triage"] as OpenApiPathFixture;
+  const gmailLabelThread = document.paths["/api/mcp/arcigy.label_gmail_thread"] as OpenApiPathFixture;
   const contractGenerate = document.paths["/api/mcp/arcigy.generate_contract_documents"] as OpenApiPathFixture;
   assert.equal(operatorBriefing.post.requestBody.content["application/json"].examples.quickStart.value.live, false);
   assert.equal(attentionDigest.post.requestBody.content["application/json"].examples.quickStart.value.syncGmail, false);
@@ -456,6 +460,9 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.equal(gmailSync.post.requestBody.content["application/json"].examples.quickStart.value.dryRun, true);
   assert.equal(gmailLeadContext.post.requestBody.content["application/json"].examples.quickStart.value.leadEmail, "lead@example.com");
   assert.equal(gmailUnreadTriage.post.requestBody.content["application/json"].examples.quickStart.value.query, "is:unread category:primary");
+  assert.equal(gmailLabelThread.post["x-arcigy-requiresApproval"], true);
+  assert.equal(gmailLabelThread.post.requestBody.content["application/json"].examples.quickStart.value.labelName, "Jarvis/Handled");
+  assert.equal(gmailLabelThread.post.requestBody.content["application/json"].examples.quickStart.value.approval.approved, true);
   assert.equal(contractGenerate.post["x-arcigy-requiresApproval"], true);
   assert.equal(contractGenerate.post.requestBody.content["application/json"].examples.quickStart.value.approval.approved, true);
   assert.equal(JSON.stringify(document).includes("<JARVIS_WEB_TOKEN>"), true);
@@ -510,6 +517,7 @@ test("remote MCP smoke checks every response for bearer token leaks", async () =
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.export_leads_csv") ||
+      url.endsWith("/api/mcp/arcigy.label_gmail_thread") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet") ||
       url.endsWith("/api/mcp/arcigy.replace_google_sheet_rows") ||
       url.endsWith("/api/mcp/arcigy.add_leads_to_smartlead_campaign") ||
@@ -574,6 +582,7 @@ test("remote MCP smoke requires valid quick-start URLs", async () => {
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
+      url.endsWith("/api/mcp/arcigy.label_gmail_thread") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet") ||
       url.endsWith("/api/mcp/arcigy.replace_google_sheet_rows")
     ) {
@@ -634,6 +643,7 @@ test("remote MCP smoke requires quick-start approval policy parity", async () =>
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
+      url.endsWith("/api/mcp/arcigy.label_gmail_thread") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet") ||
       url.endsWith("/api/mcp/arcigy.replace_google_sheet_rows")
     ) {
@@ -694,6 +704,7 @@ test("remote MCP smoke requires exact MCP call parity in quick-starts", async ()
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
+      url.endsWith("/api/mcp/arcigy.label_gmail_thread") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet") ||
       url.endsWith("/api/mcp/arcigy.replace_google_sheet_rows")
     ) {
@@ -774,6 +785,7 @@ test("remote MCP smoke blocks generic secret patterns in response bodies", async
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
+      url.endsWith("/api/mcp/arcigy.label_gmail_thread") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet") ||
       url.endsWith("/api/mcp/arcigy.replace_google_sheet_rows")
     ) {
@@ -1521,7 +1533,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 128 toolov, 13 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 129 toolov, 14 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -2527,8 +2539,41 @@ test("Gmail unread triage separates lead replies from automated messages", async
   assert.equal(result.messages.find((message) => message.messageId === "msg-lead")?.category, "likely_lead_reply");
   assert.ok(result.nextToolCalls.some((call) => call.tool === "arcigy.get_gmail_lead_context" && call.payload.leadEmail === "lead@example.com"));
   assert.ok(result.nextToolCalls.some((call) => call.tool === "arcigy.preview_gmail_ai_reply" && !call.approvalRequired));
+  assert.ok(result.nextToolCalls.some((call) => call.tool === "arcigy.label_gmail_thread" && call.approvalRequired));
   assert.ok(calls.some((url) => new URL(url).searchParams.get("q") === "is:unread category:primary"));
   assert.match(result.summary, /Ziadny zapis, label ani odoslanie/);
+});
+
+test("Gmail helper labels a thread after approval workflow", async () => {
+  const calls: Array<{ url: string; body?: unknown }> = [];
+  const fetchImpl = async (url: string | URL | Request, init?: RequestInit) => {
+    const target = String(url);
+    let body: unknown;
+    if (init?.body) {
+      try {
+        body = JSON.parse(String(init.body));
+      } catch {
+        body = String(init.body);
+      }
+    }
+    calls.push({ url: target, body });
+    if (target.includes("oauth2.googleapis.com")) return responseJson({ access_token: "gmail-access" });
+    if (target.endsWith("/labels") && !init?.method) return responseJson({ labels: [{ id: "Label_1", name: "Jarvis/Handled" }] });
+    if (target.includes("/threads/thread-1/modify")) return responseJson({ id: "thread-1" });
+    throw new Error(`Unexpected URL: ${target}`);
+  };
+
+  const result = await labelGmailThread(
+    { accountEnvKey: "GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP", threadId: "thread-1", labelName: "Jarvis/Handled" },
+    { GOOGLE_CLIENT_ID: "client", GOOGLE_CLIENT_SECRET: "secret", GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP: "refresh" },
+    fetchImpl as typeof fetch
+  );
+
+  assert.equal(result.mode, "gmail-thread-label");
+  assert.equal(result.label.created, false);
+  assert.equal(result.markRead, true);
+  const modifyCall = calls.find((call) => call.url.includes("/threads/thread-1/modify"));
+  assert.deepEqual(modifyCall?.body, { addLabelIds: ["Label_1"], removeLabelIds: ["UNREAD"] });
 });
 
 test("Gmail helper sends raw text messages through Gmail API", async () => {

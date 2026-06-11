@@ -42,6 +42,15 @@ type GmailMessageResponse = {
   };
 };
 
+type GmailLabelResponse = {
+  id: string;
+  name: string;
+};
+
+type GmailLabelListResponse = {
+  labels?: GmailLabelResponse[];
+};
+
 export type GmailLeadContextMessage = {
   accountEnvKey: string;
   accountLabel: string;
@@ -111,6 +120,18 @@ export type GmailUnreadTriageResult = {
   accounts: Array<{ envKey: string; label: string; status: "ready" | "empty" | "failed"; messageCount: number; error?: string }>;
   messages: GmailUnreadTriageMessage[];
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
+export type GmailThreadLabelResult = {
+  mode: "gmail-thread-label";
+  status: "labeled";
+  summary: string;
+  accountEnvKey: string;
+  accountLabel: string;
+  threadId: string;
+  label: { id: string; name: string; created: boolean };
+  markRead: boolean;
+  modified: boolean;
 };
 
 export type GmailSendInput = {
@@ -386,6 +407,12 @@ export async function fetchGmailUnreadTriage(
         },
         reason: "Pripravit bezpecny draft odpovede na unread Gmail spravu bez odoslania.",
         approvalRequired: false,
+      },
+      {
+        tool: "arcigy.label_gmail_thread",
+        payload: { accountEnvKey: message.accountEnvKey, threadId: message.threadId, labelName: "Jarvis/Handled", markRead: true },
+        reason: "Az po vybaveni spravy oznacit Gmail thread ako spracovany a precitany.",
+        approvalRequired: true,
       }
     );
   }
@@ -433,6 +460,41 @@ export async function sendGmailTextMessage(
   return gmailPost<GmailSendResult>("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", accessToken, payload, fetchImpl);
 }
 
+export async function labelGmailThread(
+  input: { accountEnvKey: string; threadId: string; labelName?: string; markRead?: boolean },
+  env: RuntimeEnv = process.env,
+  fetchImpl: FetchLike = fetch
+): Promise<GmailThreadLabelResult> {
+  const accountEnvKey = input.accountEnvKey.trim();
+  const threadId = input.threadId.trim();
+  const labelName = sanitizeGmailLabelName(input.labelName || "Jarvis/Handled");
+  if (!accountEnvKey) throw new Error("accountEnvKey is required.");
+  if (!threadId) throw new Error("threadId is required.");
+  const account = listConfiguredGmailAccounts(env).find((item) => item.envKey === accountEnvKey);
+  if (!account) throw new Error(`Configured Gmail account not found: ${accountEnvKey}`);
+  const accessToken = await refreshGoogleAccessToken(account.refreshToken, env, fetchImpl);
+  const label = await ensureGmailLabel(labelName, accessToken, fetchImpl);
+  const payload: { addLabelIds: string[]; removeLabelIds?: string[] } = { addLabelIds: [label.id] };
+  if (input.markRead !== false) payload.removeLabelIds = ["UNREAD"];
+  await gmailPost<unknown>(
+    `https://gmail.googleapis.com/gmail/v1/users/me/threads/${encodeURIComponent(threadId)}/modify`,
+    accessToken,
+    payload,
+    fetchImpl
+  );
+  return {
+    mode: "gmail-thread-label",
+    status: "labeled",
+    summary: `Gmail thread ${threadId} oznaceny labelom ${label.name}${input.markRead === false ? "" : " a oznaceny ako precitany"}.`,
+    accountEnvKey: account.envKey,
+    accountLabel: account.label,
+    threadId,
+    label,
+    markRead: input.markRead !== false,
+    modified: true,
+  };
+}
+
 async function gmailFetch<T>(url: string, accessToken: string, fetchImpl: FetchLike): Promise<T> {
   const response = await fetchImpl(url, {
     headers: { authorization: `Bearer ${accessToken}` },
@@ -475,6 +537,25 @@ export function encodeGmailRawMessage(input: GmailSendInput): string {
 
 function sanitizeHeader(value: string): string {
   return value.replace(/[\r\n]+/g, " ").trim();
+}
+
+function sanitizeGmailLabelName(value: string): string {
+  const cleaned = value.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
+  if (!cleaned) return "Jarvis/Handled";
+  return cleaned.slice(0, 225);
+}
+
+async function ensureGmailLabel(labelName: string, accessToken: string, fetchImpl: FetchLike): Promise<GmailLabelResponse & { created: boolean }> {
+  const labels = await gmailFetch<GmailLabelListResponse>("https://gmail.googleapis.com/gmail/v1/users/me/labels", accessToken, fetchImpl);
+  const existing = labels.labels?.find((label) => label.name.toLowerCase() === labelName.toLowerCase());
+  if (existing) return { id: existing.id, name: existing.name, created: false };
+  const created = await gmailPost<GmailLabelResponse>(
+    "https://gmail.googleapis.com/gmail/v1/users/me/labels",
+    accessToken,
+    { name: labelName, labelListVisibility: "labelShow", messageListVisibility: "show" },
+    fetchImpl
+  );
+  return { id: created.id, name: created.name, created: true };
 }
 
 export function parseFromHeader(header: string): { email: string; displayName?: string } {

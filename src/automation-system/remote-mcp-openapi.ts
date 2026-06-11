@@ -276,6 +276,7 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
   if (toolName === "arcigy.sync_gmail_recent_messages") return { dryRun: true, maxResults: 5 };
   if (toolName === "arcigy.get_gmail_lead_context") return { leadEmail: "lead@example.com", maxMessages: 10, includeBody: true };
   if (toolName === "arcigy.get_gmail_unread_triage") return { query: "is:unread category:primary", maxResults: 10, includeBody: true, maxNextCalls: 10 };
+  if (toolName === "arcigy.label_gmail_thread") return { accountEnvKey: "GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP", threadId: "thread-123", labelName: "Jarvis/Handled", markRead: true, approval: { approved: true } };
   if (toolName === "arcigy.get_smartlead_outreach_brief") return { periodLabel: "poslednych 7 dni" };
   if (toolName === "arcigy.get_smartlead_campaign_leads") return { campaignId: "123456", offset: 0, limit: 100 };
   if (toolName === "arcigy.preview_smartlead_lead_sync") return { campaignIds: ["123456"], limitPerCampaign: 100 };

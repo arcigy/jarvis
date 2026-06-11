@@ -1994,6 +1994,14 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Label Gmail thread after handling",
+      tool: "arcigy.label_gmail_thread",
+      method: "POST",
+      url: toolUrl("arcigy.label_gmail_thread"),
+      body: { accountEnvKey: "GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP", threadId: "thread-123", labelName: "Jarvis/Handled", markRead: true, approval: { approved: true } },
+      approvalRequired: true,
+    },
+    {
       label: "Generate contract documents after approval",
       tool: "arcigy.generate_contract_documents",
       method: "POST",

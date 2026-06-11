@@ -11,7 +11,7 @@ import { draftContractIntake } from "../automation-system/contract-intake-draft.
 import { runIntegrationDiagnostics } from "../automation-system/diagnostics.ts";
 import { getIntegrationHealth, loadLocalEnv } from "../automation-system/env.ts";
 import { buildClientReplyPrompt, buildPositiveOutreachReplyPrompt, generateGeminiText } from "../automation-system/gemini.ts";
-import { defaultGmailBriefingQuery, defaultGmailSyncQuery, defaultGmailUnreadTriageQuery, fetchGmailLeadContext, fetchGmailUnreadTriage, listConfiguredGmailAccounts, listRecentGmailMessageEvents, sendGmailTextMessage } from "../automation-system/gmail.ts";
+import { defaultGmailBriefingQuery, defaultGmailSyncQuery, defaultGmailUnreadTriageQuery, fetchGmailLeadContext, fetchGmailUnreadTriage, labelGmailThread, listConfiguredGmailAccounts, listRecentGmailMessageEvents, sendGmailTextMessage } from "../automation-system/gmail.ts";
 import { batchFetchPublicUrlPreviews, fetchPublicUrlPreview } from "../automation-system/http-fetch.ts";
 import { containsWakeWord, extractCommandAfterWakeWord, type JarvisVoiceSession } from "../automation-system/jarvis-voice.ts";
 import { buildJarvisCapabilityAudit, summarizeJarvisCapabilityAuditForVoice } from "../automation-system/jarvis-capability-audit.ts";
@@ -1317,6 +1317,17 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
       }),
     });
+    return;
+  }
+  if (name === "arcigy.label_gmail_thread") {
+    const result = await labelGmailThread({
+      accountEnvKey: String(payload.accountEnvKey ?? ""),
+      threadId: String(payload.threadId ?? ""),
+      labelName: optionalString(payload.labelName),
+      markRead: payload.markRead !== false,
+    });
+    addAuditEvent("arcigy.label_gmail_thread", "labeled", { accountEnvKey: payload.accountEnvKey, threadId: payload.threadId, labelName: payload.labelName, markRead: payload.markRead }, result, true);
+    writeJson(response, 200, { result });
     return;
   }
   if (name === "arcigy.get_smartlead_campaign_status") {

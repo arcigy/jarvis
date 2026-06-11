@@ -12,7 +12,7 @@ import { draftContractIntake } from "./contract-intake-draft.ts";
 import { runIntegrationDiagnostics } from "./diagnostics.ts";
 import { getIntegrationHealth, loadLocalEnv, summarizeIntegrationHealth } from "./env.ts";
 import { buildClientReplyPrompt, buildPositiveOutreachReplyPrompt, generateGeminiText } from "./gemini.ts";
-import { defaultGmailBriefingQuery, defaultGmailSyncQuery, defaultGmailUnreadTriageQuery, fetchGmailLeadContext, fetchGmailUnreadTriage, listConfiguredGmailAccounts, listRecentGmailMessageEvents, sendGmailTextMessage } from "./gmail.ts";
+import { defaultGmailBriefingQuery, defaultGmailSyncQuery, defaultGmailUnreadTriageQuery, fetchGmailLeadContext, fetchGmailUnreadTriage, labelGmailThread, listConfiguredGmailAccounts, listRecentGmailMessageEvents, sendGmailTextMessage } from "./gmail.ts";
 import { batchFetchPublicUrlPreviews, fetchPublicUrlPreview } from "./http-fetch.ts";
 import { handleJarvisVoiceEvent, type JarvisVoiceSession } from "./jarvis-voice.ts";
 import { buildJarvisCapabilityAudit, summarizeJarvisCapabilityAuditForVoice } from "./jarvis-capability-audit.ts";
@@ -1298,6 +1298,31 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(await fetchGmailUnreadTriage(input))
+  );
+
+  server.registerTool(
+    "arcigy.label_gmail_thread",
+    {
+      title: "Label Gmail thread",
+      description: "Approval-required Gmail write. Creates/fetches a Gmail label, adds it to a thread, and optionally marks the thread as read after the operator confirms the exact payload.",
+      inputSchema: {
+        accountEnvKey: z.string().min(1),
+        threadId: z.string().min(1),
+        labelName: z.string().default("Jarvis/Handled"),
+        markRead: z.boolean().default(true),
+        approval: approvalSchema,
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+    },
+    async (input) => {
+      requireExplicitApproval("arcigy.label_gmail_thread", input);
+      return jsonResult(await labelGmailThread(input));
+    }
   );
 
   server.registerTool(
