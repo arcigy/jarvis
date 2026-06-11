@@ -47,6 +47,7 @@ import {
   buildLeadgenDbStatusPreview,
   buildGoogleSheetSyncPreview,
   buildWebsiteScrapeQualityAuditPreview,
+  buildOutreachContactSelectionPreview,
   buildSlovakRegisterBatchPreview,
   buildSlovakSalutationPreview,
   buildGmailNameEnrichmentQueuePreview,
@@ -215,6 +216,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.scrape_website_contacts",
     "arcigy.batch_scrape_website_contacts",
     "arcigy.build_website_scrape_quality_audit_preview",
+    "arcigy.build_outreach_contact_selection_preview",
     "arcigy.enrich_slovak_company_register",
     "arcigy.build_local_lead_register_update_preview",
     "arcigy.apply_local_lead_register_update",
@@ -494,6 +496,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.ok(paths.includes("/api/mcp/arcigy.label_gmail_thread"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_local_lead_register_update_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.apply_local_lead_register_update"));
+  assert.ok(paths.includes("/api/mcp/arcigy.build_outreach_contact_selection_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_gmail_name_enrichment_queue_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_lead_identity_repair_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_lead_validation_scorecard_preview"));
@@ -1902,6 +1905,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.record_local_niche_run" && call.approvalRequired === true));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_local_lead_register_update_preview" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.apply_local_lead_register_update" && call.approvalRequired === true));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_outreach_contact_selection_preview" && call.approvalRequired === false && Array.isArray(call.body.scrapedResults)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_gmail_name_enrichment_queue_preview" && call.approvalRequired === false && call.body.accountEmail === "branislav.l@arcigy.group"));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_lead_identity_repair_preview" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_lead_validation_scorecard_preview" && call.approvalRequired === false && call.body.minScore === 70));
@@ -4619,6 +4623,49 @@ test("website scrape quality audit selects preferred contacts and plans rescrape
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_ai_intro_work_packet_preview" && !call.approvalRequired));
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_lead_enrichment_merge_preview" && !call.approvalRequired));
   assert.match(preview.summary, /Ziadny fetch ani zapis/);
+});
+
+test("outreach contact selection ranks scraped emails and prepares fallback search", () => {
+  const preview = buildOutreachContactSelectionPreview({
+    sourceName: "kuchyne-contact-scrape",
+    scrapedResults: [
+      {
+        url: "https://ready.sk",
+        finalUrl: "https://ready.sk/kontakt",
+        title: "Ready Studio",
+        textPreview: "Kuchyne na mieru a showroom.",
+        emails: ["info@ready.sk", "jan.novak@ready.sk", "logo@cdn.ready.sk"],
+        phones: ["+421 900 111 222"],
+      },
+      { url: "https://needs-search.sk", title: "Needs Search", textPreview: "Zakazkove interiery.", emails: [], phones: [] },
+      { url: "https://generic.sk", title: "Generic", textPreview: "Servis a kontakt.", emails: ["info@generic.sk"], phones: [] },
+    ],
+    leads: [
+      { companyName: "Ready Studio", website: "https://ready.sk" },
+      { companyName: "Needs Search", website: "https://needs-search.sk" },
+      { companyName: "Generic", website: "https://generic.sk" },
+    ],
+    offer: "AI follow-up",
+  });
+
+  assert.equal(preview.mode, "outreach-contact-selection-preview");
+  assert.equal(preview.status, "attention");
+  assert.equal(preview.totals.input, 3);
+  assert.equal(preview.totals.ready, 1);
+  assert.equal(preview.totals.needsSearch, 1);
+  assert.equal(preview.totals.manualReview, 1);
+  assert.equal(preview.totals.selectedPersonalEmails, 1);
+  assert.equal(preview.totals.selectedGenericEmails, 1);
+  assert.equal(preview.items[0].selectedEmail, "jan.novak@ready.sk");
+  assert.equal(preview.items[0].rankedEmails[0].quality, "personal");
+  assert.ok(preview.items[0].issues.includes("asset_like_emails_filtered"));
+  assert.equal(preview.fallbackSearches[0].website, "https://needs-search.sk");
+  assert.equal(preview.enrichedLeads[0].email, "jan.novak@ready.sk");
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.search_serper" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_scrape_website_contacts" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_draft_lead_intros" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_lead_repair_queue_preview" && !call.approvalRequired));
+  assert.match(preview.summary, /Ziadny fetch, zapis ani upload/);
 });
 
 test("public URL fetch preview redacts secrets and blocks private hosts", async () => {

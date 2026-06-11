@@ -464,6 +464,18 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       language: "sk",
     };
   }
+  if (toolName === "arcigy.build_outreach_contact_selection_preview") {
+    return {
+      sourceName: "kuchyne-contact-scrape",
+      scrapedResults: [
+        { url: "https://ready.sk", finalUrl: "https://ready.sk/kontakt", title: "Ready Studio", textPreview: "Kuchyne na mieru, showroom a navrhy interierov.", emails: ["info@ready.sk", "jan.novak@ready.sk"], phones: ["+421 900 111 222"] },
+        { url: "https://needs-search.sk", title: "Needs Search", textPreview: "Zakazkove interiery.", emails: [], phones: [] },
+      ],
+      leads: [{ companyName: "Ready Studio", website: "https://ready.sk" }, { companyName: "Needs Search", website: "https://needs-search.sk" }],
+      offer: "AI asistent na dopyty a follow-up",
+      language: "sk",
+    };
+  }
   if (toolName === "arcigy.enrich_slovak_company_register") return { companyName: "Modelova Firma s.r.o." };
   if (toolName === "arcigy.build_slovak_register_batch_preview") {
     return {

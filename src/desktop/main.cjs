@@ -3224,6 +3224,7 @@ function listWebMcpTools() {
     { name: "arcigy.scrape_website_contacts", requiresApproval: false },
     { name: "arcigy.batch_scrape_website_contacts", requiresApproval: false },
     { name: "arcigy.build_website_scrape_quality_audit_preview", requiresApproval: false },
+    { name: "arcigy.build_outreach_contact_selection_preview", requiresApproval: false },
     { name: "arcigy.enrich_slovak_company_register", requiresApproval: false },
     { name: "arcigy.build_local_lead_register_update_preview", requiresApproval: false },
     { name: "arcigy.apply_local_lead_register_update", requiresApproval: true },

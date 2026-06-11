@@ -136,6 +136,7 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.scrape_website_contacts`: read-only website/contact-page fetcher for emails, phones, links, title, description, and text preview.
 - `arcigy.batch_scrape_website_contacts`: read-only batch website/contact-page scraping with per-site success/error reporting.
 - `arcigy.build_website_scrape_quality_audit_preview`: audits supplied scrape results, selects preferred emails/phones/context, flags weak scrapes, and prepares rescrape, AI intro, and enrichment merge next steps without fetching or writing.
+- `arcigy.build_outreach_contact_selection_preview`: ranks scraped emails/phones for outreach, selects the best contact, and prepares fallback search, rescrape, intro, and repair next steps without fetching or writing.
 - `arcigy.enrich_slovak_company_register`: read-only ORSR lookup by ICO or company name for company, address, executives, and source URL.
 - `arcigy.build_local_lead_register_update_preview`: read-only ORSR enrichment for one local lead/person that prepares the exact JSON `data` patch and approval payload without writing.
 - `arcigy.apply_local_lead_register_update`: approval-required local SQLite write that stores reviewed ORSR enrichment in the existing local person JSON `data` payload.

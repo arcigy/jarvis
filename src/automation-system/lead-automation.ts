@@ -55,6 +55,40 @@ export type WebsiteScrapeQualityAuditPreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type OutreachContactSelectionPreview = {
+  mode: "outreach-contact-selection-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  source: { name?: string; scrapedResults: number; failures: number };
+  totals: {
+    input: number;
+    ready: number;
+    needsSearch: number;
+    manualReview: number;
+    selectedPersonalEmails: number;
+    selectedGenericEmails: number;
+    missingEmail: number;
+    missingPhone: number;
+    freeMailboxSelected: number;
+    fallbackSearches: number;
+    introsToDraft: number;
+  };
+  items: Array<{
+    scrape: Partial<ScrapedWebsiteContacts>;
+    lead?: LeadCandidateInput;
+    status: "ready" | "needs_search" | "manual_review";
+    selectedEmail?: string;
+    selectedPhone?: string;
+    rankedEmails: Array<{ email: string; score: number; quality: "personal" | "generic" | "free_mailbox" | "external" | "asset" | "invalid"; reasons: string[] }>;
+    issues: string[];
+    evidenceText: string;
+  }>;
+  fallbackSearches: Array<{ query: string; website?: string; companyName?: string; reason: string }>;
+  enrichedLeads: Array<LeadCandidateInput & { scraped?: Partial<ScrapedWebsiteContacts>; evidenceText?: string }>;
+  introInputs: LeadIntroInput[];
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type LeadIntroInput = {
   companyName: string;
   website?: string;
@@ -2819,6 +2853,138 @@ export function buildWebsiteScrapeQualityAuditPreview(input: {
     items,
     enrichedLeads,
     rescrapeUrls,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls),
+  };
+}
+
+export function buildOutreachContactSelectionPreview(input: {
+  scrapedResults?: Array<Partial<ScrapedWebsiteContacts>>;
+  batch?: Partial<BatchScrapedWebsiteContacts>;
+  leads?: LeadCandidateInput[];
+  sourceName?: string;
+  offer?: string;
+  language?: "sk" | "en";
+  includeFallbackSearch?: boolean;
+  maxNextCalls?: number;
+}): OutreachContactSelectionPreview {
+  const scrapedResults = [...(input.scrapedResults ?? []), ...(input.batch?.results ?? [])];
+  const failures = input.batch?.failures ?? [];
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 40), 1), 120);
+  const items: OutreachContactSelectionPreview["items"] = scrapedResults.map((scrape) => {
+    const lead = (input.leads ?? []).find((candidate) => scrapeMatchesLead(scrape, candidate));
+    const website = lead?.website ?? scrape.finalUrl ?? scrape.url;
+    const emails = unique([lead?.email, ...(scrape.emails ?? [])].filter((email): email is string => Boolean(email)).map((email) => email.trim().toLowerCase()));
+    const rankedEmails = rankOutreachContactEmails(emails, website);
+    const selected = rankedEmails.find((email) => email.quality !== "invalid" && email.quality !== "asset" && email.score >= 20) ?? rankedEmails.find((email) => email.quality === "generic" && email.score >= 5);
+    const selectedPhone = lead?.phone ?? scrape.phones?.find((phone) => phone.trim());
+    const evidenceText = [scrape.title, scrape.description, scrape.textPreview].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+    const issues: string[] = [];
+    if (!selected) issues.push("missing_usable_email");
+    if (selected?.quality === "generic") issues.push("selected_generic_email");
+    if (selected?.quality === "free_mailbox") issues.push("selected_free_mailbox");
+    if (selected?.quality === "external") issues.push("selected_external_domain");
+    if (!selectedPhone) issues.push("missing_phone");
+    if (rankedEmails.some((email) => email.quality === "asset")) issues.push("asset_like_emails_filtered");
+    const status: OutreachContactSelectionPreview["items"][number]["status"] = !selected ? "needs_search" : issues.some((issue) => ["selected_generic_email", "selected_free_mailbox", "selected_external_domain"].includes(issue)) ? "manual_review" : "ready";
+    return { scrape, lead, status, selectedEmail: selected?.email, selectedPhone, rankedEmails, issues, evidenceText };
+  });
+  const fallbackSearches = items
+    .filter((item) => item.status === "needs_search")
+    .map((item) => {
+      const companyName = item.lead?.companyName ?? stringField(item.lead?.customFields ?? {}, "company_name", "original_name") ?? item.scrape.title;
+      const website = item.lead?.website ?? item.scrape.finalUrl ?? item.scrape.url;
+      const domain = website ? normalizeDomain(website) : undefined;
+      const query = [companyName, domain, "email kontakt majitel"].filter(Boolean).join(" ");
+      return { query, website, companyName, reason: "Scrape nenasiel pouzitelny outreach email; skus cielene verejne hladanie kontaktu." };
+    })
+    .filter((item) => item.query.trim())
+    .slice(0, maxNextCalls);
+  const enrichedLeads = items.map((item) => ({
+    ...(item.lead ?? {}),
+    companyName: item.lead?.companyName ?? item.scrape.title,
+    website: item.lead?.website ?? item.scrape.finalUrl ?? item.scrape.url,
+    email: item.selectedEmail ?? item.lead?.email,
+    phone: item.selectedPhone ?? item.lead?.phone,
+    scraped: item.scrape,
+    evidenceText: item.evidenceText,
+    customFields: {
+      ...item.lead?.customFields,
+      contact_selection_status: item.status,
+      contact_selection_issues: item.issues.join(","),
+      selected_email_score: item.rankedEmails.find((email) => email.email === item.selectedEmail)?.score,
+      selected_email_quality: item.rankedEmails.find((email) => email.email === item.selectedEmail)?.quality,
+    },
+  }));
+  const introInputs = enrichedLeads
+    .filter((lead) => lead.companyName && lead.email && !extractLeadIntro(lead))
+    .map((lead) => ({
+      companyName: lead.companyName as string,
+      website: lead.website,
+      context: lead.evidenceText,
+      offer: input.offer,
+      language: input.language ?? "sk",
+    }))
+    .slice(0, maxNextCalls);
+  const nextToolCalls: OutreachContactSelectionPreview["nextToolCalls"] = [];
+  if (input.includeFallbackSearch !== false && fallbackSearches.length) {
+    for (const search of fallbackSearches.slice(0, Math.min(maxNextCalls, 10))) {
+      nextToolCalls.push({
+        tool: "arcigy.search_serper",
+        payload: { query: search.query, num: 5 },
+        reason: "Fallback hladanie emailu pre lead bez pouzitelneho scrape kontaktu.",
+        approvalRequired: false,
+      });
+    }
+  }
+  const rescrapeUrls = unique(items.filter((item) => item.status === "needs_search").map((item) => item.lead?.website ?? item.scrape.url ?? item.scrape.finalUrl).filter((value): value is string => Boolean(value))).slice(0, maxNextCalls);
+  if (rescrapeUrls.length) {
+    nextToolCalls.push({
+      tool: "arcigy.batch_scrape_website_contacts",
+      payload: { urls: rescrapeUrls, includePriorityPages: true, maxPages: 6, maxSites: rescrapeUrls.length },
+      reason: "Kontakt chyba alebo je slaby; zopakuj hlbsi scrape kontakt/about/team stranok.",
+      approvalRequired: false,
+    });
+  }
+  if (introInputs.length) {
+    nextToolCalls.push({
+      tool: "arcigy.batch_draft_lead_intros",
+      payload: { leads: introInputs, offer: input.offer, language: input.language ?? "sk", maxLeads: introInputs.length },
+      reason: "Vybrane kontakty maju dost kontextu; priprav AI intra pred Smartlead.",
+      approvalRequired: false,
+    });
+  }
+  if (enrichedLeads.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_lead_repair_queue_preview",
+      payload: { leads: enrichedLeads, offer: input.offer, language: input.language ?? "sk", maxNextCalls },
+      reason: "Po vybere kontaktov skontroluj emaily, mena, intra a manual-review stav pred Smartlead.",
+      approvalRequired: false,
+    });
+  }
+  const totals = {
+    input: items.length,
+    ready: items.filter((item) => item.status === "ready").length,
+    needsSearch: items.filter((item) => item.status === "needs_search").length,
+    manualReview: items.filter((item) => item.status === "manual_review").length,
+    selectedPersonalEmails: items.filter((item) => item.selectedEmail && item.rankedEmails.find((email) => email.email === item.selectedEmail)?.quality === "personal").length,
+    selectedGenericEmails: items.filter((item) => item.selectedEmail && item.rankedEmails.find((email) => email.email === item.selectedEmail)?.quality === "generic").length,
+    missingEmail: items.filter((item) => item.issues.includes("missing_usable_email")).length,
+    missingPhone: items.filter((item) => item.issues.includes("missing_phone")).length,
+    freeMailboxSelected: items.filter((item) => item.issues.includes("selected_free_mailbox")).length,
+    fallbackSearches: fallbackSearches.length,
+    introsToDraft: introInputs.length,
+  };
+  const status: OutreachContactSelectionPreview["status"] = totals.input === 0 && failures.length === 0 ? "blocked" : totals.needsSearch || totals.manualReview || failures.length ? "attention" : "ready";
+  return {
+    mode: "outreach-contact-selection-preview",
+    status,
+    summary: `Outreach contact selection ${status}: ${totals.ready} ready, ${totals.manualReview} manual review, ${totals.needsSearch} potrebuje fallback search, ${totals.selectedPersonalEmails} personal emailov. Ziadny fetch, zapis ani upload neprebehol.`,
+    source: { name: input.sourceName, scrapedResults: scrapedResults.length, failures: failures.length },
+    totals,
+    items,
+    fallbackSearches,
+    enrichedLeads,
+    introInputs,
     nextToolCalls: dedupeNextToolCalls(nextToolCalls),
   };
 }
@@ -9479,6 +9645,66 @@ function leadgenStatusTotals(rows: Array<{
 
 function preferBusinessEmail(emails: string[]): string | undefined {
   return emails.find((email) => !isGenericEmail(email)) ?? emails[0];
+}
+
+function rankOutreachContactEmails(emails: string[], website?: string): OutreachContactSelectionPreview["items"][number]["rankedEmails"] {
+  const siteDomain = website ? normalizeDomain(website) : undefined;
+  return unique(emails)
+    .map((email) => {
+      const value = email.trim().toLowerCase();
+      const domain = value.split("@")[1] ?? "";
+      const reasons: string[] = [];
+      let score = 0;
+      let quality: OutreachContactSelectionPreview["items"][number]["rankedEmails"][number]["quality"] = "personal";
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+        quality = "invalid";
+        reasons.push("invalid_format");
+        score -= 100;
+      }
+      if (isAssetLikeContactEmail(value)) {
+        quality = "asset";
+        reasons.push("asset_or_tracking_email");
+        score -= 90;
+      }
+      if (siteDomain && domain === siteDomain) {
+        reasons.push("same_domain");
+        score += 50;
+      } else if (siteDomain && domain.endsWith(`.${siteDomain}`)) {
+        reasons.push("subdomain_match");
+        score += 35;
+      } else if (siteDomain && domain) {
+        quality = quality === "personal" ? "external" : quality;
+        reasons.push("external_domain");
+        score -= 20;
+      }
+      if (isFreeMailboxContactDomain(domain)) {
+        quality = quality === "personal" ? "free_mailbox" : quality;
+        reasons.push("free_mailbox");
+        score -= 8;
+      }
+      if (isGenericEmail(value)) {
+        quality = quality === "personal" ? "generic" : quality;
+        reasons.push("generic_inbox");
+        score -= 10;
+      } else {
+        reasons.push("personal_like_local_part");
+        score += 25;
+      }
+      if (/^(majitel|owner|ceo|riaditel|reditel|konatel)[.@_-]/i.test(value.split("@")[0] ?? "")) {
+        reasons.push("decision_maker_alias");
+        score += 15;
+      }
+      return { email: value, score, quality, reasons };
+    })
+    .sort((a, b) => b.score - a.score || a.email.localeCompare(b.email));
+}
+
+function isAssetLikeContactEmail(email: string): boolean {
+  return /\.(png|jpe?g|svg|gif|webp|avif|css|js)$/i.test(email) || /(^|[._-])(logo|image|img|icon|banner|tracking|noreply|no-reply)([._-]|@)/i.test(email);
+}
+
+function isFreeMailboxContactDomain(domain: string): boolean {
+  return ["gmail.com", "seznam.cz", "email.cz", "centrum.cz", "post.sk", "azet.sk", "outlook.com", "hotmail.com", "icloud.com"].includes(domain);
 }
 
 function introEvidenceText(lead: LeadCandidateInput & { scraped?: Partial<ScrapedWebsiteContacts>; context?: string; evidenceText?: string }): string {

@@ -911,6 +911,23 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Select best outreach contacts from scrape",
+      tool: "arcigy.build_outreach_contact_selection_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_outreach_contact_selection_preview"),
+      body: {
+        sourceName: "kuchyne-contact-scrape",
+        scrapedResults: [
+          { url: "https://ready.sk", finalUrl: "https://ready.sk/kontakt", title: "Ready Studio", textPreview: "Kuchyne na mieru, showroom a navrhy interierov.", emails: ["info@ready.sk", "jan.novak@ready.sk"], phones: ["+421 900 111 222"] },
+          { url: "https://needs-search.sk", title: "Needs Search", textPreview: "Zakazkove interiery.", emails: [], phones: [] },
+        ],
+        leads: [{ companyName: "Ready Studio", website: "https://ready.sk" }, { companyName: "Needs Search", website: "https://needs-search.sk" }],
+        offer: "AI asistent na dopyty a follow-up",
+        language: "sk",
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Build a niche leadgen plan",
       tool: "arcigy.build_niche_leadgen_plan",
       method: "POST",

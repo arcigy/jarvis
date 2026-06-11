@@ -48,6 +48,7 @@ import {
   buildSmartleadNonreplyCallListPreview,
   batchScrapeWebsiteContacts,
   buildWebsiteScrapeQualityAuditPreview,
+  buildOutreachContactSelectionPreview,
   batchDraftLeadIntros,
   buildAiIntroQualityAuditPreview,
   buildFlaggedLeadReviewPreview,
@@ -1679,6 +1680,21 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
         offer: optionalString(payload.offer),
         language: payload.language === "en" ? "en" : "sk",
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_outreach_contact_selection_preview") {
+    writeJson(response, 200, {
+      result: buildOutreachContactSelectionPreview({
+        scrapedResults: Array.isArray(payload.scrapedResults) ? payload.scrapedResults as Parameters<typeof buildOutreachContactSelectionPreview>[0]["scrapedResults"] : undefined,
+        batch: isRecord(payload.batch) ? payload.batch as Parameters<typeof buildOutreachContactSelectionPreview>[0]["batch"] : undefined,
+        leads: Array.isArray(payload.leads) ? payload.leads as Parameters<typeof buildOutreachContactSelectionPreview>[0]["leads"] : undefined,
+        sourceName: optionalString(payload.sourceName),
+        offer: optionalString(payload.offer),
+        language: payload.language === "en" ? "en" : "sk",
+        includeFallbackSearch: payload.includeFallbackSearch !== false,
+        maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
       }),
     });
     return;

@@ -49,6 +49,7 @@ import {
   buildSmartleadNonreplyCallListPreview,
   batchScrapeWebsiteContacts,
   buildWebsiteScrapeQualityAuditPreview,
+  buildOutreachContactSelectionPreview,
   batchDraftLeadIntros,
   buildAiIntroQualityAuditPreview,
   buildFlaggedLeadReviewPreview,
@@ -2196,6 +2197,44 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildWebsiteScrapeQualityAuditPreview(input as Parameters<typeof buildWebsiteScrapeQualityAuditPreview>[0]))
+  );
+
+  server.registerTool(
+    "arcigy.build_outreach_contact_selection_preview",
+    {
+      title: "Build outreach contact selection preview",
+      description: "Rank scraped emails/phones for outreach, select the best contact per site, and prepare fallback search, rescrape, intro, and repair next steps without fetching or writing.",
+      inputSchema: {
+        scrapedResults: z.array(z.object({
+          url: z.string().optional(),
+          finalUrl: z.string().optional(),
+          title: z.string().optional(),
+          description: z.string().optional(),
+          textPreview: z.string().optional(),
+          emails: z.array(z.string()).optional(),
+          phones: z.array(z.string()).optional(),
+          internalLinks: z.array(z.string()).optional(),
+          fetchedAt: z.string().optional(),
+        }).partial()).optional(),
+        batch: z.object({
+          results: z.array(z.object({}).passthrough()).optional(),
+          failures: z.array(z.object({ url: z.string(), error: z.string() })).optional(),
+        }).partial().optional(),
+        leads: z.array(z.object({}).passthrough()).optional(),
+        sourceName: z.string().optional(),
+        offer: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        includeFallbackSearch: z.boolean().default(true),
+        maxNextCalls: z.number().int().min(1).max(120).default(40),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildOutreachContactSelectionPreview(input as Parameters<typeof buildOutreachContactSelectionPreview>[0]))
   );
 
   server.registerTool(
