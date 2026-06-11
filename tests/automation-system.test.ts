@@ -95,12 +95,14 @@ import {
   configureSmartleadCampaign,
   createSmartleadCampaign,
   draftSmartleadThreadReply,
+  getSmartleadCampaignWebhooks,
   getSmartleadCampaignLeads,
   getSmartleadCampaignStatus,
   getSmartleadMessageHistory,
   getSmartleadOutreachBrief,
   previewSmartleadLeadSync,
   sendSmartleadThreadReply,
+  upsertSmartleadCampaignWebhook,
 } from "../src/automation-system/smartlead.ts";
 import {
   containsWakeWord,
@@ -174,6 +176,8 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.get_smartlead_outreach_brief",
     "arcigy.get_smartlead_campaign_leads",
     "arcigy.preview_smartlead_lead_sync",
+    "arcigy.get_smartlead_campaign_webhooks",
+    "arcigy.upsert_smartlead_campaign_webhook",
     "arcigy.get_smartlead_message_history",
     "arcigy.classify_outreach_reply",
     "arcigy.build_outreach_reply_triage_preview",
@@ -356,6 +360,7 @@ test("Jarvis capability audit maps the full requested production surface to evid
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.replace_google_sheet_rows")));
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.label_gmail_thread")));
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.send_slack_message")));
+  assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.upsert_smartlead_campaign_webhook")));
   assert.doesNotMatch(JSON.stringify(audit), /AIza|GOCSPX|1\/\/|postgresql:\/\/|redis:\/\//);
 
   const score = buildProductionCompletionScore({ readiness, productionEvidence, capabilityAudit: audit, env, generatedAt: "2026-06-09T00:00:00.000Z" });
@@ -449,6 +454,8 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.ok(paths.includes("/api/mcp/arcigy.get_gmail_lead_context"));
   assert.ok(paths.includes("/api/mcp/arcigy.get_gmail_unread_triage"));
   assert.ok(paths.includes("/api/mcp/arcigy.label_gmail_thread"));
+  assert.ok(paths.includes("/api/mcp/arcigy.get_smartlead_campaign_webhooks"));
+  assert.ok(paths.includes("/api/mcp/arcigy.upsert_smartlead_campaign_webhook"));
   const operatorBriefing = document.paths["/api/mcp/arcigy.get_operator_briefing"] as OpenApiPathFixture;
   const attentionDigest = document.paths["/api/mcp/arcigy.get_proactive_attention_digest"] as OpenApiPathFixture;
   const completionScore = document.paths["/api/mcp/arcigy.get_production_completion_score"] as OpenApiPathFixture;
@@ -457,6 +464,8 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   const gmailLeadContext = document.paths["/api/mcp/arcigy.get_gmail_lead_context"] as OpenApiPathFixture;
   const gmailUnreadTriage = document.paths["/api/mcp/arcigy.get_gmail_unread_triage"] as OpenApiPathFixture;
   const gmailLabelThread = document.paths["/api/mcp/arcigy.label_gmail_thread"] as OpenApiPathFixture;
+  const smartleadWebhooks = document.paths["/api/mcp/arcigy.get_smartlead_campaign_webhooks"] as OpenApiPathFixture;
+  const smartleadWebhookUpsert = document.paths["/api/mcp/arcigy.upsert_smartlead_campaign_webhook"] as OpenApiPathFixture;
   const contractGenerate = document.paths["/api/mcp/arcigy.generate_contract_documents"] as OpenApiPathFixture;
   assert.equal(operatorBriefing.post.requestBody.content["application/json"].examples.quickStart.value.live, false);
   assert.equal(attentionDigest.post.requestBody.content["application/json"].examples.quickStart.value.syncGmail, false);
@@ -470,6 +479,9 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.equal(gmailLabelThread.post["x-arcigy-requiresApproval"], true);
   assert.equal(gmailLabelThread.post.requestBody.content["application/json"].examples.quickStart.value.labelName, "Jarvis/Handled");
   assert.equal(gmailLabelThread.post.requestBody.content["application/json"].examples.quickStart.value.approval.approved, true);
+  assert.equal(smartleadWebhooks.post.requestBody.content["application/json"].examples.quickStart.value.campaignId, "123456");
+  assert.equal(smartleadWebhookUpsert.post["x-arcigy-requiresApproval"], true);
+  assert.equal(smartleadWebhookUpsert.post.requestBody.content["application/json"].examples.quickStart.value.approval.approved, true);
   assert.equal(contractGenerate.post["x-arcigy-requiresApproval"], true);
   assert.equal(contractGenerate.post.requestBody.content["application/json"].examples.quickStart.value.approval.approved, true);
   assert.equal(JSON.stringify(document).includes("<JARVIS_WEB_TOKEN>"), true);
@@ -521,6 +533,7 @@ test("remote MCP smoke checks every response for bearer token leaks", async () =
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
+      url.endsWith("/api/mcp/arcigy.upsert_smartlead_campaign_webhook") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.export_leads_csv") ||
@@ -588,6 +601,7 @@ test("remote MCP smoke requires valid quick-start URLs", async () => {
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
+      url.endsWith("/api/mcp/arcigy.upsert_smartlead_campaign_webhook") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.label_gmail_thread") ||
@@ -649,6 +663,7 @@ test("remote MCP smoke requires quick-start approval policy parity", async () =>
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
+      url.endsWith("/api/mcp/arcigy.upsert_smartlead_campaign_webhook") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.label_gmail_thread") ||
@@ -711,6 +726,7 @@ test("remote MCP smoke requires exact MCP call parity in quick-starts", async ()
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
+      url.endsWith("/api/mcp/arcigy.upsert_smartlead_campaign_webhook") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.label_gmail_thread") ||
@@ -793,6 +809,7 @@ test("remote MCP smoke blocks generic secret patterns in response bodies", async
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
+      url.endsWith("/api/mcp/arcigy.upsert_smartlead_campaign_webhook") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.label_gmail_thread") ||
@@ -854,6 +871,7 @@ test("remote MCP smoke requires exact manifest and pack tool registries", async 
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
+      url.endsWith("/api/mcp/arcigy.upsert_smartlead_campaign_webhook") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet") ||
@@ -915,6 +933,7 @@ test("remote MCP smoke requires valid manifest tool metadata", async () => {
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
+      url.endsWith("/api/mcp/arcigy.upsert_smartlead_campaign_webhook") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet") ||
@@ -973,6 +992,7 @@ test("remote MCP smoke requires exact manifest and pack tool policies", async ()
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
+      url.endsWith("/api/mcp/arcigy.upsert_smartlead_campaign_webhook") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet") ||
@@ -1032,6 +1052,7 @@ test("remote MCP smoke requires guarded connection pack limits", async () => {
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
+      url.endsWith("/api/mcp/arcigy.upsert_smartlead_campaign_webhook") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet") ||
@@ -1308,6 +1329,7 @@ test("remote MCP smoke requires the audit trail quick-start", async () => {
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
+      url.endsWith("/api/mcp/arcigy.upsert_smartlead_campaign_webhook") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet") ||
@@ -1376,6 +1398,7 @@ test("remote MCP smoke requires the production evidence quick-start", async () =
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
+      url.endsWith("/api/mcp/arcigy.upsert_smartlead_campaign_webhook") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet") ||
@@ -1444,6 +1467,7 @@ test("remote MCP smoke requires the production evidence voice quick-start", asyn
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
+      url.endsWith("/api/mcp/arcigy.upsert_smartlead_campaign_webhook") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet") ||
@@ -1578,6 +1602,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
       url.endsWith("/api/mcp/arcigy.approve_prepared_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_approved_outreach_reply") ||
       url.endsWith("/api/mcp/arcigy.send_smartlead_thread_reply") ||
+      url.endsWith("/api/mcp/arcigy.upsert_smartlead_campaign_webhook") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
       url.endsWith("/api/mcp/arcigy.append_leads_to_google_sheet") ||
@@ -1782,6 +1807,8 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_leadgen_evening_summary" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.select_next_niche" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.preview_smartlead_lead_sync" && call.approvalRequired === false));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_campaign_webhooks" && call.approvalRequired === false));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.upsert_smartlead_campaign_webhook" && call.approvalRequired === true));
   assert.ok(pack.quickStartCalls.some((call) => call.label === "Spustit remote MCP smoke proof"));
   assert.ok(pack.quickStartCalls.some((call) => call.label === "Ziskat najnovsiu production verification evidence"));
   assert.ok(pack.quickStartCalls.some((call) => call.label === "Spytat sa Jarvisa na production evidence"));
@@ -4614,6 +4641,41 @@ test("Smartlead campaign read helpers fetch leads and message history", async ()
   assert.equal(history.latestSentEmail?.email_stats_id, "stats-1");
   assert.equal(history.latestSentEmail?.reply_message_id, "msg-1");
   assert.equal(JSON.stringify(history).includes("smartlead-secret"), false);
+});
+
+test("Smartlead helper audits and upserts campaign webhooks", async () => {
+  const calls: Array<{ url: string; body?: unknown; method?: string }> = [];
+  const fetchImpl = async (url: string | URL | Request, init?: RequestInit) => {
+    const target = String(url);
+    calls.push({ url: target, method: init?.method, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+    if (target.includes("/webhooks") && (!init?.method || init.method === "GET")) return responseJson({ data: [{ id: 1, webhook_url: "https://old.example/webhook" }] });
+    if (target.includes("/webhooks") && init?.method === "POST") return responseJson({ id: 2 });
+    throw new Error(`Unexpected Smartlead URL: ${target}`);
+  };
+  const env = { SMARTLEAD_API_KEY: "smartlead-secret" };
+
+  const audit = await getSmartleadCampaignWebhooks({ campaignId: "123" }, env, fetchImpl as typeof fetch);
+  const result = await upsertSmartleadCampaignWebhook(
+    {
+      campaignId: "123",
+      url: "https://jarvis.example/webhook/smartlead-ai-reply",
+      name: "Jarvis",
+      eventTypes: ["email_reply", "BAD", "LEAD_CATEGORY_UPDATED", "EMAIL_REPLY"],
+    },
+    env,
+    fetchImpl as typeof fetch
+  );
+
+  assert.equal(audit.campaignId, "123");
+  assert.equal(result.webhook.name, "Jarvis");
+  assert.deepEqual(result.webhook.event_types, ["EMAIL_REPLY", "LEAD_CATEGORY_UPDATED"]);
+  assert.deepEqual(calls.find((call) => call.method === "POST")?.body, {
+    id: null,
+    name: "Jarvis",
+    webhook_url: "https://jarvis.example/webhook/smartlead-ai-reply",
+    event_types: ["EMAIL_REPLY", "LEAD_CATEGORY_UPDATED"],
+  });
+  assert.equal(JSON.stringify(result).includes("smartlead-secret"), false);
 });
 
 test("Smartlead thread reply draft uses Gemini without sending", async () => {

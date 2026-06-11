@@ -125,6 +125,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(manifest.toolPolicy.approvalRequired.includes("arcigy.send_approved_outreach_reply"));
     assert.ok(manifest.toolPolicy.approvalRequired.includes("arcigy.label_gmail_thread"));
     assert.ok(manifest.toolPolicy.approvalRequired.includes("arcigy.send_slack_message"));
+    assert.ok(manifest.toolPolicy.approvalRequired.includes("arcigy.upsert_smartlead_campaign_webhook"));
     assert.ok(manifest.toolPolicy.localStateWrite.includes("arcigy.sync_gmail_recent_messages"));
     assert.ok(manifest.toolPolicy.localStateWrite.includes("arcigy.prepare_positive_outreach_reply"));
     assert.equal(manifest.toolPolicy.readOnlyOrDraft.includes("arcigy.ingest_client_message"), false);
@@ -134,6 +135,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.send_approved_outreach_reply" && tool.approval.required === true && tool.approval.field === "approval.approved"));
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.label_gmail_thread" && tool.approval.required === true && tool.approval.field === "approval.approved"));
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.send_slack_message" && tool.approval.required === true && tool.approval.field === "approval.approved"));
+    assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.upsert_smartlead_campaign_webhook" && tool.approval.required === true && tool.approval.field === "approval.approved"));
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.get_smartlead_outreach_brief" && tool.method === "POST"));
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.get_production_verification_evidence" && tool.readOnlyOrDraft === true));
     assert.ok(manifest.tools.some((tool) => tool.name === "arcigy.get_production_completion_score" && tool.readOnlyOrDraft === true));
@@ -566,6 +568,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(capabilityAuditBody.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.replace_google_sheet_rows")));
     assert.ok(capabilityAuditBody.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.label_gmail_thread")));
     assert.ok(capabilityAuditBody.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.send_slack_message")));
+    assert.ok(capabilityAuditBody.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.upsert_smartlead_campaign_webhook")));
     assert.equal(JSON.stringify(capabilityAuditBody).includes(syntheticGoogleKey), false);
 
     const mcpCapabilityAudit = await postJson(`${baseUrl}/api/mcp/arcigy.get_jarvis_capability_audit`, { live: false });
@@ -629,6 +632,8 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(openApiBody.paths["/api/mcp/arcigy.get_gmail_lead_context"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.get_gmail_unread_triage"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.label_gmail_thread"]);
+    assert.ok(openApiBody.paths["/api/mcp/arcigy.get_smartlead_campaign_webhooks"]);
+    assert.ok(openApiBody.paths["/api/mcp/arcigy.upsert_smartlead_campaign_webhook"]);
     const openApiOperator = openApiBody.paths["/api/mcp/arcigy.get_operator_briefing"] as OpenApiPathFixture;
     const openApiAttentionDigest = openApiBody.paths["/api/mcp/arcigy.get_proactive_attention_digest"] as OpenApiPathFixture;
     const openApiCompletionScore = openApiBody.paths["/api/mcp/arcigy.get_production_completion_score"] as OpenApiPathFixture;
@@ -637,6 +642,8 @@ test("local web bridge serves UI and API health", async () => {
     const openApiGmailLeadContext = openApiBody.paths["/api/mcp/arcigy.get_gmail_lead_context"] as OpenApiPathFixture;
     const openApiGmailUnreadTriage = openApiBody.paths["/api/mcp/arcigy.get_gmail_unread_triage"] as OpenApiPathFixture;
     const openApiGmailLabelThread = openApiBody.paths["/api/mcp/arcigy.label_gmail_thread"] as OpenApiPathFixture;
+    const openApiSmartleadWebhooks = openApiBody.paths["/api/mcp/arcigy.get_smartlead_campaign_webhooks"] as OpenApiPathFixture;
+    const openApiSmartleadWebhookUpsert = openApiBody.paths["/api/mcp/arcigy.upsert_smartlead_campaign_webhook"] as OpenApiPathFixture;
     const openApiContract = openApiBody.paths["/api/mcp/arcigy.generate_contract_documents"] as OpenApiPathFixture;
     assert.equal(openApiCompletionScore.post.requestBody.content["application/json"].examples.quickStart.value.live, false);
     assert.equal(openApiSlackSend.post["x-arcigy-requiresApproval"], true);
@@ -648,6 +655,9 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(openApiGmailUnreadTriage.post.requestBody.content["application/json"].examples.quickStart.value.query, "is:unread category:primary");
     assert.equal(openApiGmailLabelThread.post["x-arcigy-requiresApproval"], true);
     assert.equal(openApiGmailLabelThread.post.requestBody.content["application/json"].examples.quickStart.value.approval.approved, true);
+    assert.equal(openApiSmartleadWebhooks.post.requestBody.content["application/json"].examples.quickStart.value.campaignId, "123456");
+    assert.equal(openApiSmartleadWebhookUpsert.post["x-arcigy-requiresApproval"], true);
+    assert.equal(openApiSmartleadWebhookUpsert.post.requestBody.content["application/json"].examples.quickStart.value.approval.approved, true);
     assert.equal(openApiContract.post["x-arcigy-requiresApproval"], true);
     assert.equal(openApiContract.post.requestBody.content["application/json"].examples.quickStart.value.approval.approved, true);
 
@@ -785,6 +795,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(remotePackBody.tools.approvalRequired.includes("arcigy.send_approved_outreach_reply"));
     assert.ok(remotePackBody.tools.approvalRequired.includes("arcigy.label_gmail_thread"));
     assert.ok(remotePackBody.tools.approvalRequired.includes("arcigy.send_slack_message"));
+    assert.ok(remotePackBody.tools.approvalRequired.includes("arcigy.upsert_smartlead_campaign_webhook"));
     assert.ok(remotePackBody.tools.localStateWrite.includes("arcigy.sync_gmail_recent_messages"));
     assert.ok(remotePackBody.tools.localStateWrite.includes("arcigy.prepare_positive_outreach_reply"));
     assert.equal(remotePackBody.tools.readOnlyOrDraft.includes("arcigy.ingest_client_message"), false);
@@ -817,6 +828,15 @@ test("local web bridge serves UI and API health", async () => {
       )
     );
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_outreach_brief" && !("campaignId" in call.body)));
+    assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_campaign_webhooks" && call.approvalRequired === false));
+    assert.ok(
+      remotePackBody.quickStartCalls.some(
+        (call) =>
+          call.tool === "arcigy.upsert_smartlead_campaign_webhook" &&
+          call.approvalRequired === true &&
+          (call.body.approval as { approved?: boolean } | undefined)?.approved === true
+      )
+    );
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.prepare_positive_outreach_reply" && call.body.leadEmail === "lead@example.com"));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.send_approved_outreach_reply" && call.approvalRequired === true));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.sync_gmail_recent_messages" && call.body.dryRun === true));

@@ -334,6 +334,7 @@ async function checkApprovalGates(fetchImpl: typeof fetch, baseUrl: string, bear
     ["arcigy.replace_google_sheet_rows", { rows: [["Smoke", "https://example.com"]] }],
     ["arcigy.add_leads_to_smartlead_campaign", { campaignId: "123", leads: [{ email: "smoke@example.com" }] }],
     ["arcigy.send_smartlead_thread_reply", { campaignId: "123", email: "smoke@example.com", emailBody: "Smoke reply body." }],
+    ["arcigy.upsert_smartlead_campaign_webhook", { campaignId: "123", url: "https://jarvis.example/webhook/smartlead-ai-reply" }],
     ["arcigy.create_smartlead_campaign", { name: "SMOKE CAMPAIGN" }],
     ["arcigy.configure_smartlead_campaign", { campaignId: "123", schedule: { max_new_leads_per_day: 1 } }],
   ];
@@ -562,6 +563,7 @@ function hasSafeOpenApiExample(toolName: string, value: unknown): boolean {
   if (toolName === "arcigy.append_leads_to_google_sheet") return (payload.approval as { approved?: unknown } | undefined)?.approved === true && Array.isArray(payload.rows);
   if (toolName === "arcigy.replace_google_sheet_rows") return (payload.approval as { approved?: unknown } | undefined)?.approved === true && Array.isArray(payload.rows);
   if (toolName === "arcigy.add_leads_to_smartlead_campaign") return (payload.approval as { approved?: unknown } | undefined)?.approved === true && Array.isArray(payload.leads);
+  if (toolName === "arcigy.upsert_smartlead_campaign_webhook") return (payload.approval as { approved?: unknown } | undefined)?.approved === true && typeof payload.url === "string";
   if (toolName === "arcigy.send_smartlead_thread_reply") return (payload.approval as { approved?: unknown } | undefined)?.approved === true && typeof payload.emailBody === "string";
   if (toolName === "arcigy.create_smartlead_campaign") return (payload.approval as { approved?: unknown } | undefined)?.approved === true && typeof payload.name === "string";
   if (toolName === "arcigy.configure_smartlead_campaign") return (payload.approval as { approved?: unknown } | undefined)?.approved === true && typeof payload.campaignId !== "undefined";

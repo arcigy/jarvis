@@ -103,12 +103,14 @@ import {
   configureSmartleadCampaign,
   createSmartleadCampaign,
   draftSmartleadThreadReply,
+  getSmartleadCampaignWebhooks,
   getSmartleadCampaignLeads,
   getSmartleadCampaignStatus,
   getSmartleadMessageHistory,
   getSmartleadOutreachBrief,
   previewSmartleadLeadSync,
   sendSmartleadThreadReply,
+  upsertSmartleadCampaignWebhook,
 } from "../automation-system/smartlead.ts";
 
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
@@ -1367,6 +1369,21 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         limitPerCampaign: typeof payload.limitPerCampaign === "number" ? payload.limitPerCampaign : undefined,
       }),
     });
+    return;
+  }
+  if (name === "arcigy.get_smartlead_campaign_webhooks") {
+    writeJson(response, 200, { result: await getSmartleadCampaignWebhooks({ campaignId: (payload.campaignId ?? "") as string | number }) });
+    return;
+  }
+  if (name === "arcigy.upsert_smartlead_campaign_webhook") {
+    const result = await upsertSmartleadCampaignWebhook({
+      campaignId: (payload.campaignId ?? "") as string | number,
+      url: String(payload.url ?? ""),
+      name: optionalString(payload.name),
+      eventTypes: Array.isArray(payload.eventTypes) ? payload.eventTypes.map(String) : undefined,
+    });
+    addAuditEvent("arcigy.upsert_smartlead_campaign_webhook", "submitted", { campaignId: payload.campaignId, url: payload.url, name: payload.name, eventTypes: payload.eventTypes }, result, true);
+    writeJson(response, 200, { result });
     return;
   }
   if (name === "arcigy.get_smartlead_message_history") {

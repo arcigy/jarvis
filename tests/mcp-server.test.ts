@@ -69,6 +69,8 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(names.includes("arcigy.get_smartlead_outreach_brief"));
   assert.ok(names.includes("arcigy.get_smartlead_campaign_leads"));
   assert.ok(names.includes("arcigy.preview_smartlead_lead_sync"));
+  assert.ok(names.includes("arcigy.get_smartlead_campaign_webhooks"));
+  assert.ok(names.includes("arcigy.upsert_smartlead_campaign_webhook"));
   assert.ok(names.includes("arcigy.get_smartlead_message_history"));
   assert.ok(names.includes("arcigy.classify_outreach_reply"));
   assert.ok(names.includes("arcigy.build_outreach_reply_triage_preview"));
@@ -281,6 +283,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.replace_google_sheet_rows")));
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.label_gmail_thread")));
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.send_slack_message")));
+  assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.upsert_smartlead_campaign_webhook")));
   assert.doesNotMatch(JSON.stringify(audit), /AIza|GOCSPX|1\/\/|postgresql:\/\/|redis:\/\//);
 
   const voiceAuditResult = await client.callTool({
@@ -416,6 +419,15 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(pack.agentSetupProfiles.every((profile) => profile.requiredProofGates.includes("pack-production-evidence-quick-start") && profile.requiredProofGates.includes("production-evidence-tool-call")));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_outreach_brief" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_outreach_brief" && !("campaignId" in call.body)));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_campaign_webhooks" && call.approvalRequired === false));
+  assert.ok(
+    pack.quickStartCalls.some(
+      (call) =>
+        call.tool === "arcigy.upsert_smartlead_campaign_webhook" &&
+        call.approvalRequired === true &&
+        (call.body.approval as { approved?: boolean } | undefined)?.approved === true
+    )
+  );
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.sync_gmail_recent_messages" && call.body.dryRun === true));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_gmail_lead_context" && call.approvalRequired === false && call.body.leadEmail === "lead@example.com"));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_gmail_unread_triage" && call.approvalRequired === false && call.body.query === "is:unread category:primary"));

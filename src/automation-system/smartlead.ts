@@ -117,6 +117,30 @@ export type SmartleadCampaignWriteResult = {
   steps: Array<{ step: string; status: "skipped" | "submitted"; response?: unknown }>;
 };
 
+export type SmartleadWebhookInput = {
+  campaignId: string | number;
+  url: string;
+  name?: string;
+  eventTypes?: string[];
+};
+
+export type SmartleadCampaignWebhooksResult = {
+  campaignId: string;
+  webhooks: unknown;
+};
+
+export type SmartleadWebhookWriteResult = {
+  campaignId: string;
+  webhook: {
+    id: null;
+    name: string;
+    webhook_url: string;
+    event_types: string[];
+  };
+  response: unknown;
+  summary: string;
+};
+
 export type SmartleadCampaignLeadsResult = {
   campaignId: string;
   offset: number;
@@ -503,6 +527,37 @@ export async function configureSmartleadCampaign(
   return { campaignId, steps };
 }
 
+export async function getSmartleadCampaignWebhooks(
+  input: { campaignId: string | number },
+  env: RuntimeEnv = process.env,
+  fetchImpl: FetchLike = fetch
+): Promise<SmartleadCampaignWebhooksResult> {
+  const apiKey = requireEnv(env, "SMARTLEAD_API_KEY");
+  const campaignId = requireCampaignId(input.campaignId);
+  const webhooks = await smartleadFetch<unknown>(`/campaigns/${encodeURIComponent(campaignId)}/webhooks`, apiKey, fetchImpl);
+  return { campaignId, webhooks };
+}
+
+export async function upsertSmartleadCampaignWebhook(
+  input: SmartleadWebhookInput,
+  env: RuntimeEnv = process.env,
+  fetchImpl: FetchLike = fetch
+): Promise<SmartleadWebhookWriteResult> {
+  const apiKey = requireEnv(env, "SMARTLEAD_API_KEY");
+  const campaignId = requireCampaignId(input.campaignId);
+  const webhook = normalizeSmartleadWebhook(input);
+  const response = await smartleadFetch<unknown>(`/campaigns/${encodeURIComponent(campaignId)}/webhooks`, apiKey, fetchImpl, {
+    method: "POST",
+    body: webhook,
+  });
+  return {
+    campaignId,
+    webhook,
+    response,
+    summary: `Smartlead webhook ${webhook.name} nastaveny pre kampan ${campaignId}.`,
+  };
+}
+
 export async function getSmartleadOutreachBrief(
   input: SmartleadOutreachBriefInput,
   env: RuntimeEnv = process.env,
@@ -774,6 +829,27 @@ function normalizeSmartleadSettings(settings: NonNullable<SmartleadCampaignConfi
     stop_lead_settings: settings.stopOnReply === false ? "NEVER_STOP" : "REPLY_TO_AN_EMAIL",
     follow_up_percentage: nonNegativeInteger(settings.followUpPercentage, 100, 100),
   };
+}
+
+function normalizeSmartleadWebhook(input: SmartleadWebhookInput): SmartleadWebhookWriteResult["webhook"] {
+  const webhookUrl = input.url.trim();
+  if (!/^https:\/\//i.test(webhookUrl)) throw new Error("Smartlead webhook url must be an HTTPS URL.");
+  const name = input.name?.trim() || "Jarvis AI Reply Webhook";
+  const eventTypes = normalizeSmartleadWebhookEvents(input.eventTypes);
+  return {
+    id: null,
+    name: name.slice(0, 100),
+    webhook_url: webhookUrl,
+    event_types: eventTypes,
+  };
+}
+
+function normalizeSmartleadWebhookEvents(value: string[] | undefined): string[] {
+  const allowed = new Set(["EMAIL_REPLY", "LEAD_CATEGORY_UPDATED", "EMAIL_OPENED", "EMAIL_CLICKED"]);
+  const events = (value?.length ? value : ["EMAIL_REPLY", "LEAD_CATEGORY_UPDATED"])
+    .map((item) => item.trim().toUpperCase())
+    .filter((item) => allowed.has(item));
+  return events.length ? [...new Set(events)] : ["EMAIL_REPLY", "LEAD_CATEGORY_UPDATED"];
 }
 
 function nonNegativeInteger(value: number | undefined, fallback: number, max: number): number {

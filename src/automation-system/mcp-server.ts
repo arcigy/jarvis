@@ -106,12 +106,14 @@ import {
   configureSmartleadCampaign,
   createSmartleadCampaign,
   draftSmartleadThreadReply,
+  getSmartleadCampaignWebhooks,
   getSmartleadCampaignLeads,
   getSmartleadCampaignStatus,
   getSmartleadMessageHistory,
   getSmartleadOutreachBrief,
   previewSmartleadLeadSync,
   sendSmartleadThreadReply,
+  upsertSmartleadCampaignWebhook,
 } from "./smartlead.ts";
 import type { ClientNeedSignal, LocalPerson } from "./types.ts";
 
@@ -1428,6 +1430,49 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(await previewSmartleadLeadSync(input))
+  );
+
+  server.registerTool(
+    "arcigy.get_smartlead_campaign_webhooks",
+    {
+      title: "Smartlead campaign webhooks",
+      description: "Read-only fetch of the current Smartlead webhooks for a campaign before configuring AI reply automation.",
+      inputSchema: {
+        campaignId: z.union([z.string(), z.number()]),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (input) => jsonResult(await getSmartleadCampaignWebhooks(input))
+  );
+
+  server.registerTool(
+    "arcigy.upsert_smartlead_campaign_webhook",
+    {
+      title: "Upsert Smartlead campaign webhook",
+      description: "Approval-required Smartlead write. Adds or updates a campaign webhook, typically for EMAIL_REPLY and LEAD_CATEGORY_UPDATED events.",
+      inputSchema: {
+        campaignId: z.union([z.string(), z.number()]),
+        url: z.string().url(),
+        name: z.string().optional(),
+        eventTypes: z.array(z.string()).default(["EMAIL_REPLY", "LEAD_CATEGORY_UPDATED"]),
+        approval: approvalSchema,
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+    },
+    async (input) => {
+      requireExplicitApproval("arcigy.upsert_smartlead_campaign_webhook", input);
+      return jsonResult(await upsertSmartleadCampaignWebhook(input));
+    }
   );
 
   server.registerTool(

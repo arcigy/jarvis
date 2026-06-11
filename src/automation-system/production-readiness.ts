@@ -187,6 +187,7 @@ function buildLaunchChecklist(
     "arcigy.send_approved_outreach_reply",
     "arcigy.export_leads_csv",
     "arcigy.send_smartlead_thread_reply",
+    "arcigy.upsert_smartlead_campaign_webhook",
     "arcigy.create_smartlead_campaign",
     "arcigy.configure_smartlead_campaign",
     "arcigy.add_leads_to_smartlead_campaign",

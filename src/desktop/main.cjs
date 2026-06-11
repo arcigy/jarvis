@@ -1309,11 +1309,13 @@ function jarvisCapabilityDefinitions() {
         "arcigy.build_google_sheet_sync_preview",
         "arcigy.select_next_niche",
         "arcigy.preview_smartlead_lead_sync",
+        "arcigy.get_smartlead_campaign_webhooks",
+        "arcigy.upsert_smartlead_campaign_webhook",
         "arcigy.add_leads_to_smartlead_campaign",
         "arcigy.append_leads_to_google_sheet",
         "arcigy.replace_google_sheet_rows",
       ],
-      approvalRequired: ["arcigy.add_leads_to_smartlead_campaign", "arcigy.append_leads_to_google_sheet", "arcigy.replace_google_sheet_rows"],
+      approvalRequired: ["arcigy.upsert_smartlead_campaign_webhook", "arcigy.add_leads_to_smartlead_campaign", "arcigy.append_leads_to_google_sheet", "arcigy.replace_google_sheet_rows"],
       evidence: ["tests", "doctor-live"],
       envKeys: ["serper", "googleMaps", "gemini", "smartlead", "googleSheets"],
     },
@@ -1330,6 +1332,7 @@ function jarvisCapabilityDefinitions() {
         "arcigy.export_local_memory_snapshot",
         "arcigy.send_slack_message",
         "arcigy.send_smartlead_thread_reply",
+        "arcigy.upsert_smartlead_campaign_webhook",
         "arcigy.add_leads_to_smartlead_campaign",
         "arcigy.append_leads_to_google_sheet",
         "arcigy.replace_google_sheet_rows",
@@ -1465,7 +1468,7 @@ async function getRemoteMcpPack(payload = {}) {
       "Call MCP tools with POST JSON to mcpToolCallPattern.",
       "Use the bearer auth header placeholder; the real token must be supplied by the operator and is never returned by this pack.",
       "Use tunnel.statusUrl to inspect public tunnel URLs from the redacted secure-tunnel log. Browser-launched tunnel start requires a strong JARVIS_WEB_TOKEN.",
-      "Treat generate_contract_documents, generate_price_offer_document, approve_prepared_outreach_reply, send_approved_outreach_reply, send_smartlead_thread_reply, update_client_need_status, export_leads_csv, create_smartlead_campaign, configure_smartlead_campaign, add_leads_to_smartlead_campaign, append_leads_to_google_sheet, and replace_google_sheet_rows as approval-gated actions.",
+      "Treat generate_contract_documents, generate_price_offer_document, approve_prepared_outreach_reply, send_approved_outreach_reply, send_smartlead_thread_reply, upsert_smartlead_campaign_webhook, update_client_need_status, export_leads_csv, create_smartlead_campaign, configure_smartlead_campaign, add_leads_to_smartlead_campaign, append_leads_to_google_sheet, and replace_google_sheet_rows as approval-gated actions.",
       "Treat localStateWrite tools as local memory writes. Prefer dryRun: true for sync_gmail_recent_messages before ingesting messages.",
       "Use get_operator_briefing for a Jarvis-style daily status before making recommendations.",
     ],
@@ -1940,6 +1943,28 @@ function buildRemoteMcpQuickStartCalls(baseUrl) {
       approvalRequired: false,
     },
     {
+      label: "Audit Smartlead campaign webhooks",
+      tool: "arcigy.get_smartlead_campaign_webhooks",
+      method: "POST",
+      url: toolUrl("arcigy.get_smartlead_campaign_webhooks"),
+      body: { campaignId: "123456" },
+      approvalRequired: false,
+    },
+    {
+      label: "Upsert approved Smartlead AI reply webhook",
+      tool: "arcigy.upsert_smartlead_campaign_webhook",
+      method: "POST",
+      url: toolUrl("arcigy.upsert_smartlead_campaign_webhook"),
+      body: {
+        campaignId: "123456",
+        url: "https://jarvis.example/webhook/smartlead-ai-reply",
+        name: "Jarvis AI Reply Webhook",
+        eventTypes: ["EMAIL_REPLY", "LEAD_CATEGORY_UPDATED"],
+        approval: { approved: true },
+      },
+      approvalRequired: true,
+    },
+    {
       label: "Draft a Gemini client reply",
       tool: "arcigy.generate_ai_reply",
       method: "POST",
@@ -2369,6 +2394,7 @@ async function checkApprovalGates(baseUrl, token, topLevelApproved) {
     ["arcigy.append_leads_to_google_sheet", { rows: [["Smoke", "https://example.com"]] }],
     ["arcigy.replace_google_sheet_rows", { rows: [["Smoke", "https://example.com"]] }],
     ["arcigy.add_leads_to_smartlead_campaign", { campaignId: "123", leads: [{ email: "smoke@example.com" }] }],
+    ["arcigy.upsert_smartlead_campaign_webhook", { campaignId: "123", url: "https://jarvis.example/webhook/smartlead-ai-reply" }],
     ["arcigy.send_smartlead_thread_reply", { campaignId: "123", email: "smoke@example.com", emailBody: "Smoke reply body." }],
     ["arcigy.create_smartlead_campaign", { name: "SMOKE CAMPAIGN" }],
     ["arcigy.configure_smartlead_campaign", { campaignId: "123", schedule: { max_new_leads_per_day: 1 } }],
@@ -2534,6 +2560,7 @@ function hasSafeOpenApiExample(toolName, value) {
   if (toolName === "arcigy.append_leads_to_google_sheet") return value.approval?.approved === true && Array.isArray(value.rows);
   if (toolName === "arcigy.replace_google_sheet_rows") return value.approval?.approved === true && Array.isArray(value.rows);
   if (toolName === "arcigy.add_leads_to_smartlead_campaign") return value.approval?.approved === true && Array.isArray(value.leads);
+  if (toolName === "arcigy.upsert_smartlead_campaign_webhook") return value.approval?.approved === true && typeof value.url === "string";
   if (toolName === "arcigy.send_smartlead_thread_reply") return value.approval?.approved === true && typeof value.emailBody === "string";
   if (toolName === "arcigy.create_smartlead_campaign") return value.approval?.approved === true && typeof value.name === "string";
   if (toolName === "arcigy.configure_smartlead_campaign") return value.approval?.approved === true && typeof value.campaignId !== "undefined";
@@ -3042,6 +3069,8 @@ function listWebMcpTools() {
     { name: "arcigy.get_smartlead_outreach_brief", requiresApproval: false },
     { name: "arcigy.get_smartlead_campaign_leads", requiresApproval: false },
     { name: "arcigy.preview_smartlead_lead_sync", requiresApproval: false },
+    { name: "arcigy.get_smartlead_campaign_webhooks", requiresApproval: false },
+    { name: "arcigy.upsert_smartlead_campaign_webhook", requiresApproval: true },
     { name: "arcigy.get_smartlead_message_history", requiresApproval: false },
     { name: "arcigy.classify_outreach_reply", requiresApproval: false },
     { name: "arcigy.build_outreach_reply_triage_preview", requiresApproval: false },

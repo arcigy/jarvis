@@ -281,6 +281,8 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
   if (toolName === "arcigy.get_smartlead_outreach_brief") return { periodLabel: "poslednych 7 dni" };
   if (toolName === "arcigy.get_smartlead_campaign_leads") return { campaignId: "123456", offset: 0, limit: 100 };
   if (toolName === "arcigy.preview_smartlead_lead_sync") return { campaignIds: ["123456"], limitPerCampaign: 100 };
+  if (toolName === "arcigy.get_smartlead_campaign_webhooks") return { campaignId: "123456" };
+  if (toolName === "arcigy.upsert_smartlead_campaign_webhook") return { campaignId: "123456", url: "https://jarvis.example/webhook/smartlead-ai-reply", name: "Jarvis AI Reply Webhook", eventTypes: ["EMAIL_REPLY", "LEAD_CATEGORY_UPDATED"], approval: { approved: true } };
   if (toolName === "arcigy.get_smartlead_message_history") return { campaignId: "123456", email: "lead@example.com" };
   if (toolName === "arcigy.classify_outreach_reply") return { replyBody: "Dobry den, poslite mi prosim ukazku.", useAi: false };
   if (toolName === "arcigy.build_outreach_reply_triage_preview") {

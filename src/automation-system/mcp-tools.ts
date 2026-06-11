@@ -49,6 +49,8 @@ export type JarvisMcpToolName =
   | "arcigy.get_smartlead_outreach_brief"
   | "arcigy.get_smartlead_campaign_leads"
   | "arcigy.preview_smartlead_lead_sync"
+  | "arcigy.get_smartlead_campaign_webhooks"
+  | "arcigy.upsert_smartlead_campaign_webhook"
   | "arcigy.get_smartlead_message_history"
   | "arcigy.classify_outreach_reply"
   | "arcigy.build_outreach_reply_triage_preview"
@@ -399,6 +401,16 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
       name: "arcigy.preview_smartlead_lead_sync",
       description: "Read-only nacita Smartlead lead statusy a vrati lokalne update kandidaty bez zapisu do databazy.",
       requiresApproval: false,
+    },
+    {
+      name: "arcigy.get_smartlead_campaign_webhooks",
+      description: "Read-only nacita aktualne Smartlead webhooky kampane pred AI reply alebo launch konfiguraciou.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.upsert_smartlead_campaign_webhook",
+      description: "Po explicitnom schvaleni prida alebo aktualizuje Smartlead webhook pre kampan, typicky EMAIL_REPLY a LEAD_CATEGORY_UPDATED.",
+      requiresApproval: true,
     },
     {
       name: "arcigy.get_smartlead_message_history",
