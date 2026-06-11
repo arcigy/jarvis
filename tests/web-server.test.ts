@@ -654,6 +654,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(openApiBody.paths["/api/mcp/arcigy.build_gmail_name_enrichment_queue_preview"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.build_lead_identity_repair_preview"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.build_bulk_smartlead_upload_queue_preview"]);
+    assert.ok(openApiBody.paths["/api/mcp/arcigy.build_bulk_ai_intro_work_queue_preview"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.get_smartlead_campaign_webhooks"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.upsert_smartlead_campaign_webhook"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.get_smartlead_email_accounts"]);
@@ -900,6 +901,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_email_accounts" && call.body.requestedDailyLimit === 80 && call.approvalRequired === false));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_smartlead_local_reconciliation_preview" && call.approvalRequired === false && Array.isArray(call.body.localLeads)));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_bulk_smartlead_upload_queue_preview" && call.approvalRequired === false && Array.isArray(call.body.campaigns)));
+    assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_bulk_ai_intro_work_queue_preview" && call.approvalRequired === false && Array.isArray(call.body.groups)));
     assert.ok(
       remotePackBody.quickStartCalls.some(
         (call) =>

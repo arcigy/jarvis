@@ -33,6 +33,7 @@ import {
   buildManualReviewPickupPlan,
   buildManualReviewQueue,
   buildAiIntroWorkPacketPreview,
+  buildBulkAiIntroWorkQueuePreview,
   buildAiIntroImportPreview,
   buildLeadgenGapReport,
   buildLeadgenCampaignPipelinePreview,
@@ -291,6 +292,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.build_ai_intro_quality_audit_preview",
     "arcigy.build_flagged_lead_review_preview",
     "arcigy.build_ai_intro_work_packet_preview",
+    "arcigy.build_bulk_ai_intro_work_queue_preview",
     "arcigy.build_ai_intro_import_preview",
     "arcigy.build_ai_icebreaker_writeback_preview",
     "arcigy.build_ai_intro_cleanup_preview",
@@ -513,6 +515,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.ok(paths.includes("/api/mcp/arcigy.build_lead_validation_scorecard_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_company_short_name_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_bulk_smartlead_upload_queue_preview"));
+  assert.ok(paths.includes("/api/mcp/arcigy.build_bulk_ai_intro_work_queue_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_ai_icebreaker_writeback_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.get_smartlead_campaign_webhooks"));
   assert.ok(paths.includes("/api/mcp/arcigy.upsert_smartlead_campaign_webhook"));
@@ -1926,6 +1929,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_lead_validation_scorecard_preview" && call.approvalRequired === false && call.body.minScore === 70));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_company_short_name_preview" && call.approvalRequired === false && Array.isArray(call.body.leads)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_bulk_smartlead_upload_queue_preview" && call.approvalRequired === false && Array.isArray(call.body.campaigns)));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_bulk_ai_intro_work_queue_preview" && call.approvalRequired === false && Array.isArray(call.body.groups)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_ai_icebreaker_writeback_preview" && call.approvalRequired === false && typeof call.body.resultJsonText === "string"));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_flagged_lead_review_preview" && call.approvalRequired === false && typeof call.body.csvText === "string"));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.lookup_public_email_profile" && call.body.email === "jan.novak@example.com" && call.approvalRequired === false));
@@ -5021,6 +5025,42 @@ test("AI intro work packet preview prepares Claude task and validates returned i
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_ai_intro_cleanup_preview" && !call.approvalRequired));
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.export_leads_csv" && call.approvalRequired));
   assert.match(preview.summary, /Ziadny zapis ani upload/);
+});
+
+test("bulk AI intro work queue splits multiple groups into work packets", () => {
+  const preview = buildBulkAiIntroWorkQueuePreview({
+    groups: [
+      {
+        sourceName: "kuchyne.csv",
+        niche: "kuchynske studia",
+        leads: [
+          { id: "lead-1", companyName: "Ready Studio", website: "https://ready.sk", email: "jan@ready.sk", context: "Firma robi kuchyne na mieru a showroom." },
+          { id: "lead-2", companyName: "No Context", website: "https://no-context.sk", email: "info@no-context.sk" },
+          { id: "lead-3", companyName: "Has Intro", website: "https://has.sk", personalizedIntro: "Uz hotove intro." },
+        ],
+      },
+      {
+        sourceName: "autoservisy.csv",
+        niche: "autoservisy",
+        leads: [{ id: "lead-4", companyName: "Auto Profi", website: "https://auto.sk", email: "info@auto.sk", context: "Autoservis pre firemne flotily." }],
+      },
+    ],
+    offer: "AI asistent na dopyty",
+    batchSize: 2,
+  });
+
+  assert.equal(preview.mode, "bulk-ai-intro-work-queue-preview");
+  assert.equal(preview.status, "attention");
+  assert.equal(preview.totals.groups, 2);
+  assert.equal(preview.totals.batches, 2);
+  assert.equal(preview.totals.inputLeads, 4);
+  assert.equal(preview.totals.queuedLeads, 3);
+  assert.equal(preview.totals.skippedExistingIntro, 1);
+  assert.equal(preview.totals.noContext, 1);
+  assert.equal(preview.queue[0].packet.totals.packetItems, 2);
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_ai_intro_work_packet_preview" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_ai_intro_import_preview" && !call.approvalRequired));
+  assert.match(preview.summary, /Ziadny AI call, zapis ani upload/);
 });
 
 test("AI intro import preview parses AI result JSON and prepares safe next steps", () => {

@@ -245,6 +245,32 @@ export type AiIntroWorkPacketPreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type BulkAiIntroWorkQueuePreview = {
+  mode: "bulk-ai-intro-work-queue-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  totals: {
+    groups: number;
+    batches: number;
+    inputLeads: number;
+    queuedLeads: number;
+    skippedExistingIntro: number;
+    missingCompany: number;
+    noContext: number;
+    parsedFromCsv: number;
+  };
+  queue: Array<{
+    order: number;
+    groupName?: string;
+    niche?: string;
+    status: "ready" | "attention" | "blocked";
+    leadCount: number;
+    packet: AiIntroWorkPacketPreview;
+  }>;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+  warnings: string[];
+};
+
 export type AiIntroImportPreview = {
   mode: "ai-intro-import-preview";
   status: "ready" | "attention" | "blocked";
@@ -3388,6 +3414,115 @@ export function buildAiIntroWorkPacketPreview(input: {
     completedItems,
     mergedLeads,
     nextToolCalls: dedupeNextToolCalls(nextToolCalls),
+  };
+}
+
+export function buildBulkAiIntroWorkQueuePreview(input: {
+  groups: Array<{
+    sourceName?: string;
+    niche?: string;
+    offer?: string;
+    language?: "sk" | "en";
+    leads?: Array<LeadCandidateInput & { id?: string; raw?: Record<string, string>; scraped?: Partial<ScrapedWebsiteContacts>; context?: string; evidenceText?: string; businessFacts?: unknown }>;
+    csvText?: string;
+    delimiter?: "," | ";";
+  }>;
+  offer?: string;
+  language?: "sk" | "en";
+  batchSize?: number;
+  maxBatches?: number;
+  maxContextChars?: number;
+}): BulkAiIntroWorkQueuePreview {
+  const batchSize = Math.min(Math.max(Math.trunc(input.batchSize ?? 40), 1), 100);
+  const maxBatches = Math.min(Math.max(Math.trunc(input.maxBatches ?? 30), 1), 100);
+  const language = input.language ?? "sk";
+  const queue: BulkAiIntroWorkQueuePreview["queue"] = [];
+  const nextToolCalls: BulkAiIntroWorkQueuePreview["nextToolCalls"] = [];
+  const warnings: string[] = [];
+  let parsedFromCsv = 0;
+  let inputLeads = 0;
+  let skippedExistingIntro = 0;
+  let missingCompany = 0;
+
+  for (const group of input.groups) {
+    if (queue.length >= maxBatches) break;
+    const parsed = group.csvText?.trim() ? parseLeadsCsv({ csvText: group.csvText, delimiter: group.delimiter }) : undefined;
+    parsedFromCsv += parsed?.leads.length ?? 0;
+    const groupLeads = [...(group.leads ?? []), ...(parsed?.leads ?? [])] as AiIntroWorkPacketPreview["packetItems"][number]["lead"][];
+    inputLeads += groupLeads.length;
+    skippedExistingIntro += groupLeads.filter((lead) => Boolean(extractLeadIntro(lead))).length;
+    missingCompany += groupLeads.filter((lead) => !aiIntroWorkCompanyName(lead)).length;
+    const eligible = groupLeads.filter((lead) => aiIntroWorkCompanyName(lead) && !extractLeadIntro(lead));
+    const batches = chunk(eligible, batchSize);
+    for (const leads of batches) {
+      if (queue.length >= maxBatches) break;
+      const packet = buildAiIntroWorkPacketPreview({
+        leads,
+        sourceName: group.sourceName,
+        niche: group.niche,
+        offer: group.offer ?? input.offer,
+        language: group.language ?? language,
+        maxLeads: batchSize,
+        maxContextChars: input.maxContextChars,
+      });
+      const status: BulkAiIntroWorkQueuePreview["queue"][number]["status"] = packet.status;
+      const order = queue.length + 1;
+      queue.push({ order, groupName: group.sourceName, niche: group.niche, status, leadCount: leads.length, packet });
+      nextToolCalls.push({
+        tool: "arcigy.build_ai_intro_work_packet_preview",
+        payload: {
+          leads,
+          sourceName: group.sourceName,
+          niche: group.niche,
+          offer: group.offer ?? input.offer,
+          language: group.language ?? language,
+          maxLeads: batchSize,
+          maxContextChars: input.maxContextChars,
+        },
+        reason: `Priprav AI intro work packet batch ${order}${group.niche ? ` pre ${group.niche}` : ""}.`,
+        approvalRequired: false,
+      });
+      nextToolCalls.push({
+        tool: "arcigy.build_ai_intro_import_preview",
+        payload: {
+          leads,
+          sourceName: group.sourceName,
+          niche: group.niche,
+          offer: group.offer ?? input.offer,
+          language: group.language ?? language,
+          completedIntros: [],
+        },
+        reason: `Po vyplneni AI JSONu validuj a mergni intra pre batch ${order}.`,
+        approvalRequired: false,
+      });
+    }
+  }
+
+  if (input.groups.length && queue.length >= maxBatches) warnings.push("Queue was truncated by maxBatches.");
+  if (!queue.length) warnings.push("No leads without personalized intro were eligible for AI intro work packets.");
+  const totals = {
+    groups: input.groups.length,
+    batches: queue.length,
+    inputLeads,
+    queuedLeads: queue.reduce((sum, item) => sum + item.packet.totals.packetItems, 0),
+    skippedExistingIntro,
+    missingCompany,
+    noContext: queue.reduce((sum, item) => sum + item.packet.totals.noContext, 0),
+    parsedFromCsv,
+  };
+  const status: BulkAiIntroWorkQueuePreview["status"] = !queue.length
+    ? "blocked"
+    : totals.noContext || warnings.length
+      ? "attention"
+      : "ready";
+  return {
+    mode: "bulk-ai-intro-work-queue-preview",
+    status,
+    summary: `Bulk AI intro queue ${status}: ${totals.queuedLeads} leadov v ${totals.batches} batchoch, ${totals.skippedExistingIntro} uz malo intro, ${totals.noContext} bez kontextu. Ziadny AI call, zapis ani upload neprebehol.`,
+    totals,
+    queue,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls),
+    warnings,
   };
 }
 

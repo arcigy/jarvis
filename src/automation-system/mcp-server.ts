@@ -58,6 +58,7 @@ import {
   buildFlaggedLeadReviewPreview,
   buildAiIntroCleanupPreview,
   buildAiIntroWorkPacketPreview,
+  buildBulkAiIntroWorkQueuePreview,
   buildAiIntroImportPreview,
   buildAiIcebreakerWritebackPreview,
   buildLocalLeadRegisterUpdatePreview,
@@ -4655,6 +4656,37 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildFlaggedLeadReviewPreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_bulk_ai_intro_work_queue_preview",
+    {
+      title: "Build bulk AI intro work queue preview",
+      description: "Split many leads from multiple CSV/source/niche groups into AI intro work-packet batches, with import/audit next steps, without calling AI, writing, or uploading.",
+      inputSchema: {
+        groups: z.array(z.object({
+          sourceName: z.string().optional(),
+          niche: z.string().optional(),
+          offer: z.string().optional(),
+          language: z.enum(["sk", "en"]).optional(),
+          leads: z.array(z.object({}).passthrough()).optional(),
+          csvText: z.string().optional(),
+          delimiter: z.enum([",", ";"]).optional(),
+        })).min(1).max(50),
+        offer: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        batchSize: z.number().int().min(1).max(100).default(40),
+        maxBatches: z.number().int().min(1).max(100).default(30),
+        maxContextChars: z.number().int().min(200).max(5000).default(1200),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildBulkAiIntroWorkQueuePreview(input as Parameters<typeof buildBulkAiIntroWorkQueuePreview>[0]))
   );
 
   server.registerTool(

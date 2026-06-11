@@ -2231,6 +2231,33 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Build bulk AI intro work queue",
+      tool: "arcigy.build_bulk_ai_intro_work_queue_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_bulk_ai_intro_work_queue_preview"),
+      body: {
+        groups: [
+          {
+            sourceName: "kuchyne_sk_google_maps.csv",
+            niche: "kuchynske studia",
+            leads: [
+              { id: "lead-1", companyName: "Ready Studio", website: "https://ready.sk", email: "jan@ready.sk", context: "Firma robi kuchyne na mieru, showroom a navrhy interierov." },
+              { id: "lead-2", companyName: "Needs Context", website: "https://needs-context.sk", email: "info@needs-context.sk" },
+            ],
+          },
+          {
+            sourceName: "autoservisy.csv",
+            niche: "autoservisy",
+            leads: [{ id: "lead-3", companyName: "Auto Profi", website: "https://auto.example", email: "info@auto.example", context: "Autoservis pre firemne flotily a pneuservis." }],
+          },
+        ],
+        offer: "AI asistent na dopyty a follow-up.",
+        language: "sk",
+        batchSize: 2,
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Import AI intro results from ChatGPT or Claude",
       tool: "arcigy.build_ai_intro_import_preview",
       method: "POST",

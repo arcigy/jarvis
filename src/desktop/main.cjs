@@ -3295,6 +3295,7 @@ function listWebMcpTools() {
     { name: "arcigy.build_ai_intro_quality_audit_preview", requiresApproval: false },
     { name: "arcigy.build_flagged_lead_review_preview", requiresApproval: false },
     { name: "arcigy.build_ai_intro_work_packet_preview", requiresApproval: false },
+    { name: "arcigy.build_bulk_ai_intro_work_queue_preview", requiresApproval: false },
     { name: "arcigy.build_ai_intro_import_preview", requiresApproval: false },
     { name: "arcigy.build_ai_icebreaker_writeback_preview", requiresApproval: false },
     { name: "arcigy.build_ai_intro_cleanup_preview", requiresApproval: false },

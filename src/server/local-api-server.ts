@@ -57,6 +57,7 @@ import {
   buildFlaggedLeadReviewPreview,
   buildAiIntroCleanupPreview,
   buildAiIntroWorkPacketPreview,
+  buildBulkAiIntroWorkQueuePreview,
   buildAiIntroImportPreview,
   buildAiIcebreakerWritebackPreview,
   buildLocalLeadRegisterUpdatePreview,
@@ -2810,6 +2811,19 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         maxLeads: typeof payload.maxLeads === "number" ? payload.maxLeads : undefined,
         maxContextChars: typeof payload.maxContextChars === "number" ? payload.maxContextChars : undefined,
         completedIntros: Array.isArray(payload.completedIntros) ? payload.completedIntros as Parameters<typeof buildAiIntroWorkPacketPreview>[0]["completedIntros"] : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_bulk_ai_intro_work_queue_preview") {
+    writeJson(response, 200, {
+      result: buildBulkAiIntroWorkQueuePreview({
+        groups: Array.isArray(payload.groups) ? payload.groups as Parameters<typeof buildBulkAiIntroWorkQueuePreview>[0]["groups"] : [],
+        offer: optionalString(payload.offer),
+        language: payload.language === "en" ? "en" : "sk",
+        batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
+        maxBatches: typeof payload.maxBatches === "number" ? payload.maxBatches : undefined,
+        maxContextChars: typeof payload.maxContextChars === "number" ? payload.maxContextChars : undefined,
       }),
     });
     return;
