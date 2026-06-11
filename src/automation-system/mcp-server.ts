@@ -44,6 +44,7 @@ import {
   batchDraftLeadIntros,
   buildAiIntroQualityAuditPreview,
   buildAiIntroCleanupPreview,
+  buildAiIntroWorkPacketPreview,
   buildManualReviewPickupPlan,
   buildManualReviewQueue,
   buildSmartleadCampaignLaunchPreview,
@@ -3492,6 +3493,52 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildAiIntroQualityAuditPreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_ai_intro_work_packet_preview",
+    {
+      title: "Build AI intro work packet preview",
+      description: "Prepare a read-only Markdown/JSON work packet for ChatGPT or Claude to fill missing icebreakers, then validate returned intros and prepare safe next steps without DB writes.",
+      inputSchema: {
+        leads: z.array(leadCandidateSchema.extend({
+          id: z.string().optional(),
+          raw: z.record(z.string(), z.string()).optional(),
+          context: z.string().optional(),
+          evidenceText: z.string().optional(),
+          businessFacts: z.unknown().optional(),
+          scraped: z.object({
+            url: z.string().optional(),
+            finalUrl: z.string().optional(),
+            title: z.string().optional(),
+            description: z.string().optional(),
+            textPreview: z.string().optional(),
+            emails: z.array(z.string()).optional(),
+            phones: z.array(z.string()).optional(),
+          }).optional(),
+        }).passthrough()).optional(),
+        csvText: z.string().optional(),
+        delimiter: z.enum([",", ";"]).optional(),
+        sourceName: z.string().optional(),
+        niche: z.string().optional(),
+        offer: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        maxLeads: z.number().int().min(1).max(200).default(50),
+        maxContextChars: z.number().int().min(200).max(5000).default(1200),
+        completedIntros: z.array(z.object({
+          id: z.string().min(1),
+          icebreaker: z.string().optional(),
+          personalizedIntro: z.string().optional(),
+        })).optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildAiIntroWorkPacketPreview(input))
   );
 
   server.registerTool(

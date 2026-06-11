@@ -43,6 +43,7 @@ import {
   batchDraftLeadIntros,
   buildAiIntroQualityAuditPreview,
   buildAiIntroCleanupPreview,
+  buildAiIntroWorkPacketPreview,
   buildManualReviewPickupPlan,
   buildManualReviewQueue,
   buildSmartleadCampaignLaunchPreview,
@@ -2281,6 +2282,23 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         minEvidenceTerms: typeof payload.minEvidenceTerms === "number" ? payload.minEvidenceTerms : undefined,
         maxRedrafts: typeof payload.maxRedrafts === "number" ? payload.maxRedrafts : undefined,
         maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_ai_intro_work_packet_preview") {
+    writeJson(response, 200, {
+      result: buildAiIntroWorkPacketPreview({
+        leads: Array.isArray(payload.leads) ? payload.leads as Parameters<typeof buildAiIntroWorkPacketPreview>[0]["leads"] : undefined,
+        csvText: optionalString(payload.csvText),
+        delimiter: payload.delimiter === ";" ? ";" : payload.delimiter === "," ? "," : undefined,
+        sourceName: optionalString(payload.sourceName),
+        niche: optionalString(payload.niche),
+        offer: optionalString(payload.offer),
+        language: payload.language === "en" ? "en" : "sk",
+        maxLeads: typeof payload.maxLeads === "number" ? payload.maxLeads : undefined,
+        maxContextChars: typeof payload.maxContextChars === "number" ? payload.maxContextChars : undefined,
+        completedIntros: Array.isArray(payload.completedIntros) ? payload.completedIntros as Parameters<typeof buildAiIntroWorkPacketPreview>[0]["completedIntros"] : undefined,
       }),
     });
     return;

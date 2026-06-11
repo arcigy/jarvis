@@ -99,6 +99,37 @@ export type AiIntroCleanupPreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type AiIntroWorkPacketPreview = {
+  mode: "ai-intro-work-packet-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  source: { name?: string; niche?: string; parsedFromCsv: number; language: "sk" | "en"; offer?: string };
+  totals: {
+    input: number;
+    eligible: number;
+    skippedExistingIntro: number;
+    missingCompany: number;
+    noContext: number;
+    packetItems: number;
+    completedIntros: number;
+    validCompleted: number;
+    invalidCompleted: number;
+  };
+  packetItems: Array<{
+    id: string;
+    lead: LeadCandidateInput & { id?: string; raw?: Record<string, string>; scraped?: Partial<ScrapedWebsiteContacts>; context?: string; evidenceText?: string; businessFacts?: unknown };
+    companyName: string;
+    website?: string;
+    context: string;
+    evidenceTerms: string[];
+  }>;
+  markdownTask: string;
+  expectedJson: Array<{ id: string; icebreaker: string }>;
+  completedItems: Array<{ id: string; status: "valid" | "invalid" | "unknown_lead"; icebreaker?: string; issues: string[] }>;
+  mergedLeads: LeadCandidateInput[];
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type LeadBatchQaPreview = {
   mode: "lead-batch-qa-preview";
   status: "ready" | "attention" | "blocked";
@@ -1833,6 +1864,135 @@ export function buildPhoneEnrichmentQueuePreview(input: {
     enrichedLeads,
     scrapeUrls,
     exportPreview,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls),
+  };
+}
+
+export function buildAiIntroWorkPacketPreview(input: {
+  leads?: Array<LeadCandidateInput & { id?: string; raw?: Record<string, string>; scraped?: Partial<ScrapedWebsiteContacts>; context?: string; evidenceText?: string; businessFacts?: unknown }>;
+  csvText?: string;
+  delimiter?: "," | ";";
+  sourceName?: string;
+  niche?: string;
+  offer?: string;
+  language?: "sk" | "en";
+  maxLeads?: number;
+  maxContextChars?: number;
+  completedIntros?: Array<{ id: string; icebreaker?: string; personalizedIntro?: string }>;
+}): AiIntroWorkPacketPreview {
+  const parsed = input.csvText?.trim() ? parseLeadsCsv({ csvText: input.csvText, delimiter: input.delimiter }) : undefined;
+  const leads = [...(input.leads ?? []), ...(parsed?.leads ?? [])] as AiIntroWorkPacketPreview["packetItems"][number]["lead"][];
+  const language = input.language ?? "sk";
+  const maxLeads = Math.min(Math.max(Math.trunc(input.maxLeads ?? 50), 1), 200);
+  const maxContextChars = Math.min(Math.max(Math.trunc(input.maxContextChars ?? 1200), 200), 5000);
+  const skippedExistingIntro = leads.filter((lead) => Boolean(extractLeadIntro(lead))).length;
+  const missingCompany = leads.filter((lead) => !aiIntroWorkCompanyName(lead)).length;
+  const packetItems = leads
+    .map((lead, index) => {
+      const companyName = aiIntroWorkCompanyName(lead);
+      if (!companyName || extractLeadIntro(lead)) return null;
+      const context = aiIntroWorkContext(lead).slice(0, maxContextChars);
+      return {
+        id: aiIntroWorkLeadId(lead, index),
+        lead,
+        companyName,
+        ...(lead.website ? { website: lead.website } : {}),
+        context,
+        evidenceTerms: importantIntroTerms(context),
+      };
+    })
+    .filter((item): item is AiIntroWorkPacketPreview["packetItems"][number] => item !== null)
+    .slice(0, maxLeads);
+  const packetById = new Map(packetItems.map((item) => [item.id, item]));
+  const completedItems: AiIntroWorkPacketPreview["completedItems"] = (input.completedIntros ?? []).map((item) => {
+    const packet = packetById.get(item.id);
+    const icebreaker = (item.icebreaker ?? item.personalizedIntro ?? "").replace(/\s+/g, " ").trim();
+    if (!packet) return { id: item.id, status: "unknown_lead", icebreaker, issues: ["unknown_lead_id"] };
+    const issues = introQualityIssues(icebreaker, packet.evidenceTerms, 0, packet.lead)
+      .filter((issue) => issue !== "missing_evidence" && issue !== "weak_evidence_grounding");
+    return { id: item.id, status: issues.length ? "invalid" : "valid", icebreaker, issues };
+  });
+  const validById = new Map(completedItems
+    .filter((item) => item.status === "valid" && item.icebreaker)
+    .map((item) => [item.id, item.icebreaker as string]));
+  const mergedLeads: LeadCandidateInput[] = packetItems
+    .filter((item) => validById.has(item.id))
+    .map((item) => {
+      const intro = validById.get(item.id) as string;
+      return {
+        ...item.lead,
+        companyName: item.companyName,
+        personalizedIntro: intro,
+        source: item.lead.source ?? input.sourceName,
+        customFields: {
+          ...item.lead.customFields,
+          ai_intro_work_packet_id: item.id,
+          personalized_intro: intro,
+          icebreaker_sentence: intro,
+        },
+      };
+    });
+  const draftInputs = packetItems.map((item) => ({
+    companyName: item.companyName,
+    website: item.website,
+    context: item.context,
+    offer: input.offer,
+    language,
+  }));
+  const nextToolCalls: AiIntroWorkPacketPreview["nextToolCalls"] = [];
+  if (draftInputs.length) {
+    nextToolCalls.push({
+      tool: "arcigy.batch_draft_lead_intros",
+      payload: { leads: draftInputs.slice(0, 50), offer: input.offer, language, maxLeads: Math.min(draftInputs.length, 50) },
+      reason: "Alternativa k manualnemu AI baliku: nech Jarvis/Gemini navrhne intra priamo z pripraveneho kontextu.",
+      approvalRequired: false,
+    });
+  }
+  if (mergedLeads.length) {
+    nextToolCalls.push(
+      {
+        tool: "arcigy.build_ai_intro_cleanup_preview",
+        payload: { leads: mergedLeads, offer: input.offer, language, defaultSource: input.sourceName },
+        reason: "Vycistit validne AI intra od pozdravov a mien pred importom.",
+        approvalRequired: false,
+      },
+      {
+        tool: "arcigy.build_ai_intro_quality_audit_preview",
+        payload: { leads: mergedLeads, offer: input.offer, language, minEvidenceTerms: 0 },
+        reason: "Skontrolovat vygenerovane intra pred Smartlead uploadom alebo exportom.",
+        approvalRequired: false,
+      },
+      {
+        tool: "arcigy.export_leads_csv",
+        payload: { leads: mergedLeads, columns: ["companyName", "email", "website", "personalizedIntro", "source", "ai_intro_work_packet_id"] },
+        reason: "Exportovat AI intro vysledky az po kontrole operatorom.",
+        approvalRequired: true,
+      }
+    );
+  }
+  const totals = {
+    input: leads.length,
+    eligible: packetItems.length,
+    skippedExistingIntro,
+    missingCompany,
+    noContext: packetItems.filter((item) => !item.context).length,
+    packetItems: packetItems.length,
+    completedIntros: input.completedIntros?.length ?? 0,
+    validCompleted: completedItems.filter((item) => item.status === "valid").length,
+    invalidCompleted: completedItems.filter((item) => item.status !== "valid").length,
+  };
+  const status: AiIntroWorkPacketPreview["status"] = totals.input === 0 || totals.packetItems === 0 ? "blocked" : totals.noContext || totals.invalidCompleted ? "attention" : "ready";
+  return {
+    mode: "ai-intro-work-packet-preview",
+    status,
+    summary: `AI intro work packet ${status}: ${totals.packetItems} leadov pripravenych pre AI, ${totals.validCompleted}/${totals.completedIntros} dodanych intr validnych. Ziadny zapis ani upload neprebehol.`,
+    source: { name: input.sourceName, niche: input.niche, parsedFromCsv: parsed?.leads.length ?? 0, language, offer: input.offer },
+    totals,
+    packetItems,
+    markdownTask: buildAiIntroWorkMarkdownTask({ packetItems, niche: input.niche, offer: input.offer, language }),
+    expectedJson: packetItems.map((item) => ({ id: item.id, icebreaker: "" })),
+    completedItems,
+    mergedLeads,
     nextToolCalls: dedupeNextToolCalls(nextToolCalls),
   };
 }
@@ -6334,6 +6494,77 @@ function extractLeadIntro(lead: LeadCandidateInput & { intro?: Partial<LeadIntro
   return stringField(lead, "personalizedIntro", "icebreakerSentence", "icebreaker_sentence")
     ?? lead.intro?.personalizedIntro
     ?? stringField(lead.customFields ?? {}, "personalized_intro", "icebreaker_sentence");
+}
+
+function aiIntroWorkLeadId(lead: LeadCandidateInput & { id?: string; raw?: Record<string, string> }, index: number): string {
+  return stringField(lead, "id", "leadId", "lead_id")
+    ?? stringField(lead.customFields ?? {}, "id", "lead_id", "uuid")
+    ?? stringField(lead.raw ?? {}, "id", "lead_id", "uuid")
+    ?? `${slugify(aiIntroWorkCompanyName(lead) ?? lead.website ?? "lead")}-${index + 1}`;
+}
+
+function aiIntroWorkCompanyName(lead: LeadCandidateInput & { raw?: Record<string, string> }): string | undefined {
+  return stringField(lead, "companyName", "company_name", "original_name", "official_company_name")
+    ?? stringField(lead.customFields ?? {}, "company_name", "original_name", "official_company_name", "company_name_short")
+    ?? stringField(lead.raw ?? {}, "company", "company_name", "original_name", "official_company_name");
+}
+
+function aiIntroWorkContext(lead: LeadCandidateInput & { raw?: Record<string, string>; scraped?: Partial<ScrapedWebsiteContacts>; context?: string; evidenceText?: string; businessFacts?: unknown }): string {
+  const facts = Array.isArray(lead.businessFacts)
+    ? lead.businessFacts.join("; ")
+    : typeof lead.businessFacts === "object" && lead.businessFacts
+      ? JSON.stringify(lead.businessFacts)
+      : String(lead.businessFacts ?? "");
+  return [
+    introEvidenceText(lead),
+    facts,
+    stringField(lead.customFields ?? {}, "business_facts", "matched_queries", "source_context", "context_preview"),
+    stringField(lead.raw ?? {}, "business_facts", "matched_queries", "description", "category"),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function buildAiIntroWorkMarkdownTask(input: {
+  packetItems: AiIntroWorkPacketPreview["packetItems"];
+  niche?: string;
+  offer?: string;
+  language: "sk" | "en";
+}): string {
+  const lines = [
+    `# AI Intro Work Packet${input.niche ? ` - ${input.niche}` : ""}`,
+    "",
+    "Vytvor kratky personalizovany icebreaker pre kazdu firmu nizsie.",
+    "",
+    "## Pravidla",
+    input.language === "en" ? "- Write in English." : "- Pis po slovensky.",
+    "- Max 1-2 vety.",
+    "- Musi byt konkretny k firme a vychadzat z dodaneho kontextu.",
+    "- Bez pozdravu, bez mena adresata, bez tvrdenia ze si nieco vykonal.",
+    "- Nepouzivaj genericke vety typu 'mate zaujimavy web' bez konkretneho faktu.",
+    "- Vrat iba JSON pole v presnom formate uvedenom nizsie.",
+    input.offer ? `- Ponuka/kontekst Arcigy: ${input.offer}` : "",
+    "",
+    "## Vystupny format",
+    "```json",
+    "[",
+    '  { "id": "lead-id", "icebreaker": "Zaujalo ma, ze..." }',
+    "]",
+    "```",
+    "",
+    `## Firmy (${input.packetItems.length})`,
+    "",
+  ].filter((line) => line !== "");
+  for (const item of input.packetItems) {
+    lines.push(`### ${item.companyName}`);
+    lines.push(`- ID: ${item.id}`);
+    if (item.website) lines.push(`- Web: ${item.website}`);
+    lines.push(`- Kontext: ${item.context || "(chyba kontext - pouzi len jasne dostupne fakty z nazvu/webu)"}`);
+    lines.push("");
+  }
+  return lines.join("\n");
 }
 
 function introEvidenceText(lead: LeadCandidateInput & { scraped?: Partial<ScrapedWebsiteContacts>; context?: string; evidenceText?: string }): string {

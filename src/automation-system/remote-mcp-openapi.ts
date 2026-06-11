@@ -901,6 +901,21 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       minEvidenceTerms: 1,
     };
   }
+  if (toolName === "arcigy.build_ai_intro_work_packet_preview") {
+    return {
+      sourceName: "prep-for-ai-kuchyne",
+      niche: "kuchynske studia",
+      offer: "AI asistent na dopyty a follow-up.",
+      language: "sk",
+      leads: [
+        { id: "lead-1", companyName: "Ready Studio", website: "https://ready.sk", email: "jan@ready.sk", context: "Firma robi kuchyne na mieru, showroom a navrhy interierov." },
+        { id: "lead-2", companyName: "Needs Context", website: "https://needs-context.sk", email: "info@needs-context.sk" },
+      ],
+      completedIntros: [
+        { id: "lead-1", icebreaker: "Zaujalo ma, ze prepajate navrhy interierov so showroomom pre kuchyne na mieru." },
+      ],
+    };
+  }
   if (toolName === "arcigy.build_ai_intro_cleanup_preview") {
     return {
       campaignId: "123456",

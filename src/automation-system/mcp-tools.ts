@@ -113,6 +113,7 @@ export type JarvisMcpToolName =
   | "arcigy.draft_lead_intro"
   | "arcigy.batch_draft_lead_intros"
   | "arcigy.build_ai_intro_quality_audit_preview"
+  | "arcigy.build_ai_intro_work_packet_preview"
   | "arcigy.build_ai_intro_cleanup_preview"
   | "arcigy.enrich_website_leads_preview"
   | "arcigy.prepare_smartlead_leads"
@@ -705,6 +706,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.build_ai_intro_quality_audit_preview",
       description: "Skontroluje AI intra pred Smartlead importom, najde chybajuce/genericke/kratke/slabo podlozene texty a pripravi redraft kroky.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_ai_intro_work_packet_preview",
+      description: "Pripravi Markdown/JSON pracovny balik pre ChatGPT alebo Claude na doplnenie chybajucich icebreakerov a validuje vratene intra bez DB zapisu.",
       requiresApproval: false,
     },
     {

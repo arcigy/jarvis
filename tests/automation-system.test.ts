@@ -27,6 +27,7 @@ import {
   batchDraftLeadIntros,
   buildManualReviewPickupPlan,
   buildManualReviewQueue,
+  buildAiIntroWorkPacketPreview,
   buildLeadgenGapReport,
   buildLeadgenCampaignPipelinePreview,
   buildLeadgenAutopilotBatchPreview,
@@ -229,6 +230,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.draft_lead_intro",
     "arcigy.batch_draft_lead_intros",
     "arcigy.build_ai_intro_quality_audit_preview",
+    "arcigy.build_ai_intro_work_packet_preview",
     "arcigy.build_ai_intro_cleanup_preview",
     "arcigy.enrich_website_leads_preview",
     "arcigy.prepare_smartlead_leads",
@@ -1483,7 +1485,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 117 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 118 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -4008,6 +4010,40 @@ test("AI intro quality audit flags weak intros and prepares redrafts", () => {
   assert.ok(audit.nextToolCalls.some((call) => call.tool === "arcigy.batch_draft_lead_intros" && !call.approvalRequired));
   assert.ok(audit.nextToolCalls.some((call) => call.tool === "arcigy.build_lead_repair_queue_preview" && !call.approvalRequired));
   assert.match(audit.summary, /Ziadny email ani zapis neprebehol/);
+});
+
+test("AI intro work packet preview prepares Claude task and validates returned intros", () => {
+  const preview = buildAiIntroWorkPacketPreview({
+    sourceName: "prep-for-ai-kuchyne",
+    niche: "kuchynske studia",
+    offer: "AI asistent na dopyty a follow-up.",
+    leads: [
+      { id: "lead-1", companyName: "Ready Studio", website: "https://ready.sk", email: "jan@ready.sk", context: "Firma robi kuchyne na mieru, showroom a navrhy interierov." },
+      { id: "lead-2", companyName: "Has Intro", website: "https://has-intro.sk", personalizedIntro: "Vsimol som si vase portfolio." },
+      { id: "lead-3", website: "https://missing-company.sk", context: "Bez nazvu firmy." },
+      { id: "lead-4", companyName: "No Context", website: "https://no-context.sk", email: "info@no-context.sk" },
+    ],
+    completedIntros: [
+      { id: "lead-1", icebreaker: "Zaujalo ma, ze prepajate navrhy interierov so showroomom pre kuchyne na mieru." },
+      { id: "lead-x", icebreaker: "Zaujalo ma, ze mate showroom." },
+    ],
+  });
+
+  assert.equal(preview.mode, "ai-intro-work-packet-preview");
+  assert.equal(preview.totals.input, 4);
+  assert.equal(preview.totals.packetItems, 2);
+  assert.equal(preview.totals.skippedExistingIntro, 1);
+  assert.equal(preview.totals.missingCompany, 1);
+  assert.equal(preview.totals.noContext, 1);
+  assert.equal(preview.totals.validCompleted, 1);
+  assert.equal(preview.totals.invalidCompleted, 1);
+  assert.match(preview.markdownTask, /AI Intro Work Packet/);
+  assert.deepEqual(preview.expectedJson[0], { id: "lead-1", icebreaker: "" });
+  assert.equal(preview.mergedLeads[0].personalizedIntro, "Zaujalo ma, ze prepajate navrhy interierov so showroomom pre kuchyne na mieru.");
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_draft_lead_intros" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_ai_intro_cleanup_preview" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.export_leads_csv" && call.approvalRequired));
+  assert.match(preview.summary, /Ziadny zapis ani upload/);
 });
 
 test("AI intro cleanup preview removes greetings and prepares safe next steps", () => {
