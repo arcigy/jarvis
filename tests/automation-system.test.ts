@@ -119,7 +119,7 @@ import { lookupPublicEmailProfile } from "../src/automation-system/public-profil
 import { buildOperatorBriefing } from "../src/automation-system/operator-briefing.ts";
 import { buildLeadgenDailyReport, buildLeadgenEveningSummary, buildLeadgenOpsDigest, buildLeadgenSlackReportPreview, selectNextNiche } from "../src/automation-system/leadgen-report.ts";
 import { sendSlackMessage } from "../src/automation-system/slack.ts";
-import { draftPriceOfferIntake } from "../src/automation-system/price-offer.ts";
+import { buildPricingProposalPreview, draftPriceOfferIntake } from "../src/automation-system/price-offer.ts";
 import { buildProactiveAttentionDigest } from "../src/automation-system/proactive-attention-digest.ts";
 import { buildOutreachReplyTriagePreview, classifyOutreachReply, previewGmailAiReply, previewSmartleadAiReply } from "../src/automation-system/reply-decision.ts";
 import { buildJarvisCapabilityAudit } from "../src/automation-system/jarvis-capability-audit.ts";
@@ -136,6 +136,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.generate_contract_documents",
     "arcigy.draft_contract_intake",
     "arcigy.draft_price_offer_intake",
+    "arcigy.build_pricing_proposal_preview",
     "arcigy.generate_price_offer_document",
     "arcigy.get_cold_outreach_brief",
     "arcigy.get_cold_outreach_brief_from_db",
@@ -367,6 +368,7 @@ test("Jarvis capability audit maps the full requested production surface to evid
   assert.ok(remoteMcpCapability?.tools.includes("arcigy.get_production_completion_score"));
   assert.ok(remoteMcpCapability?.evidence.includes("pack-production-evidence-quick-start"));
   assert.ok(remoteMcpCapability?.evidence.includes("production-evidence-tool-call"));
+  assert.ok(audit.capabilities.some((item) => item.id === "contracts" && item.tools.includes("arcigy.build_pricing_proposal_preview")));
   assert.ok(audit.capabilities.some((item) => item.id === "proactive-digest" && item.status === "ready" && item.tools.includes("arcigy.sync_gmail_recent_messages")));
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.append_leads_to_google_sheet")));
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.replace_google_sheet_rows")));
@@ -479,6 +481,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.ok(paths.includes("/api/mcp/arcigy.get_smartlead_campaign_webhooks"));
   assert.ok(paths.includes("/api/mcp/arcigy.upsert_smartlead_campaign_webhook"));
   assert.ok(paths.includes("/api/mcp/arcigy.get_smartlead_email_accounts"));
+  assert.ok(paths.includes("/api/mcp/arcigy.build_pricing_proposal_preview"));
   const operatorBriefing = document.paths["/api/mcp/arcigy.get_operator_briefing"] as OpenApiPathFixture;
   const attentionDigest = document.paths["/api/mcp/arcigy.get_proactive_attention_digest"] as OpenApiPathFixture;
   const completionScore = document.paths["/api/mcp/arcigy.get_production_completion_score"] as OpenApiPathFixture;
@@ -497,6 +500,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   const smartleadWebhooks = document.paths["/api/mcp/arcigy.get_smartlead_campaign_webhooks"] as OpenApiPathFixture;
   const smartleadWebhookUpsert = document.paths["/api/mcp/arcigy.upsert_smartlead_campaign_webhook"] as OpenApiPathFixture;
   const smartleadEmailAccounts = document.paths["/api/mcp/arcigy.get_smartlead_email_accounts"] as OpenApiPathFixture;
+  const pricingProposalPreview = document.paths["/api/mcp/arcigy.build_pricing_proposal_preview"] as OpenApiPathFixture;
   const contractGenerate = document.paths["/api/mcp/arcigy.generate_contract_documents"] as OpenApiPathFixture;
   assert.equal(operatorBriefing.post.requestBody.content["application/json"].examples.quickStart.value.live, false);
   assert.equal(attentionDigest.post.requestBody.content["application/json"].examples.quickStart.value.syncGmail, false);
@@ -525,6 +529,8 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.equal(smartleadEmailAccounts.post.requestBody.content["application/json"].examples.quickStart.value.requestedDailyLimit, 80);
   assert.equal(smartleadWebhookUpsert.post["x-arcigy-requiresApproval"], true);
   assert.equal(smartleadWebhookUpsert.post.requestBody.content["application/json"].examples.quickStart.value.approval.approved, true);
+  assert.equal(pricingProposalPreview.post.requestBody.content["application/json"].examples.quickStart.value.clientName, "Modelova Firma s.r.o.");
+  assert.equal(pricingProposalPreview.post.requestBody.content["application/json"].examples.quickStart.value.items.length, 2);
   assert.equal(contractGenerate.post["x-arcigy-requiresApproval"], true);
   assert.equal(contractGenerate.post.requestBody.content["application/json"].examples.quickStart.value.approval.approved, true);
   assert.equal(JSON.stringify(document).includes("<JARVIS_WEB_TOKEN>"), true);
@@ -2167,6 +2173,33 @@ test("price offer intake draft parses Gemini JSON output", async () => {
 
   assert.equal(draft.company, "Modelova Firma s.r.o.");
   assert.equal(draft.cost, 2200);
+});
+
+test("pricing proposal preview calculates discounts margin and approved DOCX next call", () => {
+  const preview = buildPricingProposalPreview({
+    customerId: "VIP-123",
+    clientName: "Modelova Firma s.r.o.",
+    projectName: "Leadgen a follow-up automatizacia",
+    items: [
+      { id: "setup", name: "Implementacia automatizacie", quantity: 1, unitPriceEur: 2000, unitCostEur: 900 },
+      { id: "monthly", name: "Mesacna prevadzka", quantity: 12, unitPriceEur: 200, unitCostEur: 80, recurring: true },
+    ],
+    manualDiscountPercent: 5,
+    vatPercent: 20,
+  });
+
+  assert.equal(preview.mode, "pricing-proposal-preview");
+  assert.equal(preview.totals.subtotalEur, 4400);
+  assert.equal(preview.discounts.bulkPercent, 10);
+  assert.equal(preview.discounts.vipBonusPercent, 5);
+  assert.equal(preview.totals.discountPercent, 15);
+  assert.equal(preview.totals.netTotalEur, 3740);
+  assert.equal(preview.totals.grossTotalEur, 4488);
+  assert.equal(preview.validation.valid, true);
+  assert.equal(preview.nextToolCalls[0].tool, "arcigy.generate_price_offer_document");
+  assert.equal(preview.nextToolCalls[0].approvalRequired, true);
+  assert.equal((preview.nextToolCalls[0].payload.offer as Record<string, unknown>).company, "Modelova Firma s.r.o.");
+  assert.match(preview.summary, /Dokument negenerujem bez schvalenia/);
 });
 
 test("price offer generator creates a DOCX from the bundled template", () => {

@@ -95,7 +95,7 @@ import {
   identifyEmailMcpAnswer,
 } from "./mcp-tools.ts";
 import { buildOperatorBriefing } from "./operator-briefing.ts";
-import { draftPriceOfferIntake } from "./price-offer.ts";
+import { buildPricingProposalPreview, draftPriceOfferIntake } from "./price-offer.ts";
 import { buildProactiveAttentionDigest } from "./proactive-attention-digest.ts";
 import { buildProductionCompletionScore, summarizeProductionCompletionScoreForVoice } from "./production-completion-score.ts";
 import { buildProductionReadinessReport } from "./production-readiness.ts";
@@ -207,6 +207,42 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async ({ brief, baseOffer }) => jsonResult(await draftPriceOfferIntake({ brief, baseOffer }))
+  );
+
+  server.registerTool(
+    "arcigy.build_pricing_proposal_preview",
+    {
+      title: "Build pricing proposal preview",
+      description: "Calculate an Arcigy price proposal with discounts, margin checks, VAT, and a next approved DOCX generation payload without writing files.",
+      inputSchema: {
+        customerId: z.string().min(1).optional(),
+        clientName: z.string().min(1).optional(),
+        projectName: z.string().min(1).optional(),
+        items: z.array(z.object({
+          id: z.string().min(1).optional(),
+          name: z.string().min(1),
+          quantity: z.number().positive().optional(),
+          unitPriceEur: z.number().nonnegative(),
+          unitCostEur: z.number().nonnegative().optional(),
+          category: z.string().min(1).optional(),
+          recurring: z.boolean().optional(),
+        })).min(1),
+        manualDiscountPercent: z.number().min(0).max(100).optional(),
+        vatPercent: z.number().min(0).max(100).optional(),
+        validDays: z.number().int().positive().optional(),
+        minMarginPercent: z.number().min(0).optional(),
+        minTotalEur: z.number().min(0).optional(),
+        maxDiscountPercent: z.number().min(0).max(100).optional(),
+        vip: z.boolean().optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildPricingProposalPreview(input))
   );
 
   server.registerTool(

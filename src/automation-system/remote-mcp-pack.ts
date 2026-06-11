@@ -804,6 +804,24 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Calculate pricing proposal before DOCX approval",
+      tool: "arcigy.build_pricing_proposal_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_pricing_proposal_preview"),
+      body: {
+        customerId: "VIP-123",
+        clientName: "Modelova Firma s.r.o.",
+        projectName: "Leadgen a follow-up automatizacia",
+        items: [
+          { id: "setup", name: "Implementacia automatizacie", quantity: 1, unitPriceEur: 2000, unitCostEur: 900 },
+          { id: "monthly", name: "Mesacna prevadzka", quantity: 12, unitPriceEur: 200, unitCostEur: 80, recurring: true },
+        ],
+        manualDiscountPercent: 5,
+        vatPercent: 20,
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Discover leads without writing",
       tool: "arcigy.discover_leads",
       method: "POST",

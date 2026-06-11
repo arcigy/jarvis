@@ -90,7 +90,7 @@ import {
 } from "../automation-system/lead-automation.ts";
 import { buildContractGenerationCommand, getColdOutreachMcpAnswer, listJarvisMcpTools, localStateWriteToolNames } from "../automation-system/mcp-tools.ts";
 import { buildOperatorBriefing } from "../automation-system/operator-briefing.ts";
-import { draftPriceOfferIntake } from "../automation-system/price-offer.ts";
+import { buildPricingProposalPreview, draftPriceOfferIntake } from "../automation-system/price-offer.ts";
 import { buildProactiveAttentionDigest } from "../automation-system/proactive-attention-digest.ts";
 import { buildProductionCompletionScore, summarizeProductionCompletionScoreForVoice } from "../automation-system/production-completion-score.ts";
 import { buildProductionReadinessReport } from "../automation-system/production-readiness.ts";
@@ -1057,6 +1057,24 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
       result: await draftPriceOfferIntake({
         brief: String(payload.brief ?? ""),
         baseOffer: payload.baseOffer && typeof payload.baseOffer === "object" ? payload.baseOffer as Record<string, unknown> : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_pricing_proposal_preview") {
+    writeJson(response, 200, {
+      result: buildPricingProposalPreview({
+        customerId: optionalString(payload.customerId),
+        clientName: optionalString(payload.clientName),
+        projectName: optionalString(payload.projectName),
+        items: Array.isArray(payload.items) ? payload.items as never : [],
+        manualDiscountPercent: optionalNumber(payload.manualDiscountPercent),
+        vatPercent: optionalNumber(payload.vatPercent),
+        validDays: optionalNumber(payload.validDays),
+        minMarginPercent: optionalNumber(payload.minMarginPercent),
+        minTotalEur: optionalNumber(payload.minTotalEur),
+        maxDiscountPercent: optionalNumber(payload.maxDiscountPercent),
+        vip: payload.vip === true,
       }),
     });
     return;
@@ -3815,6 +3833,11 @@ function parseContractIntake(value: unknown): unknown {
 
 function optionalString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+function optionalNumber(value: unknown): number | undefined {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

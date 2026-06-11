@@ -6,6 +6,7 @@ export type JarvisMcpToolName =
   | "arcigy.generate_contract_documents"
   | "arcigy.draft_contract_intake"
   | "arcigy.draft_price_offer_intake"
+  | "arcigy.build_pricing_proposal_preview"
   | "arcigy.generate_price_offer_document"
   | "arcigy.get_cold_outreach_brief"
   | "arcigy.get_cold_outreach_brief_from_db"
@@ -189,6 +190,12 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.draft_price_offer_intake",
       description: "Pouzije Gemini na navrh JSON vstupu pre Arcigy cenovu ponuku bez generovania dokumentu.",
+      inputSchemaRef: "docs/pricing/price-offer.schema.json",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_pricing_proposal_preview",
+      description: "Read-only vypocita cenovu ponuku, zlavove pravidla, DPH a marzu a pripravi schvalovaci next call na DOCX.",
       inputSchemaRef: "docs/pricing/price-offer.schema.json",
       requiresApproval: false,
     },

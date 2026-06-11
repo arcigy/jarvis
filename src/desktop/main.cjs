@@ -668,7 +668,7 @@ const coreWebWorkflowSurfaces = [
   {
     id: "contract-workflow",
     title: "Contract automation workflow",
-    tools: ["arcigy.draft_contract_intake", "arcigy.generate_contract_documents", "arcigy.draft_price_offer_intake", "arcigy.generate_price_offer_document"],
+    tools: ["arcigy.draft_contract_intake", "arcigy.generate_contract_documents", "arcigy.draft_price_offer_intake", "arcigy.build_pricing_proposal_preview", "arcigy.generate_price_offer_document"],
     approvalRequired: ["arcigy.generate_contract_documents", "arcigy.generate_price_offer_document"],
     proof: "Gemini intake drafts and approval-gated DOCX contract/price-offer generation are registered.",
   },
@@ -1196,7 +1196,7 @@ function jarvisCapabilityDefinitions() {
     {
       id: "contracts",
       title: "Universal Arcigy contract automation",
-      tools: ["arcigy.draft_contract_intake", "arcigy.generate_contract_documents"],
+      tools: ["arcigy.draft_contract_intake", "arcigy.generate_contract_documents", "arcigy.draft_price_offer_intake", "arcigy.build_pricing_proposal_preview", "arcigy.generate_price_offer_document"],
       approvalRequired: ["arcigy.generate_contract_documents", "arcigy.generate_price_offer_document"],
       evidence: ["contract-template-safety", "tests", "ui-smoke"],
       envKeys: ["gemini"],
@@ -2095,6 +2095,24 @@ function buildRemoteMcpQuickStartCalls(baseUrl) {
       url: toolUrl("arcigy.draft_price_offer_intake"),
       body: {
         brief: "Klient Modelova Firma chce automatizovat dopyty, setup 2000 EUR, mesacne 200 EUR, ciel je usetrit obchodnikovi 8 hodin tyzdenne.",
+      },
+      approvalRequired: false,
+    },
+    {
+      label: "Calculate pricing proposal before DOCX approval",
+      tool: "arcigy.build_pricing_proposal_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_pricing_proposal_preview"),
+      body: {
+        customerId: "VIP-123",
+        clientName: "Modelova Firma s.r.o.",
+        projectName: "Leadgen a follow-up automatizacia",
+        items: [
+          { id: "setup", name: "Implementacia automatizacie", quantity: 1, unitPriceEur: 2000, unitCostEur: 900 },
+          { id: "monthly", name: "Mesacna prevadzka", quantity: 12, unitPriceEur: 200, unitCostEur: 80, recurring: true },
+        ],
+        manualDiscountPercent: 5,
+        vatPercent: 20,
       },
       approvalRequired: false,
     },
@@ -3118,6 +3136,7 @@ function listWebMcpTools() {
     { name: "arcigy.generate_contract_documents", requiresApproval: true },
     { name: "arcigy.draft_contract_intake", requiresApproval: false },
     { name: "arcigy.draft_price_offer_intake", requiresApproval: false },
+    { name: "arcigy.build_pricing_proposal_preview", requiresApproval: false },
     { name: "arcigy.generate_price_offer_document", requiresApproval: true },
     { name: "arcigy.get_cold_outreach_brief", requiresApproval: false },
     { name: "arcigy.get_cold_outreach_brief_from_db", requiresApproval: false },

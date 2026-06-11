@@ -261,6 +261,19 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
   if (toolName === "arcigy.record_local_niche_run") return { slug: "kuchyne", stats: { discovered: 40, enriched: 30, qualified: 18, sentToSmartlead: 18, failed: 2 }, approval: { approved: true } };
   if (toolName === "arcigy.draft_contract_intake") return { brief: "Klient potrebuje webovu aplikaciu pre lead intake, reporting a klientsku evidenciu." };
   if (toolName === "arcigy.draft_price_offer_intake") return { brief: "Klient Modelova Firma chce automatizovat dopyty, setup 2000 EUR, mesacne 200 EUR, ciel je usetrit obchodnikovi 8 hodin tyzdenne." };
+  if (toolName === "arcigy.build_pricing_proposal_preview") {
+    return {
+      customerId: "VIP-123",
+      clientName: "Modelova Firma s.r.o.",
+      projectName: "Leadgen a follow-up automatizacia",
+      items: [
+        { id: "setup", name: "Implementacia automatizacie", quantity: 1, unitPriceEur: 2000, unitCostEur: 900 },
+        { id: "monthly", name: "Mesacna prevadzka", quantity: 12, unitPriceEur: 200, unitCostEur: 80, recurring: true },
+      ],
+      manualDiscountPercent: 5,
+      vatPercent: 20,
+    };
+  }
   if (toolName === "arcigy.generate_price_offer_document") {
     return {
       approval: { approved: true },
