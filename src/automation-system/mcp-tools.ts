@@ -94,6 +94,7 @@ export type JarvisMcpToolName =
   | "arcigy.preview_lead_enrichment_batch"
   | "arcigy.build_lead_enrichment_merge_preview"
   | "arcigy.build_leadgen_gap_report"
+  | "arcigy.build_leadgen_status_board_preview"
   | "arcigy.build_leadgen_campaign_pipeline_preview"
   | "arcigy.build_lead_source_import_queue_preview"
   | "arcigy.build_lead_source_bundle_preview"
@@ -611,6 +612,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.build_leadgen_gap_report",
       description: "Vyhodnoti leady pred Smartleadom, ukaze chybajuce emaily/weby/intra a navrhne dalsie safe MCP kroky bez zapisu.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_leadgen_status_board_preview",
+      description: "Z CSV alebo leadov vytvori read-only status board po niche/campaign: ready pre Smartlead, bez emailu, bez AI intra, bez telefonu, uz odoslane a repair kroky.",
       requiresApproval: false,
     },
     {

@@ -130,6 +130,37 @@ export type AiIntroWorkPacketPreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type LeadgenStatusBoardPreview = {
+  mode: "leadgen-status-board-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  source: { name?: string; parsedFromCsv: number; groupBy: "niche" | "campaign" | "source" };
+  totals: {
+    input: number;
+    groups: number;
+    readyForSmartlead: number;
+    needsEmail: number;
+    needsIntro: number;
+    needsPhone: number;
+    sentToSmartlead: number;
+    verified: number;
+    failed: number;
+    orphan: number;
+  };
+  groups: Array<{
+    key: string;
+    label: string;
+    campaignId?: string | number | null;
+    totals: LeadgenStatusBoardPreview["totals"];
+    readyLeads: LeadCandidateInput[];
+    needsEmailLeads: LeadCandidateInput[];
+    needsIntroLeads: LeadCandidateInput[];
+    needsPhoneLeads: LeadCandidateInput[];
+    failedLeads: LeadCandidateInput[];
+  }>;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type LeadBatchQaPreview = {
   mode: "lead-batch-qa-preview";
   status: "ready" | "attention" | "blocked";
@@ -1993,6 +2024,168 @@ export function buildAiIntroWorkPacketPreview(input: {
     expectedJson: packetItems.map((item) => ({ id: item.id, icebreaker: "" })),
     completedItems,
     mergedLeads,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls),
+  };
+}
+
+export function buildLeadgenStatusBoardPreview(input: {
+  leads?: Array<LeadCandidateInput & {
+    id?: string;
+    raw?: Record<string, string>;
+    nicheSlug?: string;
+    nicheId?: string;
+    campaignTag?: string;
+    campaignId?: string | number | null;
+    verificationStatus?: string;
+    sentToSmartlead?: boolean;
+    sent_to_smartlead?: boolean;
+    smartleadStatus?: string;
+    smartlead_status?: string;
+    ico?: string;
+    official_company_name?: string;
+  }>;
+  csvText?: string;
+  delimiter?: "," | ";";
+  sourceName?: string;
+  groupBy?: "niche" | "campaign" | "source";
+  defaultNiche?: string;
+  defaultCampaignId?: string | number | null;
+  offer?: string;
+  language?: "sk" | "en";
+  maxNextCalls?: number;
+}): LeadgenStatusBoardPreview {
+  const parsed = input.csvText?.trim() ? parseLeadsCsv({ csvText: input.csvText, delimiter: input.delimiter }) : undefined;
+  const leads = [...(input.leads ?? []), ...(parsed?.leads ?? [])] as NonNullable<typeof input.leads>;
+  const groupBy = input.groupBy ?? "niche";
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 50), 1), 200);
+  const rows = leads.map((lead) => {
+    const email = lead.email ?? leadgenStatusField(lead, "primary_email", "email");
+    const intro = extractLeadIntro(lead) ?? leadgenStatusField(lead, "icebreaker_sentence", "personalized_intro", "icebreaker");
+    const phone = lead.phone ?? leadgenStatusField(lead, "phone", "international_phone");
+    const verificationStatus = (lead.verificationStatus ?? leadgenStatusField(lead, "verification_status", "verificationStatus") ?? "").toLowerCase();
+    const smartleadStatus = (lead.smartleadStatus ?? lead.smartlead_status ?? leadgenStatusField(lead, "smartlead_status", "smartlead_statuses") ?? "").toLowerCase();
+    const sentToSmartlead = lead.sentToSmartlead === true
+      || lead.sent_to_smartlead === true
+      || leadgenStatusBoolean(lead, "sent_to_smartlead", "cold_email_sent")
+      || /sent|opened|replied|completed|paused/.test(smartleadStatus);
+    const failed = verificationStatus === "failed" || verificationStatus === "rejected" || /bounced|blocked|unsubscribed|failed/.test(smartleadStatus);
+    const verified = verificationStatus === "verified" || verificationStatus === "ok" || Boolean(lead.ico ?? lead.official_company_name ?? leadgenStatusField(lead, "ico", "official_company_name", "orsr_verified"));
+    const group = leadgenStatusGroup(lead, groupBy, input.defaultNiche);
+    const normalizedLead: LeadCandidateInput = {
+      ...lead,
+      email,
+      phone,
+      source: lead.source ?? input.sourceName,
+      personalizedIntro: intro,
+      customFields: {
+        ...lead.customFields,
+        leadgen_status_group: group.key,
+        verification_status: verificationStatus || undefined,
+        sent_to_smartlead: sentToSmartlead,
+      },
+    };
+    return {
+      lead: normalizedLead,
+      group,
+      email,
+      intro,
+      phone,
+      sentToSmartlead,
+      failed,
+      verified,
+      readyForSmartlead: Boolean(email && intro && !sentToSmartlead && !failed),
+      needsEmail: Boolean(!email && !failed),
+      needsIntro: Boolean(email && !intro && !failed),
+      needsPhone: Boolean(email && intro && !phone && lead.website && !sentToSmartlead && !failed),
+      orphan: group.key === "orphan",
+    };
+  });
+  const groupMap = new Map<string, typeof rows>();
+  for (const row of rows) {
+    groupMap.set(row.group.key, [...(groupMap.get(row.group.key) ?? []), row]);
+  }
+  const groups: LeadgenStatusBoardPreview["groups"] = [...groupMap.entries()].map(([key, items]) => {
+    const first = items[0];
+    const readyLeads = items.filter((item) => item.readyForSmartlead).map((item) => item.lead);
+    const needsEmailLeads = items.filter((item) => item.needsEmail).map((item) => item.lead);
+    const needsIntroLeads = items.filter((item) => item.needsIntro).map((item) => item.lead);
+    const needsPhoneLeads = items.filter((item) => item.needsPhone).map((item) => item.lead);
+    const failedLeads = items.filter((item) => item.failed).map((item) => item.lead);
+    return {
+      key,
+      label: first?.group.label ?? key,
+      campaignId: first?.group.campaignId ?? input.defaultCampaignId,
+      totals: { ...leadgenStatusTotals(items), groups: 1 },
+      readyLeads,
+      needsEmailLeads,
+      needsIntroLeads,
+      needsPhoneLeads,
+      failedLeads,
+    };
+  }).sort((a, b) => b.totals.input - a.totals.input);
+  const totals = { ...leadgenStatusTotals(rows), groups: groups.length };
+  const nextToolCalls: LeadgenStatusBoardPreview["nextToolCalls"] = [];
+  const needsEmailLeads = rows.filter((row) => row.needsEmail && row.lead.website).map((row) => row.lead).slice(0, maxNextCalls);
+  const needsIntroLeads = rows.filter((row) => row.needsIntro).map((row) => row.lead).slice(0, maxNextCalls);
+  const needsPhoneLeads = rows.filter((row) => row.needsPhone).map((row) => row.lead).slice(0, maxNextCalls);
+  const failedLeads = rows.filter((row) => row.failed || row.needsEmail || row.needsIntro).map((row) => row.lead).slice(0, maxNextCalls);
+  const readyLeads = rows.filter((row) => row.readyForSmartlead).map((row) => row.lead).slice(0, maxNextCalls);
+  if (needsEmailLeads.length) {
+    nextToolCalls.push({
+      tool: "arcigy.batch_scrape_website_contacts",
+      payload: { urls: unique(needsEmailLeads.map((lead) => lead.website).filter((value): value is string => Boolean(value))), includePriorityPages: true, maxPages: 4, maxSites: needsEmailLeads.length },
+      reason: "Leady bez emailu maju web; najprv vytiahni kontaktne udaje.",
+      approvalRequired: false,
+    });
+  }
+  if (needsIntroLeads.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_ai_intro_work_packet_preview",
+      payload: { leads: needsIntroLeads, sourceName: input.sourceName, offer: input.offer, language: input.language ?? "sk", maxLeads: needsIntroLeads.length },
+      reason: "Leady maju email, ale chyba personalizovane AI intro.",
+      approvalRequired: false,
+    });
+  }
+  if (needsPhoneLeads.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_phone_enrichment_queue_preview",
+      payload: { leads: needsPhoneLeads, sourceName: input.sourceName, maxNextCalls },
+      reason: "Leady bez telefonu priprav na phone enrichment a contact-page scrape.",
+      approvalRequired: false,
+    });
+  }
+  if (failedLeads.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_lead_repair_queue_preview",
+      payload: { leads: failedLeads, offer: input.offer, language: input.language ?? "sk", maxNextCalls },
+      reason: "Problemove leady posli do repair queue pred importom.",
+      approvalRequired: false,
+    });
+  }
+  if (readyLeads.length) {
+    nextToolCalls.push(
+      {
+        tool: "arcigy.build_smartlead_injection_plan",
+        payload: { leads: readyLeads, campaignId: input.defaultCampaignId, batchSize: Math.min(readyLeads.length, 50) },
+        reason: "Ready leady priprav do Smartlead lead_list batchov bez uploadu.",
+        approvalRequired: false,
+      },
+      {
+        tool: "arcigy.export_leads_csv",
+        payload: { leads: readyLeads, columns: ["companyName", "email", "website", "phone", "personalizedIntro", "source", "leadgen_status_group"] },
+        reason: "Exportuj ready leady az po kontrole operatorom.",
+        approvalRequired: true,
+      }
+    );
+  }
+  const status: LeadgenStatusBoardPreview["status"] = totals.input === 0 ? "blocked" : totals.needsEmail || totals.needsIntro || totals.failed || totals.orphan ? "attention" : "ready";
+  return {
+    mode: "leadgen-status-board-preview",
+    status,
+    summary: `Leadgen status board ${status}: ${totals.input} leadov v ${groups.length} skupinach, ${totals.readyForSmartlead} ready pre Smartlead, ${totals.needsEmail} bez emailu, ${totals.needsIntro} bez intra, ${totals.sentToSmartlead} uz v Smartlead. Ziadny zapis ani upload neprebehol.`,
+    source: { name: input.sourceName, parsedFromCsv: parsed?.leads.length ?? 0, groupBy },
+    totals,
+    groups,
     nextToolCalls: dedupeNextToolCalls(nextToolCalls),
   };
 }
@@ -6565,6 +6758,64 @@ function buildAiIntroWorkMarkdownTask(input: {
     lines.push("");
   }
   return lines.join("\n");
+}
+
+function leadgenStatusField(lead: LeadCandidateInput & { raw?: Record<string, string> }, ...keys: string[]): string | undefined {
+  return stringField(lead, ...keys)
+    ?? stringField(lead.customFields ?? {}, ...keys)
+    ?? stringField(lead.raw ?? {}, ...keys);
+}
+
+function leadgenStatusBoolean(lead: LeadCandidateInput & { raw?: Record<string, string> }, ...keys: string[]): boolean {
+  const value = leadgenStatusField(lead, ...keys);
+  if (!value) return false;
+  return /^(true|1|yes|ano|sent|odoslane)$/i.test(value.trim());
+}
+
+function leadgenStatusGroup(
+  lead: LeadCandidateInput & { raw?: Record<string, string>; nicheSlug?: string; nicheId?: string; campaignTag?: string; campaignId?: string | number | null },
+  groupBy: "niche" | "campaign" | "source",
+  defaultNiche?: string
+): { key: string; label: string; campaignId?: string | number | null } {
+  const campaignId = lead.campaignId ?? leadgenStatusField(lead, "campaignId", "campaign_id", "smartlead_campaign_id");
+  const niche = lead.nicheSlug
+    ?? lead.nicheId
+    ?? lead.campaignTag
+    ?? leadgenStatusField(lead, "nicheSlug", "niche_slug", "niche", "niche_id", "campaign_tag")
+    ?? defaultNiche;
+  const source = lead.source ?? leadgenStatusField(lead, "source", "source_name");
+  const raw = groupBy === "campaign"
+    ? (campaignId ? String(campaignId) : niche)
+    : groupBy === "source"
+      ? source
+      : niche;
+  if (!raw?.trim()) return { key: "orphan", label: "(bez niche/campaign)", campaignId };
+  const label = raw.trim();
+  return { key: slugify(label) || "orphan", label, campaignId };
+}
+
+function leadgenStatusTotals(rows: Array<{
+  readyForSmartlead: boolean;
+  needsEmail: boolean;
+  needsIntro: boolean;
+  needsPhone: boolean;
+  sentToSmartlead: boolean;
+  verified: boolean;
+  failed: boolean;
+  orphan: boolean;
+}>): LeadgenStatusBoardPreview["totals"] {
+  return {
+    input: rows.length,
+    groups: 0,
+    readyForSmartlead: rows.filter((row) => row.readyForSmartlead).length,
+    needsEmail: rows.filter((row) => row.needsEmail).length,
+    needsIntro: rows.filter((row) => row.needsIntro).length,
+    needsPhone: rows.filter((row) => row.needsPhone).length,
+    sentToSmartlead: rows.filter((row) => row.sentToSmartlead).length,
+    verified: rows.filter((row) => row.verified).length,
+    failed: rows.filter((row) => row.failed).length,
+    orphan: rows.filter((row) => row.orphan).length,
+  };
 }
 
 function introEvidenceText(lead: LeadCandidateInput & { scraped?: Partial<ScrapedWebsiteContacts>; context?: string; evidenceText?: string }): string {

@@ -23,6 +23,7 @@ import {
   buildLeadDiscoveryMatrixPreview,
   buildNicheLeadgenPlan,
   buildLeadgenGapReport,
+  buildLeadgenStatusBoardPreview,
   buildLeadgenCampaignPipelinePreview,
   buildLeadgenAutopilotBatchPreview,
   buildRegionExpansionQueuePreview,
@@ -1947,6 +1948,23 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         language: payload.language === "en" ? "en" : "sk",
         minScore: typeof payload.minScore === "number" ? payload.minScore : undefined,
         batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_leadgen_status_board_preview") {
+    writeJson(response, 200, {
+      result: buildLeadgenStatusBoardPreview({
+        leads: Array.isArray(payload.leads) ? payload.leads as Parameters<typeof buildLeadgenStatusBoardPreview>[0]["leads"] : undefined,
+        csvText: optionalString(payload.csvText),
+        delimiter: payload.delimiter === ";" ? ";" : payload.delimiter === "," ? "," : undefined,
+        sourceName: optionalString(payload.sourceName),
+        groupBy: payload.groupBy === "campaign" || payload.groupBy === "source" ? payload.groupBy : "niche",
+        defaultNiche: optionalString(payload.defaultNiche),
+        defaultCampaignId: typeof payload.defaultCampaignId === "string" || typeof payload.defaultCampaignId === "number" || payload.defaultCampaignId === null ? payload.defaultCampaignId : undefined,
+        offer: optionalString(payload.offer),
+        language: payload.language === "en" ? "en" : "sk",
+        maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
       }),
     });
     return;

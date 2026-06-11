@@ -740,6 +740,15 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       batchSize: 50,
     };
   }
+  if (toolName === "arcigy.build_leadgen_status_board_preview") {
+    return {
+      sourceName: "db-status-export",
+      groupBy: "niche",
+      defaultCampaignId: "123456",
+      offer: "AI asistent na dopyty a follow-up.",
+      csvText: "company,campaign_tag,email,website,phone,icebreaker_sentence,sent_to_smartlead,verification_status\nReady Studio,kuchyne,jan@ready.sk,https://ready.sk,+421 900 111 222,Vsimol som si vase realizacie kuchyn.,false,verified\nNeeds Email,kuchyne,,https://needs-email.sk,,,false,\nNeeds Intro,kuchyne,info@needs-intro.sk,https://needs-intro.sk,+421 900 222 333,,false,\nAlready Sent,kuchyne,sent@ready.sk,https://sent.sk,+421 900 333 444,Vsimol som si showroom.,true,verified\nOrphan Lead,,orphan@example.com,https://orphan.sk,,,false,failed",
+    };
+  }
   if (toolName === "arcigy.build_leadgen_campaign_pipeline_preview") {
     return {
       niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456" },

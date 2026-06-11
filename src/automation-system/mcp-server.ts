@@ -24,6 +24,7 @@ import {
   buildLeadDiscoveryMatrixPreview,
   buildNicheLeadgenPlan,
   buildLeadgenGapReport,
+  buildLeadgenStatusBoardPreview,
   buildLeadgenCampaignPipelinePreview,
   buildLeadgenAutopilotBatchPreview,
   buildRegionExpansionQueuePreview,
@@ -2868,6 +2869,47 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildLeadgenGapReport(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_leadgen_status_board_preview",
+    {
+      title: "Build leadgen status board preview",
+      description: "Create a read-only leadgen status board from CSV or leads, grouped by niche/campaign/source, with counts and exact next MCP calls for scrape, AI intros, phone enrichment, repair, export, and Smartlead injection planning.",
+      inputSchema: {
+        leads: z.array(pipelineLeadSchema.extend({
+          id: z.string().optional(),
+          raw: z.record(z.string(), z.string()).optional(),
+          nicheSlug: z.string().optional(),
+          nicheId: z.string().optional(),
+          campaignTag: z.string().optional(),
+          campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+          verificationStatus: z.string().optional(),
+          sentToSmartlead: z.boolean().optional(),
+          sent_to_smartlead: z.boolean().optional(),
+          smartleadStatus: z.string().optional(),
+          smartlead_status: z.string().optional(),
+          ico: z.string().optional(),
+          official_company_name: z.string().optional(),
+        }).passthrough()).optional(),
+        csvText: z.string().optional(),
+        delimiter: z.enum([",", ";"]).optional(),
+        sourceName: z.string().optional(),
+        groupBy: z.enum(["niche", "campaign", "source"]).default("niche"),
+        defaultNiche: z.string().optional(),
+        defaultCampaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+        offer: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        maxNextCalls: z.number().int().min(1).max(200).default(50),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildLeadgenStatusBoardPreview(input))
   );
 
   server.registerTool(

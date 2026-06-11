@@ -1347,6 +1347,20 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Build leadgen status board",
+      tool: "arcigy.build_leadgen_status_board_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_leadgen_status_board_preview"),
+      body: {
+        sourceName: "db-status-export",
+        groupBy: "niche",
+        defaultCampaignId: "123456",
+        offer: "AI asistent na dopyty a follow-up.",
+        csvText: "company,campaign_tag,email,website,phone,icebreaker_sentence,sent_to_smartlead,verification_status\nReady Studio,kuchyne,jan@ready.sk,https://ready.sk,+421 900 111 222,Vsimol som si vase realizacie kuchyn.,false,verified\nNeeds Email,kuchyne,,https://needs-email.sk,,,false,\nNeeds Intro,kuchyne,info@needs-intro.sk,https://needs-intro.sk,+421 900 222 333,,false,\nAlready Sent,kuchyne,sent@ready.sk,https://sent.sk,+421 900 333 444,Vsimol som si showroom.,true,verified\nOrphan Lead,,orphan@example.com,https://orphan.sk,,,false,failed",
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Build full leadgen campaign pipeline preview",
       tool: "arcigy.build_leadgen_campaign_pipeline_preview",
       method: "POST",
