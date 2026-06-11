@@ -198,6 +198,7 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.build_ai_intro_quality_audit_preview`: checks AI intros before Smartlead for missing, generic, short, placeholder, greeting, or weakly grounded text and prepares safe redraft calls.
 - `arcigy.build_ai_intro_work_packet_preview`: prepares a read-only Markdown/JSON work packet for ChatGPT or Claude to fill missing icebreakers, validates returned intros, and prepares cleanup/audit/export next steps without DB writes.
 - `arcigy.build_ai_intro_import_preview`: parses ChatGPT/Claude JSON or CSV icebreaker results, matches them to work-packet leads, validates them, and prepares cleanup/audit/export/Smartlead next steps without DB writes.
+- `arcigy.build_ai_icebreaker_writeback_preview`: validates AI icebreaker JSON by lead ID, detects duplicates/placeholders/unknown leads, merges valid intros back onto leads, and prepares cleanup/QA/Smartlead steps without DB writes.
 - `arcigy.build_ai_intro_cleanup_preview`: deterministically removes greetings, decision-maker names, and salutation text from AI intros, then prepares redraft or Smartlead audit steps without writes.
 - `arcigy.enrich_website_leads_preview`: live read-only batch enrichment that scrapes lead websites, drafts AI intros, and prepares pipeline/Smartlead launch previews without writing.
 - `arcigy.prepare_smartlead_leads`: normalizes selected leads into Smartlead `lead_list` payload without writing.

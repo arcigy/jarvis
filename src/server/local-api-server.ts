@@ -50,6 +50,7 @@ import {
   buildAiIntroCleanupPreview,
   buildAiIntroWorkPacketPreview,
   buildAiIntroImportPreview,
+  buildAiIcebreakerWritebackPreview,
   buildLocalLeadRegisterUpdatePreview,
   buildManualReviewPickupPlan,
   buildManualReviewQueue,
@@ -2654,6 +2655,23 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         resultJsonText: optionalString(payload.resultJsonText),
         resultCsvText: optionalString(payload.resultCsvText),
         resultDelimiter: payload.resultDelimiter === ";" ? ";" : payload.resultDelimiter === "," ? "," : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_ai_icebreaker_writeback_preview") {
+    writeJson(response, 200, {
+      result: buildAiIcebreakerWritebackPreview({
+        leads: Array.isArray(payload.leads) ? payload.leads as Parameters<typeof buildAiIcebreakerWritebackPreview>[0]["leads"] : [],
+        icebreakers: Array.isArray(payload.icebreakers) ? payload.icebreakers as Parameters<typeof buildAiIcebreakerWritebackPreview>[0]["icebreakers"] : undefined,
+        resultJsonText: optionalString(payload.resultJsonText),
+        sourceName: optionalString(payload.sourceName),
+        niche: optionalString(payload.niche),
+        offer: optionalString(payload.offer),
+        language: payload.language === "en" ? "en" : "sk",
+        defaultSource: optionalString(payload.defaultSource),
+        campaignId: typeof payload.campaignId === "string" || typeof payload.campaignId === "number" || payload.campaignId === null ? payload.campaignId : undefined,
+        maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
       }),
     });
     return;

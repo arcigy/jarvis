@@ -51,6 +51,7 @@ import {
   buildAiIntroCleanupPreview,
   buildAiIntroWorkPacketPreview,
   buildAiIntroImportPreview,
+  buildAiIcebreakerWritebackPreview,
   buildLocalLeadRegisterUpdatePreview,
   buildManualReviewPickupPlan,
   buildManualReviewQueue,
@@ -4295,6 +4296,54 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildAiIntroImportPreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_ai_icebreaker_writeback_preview",
+    {
+      title: "Build AI icebreaker writeback preview",
+      description: "Validate Claude/ChatGPT icebreaker JSON by lead ID, merge valid intros back onto leads, and prepare cleanup/QA/Smartlead next steps without DB writes.",
+      inputSchema: {
+        leads: z.array(leadCandidateSchema.extend({
+          id: z.string().optional(),
+          leadId: z.string().optional(),
+          lead_id: z.string().optional(),
+          raw: z.record(z.string(), z.string()).optional(),
+          context: z.string().optional(),
+          evidenceText: z.string().optional(),
+          businessFacts: z.unknown().optional(),
+          scraped: z.object({
+            url: z.string().optional(),
+            finalUrl: z.string().optional(),
+            title: z.string().optional(),
+            description: z.string().optional(),
+            textPreview: z.string().optional(),
+            emails: z.array(z.string()).optional(),
+            phones: z.array(z.string()).optional(),
+          }).optional(),
+        }).passthrough()).min(1).max(1000),
+        icebreakers: z.array(z.object({
+          id: z.string().min(1),
+          icebreaker: z.string().optional(),
+          personalizedIntro: z.string().optional(),
+        })).optional(),
+        resultJsonText: z.string().optional(),
+        sourceName: z.string().optional(),
+        niche: z.string().optional(),
+        offer: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        defaultSource: z.string().optional(),
+        campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+        maxNextCalls: z.number().int().min(1).max(500).default(100),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildAiIcebreakerWritebackPreview(input))
   );
 
   server.registerTool(

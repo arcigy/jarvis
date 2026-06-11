@@ -185,6 +185,33 @@ export type AiIntroImportPreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type AiIcebreakerWritebackPreview = {
+  mode: "ai-icebreaker-writeback-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  source: { name?: string; niche?: string; parsedFromJson: number; language: "sk" | "en"; offer?: string };
+  totals: {
+    leads: number;
+    parsedIcebreakers: number;
+    valid: number;
+    invalid: number;
+    unknownLead: number;
+    duplicateIds: number;
+    mergedLeads: number;
+    smartleadReady: number;
+  };
+  items: Array<{
+    id: string;
+    status: "valid" | "invalid" | "unknown_lead" | "duplicate";
+    icebreaker?: string;
+    issues: string[];
+    lead?: LeadCandidateInput & { id?: string; leadId?: string; lead_id?: string; raw?: Record<string, string> };
+  }>;
+  mergedLeads: PreparedSmartleadLeadInput[];
+  smartleadPrepared: ReturnType<typeof prepareSmartleadLeads>;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type LeadgenStatusBoardPreview = {
   mode: "leadgen-status-board-preview";
   status: "ready" | "attention" | "blocked";
@@ -2745,6 +2772,141 @@ export function buildAiIntroImportPreview(input: {
     workPacket,
     nextToolCalls: dedupeNextToolCalls(nextToolCalls),
   };
+}
+
+export function buildAiIcebreakerWritebackPreview(input: {
+  leads: Array<LeadCandidateInput & { id?: string; leadId?: string; lead_id?: string; raw?: Record<string, string>; scraped?: Partial<ScrapedWebsiteContacts>; context?: string; evidenceText?: string; businessFacts?: unknown }>;
+  icebreakers?: Array<{ id: string; icebreaker?: string; personalizedIntro?: string }>;
+  resultJsonText?: string;
+  sourceName?: string;
+  niche?: string;
+  offer?: string;
+  language?: "sk" | "en";
+  defaultSource?: string;
+  campaignId?: string | number | null;
+  maxNextCalls?: number;
+}): AiIcebreakerWritebackPreview {
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 100), 1), 500);
+  const parsed = parseAiIntroImportResults({ completedIntros: input.icebreakers, resultJsonText: input.resultJsonText });
+  const leadById = new Map(input.leads.flatMap((lead) => {
+    const id = aiIcebreakerWritebackLeadId(lead);
+    return id ? [[id, lead] as const] : [];
+  }));
+  const seen = new Set<string>();
+  const items: AiIcebreakerWritebackPreview["items"] = parsed.map((item) => {
+    const id = item.id.trim();
+    const icebreaker = item.icebreaker?.replace(/\s+/g, " ").trim();
+    const lead = leadById.get(id);
+    const duplicate = seen.has(id);
+    if (id) seen.add(id);
+    const issues: string[] = [];
+    if (!id) issues.push("missing_id");
+    if (!icebreaker) issues.push("missing_icebreaker");
+    if (icebreaker && /dopln|doplň|sem|todo|tbd|xxx|\?\?\?/i.test(icebreaker)) issues.push("placeholder_icebreaker");
+    if (icebreaker && icebreaker.length > 280) issues.push("icebreaker_too_long");
+    if (lead && icebreaker) issues.push(...introQualityIssues(icebreaker, importantIntroTerms(introEvidenceText(lead)), 0, lead));
+    if (!lead && id) issues.push("unknown_lead");
+    const status: AiIcebreakerWritebackPreview["items"][number]["status"] = duplicate
+      ? "duplicate"
+      : !lead
+        ? "unknown_lead"
+        : issues.length
+          ? "invalid"
+          : "valid";
+    return { id, status, icebreaker, issues: unique(issues), lead };
+  });
+  const mergedLeads: PreparedSmartleadLeadInput[] = items
+    .filter((item) => item.status === "valid" && item.lead && item.icebreaker)
+    .map((item) => {
+      const lead = item.lead as LeadCandidateInput & { id?: string; leadId?: string; lead_id?: string; raw?: Record<string, string> };
+      return {
+        email: lead.email ?? "",
+        companyName: lead.companyName,
+        firstName: lead.firstName,
+        lastName: lead.lastName,
+        website: lead.website,
+        phone: lead.phone,
+        source: input.defaultSource ?? input.sourceName ?? lead.source,
+        personalizedIntro: item.icebreaker,
+        customFields: {
+          ...lead.customFields,
+          lead_id: aiIcebreakerWritebackLeadId(lead),
+          personalized_intro: item.icebreaker,
+          icebreaker_sentence: item.icebreaker,
+          ai_icebreaker_writeback_status: "valid",
+          source_name: input.sourceName ?? lead.customFields?.source_name,
+        },
+      };
+    });
+  const smartleadPrepared = prepareSmartleadLeads({ leads: mergedLeads, defaultSource: input.defaultSource ?? input.sourceName ?? "ai-icebreaker-writeback" });
+  const nextLeads = mergedLeads.slice(0, maxNextCalls);
+  const invalidLeads = items
+    .filter((item) => item.status === "invalid" && item.lead)
+    .slice(0, maxNextCalls)
+    .map((item) => item.lead as LeadCandidateInput);
+  const nextToolCalls: AiIcebreakerWritebackPreview["nextToolCalls"] = [];
+  if (nextLeads.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_ai_intro_cleanup_preview",
+      payload: { leads: nextLeads, defaultSource: input.defaultSource ?? input.sourceName ?? "ai-icebreaker-writeback", campaignId: input.campaignId, offer: input.offer, language: input.language ?? "sk" },
+      reason: "Po writeback preview este vycistit pozdravy, mena a placeholders pred Smartleadom.",
+      approvalRequired: false,
+    });
+    nextToolCalls.push({
+      tool: "arcigy.build_lead_batch_qa_preview",
+      payload: { leads: nextLeads, defaultSource: input.defaultSource ?? input.sourceName ?? "ai-icebreaker-writeback", campaignId: input.campaignId, offer: input.offer, language: input.language ?? "sk", maxNextCalls },
+      reason: "Skontrolovat emaily, company_short a intro pred Smartlead importom.",
+      approvalRequired: false,
+    });
+  }
+  if (input.campaignId && smartleadPrepared.leadList.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_smartlead_import_audit_preview",
+      payload: { campaignId: input.campaignId, leads: smartleadPrepared.leadList },
+      reason: "Pred uploadom overit duplicity a existujuce leady v Smartlead kampani.",
+      approvalRequired: false,
+    });
+  }
+  if (invalidLeads.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_ai_intro_work_packet_preview",
+      payload: { leads: invalidLeads, sourceName: input.sourceName, niche: input.niche, offer: input.offer, language: input.language ?? "sk", maxLeads: Math.min(invalidLeads.length, 50) },
+      reason: "Neplatne icebreakery vratit do AI work packetu na opravu.",
+      approvalRequired: false,
+    });
+  }
+  const totals = {
+    leads: input.leads.length,
+    parsedIcebreakers: parsed.length,
+    valid: items.filter((item) => item.status === "valid").length,
+    invalid: items.filter((item) => item.status === "invalid").length,
+    unknownLead: items.filter((item) => item.status === "unknown_lead").length,
+    duplicateIds: items.filter((item) => item.status === "duplicate").length,
+    mergedLeads: mergedLeads.length,
+    smartleadReady: smartleadPrepared.leadList.length,
+  };
+  const status: AiIcebreakerWritebackPreview["status"] = totals.leads === 0 || totals.parsedIcebreakers === 0
+    ? "blocked"
+    : totals.valid === 0 || totals.invalid > 0 || totals.unknownLead > 0 || totals.duplicateIds > 0
+      ? "attention"
+      : "ready";
+  return {
+    mode: "ai-icebreaker-writeback-preview",
+    status,
+    summary: `AI icebreaker writeback ${status}: ${totals.valid}/${totals.parsedIcebreakers} validnych, ${totals.mergedLeads} leadov mergnutych, ${totals.smartleadReady} ready pre Smartlead. Ziadny DB zapis ani upload neprebehol.`,
+    source: { name: input.sourceName, niche: input.niche, parsedFromJson: input.resultJsonText?.trim() ? parsed.length : 0, language: input.language ?? "sk", offer: input.offer },
+    totals,
+    items,
+    mergedLeads,
+    smartleadPrepared,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls),
+  };
+}
+
+function aiIcebreakerWritebackLeadId(lead: LeadCandidateInput & { id?: string; leadId?: string; lead_id?: string; raw?: Record<string, string> }): string | undefined {
+  return stringField(lead, "id", "leadId", "lead_id")
+    ?? stringField(lead.customFields ?? {}, "id", "lead_id", "uuid")
+    ?? stringField(lead.raw ?? {}, "id", "lead_id", "uuid");
 }
 
 function parseAiIntroImportResults(input: {

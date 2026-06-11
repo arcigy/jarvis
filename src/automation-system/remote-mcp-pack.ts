@@ -2069,6 +2069,22 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Preview AI icebreaker writeback by lead ID",
+      tool: "arcigy.build_ai_icebreaker_writeback_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_ai_icebreaker_writeback_preview"),
+      body: {
+        sourceName: "prep-for-ai-kuchyne",
+        niche: "kuchynske studia",
+        campaignId: "123456",
+        leads: [
+          { id: "lead-1", companyName: "Ready Studio", website: "https://ready.sk", email: "jan@ready.sk", context: "Firma robi kuchyne na mieru, showroom a navrhy interierov." },
+        ],
+        resultJsonText: "[{\"id\":\"lead-1\",\"icebreaker\":\"Zaujalo ma, ze Ready Studio prepaja showroom s navrhmi kuchyn na mieru.\"}]",
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Clean AI intros before Smartlead",
       tool: "arcigy.build_ai_intro_cleanup_preview",
       method: "POST",

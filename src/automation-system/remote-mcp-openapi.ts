@@ -1072,6 +1072,17 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       resultJsonText: "[{\"id\":\"lead-1\",\"icebreaker\":\"Zaujalo ma, ze prepajate navrhy interierov so showroomom pre kuchyne na mieru.\"}]",
     };
   }
+  if (toolName === "arcigy.build_ai_icebreaker_writeback_preview") {
+    return {
+      sourceName: "prep-for-ai-kuchyne",
+      niche: "kuchynske studia",
+      campaignId: "123456",
+      leads: [
+        { id: "lead-1", companyName: "Ready Studio", website: "https://ready.sk", email: "jan@ready.sk", context: "Firma robi kuchyne na mieru, showroom a navrhy interierov." },
+      ],
+      resultJsonText: "[{\"id\":\"lead-1\",\"icebreaker\":\"Zaujalo ma, ze Ready Studio prepaja showroom s navrhmi kuchyn na mieru.\"}]",
+    };
+  }
   if (toolName === "arcigy.build_ai_intro_cleanup_preview") {
     return {
       campaignId: "123456",
