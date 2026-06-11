@@ -20,6 +20,7 @@ import {
   buildLeadgenExecutionQueuePreview,
   buildStickyNicheLeadgenDecisionPreview,
   buildLeadDiscoveryMatrixPreview,
+  buildMapsCitySweepPreview,
   buildNicheLeadgenPlan,
   buildDailyLeadgenRunClosurePreview,
   buildAiIntroQualityAuditPreview,
@@ -248,6 +249,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.build_niche_leadgen_plan",
     "arcigy.build_batch_niche_discovery_plan",
     "arcigy.build_lead_discovery_matrix_preview",
+    "arcigy.build_maps_city_sweep_preview",
     "arcigy.build_leadgen_execution_queue_preview",
     "arcigy.build_sticky_niche_leadgen_decision_preview",
     "arcigy.build_daily_leadgen_run_closure_preview",
@@ -1953,6 +1955,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_lead_identity_repair_preview" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_lead_validation_scorecard_preview" && call.approvalRequired === false && call.body.minScore === 70));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_company_short_name_preview" && call.approvalRequired === false && Array.isArray(call.body.leads)));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_maps_city_sweep_preview" && call.approvalRequired === false && call.body.niche === "fotovoltaika"));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_leadgen_to_smartlead_dispatch_preview" && call.approvalRequired === false && Array.isArray(call.body.groups)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_company_research_queue_preview" && call.approvalRequired === false && Array.isArray(call.body.leads)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_research_results_import_preview" && call.approvalRequired === false && Array.isArray(call.body.placesResults)));
@@ -3582,6 +3585,33 @@ test("lead discovery matrix preview builds keyword region query slots safely", (
   assert.ok(matrix.nextToolCalls.some((call) => call.tool === "arcigy.discover_leads" && !call.approvalRequired));
   assert.ok(matrix.nextToolCalls.some((call) => call.tool === "arcigy.build_lead_source_import_queue_preview" && !call.approvalRequired));
   assert.match(matrix.summary, /Ziadne API volanie, scrape ani upload/);
+});
+
+test("Maps city sweep preview plans old photovoltaic city search workflow without API calls", () => {
+  const sweep = buildMapsCitySweepPreview({
+    niche: "fotovoltaika",
+    regionPreset: "all_slovakia",
+    targetCount: 300,
+    maxCities: 3,
+    maxKeywordsPerCity: 2,
+    maxSearchCalls: 5,
+    resultsPerSearch: 20,
+    maxNextCalls: 3,
+  });
+
+  assert.equal(sweep.mode, "maps-city-sweep-preview");
+  assert.equal(sweep.status, "attention");
+  assert.equal(sweep.totals.cities, 3);
+  assert.equal(sweep.totals.keywords, 2);
+  assert.equal(sweep.totals.plannedSearchCalls, 6);
+  assert.equal(sweep.totals.cappedSearchCalls, 5);
+  assert.equal(sweep.queryBatches[0].query.includes("fotovoltaika"), true);
+  assert.equal(sweep.queryBatches[0].query.includes("Slovensko"), true);
+  assert.ok(sweep.keywords.includes("solarne panely"));
+  assert.ok(sweep.nextToolCalls.some((call) => call.tool === "arcigy.search_google_places" && !call.approvalRequired));
+  assert.ok(sweep.nextToolCalls.some((call) => call.tool === "arcigy.build_research_results_import_preview" && !call.approvalRequired));
+  assert.ok(sweep.nextToolCalls.some((call) => call.tool === "arcigy.build_maps_cold_calling_export_preview" && !call.approvalRequired));
+  assert.match(sweep.summary, /Ziadne Google Maps API volanie ani export/);
 });
 
 test("leadgen execution queue preview prioritizes daily niche work without writes", () => {

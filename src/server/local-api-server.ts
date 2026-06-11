@@ -23,6 +23,7 @@ import {
   buildLeadgenExecutionQueuePreview,
   buildStickyNicheLeadgenDecisionPreview,
   buildLeadDiscoveryMatrixPreview,
+  buildMapsCitySweepPreview,
   buildNicheLeadgenPlan,
   buildLeadgenGapReport,
   buildLeadgenStatusBoardPreview,
@@ -1991,6 +1992,26 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         existingDomains: Array.isArray(payload.existingDomains) ? payload.existingDomains.map(String) : undefined,
         blacklistDomains: Array.isArray(payload.blacklistDomains) ? payload.blacklistDomains.map(String) : undefined,
         blacklistKeywords: Array.isArray(payload.blacklistKeywords) ? payload.blacklistKeywords.map(String) : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_maps_city_sweep_preview") {
+    writeJson(response, 200, {
+      result: buildMapsCitySweepPreview({
+        niche: String(payload.niche ?? ""),
+        keywords: Array.isArray(payload.keywords) ? payload.keywords.map(String) : undefined,
+        cities: Array.isArray(payload.cities) ? payload.cities.map(String) : undefined,
+        regionPreset: payload.regionPreset === "capitals" || payload.regionPreset === "all_slovakia" || payload.regionPreset === "custom" ? payload.regionPreset : undefined,
+        country: optionalString(payload.country),
+        sourceName: optionalString(payload.sourceName),
+        targetCount: typeof payload.targetCount === "number" ? payload.targetCount : undefined,
+        resultsPerSearch: typeof payload.resultsPerSearch === "number" ? payload.resultsPerSearch : undefined,
+        maxCities: typeof payload.maxCities === "number" ? payload.maxCities : undefined,
+        maxKeywordsPerCity: typeof payload.maxKeywordsPerCity === "number" ? payload.maxKeywordsPerCity : undefined,
+        maxSearchCalls: typeof payload.maxSearchCalls === "number" ? payload.maxSearchCalls : undefined,
+        maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
+        includeColdCallingExport: payload.includeColdCallingExport !== false,
       }),
     });
     return;

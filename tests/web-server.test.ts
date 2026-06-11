@@ -910,6 +910,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_email_accounts" && call.body.requestedDailyLimit === 80 && call.approvalRequired === false));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_smartlead_local_reconciliation_preview" && call.approvalRequired === false && Array.isArray(call.body.localLeads)));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_leadgen_to_smartlead_dispatch_preview" && call.approvalRequired === false && Array.isArray(call.body.groups)));
+    assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_maps_city_sweep_preview" && call.approvalRequired === false && call.body.niche === "fotovoltaika"));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_company_research_queue_preview" && call.approvalRequired === false && Array.isArray(call.body.leads)));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_research_results_import_preview" && call.approvalRequired === false && Array.isArray(call.body.placesResults)));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_maps_cold_calling_export_preview" && call.approvalRequired === false && Array.isArray(call.body.placesResults)));

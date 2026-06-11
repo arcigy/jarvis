@@ -633,6 +633,19 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       existingDomains: ["example.sk"],
     };
   }
+  if (toolName === "arcigy.build_maps_city_sweep_preview") {
+    return {
+      niche: "fotovoltaika",
+      regionPreset: "all_slovakia",
+      country: "SK",
+      targetCount: 300,
+      maxCities: 40,
+      maxKeywordsPerCity: 6,
+      maxSearchCalls: 120,
+      resultsPerSearch: 20,
+      includeColdCallingExport: true,
+    };
+  }
   if (toolName === "arcigy.build_leadgen_execution_queue_preview") {
     return {
       date: "2026-06-10",

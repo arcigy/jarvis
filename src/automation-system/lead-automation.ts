@@ -2006,6 +2006,21 @@ export type LeadDiscoveryMatrixPreview = {
   warnings: string[];
 };
 
+export type MapsCitySweepPreview = {
+  mode: "maps-city-sweep-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  source: { niche: string; country: string; regionPreset: "capitals" | "all_slovakia" | "custom"; sourceName?: string };
+  target: { targetCount: number; resultsPerSearch: number; maxSearchCalls: number; maxCities: number; maxKeywordsPerCity: number };
+  totals: { cities: number; keywords: number; plannedSearchCalls: number; cappedSearchCalls: number; estimatedResultSlots: number; batches: number };
+  cities: string[];
+  keywords: string[];
+  queryBatches: Array<{ order: number; city: string; keyword: string; query: string; maxResults: number; priority: number }>;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+  safetyGates: string[];
+  warnings: string[];
+};
+
 export type LeadgenExecutionQueuePreview = {
   mode: "leadgen-execution-queue-preview";
   summary: string;
@@ -2213,6 +2228,16 @@ const nicheTemplates: Record<string, Omit<NicheLeadgenPlan, "niche" | "region" |
     mapsQueries: ["montaz tepelnych cerpadiel", "tepelne cerpadla", "kurenie a chladenie", "plynoinstalacia kurenie"],
     serperQueries: ["montaz tepelneho cerpadla firma SK", "tepelne cerpadla a solarne systemy", "predaj montaz tepelnych cerpadiel"],
     blacklistKeywords: ["bazos", "heureka", "alza", "mall"],
+  },
+  fotovoltaika: {
+    mapsQueries: ["fotovoltaika", "solarne panely", "solarna energia", "montaz fotovoltaiky", "fotovoltaicke panely", "solarne systemy"],
+    serperQueries: ["montaz fotovoltaiky firma SK", "solarne panely instalacia", "fotovoltaicka elektraren kontakt"],
+    blacklistKeywords: ["heureka", "alza", "mall", "bazos", "wikipedia", "dotacie"],
+  },
+  fotovoltaiky: {
+    mapsQueries: ["fotovoltaika", "solarne panely", "solarna energia", "montaz fotovoltaiky", "fotovoltaicke panely", "solarne systemy"],
+    serperQueries: ["montaz fotovoltaiky firma SK", "solarne panely instalacia", "fotovoltaicka elektraren kontakt"],
+    blacklistKeywords: ["heureka", "alza", "mall", "bazos", "wikipedia", "dotacie"],
   },
 };
 
@@ -10131,6 +10156,111 @@ export function buildLeadDiscoveryMatrixPreview(input: {
       "Dedupe domeny proti existingDomains pred scrape/importom.",
       "Blacklistuj katalogy, social siete, job portaly a marketplace vysledky pred AI intro.",
       "Po discovery pouzi lead_source_import_queue_preview a az potom scrape, AI intro audit a Smartlead approval upload.",
+    ],
+    warnings,
+  };
+}
+
+export function buildMapsCitySweepPreview(input: {
+  niche: string;
+  keywords?: string[];
+  cities?: string[];
+  regionPreset?: "capitals" | "all_slovakia" | "custom";
+  country?: string;
+  sourceName?: string;
+  targetCount?: number;
+  resultsPerSearch?: number;
+  maxCities?: number;
+  maxKeywordsPerCity?: number;
+  maxSearchCalls?: number;
+  maxNextCalls?: number;
+  includeColdCallingExport?: boolean;
+}): MapsCitySweepPreview {
+  const country = (input.country ?? "SK").toUpperCase();
+  const regionPreset = input.regionPreset ?? (input.cities?.length ? "custom" : "all_slovakia");
+  const baseCities = input.cities?.length
+    ? input.cities
+    : regionPreset === "capitals"
+      ? slovakiaCapitalRegions
+      : slovakiaExpansionRegions;
+  const maxCities = Math.min(Math.max(Math.trunc(input.maxCities ?? (regionPreset === "all_slovakia" ? 40 : 12)), 1), 80);
+  const maxKeywordsPerCity = Math.min(Math.max(Math.trunc(input.maxKeywordsPerCity ?? 6), 1), 20);
+  const maxSearchCalls = Math.min(Math.max(Math.trunc(input.maxSearchCalls ?? 120), 1), 500);
+  const targetCount = Math.min(Math.max(Math.trunc(input.targetCount ?? 300), 1), 5000);
+  const resultsPerSearch = Math.min(Math.max(Math.trunc(input.resultsPerSearch ?? 20), 1), 50);
+  const plan = buildNicheLeadgenPlan({ niche: input.niche, customKeywords: input.keywords });
+  const keywords = unique([...(input.keywords ?? []), ...plan.mapsQueries]).slice(0, maxKeywordsPerCity);
+  const cities = unique(baseCities).slice(0, maxCities);
+  const allQueries = cities.flatMap((city, cityIndex) =>
+    keywords.map((keyword, keywordIndex) => ({
+      order: cityIndex * keywords.length + keywordIndex + 1,
+      city,
+      keyword,
+      query: `${keyword} ${city} ${country === "SK" ? "Slovensko" : country}`.trim(),
+      maxResults: resultsPerSearch,
+      priority: cityIndex * 100 + keywordIndex,
+    }))
+  );
+  const queryBatches = allQueries.slice(0, maxSearchCalls);
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 25), 1), 100);
+  const sourceName = input.sourceName ?? `${slugify(input.niche)}-maps-city-sweep`;
+  const nextToolCalls: MapsCitySweepPreview["nextToolCalls"] = [
+    ...queryBatches.slice(0, maxNextCalls).map((item) => ({
+      tool: "arcigy.search_google_places",
+      payload: { query: item.query, maxResults: item.maxResults },
+      reason: `Google Places city sweep ${item.order}: ${item.keyword} / ${item.city}.`,
+      approvalRequired: false,
+    })),
+    {
+      tool: "arcigy.build_research_results_import_preview",
+      payload: {
+        sourceName,
+        sourceType: "google_places",
+        placesResults: [],
+        niche: { slug: slugify(input.niche), name: input.niche },
+        country,
+        blacklistKeywords: plan.blacklistKeywords,
+        maxResults: targetCount,
+      },
+      reason: "Po zozbierani Places vysledkov normalizuj leady, deduplikuj a priprav scrape/AI intro/Smartlead queue.",
+      approvalRequired: false,
+    },
+  ];
+  if (input.includeColdCallingExport !== false) {
+    nextToolCalls.push({
+      tool: "arcigy.build_maps_cold_calling_export_preview",
+      payload: { sourceName, sourceType: "google_places", country, placesResults: [], blacklistKeywords: plan.blacklistKeywords, maxResults: targetCount },
+      reason: "Ak Places vysledky obsahuju telefony, priprav cold-calling CSV preview bez zapisu.",
+      approvalRequired: false,
+    });
+  }
+  const warnings: string[] = [];
+  if (allQueries.length > maxSearchCalls) warnings.push(`Search plan capped from ${allQueries.length} to ${maxSearchCalls} calls.`);
+  if (queryBatches.length * resultsPerSearch < targetCount) warnings.push("Estimated result slots are below targetCount; increase maxSearchCalls or resultsPerSearch.");
+  const status: MapsCitySweepPreview["status"] = !cities.length || !keywords.length ? "blocked" : warnings.length ? "attention" : "ready";
+  return {
+    mode: "maps-city-sweep-preview",
+    status,
+    summary: `Maps city sweep ${status}: ${queryBatches.length} search calls, ${cities.length} miest, ${keywords.length} keywords, target ${targetCount}. Ziadne Google Maps API volanie ani export neprebehol.`,
+    source: { niche: input.niche, country, regionPreset, sourceName },
+    target: { targetCount, resultsPerSearch, maxSearchCalls, maxCities, maxKeywordsPerCity },
+    totals: {
+      cities: cities.length,
+      keywords: keywords.length,
+      plannedSearchCalls: allQueries.length,
+      cappedSearchCalls: queryBatches.length,
+      estimatedResultSlots: queryBatches.length * resultsPerSearch,
+      batches: Math.ceil(queryBatches.length / maxNextCalls),
+    },
+    cities,
+    keywords,
+    queryBatches,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls),
+    safetyGates: [
+      "Spustaj search_google_places po batchoch, nie vsetky naraz.",
+      "Po kazdom batchi deduplikuj placeId, telefon a domenu pred dalsim exportom.",
+      "Cold-calling CSV aj Smartlead upload ostavaju approval-gated.",
+      "Ak quota alebo provider zlyha, uloz ciastocne vysledky a pokracuj dalsim mestom.",
     ],
     warnings,
   };

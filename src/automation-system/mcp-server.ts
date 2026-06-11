@@ -24,6 +24,7 @@ import {
   buildLeadgenExecutionQueuePreview,
   buildStickyNicheLeadgenDecisionPreview,
   buildLeadDiscoveryMatrixPreview,
+  buildMapsCitySweepPreview,
   buildNicheLeadgenPlan,
   buildLeadgenGapReport,
   buildLeadgenStatusBoardPreview,
@@ -2867,6 +2868,36 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildLeadDiscoveryMatrixPreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_maps_city_sweep_preview",
+    {
+      title: "Build Maps city sweep preview",
+      description: "Plan a read-only Google Maps city sweep for one niche: cities x keywords, search_google_places batches, import, and cold-calling export next steps.",
+      inputSchema: {
+        niche: z.string().min(1),
+        keywords: z.array(z.string()).optional(),
+        cities: z.array(z.string()).optional(),
+        regionPreset: z.enum(["capitals", "all_slovakia", "custom"]).optional(),
+        country: z.string().default("SK"),
+        sourceName: z.string().optional(),
+        targetCount: z.number().int().min(1).max(5000).default(300),
+        resultsPerSearch: z.number().int().min(1).max(50).default(20),
+        maxCities: z.number().int().min(1).max(80).optional(),
+        maxKeywordsPerCity: z.number().int().min(1).max(20).default(6),
+        maxSearchCalls: z.number().int().min(1).max(500).default(120),
+        maxNextCalls: z.number().int().min(1).max(100).default(25),
+        includeColdCallingExport: z.boolean().default(true),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildMapsCitySweepPreview(input))
   );
 
   server.registerTool(

@@ -97,6 +97,7 @@ export type JarvisMcpToolName =
   | "arcigy.build_niche_leadgen_plan"
   | "arcigy.build_batch_niche_discovery_plan"
   | "arcigy.build_lead_discovery_matrix_preview"
+  | "arcigy.build_maps_city_sweep_preview"
   | "arcigy.build_leadgen_execution_queue_preview"
   | "arcigy.build_sticky_niche_leadgen_decision_preview"
   | "arcigy.build_daily_leadgen_run_closure_preview"
@@ -676,6 +677,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.build_lead_discovery_matrix_preview",
       description: "Vytvori keyword-region Google Maps/Serper discovery matrix s blacklistom, dedupe a dalsimi MCP krokmi pred scrapingom/importom.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_maps_city_sweep_preview",
+      description: "Naplanuje Google Maps city sweep pre niche: mesta x keywords, search_google_places batche, import a cold-calling export next kroky bez API volania.",
       requiresApproval: false,
     },
     {

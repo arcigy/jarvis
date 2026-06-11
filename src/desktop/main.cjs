@@ -3244,6 +3244,7 @@ function listWebMcpTools() {
     { name: "arcigy.build_niche_leadgen_plan", requiresApproval: false },
     { name: "arcigy.build_batch_niche_discovery_plan", requiresApproval: false },
     { name: "arcigy.build_lead_discovery_matrix_preview", requiresApproval: false },
+    { name: "arcigy.build_maps_city_sweep_preview", requiresApproval: false },
     { name: "arcigy.build_leadgen_execution_queue_preview", requiresApproval: false },
     { name: "arcigy.build_sticky_niche_leadgen_decision_preview", requiresApproval: false },
     { name: "arcigy.build_daily_leadgen_run_closure_preview", requiresApproval: false },
