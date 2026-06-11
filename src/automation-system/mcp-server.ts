@@ -76,6 +76,7 @@ import {
   buildSmartleadSendReadinessQueuePreview,
   buildSmartleadCampaignQaPreview,
   buildSmartleadCampaignHandoffPackagePreview,
+  buildSmartleadFixedCampaignPackagePreview,
   buildSmartleadCampaignBackupPlan,
   buildSmartleadCampaignRestorePlan,
   buildSmartleadInjectionPlan,
@@ -3899,6 +3900,44 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildSmartleadCampaignHandoffPackagePreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_smartlead_fixed_campaign_package_preview",
+    {
+      title: "Build Smartlead fixed campaign package preview",
+      description: "Build a read-only fixed Smartlead campaign package based on the old injector script: fixed sequence, stop-on-reply settings, webhook, schedule, QA, and approval payloads.",
+      inputSchema: {
+        niche: z.object({
+          id: z.string().optional(),
+          slug: z.string().optional(),
+          name: z.string().min(1),
+          campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+          smartleadCampaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+        }),
+        leads: z.array(handoffLeadSchema).max(1000).default([]),
+        campaignName: z.string().optional(),
+        existingCampaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+        offer: z.string().optional(),
+        painPoint: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        clientId: z.union([z.string(), z.number(), z.null()]).optional(),
+        emailAccountIds: z.array(z.union([z.string(), z.number()])).optional(),
+        webhookUrl: z.string().url().optional(),
+        sequences: z.array(z.record(z.string(), z.unknown())).optional(),
+        batchSize: z.number().int().min(1).max(100).default(50),
+        maxNewLeadsPerDay: z.number().int().min(1).max(500).optional(),
+        minTimeBetweenEmails: z.number().int().min(1).max(240).optional(),
+        includeActivationChecklist: z.boolean().default(true),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildSmartleadFixedCampaignPackagePreview(input as Parameters<typeof buildSmartleadFixedCampaignPackagePreview>[0]))
   );
 
   server.registerTool(

@@ -183,6 +183,7 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.build_smartlead_campaign_launch_preview`: prepares a complete Smartlead launch plan with create/configure campaign payloads, sequence/schedule/webhook, and add-leads approval payloads without writing.
 - `arcigy.build_smartlead_campaign_qa_preview`: validates Smartlead campaign launch payloads, leads, sequences, schedule limits, variables, and approval next steps without writing.
 - `arcigy.build_smartlead_campaign_handoff_package_preview`: combines Smartlead launch, QA, sender capacity, approvals, and operator checklist into one read-only handoff package.
+- `arcigy.build_smartlead_fixed_campaign_package_preview`: recreates the old fixed Smartlead injector flow as a read-only package with fixed sequence copy, stop-on-reply settings, webhook, schedule, QA, and approval payloads.
 - `arcigy.preview_lead_enrichment_batch`: merges scraped website, register, and AI fields for a batch, then dedupes, scores, queues manual review, and prepares Smartlead upload plans without writing.
 - `arcigy.build_lead_enrichment_merge_preview`: merges separate scrape results and AI intro drafts back into original leads by domain/company before review and Smartlead next steps.
 - `arcigy.build_leadgen_gap_report`: audits a lead batch before Smartlead, reports missing email/website/AI intro/decision-maker gaps, and proposes safe next MCP calls without writing.

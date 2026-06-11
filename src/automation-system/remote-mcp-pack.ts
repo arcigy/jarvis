@@ -1685,6 +1685,23 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Build Smartlead fixed campaign package",
+      tool: "arcigy.build_smartlead_fixed_campaign_package_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_smartlead_fixed_campaign_package_preview"),
+      body: {
+        niche: { id: "niche-1", slug: "kuchyne-na-mieru-cz", name: "Kuchyne na mieru CZ", campaignId: "3209165" },
+        campaignName: "KUCHYNE-NA-MIERU-CZ_SK_FIXED",
+        offer: "AI audit a automatizacia dopytov",
+        painPoint: "manualne filtrovanie dopytov",
+        language: "sk",
+        emailAccountIds: ["14382544"],
+        leads: [{ email: "jan.novak@example.com", companyName: "Modelova Firma", companyNameShort: "Modelova Firma", website: "https://example.com", firstName: "Jan", personalizedIntro: "Vsimol som si vase realizacie kuchyn.", customFields: { last_name_with_salutation: " pan Novak" } }],
+        batchSize: 50,
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Preview enriched lead batch before Smartlead",
       tool: "arcigy.preview_lead_enrichment_batch",
       method: "POST",

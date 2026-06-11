@@ -75,6 +75,7 @@ import {
   buildSmartleadSendReadinessQueuePreview,
   buildSmartleadCampaignQaPreview,
   buildSmartleadCampaignHandoffPackagePreview,
+  buildSmartleadFixedCampaignPackagePreview,
   buildSmartleadCampaignBackupPlan,
   buildSmartleadCampaignRestorePlan,
   buildSmartleadInjectionPlan,
@@ -2420,6 +2421,28 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         senderAccounts: Array.isArray(payload.senderAccounts) ? payload.senderAccounts as Parameters<typeof buildSmartleadCampaignHandoffPackagePreview>[0]["senderAccounts"] : undefined,
         requestedDailyLimit: typeof payload.requestedDailyLimit === "number" ? payload.requestedDailyLimit : undefined,
         minTimeBetweenEmailsMinutes: typeof payload.minTimeBetweenEmailsMinutes === "number" ? payload.minTimeBetweenEmailsMinutes : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_smartlead_fixed_campaign_package_preview") {
+    writeJson(response, 200, {
+      result: buildSmartleadFixedCampaignPackagePreview({
+        niche: (payload.niche ?? {}) as Parameters<typeof buildSmartleadFixedCampaignPackagePreview>[0]["niche"],
+        leads: Array.isArray(payload.leads) ? payload.leads as Parameters<typeof buildSmartleadFixedCampaignPackagePreview>[0]["leads"] : [],
+        campaignName: optionalString(payload.campaignName),
+        existingCampaignId: (payload.existingCampaignId ?? null) as string | number | null,
+        offer: optionalString(payload.offer),
+        painPoint: optionalString(payload.painPoint),
+        language: payload.language === "en" ? "en" : "sk",
+        clientId: (payload.clientId ?? null) as string | number | null,
+        emailAccountIds: Array.isArray(payload.emailAccountIds) ? (payload.emailAccountIds as Array<string | number>) : undefined,
+        webhookUrl: optionalString(payload.webhookUrl),
+        sequences: Array.isArray(payload.sequences) ? payload.sequences as Parameters<typeof buildSmartleadFixedCampaignPackagePreview>[0]["sequences"] : undefined,
+        batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
+        maxNewLeadsPerDay: typeof payload.maxNewLeadsPerDay === "number" ? payload.maxNewLeadsPerDay : undefined,
+        minTimeBetweenEmails: typeof payload.minTimeBetweenEmails === "number" ? payload.minTimeBetweenEmails : undefined,
+        includeActivationChecklist: payload.includeActivationChecklist !== false,
       }),
     });
     return;

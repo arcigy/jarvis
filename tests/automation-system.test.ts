@@ -73,6 +73,7 @@ import {
   buildSmartleadSequenceVariableRepairPreview,
   buildCompanyShortNamePreview,
   buildSmartleadCampaignHandoffPackagePreview,
+  buildSmartleadFixedCampaignPackagePreview,
   buildBulkSmartleadUploadQueuePreview,
   buildSmartleadSendReadinessQueuePreview,
   buildSmartleadCampaignBackupPlan,
@@ -277,6 +278,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.build_smartlead_campaign_launch_preview",
     "arcigy.build_smartlead_campaign_qa_preview",
     "arcigy.build_smartlead_campaign_handoff_package_preview",
+    "arcigy.build_smartlead_fixed_campaign_package_preview",
     "arcigy.preview_lead_enrichment_batch",
     "arcigy.build_lead_enrichment_merge_preview",
     "arcigy.build_leadgen_gap_report",
@@ -546,6 +548,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
     assert.ok(paths.includes("/api/mcp/arcigy.build_service_capacity_preview"));
     assert.ok(paths.includes("/api/mcp/arcigy.build_smartlead_reply_followup_queue_preview"));
     assert.ok(paths.includes("/api/mcp/arcigy.build_showcase_reply_preview"));
+    assert.ok(paths.includes("/api/mcp/arcigy.build_smartlead_fixed_campaign_package_preview"));
   const operatorBriefing = document.paths["/api/mcp/arcigy.get_operator_briefing"] as OpenApiPathFixture;
   const attentionDigest = document.paths["/api/mcp/arcigy.get_proactive_attention_digest"] as OpenApiPathFixture;
   const completionScore = document.paths["/api/mcp/arcigy.get_production_completion_score"] as OpenApiPathFixture;
@@ -3412,6 +3415,42 @@ test("Smartlead campaign handoff package combines launch QA capacity and approva
   assert.ok(handoff.nextToolCalls.some((call) => call.tool === "arcigy.configure_smartlead_campaign" && call.approvalRequired));
   assert.ok(handoff.nextToolCalls.some((call) => call.tool === "arcigy.add_leads_to_smartlead_campaign" && call.approvalRequired));
   assert.match(handoff.summary, /Ziadny zapis ani upload/);
+});
+
+test("Smartlead fixed campaign package mirrors old injector flow without writes", () => {
+  const preview = buildSmartleadFixedCampaignPackagePreview({
+    niche: { id: "niche-1", slug: "kuchyne-na-mieru-cz", name: "Kuchyne na mieru CZ", campaignId: "3209165" },
+    campaignName: "KUCHYNE-NA-MIERU-CZ_SK_FIXED",
+    offer: "AI audit a automatizacia dopytov",
+    painPoint: "manualne filtrovanie dopytov",
+    emailAccountIds: ["14382544", "14382545"],
+    leads: [
+      {
+        email: "jan@ready.sk",
+        companyName: "Ready Firma",
+        companyNameShort: "Ready Firma",
+        website: "https://ready.sk",
+        firstName: "Jan",
+        personalizedIntro: "Vsimol som si vase realizacie kuchyn.",
+        customFields: { last_name_with_salutation: " pan Novak" },
+      },
+    ],
+  });
+
+  assert.equal(preview.mode, "smartlead-fixed-campaign-package-preview");
+  assert.equal(preview.status, "attention");
+  assert.equal(preview.source.campaignName, "KUCHYNE-NA-MIERU-CZ_SK_FIXED");
+  assert.equal(preview.fixedDefaults.schedule.timezone, "Europe/Bratislava");
+  assert.equal(preview.fixedDefaults.settings.stopOnReply, true);
+  assert.equal(preview.fixedDefaults.settings.trackOpen, false);
+  assert.equal(preview.fixedDefaults.webhook.eventTypes.includes("EMAIL_REPLY"), true);
+  assert.equal(preview.launchPreview.campaignSetup.sequences[0].seq_variants[0].subject.includes("{{company_name_short}}"), true);
+  assert.equal(preview.qaPreview.requiredVariables.includes("{{last_name_with_salutation}}"), true);
+  assert.equal(preview.approvalPayloads.configureCampaign?.campaignId, "3209165");
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.configure_smartlead_campaign" && call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.add_leads_to_smartlead_campaign" && call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.preview_smartlead_email_rendering" && !call.approvalRequired));
+  assert.match(preview.summary, /Ziadny zapis ani upload/);
 });
 
 test("Smartlead campaign QA preview flags launch payload risks before approval", () => {

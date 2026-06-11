@@ -1552,6 +1552,43 @@ export type SmartleadCampaignHandoffPackagePreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type SmartleadFixedCampaignPackagePreview = {
+  mode: "smartlead-fixed-campaign-package-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  source: {
+    niche: { id?: string; slug: string; name: string; campaignId?: string | number | null };
+    campaignName: string;
+    existingCampaignId?: string | number | null;
+    language: "sk" | "en";
+  };
+  totals: {
+    leads: number;
+    preparedLeads: number;
+    skippedLeads: number;
+    sequenceSteps: number;
+    variants: number;
+    approvalCalls: number;
+    webhookEvents: number;
+    emailAccounts: number;
+    warnings: number;
+  };
+  fixedDefaults: {
+    schedule: NicheSmartleadCampaignSetupDraft["schedule"];
+    settings: NicheSmartleadCampaignSetupDraft["settings"];
+    webhook: NicheSmartleadCampaignSetupDraft["webhook"];
+    uploadSettings: { ignore_global_block_list: boolean; ignore_unsubscribe_list: boolean };
+  };
+  launchPreview: SmartleadCampaignLaunchPreview;
+  qaPreview: SmartleadCampaignQaPreview;
+  operatorChecklist: Array<{ item: string; status: "ready" | "attention" | "blocked"; detail: string }>;
+  approvalPayloads: SmartleadCampaignLaunchPreview["approvalPayloads"] & {
+    activateCampaign?: { campaignId: string | number; status: "ACTIVE"; approval: { approved: true } };
+  };
+  warnings: string[];
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type SmartleadCampaignBackupPlanCampaign = {
   id?: string | number;
   name?: string;
@@ -6904,8 +6941,9 @@ export function buildSmartleadCampaignQaPreview(input: {
   const genericEmails = emails.filter(isGenericEmail);
   const missingIntro = leads.filter((lead) => !String(lead.custom_fields?.personalized_intro ?? "").trim());
   const variantBodies = sequences.flatMap((sequence) => sequence.seq_variants.map((variant) => `${variant.subject}\n${variant.email_body}`));
-  const requiredVariables = unique(["{{company_name}}", "{{personalized_intro}}", ...variantBodies.flatMap(extractTemplateVariables)]);
   const combinedSequenceText = variantBodies.join("\n");
+  const companyVariable = combinedSequenceText.includes("{{company_name_short}}") ? "{{company_name_short}}" : "{{company_name}}";
+  const requiredVariables = unique([companyVariable, "{{personalized_intro}}", ...variantBodies.flatMap(extractTemplateVariables)]);
   const missingVariables = requiredVariables.filter((variable) => !combinedSequenceText.includes(variable));
   const approvalCalls = nextToolCalls.filter((call) => call.approvalRequired).length;
   const checks: SmartleadCampaignQaPreview["checks"] = [];
@@ -9328,6 +9366,228 @@ export function buildSmartleadCampaignHandoffPackagePreview(input: {
     operatorChecklist: checklist,
     nextToolCalls: allCalls,
   };
+}
+
+export function buildSmartleadFixedCampaignPackagePreview(input: {
+  niche: { id?: string; slug?: string; name: string; campaignId?: string | number | null; smartleadCampaignId?: string | number | null };
+  leads?: ManualReviewPickupLead[];
+  campaignName?: string;
+  existingCampaignId?: string | number | null;
+  offer?: string;
+  painPoint?: string;
+  language?: "sk" | "en";
+  clientId?: string | number | null;
+  emailAccountIds?: Array<string | number>;
+  webhookUrl?: string;
+  sequences?: SmartleadSequence[];
+  batchSize?: number;
+  maxNewLeadsPerDay?: number;
+  minTimeBetweenEmails?: number;
+  includeActivationChecklist?: boolean;
+}): SmartleadFixedCampaignPackagePreview {
+  const language = input.language ?? "sk";
+  const slug = input.niche.slug?.trim() || slugify(input.niche.name);
+  const campaignId = input.existingCampaignId ?? input.niche.campaignId ?? input.niche.smartleadCampaignId ?? null;
+  const niche = { id: input.niche.id, slug, name: input.niche.name, campaignId };
+  const campaignName = input.campaignName?.trim() || `${slug}_SK_FIXED`;
+  const emailAccounts = input.emailAccountIds ?? [];
+  const schedule = {
+    timezone: "Europe/Bratislava",
+    start_hour: "08:00",
+    end_hour: "18:00",
+    days_of_the_week: [1, 2, 3, 4, 5],
+    max_new_leads_per_day: Math.min(Math.max(Math.trunc(input.maxNewLeadsPerDay ?? (emailAccounts.length ? Math.floor(120 / emailAccounts.length) : 30)), 1), 500),
+    min_time_btw_emails: Math.min(Math.max(Math.trunc(input.minTimeBetweenEmails ?? 15), 1), 240),
+    schedule_start_time: null,
+  };
+  const settings = { trackOpen: false, stopOnReply: true, followUpPercentage: 100 };
+  const launchPreview = buildSmartleadCampaignLaunchPreview({
+    niche,
+    leads: input.leads ?? [],
+    offer: input.offer,
+    painPoint: input.painPoint,
+    language,
+    clientId: input.clientId,
+    emailAccountIds: emailAccounts,
+    webhookUrl: input.webhookUrl,
+    schedule,
+    settings,
+    batchSize: input.batchSize,
+  });
+  const sequences = input.sequences?.length
+    ? input.sequences.map(normalizeSequencePreview)
+    : buildFixedSmartleadCampaignSequences({ niche: niche.name, offer: input.offer, painPoint: input.painPoint, language });
+  const campaignSetup = {
+    ...launchPreview.campaignSetup,
+    campaignName,
+    sequences,
+    schedule,
+    settings,
+    createCampaignApprovalPayload: {
+      ...launchPreview.campaignSetup.createCampaignApprovalPayload,
+      name: campaignName,
+      sequences,
+      emailAccountIds: emailAccounts,
+      schedule,
+      settings,
+    },
+  };
+  const configureCampaign = campaignId
+    ? {
+        campaignId,
+        sequences,
+        emailAccountIds: emailAccounts,
+        schedule,
+        settings,
+        webhook: campaignSetup.webhook,
+        approval: { approved: true as const },
+      }
+    : undefined;
+  const approvalPayloads: SmartleadFixedCampaignPackagePreview["approvalPayloads"] = {
+    createCampaign: campaignId ? undefined : campaignSetup.createCampaignApprovalPayload,
+    configureCampaign,
+    addLeads: launchPreview.approvalPayloads.addLeads,
+    activateCampaign: campaignId && input.includeActivationChecklist !== false ? { campaignId, status: "ACTIVE", approval: { approved: true } } : undefined,
+  };
+  const fixedLaunchPreview: SmartleadCampaignLaunchPreview = {
+    ...launchPreview,
+    summary: campaignId
+      ? `Smartlead fixed campaign package: nakonfiguruj kampan ${campaignId}, priprav ${launchPreview.injectionPlan.totals.prepared} leadov a potom manualne skontroluj ACTIVE status. Ziadny zapis ani upload neprebehol.`
+      : `Smartlead fixed campaign package: pripravena nova kampan ${campaignName}, ${launchPreview.injectionPlan.totals.prepared} leadov a fixed sekvencia. Ziadny zapis ani upload neprebehol.`,
+    campaignSetup,
+    approvalPayloads,
+    nextToolCalls: dedupeNextToolCalls([
+      {
+        tool: campaignId ? "arcigy.configure_smartlead_campaign" : "arcigy.create_smartlead_campaign",
+        payload: (campaignId ? configureCampaign : campaignSetup.createCampaignApprovalPayload) as unknown as Record<string, unknown>,
+        reason: campaignId
+          ? "Po schvaleni nastav existujucu Smartlead kampan fixed sekvenciou, uctami, schedule, stop-on-reply settings a webhookom."
+          : "Po schvaleni vytvor Smartlead kampan s fixed sekvenciou, uctami, schedule, stop-on-reply settings a webhookom.",
+        approvalRequired: true,
+      },
+      ...launchPreview.nextToolCalls.filter((call) => call.tool !== "arcigy.create_smartlead_campaign" && call.tool !== "arcigy.configure_smartlead_campaign"),
+    ]),
+  };
+  const qaPreview = buildSmartleadCampaignQaPreview({
+    launchPreview: fixedLaunchPreview,
+    maxNewLeadsPerDay: schedule.max_new_leads_per_day,
+  });
+  const warnings: string[] = [];
+  if (!emailAccounts.length) warnings.push("Email account ids were not provided; campaign setup can be drafted but sender assignment needs operator review.");
+  if (!campaignId) warnings.push("No existing campaignId; create campaign first, then rerun with the returned campaignId before add-leads upload.");
+  if (approvalPayloads.activateCampaign) warnings.push("ACTIVE status is prepared as an operator checklist item; there is no separate Jarvis Smartlead status write tool yet.");
+  const operatorChecklist: SmartleadFixedCampaignPackagePreview["operatorChecklist"] = [
+    { item: "Campaign target", status: campaignId || campaignName ? "ready" : "blocked", detail: campaignId ? `Configure existing campaign ${campaignId}.` : `Create new campaign ${campaignName}.` },
+    { item: "Fixed sequence", status: qaPreview.checks.find((check) => check.key === "sequences")?.status ?? "blocked", detail: `${sequences.length} steps, ${sequences.reduce((sum, sequence) => sum + sequence.seq_variants.length, 0)} variants, uses company_name_short, last_name_with_salutation and personalized_intro.` },
+    { item: "Stop on reply", status: settings.stopOnReply ? "ready" : "blocked", detail: "stop_lead_settings should resolve to REPLY_TO_AN_EMAIL in Smartlead." },
+    { item: "Webhook", status: campaignSetup.webhook.url ? "ready" : "blocked", detail: `${campaignSetup.webhook.name}: ${campaignSetup.webhook.eventTypes.join(", ")}` },
+    { item: "Lead upload", status: launchPreview.injectionPlan.totals.prepared > 0 && campaignId ? "ready" : launchPreview.injectionPlan.totals.prepared > 0 ? "attention" : "blocked", detail: `${launchPreview.injectionPlan.totals.prepared} prepared, ${launchPreview.injectionPlan.totals.skipped} skipped.` },
+    { item: "Activation", status: campaignId ? "attention" : "blocked", detail: campaignId ? "After approvals, verify campaign status ACTIVE in Smartlead UI/API." : "Activation is possible only after Smartlead returns campaignId." },
+  ];
+  const nextToolCalls = dedupeNextToolCalls([
+    ...fixedLaunchPreview.nextToolCalls,
+    {
+      tool: "arcigy.build_smartlead_campaign_qa_preview",
+      payload: { launchPreview: fixedLaunchPreview, maxNewLeadsPerDay: schedule.max_new_leads_per_day },
+      reason: "Pred schvalenim write krokov znovu skontroluj fixed campaign payload.",
+      approvalRequired: false,
+    },
+    {
+      tool: "arcigy.preview_smartlead_email_rendering",
+      payload: { leads: fixedLaunchPreview.injectionPlan.batches.flatMap((batch) => batch.leads).slice(0, 5), sequences },
+      reason: "Vyrenderuj prvych par emailov a over custom fields pred uploadom.",
+      approvalRequired: false,
+    },
+  ]);
+  const status: SmartleadFixedCampaignPackagePreview["status"] =
+    operatorChecklist.some((item) => item.status === "blocked") || qaPreview.status === "blocked"
+      ? "blocked"
+      : operatorChecklist.some((item) => item.status === "attention") || qaPreview.status === "attention" || warnings.length
+        ? "attention"
+        : "ready";
+  return {
+    mode: "smartlead-fixed-campaign-package-preview",
+    status,
+    summary: `Smartlead fixed campaign package ${status}: ${campaignName}, ${fixedLaunchPreview.injectionPlan.totals.prepared} leadov, ${sequences.length} sekvencii, ${nextToolCalls.filter((call) => call.approvalRequired).length} approval krokov. Ziadny zapis ani upload neprebehol.`,
+    source: { niche, campaignName, existingCampaignId: campaignId, language },
+    totals: {
+      leads: input.leads?.length ?? 0,
+      preparedLeads: fixedLaunchPreview.injectionPlan.totals.prepared,
+      skippedLeads: fixedLaunchPreview.injectionPlan.totals.skipped,
+      sequenceSteps: sequences.length,
+      variants: sequences.reduce((sum, sequence) => sum + sequence.seq_variants.length, 0),
+      approvalCalls: nextToolCalls.filter((call) => call.approvalRequired).length,
+      webhookEvents: campaignSetup.webhook.eventTypes.length,
+      emailAccounts: emailAccounts.length,
+      warnings: warnings.length,
+    },
+    fixedDefaults: {
+      schedule,
+      settings,
+      webhook: campaignSetup.webhook,
+      uploadSettings: { ignore_global_block_list: false, ignore_unsubscribe_list: false },
+    },
+    launchPreview: fixedLaunchPreview,
+    qaPreview,
+    operatorChecklist,
+    approvalPayloads,
+    warnings,
+    nextToolCalls,
+  };
+}
+
+function buildFixedSmartleadCampaignSequences(input: { niche: string; offer?: string; painPoint?: string; language: "sk" | "en" }): SmartleadSequence[] {
+  const niche = input.niche.trim() || "firmy";
+  const offer = input.offer?.trim() || "AI audit a automatizacia dopytov";
+  const painPoint = input.painPoint?.trim() || "manualne filtrovanie dopytov a opakovane odpovedanie";
+  if (input.language === "en") {
+    return [
+      {
+        seq_number: 1,
+        seq_delay_details: { delay_in_days: 0 },
+        seq_variants: [
+          {
+            variant_label: "A",
+            subject: "Quick thought about {{company_name_short}}",
+            email_body: `<p>Hello{{last_name_with_salutation}},</p><p>{{personalized_intro}}</p><p>I help ${escapeHtml(niche)} reduce ${escapeHtml(painPoint)} with ${escapeHtml(offer)}.</p><p>Would it make sense to send one concrete example for {{company_name_short}}?</p><p>%signature%</p>`,
+          },
+          {
+            variant_label: "B",
+            subject: "Question for {{company_name_short}}",
+            email_body: `<p>Hello{{last_name_with_salutation}},</p><p>{{personalized_intro}}</p><p>Are you already solving ${escapeHtml(painPoint)}, or is it still handled manually?</p><p>I can send a short practical example if useful.</p><p>%signature%</p>`,
+          },
+        ],
+      },
+      {
+        seq_number: 2,
+        seq_delay_details: { delay_in_days: 3 },
+        seq_variants: [{ variant_label: "A", subject: "", email_body: "<p>Hello{{last_name_with_salutation}},</p><p>just checking whether my previous email reached you.</p><p>A short yes/no is enough, so I know whether this is relevant.</p><p>%sender-firstname%</p>" }],
+      },
+    ];
+  }
+  return [
+    {
+      seq_number: 1,
+      seq_delay_details: { delay_in_days: 0 },
+      seq_variants: [
+        {
+          variant_label: "A",
+          subject: "Len taka uvaha nad {{company_name_short}}",
+          email_body: `<p>Dobry den{{last_name_with_salutation}},</p><p>{{personalized_intro}}</p><p>Pre ${escapeHtml(niche)} riesime ${escapeHtml(painPoint)} cez ${escapeHtml(offer)}.</p><p>Napadlo mi, ci by davalo zmysel poslat vam kratku ukazku, ako by to mohlo vyzerat pre {{company_name_short}}.</p><p>%signature%</p>`,
+        },
+        {
+          variant_label: "B",
+          subject: "Otazka k {{company_name_short}}",
+          email_body: `<p>Dobry den{{last_name_with_salutation}},</p><p>{{personalized_intro}}</p><p>Neodchadza vam pri dopytoch vela casu na tie iste otazky a prvotne filtrovanie?</p><p>Prave tam vie pomoct jednoduchy AI audit a automatizacia. Ak chcete, poslem strucny priklad pre vas typ firmy.</p><p>%signature%</p>`,
+        },
+      ],
+    },
+    {
+      seq_number: 2,
+      seq_delay_details: { delay_in_days: 3 },
+      seq_variants: [{ variant_label: "A", subject: "", email_body: "<p>Dobry den{{last_name_with_salutation}},</p><p>len som sa chcel uistit, ci vam moj mail nespadol do spamu.</p><p>Staci mi kratke ano/nie, ci je tema automatizacie dopytov pre vas relevantna.</p><p>%sender-firstname%</p>" }],
+    },
+  ];
 }
 
 export function buildSmartleadCampaignBackupPlan(input: {

@@ -125,6 +125,7 @@ export type JarvisMcpToolName =
   | "arcigy.build_smartlead_campaign_launch_preview"
   | "arcigy.build_smartlead_campaign_qa_preview"
   | "arcigy.build_smartlead_campaign_handoff_package_preview"
+  | "arcigy.build_smartlead_fixed_campaign_package_preview"
   | "arcigy.preview_lead_enrichment_batch"
   | "arcigy.build_lead_enrichment_merge_preview"
   | "arcigy.build_leadgen_gap_report"
@@ -817,6 +818,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.build_smartlead_campaign_handoff_package_preview",
       description: "Zlozi Smartlead launch, QA, sender kapacitu a approval checklist do jedneho handoff balika bez zapisu.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_smartlead_fixed_campaign_package_preview",
+      description: "Zlozi fixed Smartlead campaign setup zo stareho injector skriptu: fixed sekvencia, stop-on-reply, webhook, schedule, QA a approval payloady bez zapisu.",
       requiresApproval: false,
     },
     {

@@ -667,6 +667,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(openApiBody.paths["/api/mcp/arcigy.build_pricing_proposal_preview"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.build_service_capacity_preview"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.build_showcase_reply_preview"]);
+    assert.ok(openApiBody.paths["/api/mcp/arcigy.build_smartlead_fixed_campaign_package_preview"]);
     const openApiOperator = openApiBody.paths["/api/mcp/arcigy.get_operator_briefing"] as OpenApiPathFixture;
     const openApiAttentionDigest = openApiBody.paths["/api/mcp/arcigy.get_proactive_attention_digest"] as OpenApiPathFixture;
     const openApiCompletionScore = openApiBody.paths["/api/mcp/arcigy.get_production_completion_score"] as OpenApiPathFixture;

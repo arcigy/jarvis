@@ -993,6 +993,18 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       batchSize: 50,
     };
   }
+  if (toolName === "arcigy.build_smartlead_fixed_campaign_package_preview") {
+    return {
+      niche: { id: "niche-1", slug: "kuchyne-na-mieru-cz", name: "Kuchyne na mieru CZ", campaignId: "3209165" },
+      campaignName: "KUCHYNE-NA-MIERU-CZ_SK_FIXED",
+      offer: "AI audit a automatizacia dopytov",
+      painPoint: "manualne filtrovanie dopytov",
+      language: "sk",
+      emailAccountIds: ["14382544"],
+      leads: [{ email: "jan.novak@example.com", companyName: "Modelova Firma", companyNameShort: "Modelova Firma", website: "https://example.com", firstName: "Jan", personalizedIntro: "Vsimol som si vase realizacie kuchyn.", customFields: { last_name_with_salutation: " pan Novak" } }],
+      batchSize: 50,
+    };
+  }
   if (toolName === "arcigy.preview_lead_enrichment_batch") {
     return {
       niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456" },
