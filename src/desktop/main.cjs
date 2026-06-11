@@ -3231,6 +3231,7 @@ function listWebMcpTools() {
     { name: "arcigy.build_slovak_salutation_preview", requiresApproval: false },
     { name: "arcigy.build_lead_identity_repair_preview", requiresApproval: false },
     { name: "arcigy.score_lead_quality", requiresApproval: false },
+    { name: "arcigy.build_lead_validation_scorecard_preview", requiresApproval: false },
     { name: "arcigy.dedupe_lead_candidates", requiresApproval: false },
     { name: "arcigy.build_suppression_list_preview", requiresApproval: false },
     { name: "arcigy.build_smartlead_history_suppression_preview", requiresApproval: false },

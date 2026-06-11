@@ -1056,6 +1056,23 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Build lead validation scorecard before Smartlead",
+      tool: "arcigy.build_lead_validation_scorecard_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_lead_validation_scorecard_preview"),
+      body: {
+        minScore: 70,
+        niche: { slug: "kuchynske-studia", name: "Kuchynske studia", campaignId: "123456" },
+        leads: [
+          { id: "lead-1", email: "majitel@ready.sk", companyName: "Ready Studio", website: "https://ready.sk", decisionMakerName: "Jan Novak", registerVerified: true, personalizedIntro: "Zaujalo ma, ze prepajate showroom s navrhmi kuchyn." },
+          { id: "lead-2", email: "info@kontakt.sk", companyName: "Kontakt Studio", website: "https://kontakt.sk" },
+          { id: "lead-3", email: "sent@ready.sk", companyName: "Sent Studio", website: "https://sent.sk", sentToSmartlead: true },
+        ],
+        batchSize: 50,
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Dedupe lead candidates before import",
       tool: "arcigy.dedupe_lead_candidates",
       method: "POST",

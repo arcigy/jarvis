@@ -283,6 +283,35 @@ export type LeadBatchQaPreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type LeadValidationScorecardPreview = {
+  mode: "lead-validation-scorecard-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  source: { niche?: { id?: string; slug: string; name: string; campaignId?: string | number | null }; campaignId?: string | number | null; minScore: number; includeSentToSmartlead: boolean };
+  totals: {
+    input: number;
+    scored: number;
+    passed: number;
+    failed: number;
+    excludedSentToSmartlead: number;
+    averageScore: number;
+    smartleadReady: number;
+  };
+  buckets: Record<string, number>;
+  items: Array<{
+    lead: LeadCandidateInput & { id?: string | number; sentToSmartlead?: boolean; sent_to_smartlead?: boolean; verificationStatus?: "ok" | "flagged" | "failed" | "verified" };
+    status: "qualified" | "below_threshold" | "excluded_sent";
+    score: number;
+    passed: boolean;
+    reasons: string[];
+  }>;
+  qualifiedLeads: PreparedSmartleadLeadInput[];
+  failedLeads: LeadCandidateInput[];
+  smartleadPrepared: ReturnType<typeof prepareSmartleadLeads>;
+  injectionPlan?: SmartleadInjectionPlan;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type CompanyShortNamePreview = {
   mode: "company-short-name-preview";
   status: "ready" | "attention" | "blocked";
@@ -3820,6 +3849,128 @@ export function scoreLeadQuality(input: { leads: LeadQualityInput[]; minScore?: 
     failed: scoredLeads.filter((lead) => !lead.passed).length,
     scoredLeads,
     buckets: buildScoreBuckets(scoredLeads.map((lead) => lead.score)),
+  };
+}
+
+export function buildLeadValidationScorecardPreview(input: {
+  leads: Array<LeadCandidateInput & { id?: string | number; sentToSmartlead?: boolean; sent_to_smartlead?: boolean; verificationStatus?: "ok" | "flagged" | "failed" | "verified"; registerVerified?: boolean; decisionMakerName?: string; decision_maker_name?: string }>;
+  minScore?: number;
+  niche?: { id?: string; slug: string; name: string; campaignId?: string | number | null };
+  campaignId?: string | number | null;
+  defaultSource?: string;
+  includeSentToSmartlead?: boolean;
+  batchSize?: number;
+  maxNextCalls?: number;
+}): LeadValidationScorecardPreview {
+  const minScore = Math.min(Math.max(Math.trunc(input.minScore ?? 50), 0), 100);
+  const includeSentToSmartlead = input.includeSentToSmartlead === true;
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 100), 1), 500);
+  const scoredInput = input.leads.filter((lead) => includeSentToSmartlead || !leadSentToSmartlead(lead));
+  const score = scoreLeadQuality({
+    leads: scoredInput.map((lead) => ({
+      email: lead.email,
+      companyName: lead.companyName,
+      website: lead.website,
+      decisionMaker: decisionMakerForLead(lead as ManualReviewPickupLead) ?? stringField(lead.customFields ?? {}, "decision_maker_name", "decision_maker_full_name"),
+      ico: stringField(lead.customFields ?? {}, "ico"),
+      registerVerified: lead.registerVerified ?? booleanField(lead.customFields ?? {}, "register_verified", "orsr_verified"),
+      personalizedIntro: lead.personalizedIntro ?? stringField(lead.customFields ?? {}, "personalized_intro", "icebreaker_sentence"),
+      verificationStatus: normalizeLeadQualityVerificationStatus(lead.verificationStatus ?? stringField(lead.customFields ?? {}, "verification_status")),
+    })),
+    minScore,
+  });
+  const items: LeadValidationScorecardPreview["items"] = [
+    ...input.leads
+      .filter((lead) => !includeSentToSmartlead && leadSentToSmartlead(lead))
+      .map((lead) => ({ lead, status: "excluded_sent" as const, score: 0, passed: false, reasons: ["already_sent_to_smartlead"] })),
+    ...scoredInput.map((lead, index) => {
+      const scored = score.scoredLeads[index];
+      return {
+        lead,
+        status: scored.passed ? "qualified" as const : "below_threshold" as const,
+        score: scored.score,
+        passed: scored.passed,
+        reasons: scored.reasons,
+      };
+    }),
+  ];
+  const qualifiedLeads: PreparedSmartleadLeadInput[] = items
+    .filter((item) => item.status === "qualified")
+    .map((item) => ({
+      email: item.lead.email ?? "",
+      companyName: item.lead.companyName,
+      firstName: item.lead.firstName,
+      lastName: item.lead.lastName,
+      website: item.lead.website,
+      phone: item.lead.phone,
+      source: input.defaultSource ?? item.lead.source ?? input.niche?.slug,
+      personalizedIntro: item.lead.personalizedIntro ?? stringField(item.lead.customFields ?? {}, "personalized_intro", "icebreaker_sentence"),
+      customFields: {
+        ...item.lead.customFields,
+        lead_score: item.score,
+        lead_score_min: minScore,
+        lead_validation_status: "qualified",
+        source_name: input.defaultSource ?? item.lead.customFields?.source_name,
+      },
+    }));
+  const failedLeads = items.filter((item) => item.status === "below_threshold").map((item) => item.lead);
+  const smartleadPrepared = prepareSmartleadLeads({ leads: qualifiedLeads, defaultSource: input.defaultSource ?? input.niche?.slug ?? "lead-validation-scorecard" });
+  const injectionPlan = input.niche && qualifiedLeads.length
+    ? buildSmartleadInjectionPlan({ niche: { ...input.niche, campaignId: input.campaignId ?? input.niche.campaignId }, leads: qualifiedLeads as ManualReviewPickupLead[], batchSize: input.batchSize })
+    : undefined;
+  const nextToolCalls: LeadValidationScorecardPreview["nextToolCalls"] = [];
+  if (qualifiedLeads.length) {
+    nextToolCalls.push({
+      tool: "arcigy.prepare_smartlead_leads",
+      payload: { leads: qualifiedLeads.slice(0, maxNextCalls), defaultSource: input.defaultSource ?? input.niche?.slug ?? "lead-validation-scorecard" },
+      reason: "Normalizovat qualified leady do Smartlead lead_list payloadu bez uploadu.",
+      approvalRequired: false,
+    });
+    if (input.niche) {
+      nextToolCalls.push({
+        tool: "arcigy.build_smartlead_injection_plan",
+        payload: { niche: { ...input.niche, campaignId: input.campaignId ?? input.niche.campaignId }, leads: qualifiedLeads.slice(0, maxNextCalls), batchSize: input.batchSize },
+        reason: "Z qualified leadov pripravit batche a approval payload pre Smartlead upload.",
+        approvalRequired: false,
+      });
+    }
+  }
+  if (failedLeads.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_manual_review_queue",
+      payload: { leads: failedLeads.slice(0, maxNextCalls), minScore },
+      reason: "Leadom pod prahom pripravit manual review alebo opravy pred uploadom.",
+      approvalRequired: false,
+    });
+  }
+  const excludedSentToSmartlead = items.filter((item) => item.status === "excluded_sent").length;
+  const totals = {
+    input: input.leads.length,
+    scored: scoredInput.length,
+    passed: score.passed,
+    failed: score.failed,
+    excludedSentToSmartlead,
+    averageScore: score.averageScore,
+    smartleadReady: smartleadPrepared.leadList.length,
+  };
+  const status: LeadValidationScorecardPreview["status"] = totals.scored === 0
+    ? "blocked"
+    : totals.passed === 0 || totals.failed > 0 || excludedSentToSmartlead > 0
+      ? "attention"
+      : "ready";
+  return {
+    mode: "lead-validation-scorecard-preview",
+    status,
+    summary: `Lead validation scorecard ${status}: ${totals.passed}/${totals.scored} preslo minScore ${minScore}, priemer ${totals.averageScore}/100, ${totals.smartleadReady} ready pre Smartlead. Ziadny DB zapis ani upload neprebehol.`,
+    source: { niche: input.niche, campaignId: input.campaignId ?? input.niche?.campaignId, minScore, includeSentToSmartlead },
+    totals,
+    buckets: score.buckets,
+    items,
+    qualifiedLeads,
+    failedLeads,
+    smartleadPrepared,
+    injectionPlan,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls),
   };
 }
 
@@ -7910,6 +8061,20 @@ function booleanField(record: Record<string, unknown>, ...keys: string[]): boole
     if (typeof value === "number") return value !== 0;
     if (typeof value === "string" && value.trim()) return ["true", "1", "yes"].includes(value.trim().toLowerCase());
   }
+  return undefined;
+}
+
+function leadSentToSmartlead(lead: LeadCandidateInput & { sentToSmartlead?: boolean; sent_to_smartlead?: boolean }): boolean {
+  return lead.sentToSmartlead === true
+    || lead.sent_to_smartlead === true
+    || booleanField(lead.customFields ?? {}, "sent_to_smartlead", "sentToSmartlead", "smartlead_uploaded") === true;
+}
+
+function normalizeLeadQualityVerificationStatus(value: unknown): LeadQualityInput["verificationStatus"] | undefined {
+  const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (normalized === "verified" || normalized === "ok") return "ok";
+  if (normalized === "flagged") return "flagged";
+  if (normalized === "failed") return "failed";
   return undefined;
 }
 

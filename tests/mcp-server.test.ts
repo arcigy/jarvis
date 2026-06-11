@@ -104,6 +104,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(names.includes("arcigy.build_slovak_salutation_preview"));
   assert.ok(names.includes("arcigy.build_lead_identity_repair_preview"));
   assert.ok(names.includes("arcigy.score_lead_quality"));
+  assert.ok(names.includes("arcigy.build_lead_validation_scorecard_preview"));
   assert.ok(names.includes("arcigy.dedupe_lead_candidates"));
   assert.ok(names.includes("arcigy.build_suppression_list_preview"));
   assert.ok(names.includes("arcigy.build_smartlead_history_suppression_preview"));
@@ -441,6 +442,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_local_lead_register_update_preview" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.apply_local_lead_register_update" && call.approvalRequired === true));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_lead_identity_repair_preview" && call.approvalRequired === false));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_lead_validation_scorecard_preview" && call.approvalRequired === false && call.body.minScore === 70));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_campaign_webhooks" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_email_accounts" && call.body.requestedDailyLimit === 80 && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_company_short_name_preview" && call.approvalRequired === false && Array.isArray(call.body.leads)));

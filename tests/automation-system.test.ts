@@ -82,6 +82,7 @@ import {
   buildLeadEnrichmentMergePreview,
   previewSmartleadEmailRendering,
   prepareSmartleadLeads,
+  buildLeadValidationScorecardPreview,
   scoreLeadQuality,
   serializeLeadsCsv,
   scrapeWebsiteContacts,
@@ -217,6 +218,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.build_slovak_salutation_preview",
     "arcigy.build_lead_identity_repair_preview",
     "arcigy.score_lead_quality",
+    "arcigy.build_lead_validation_scorecard_preview",
     "arcigy.dedupe_lead_candidates",
     "arcigy.build_suppression_list_preview",
     "arcigy.build_smartlead_history_suppression_preview",
@@ -485,6 +487,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.ok(paths.includes("/api/mcp/arcigy.build_local_lead_register_update_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.apply_local_lead_register_update"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_lead_identity_repair_preview"));
+  assert.ok(paths.includes("/api/mcp/arcigy.build_lead_validation_scorecard_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_company_short_name_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_ai_icebreaker_writeback_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.get_smartlead_campaign_webhooks"));
@@ -508,6 +511,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   const localLeadRegisterPreview = document.paths["/api/mcp/arcigy.build_local_lead_register_update_preview"] as OpenApiPathFixture;
   const localLeadRegisterApply = document.paths["/api/mcp/arcigy.apply_local_lead_register_update"] as OpenApiPathFixture;
   const leadIdentityRepair = document.paths["/api/mcp/arcigy.build_lead_identity_repair_preview"] as OpenApiPathFixture;
+  const leadValidationScorecard = document.paths["/api/mcp/arcigy.build_lead_validation_scorecard_preview"] as OpenApiPathFixture;
   const companyShortName = document.paths["/api/mcp/arcigy.build_company_short_name_preview"] as OpenApiPathFixture;
   const icebreakerWriteback = document.paths["/api/mcp/arcigy.build_ai_icebreaker_writeback_preview"] as OpenApiPathFixture;
   const smartleadWebhooks = document.paths["/api/mcp/arcigy.get_smartlead_campaign_webhooks"] as OpenApiPathFixture;
@@ -529,6 +533,9 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.equal(localNicheRun.post.requestBody.content["application/json"].examples.quickStart.value.approval.approved, true);
   assert.equal(leadIdentityRepair.post["x-arcigy-requiresApproval"], false);
   assert.ok(Array.isArray(leadIdentityRepair.post.requestBody.content["application/json"].examples.quickStart.value.leads));
+  assert.equal(leadValidationScorecard.post["x-arcigy-requiresApproval"], false);
+  assert.equal(leadValidationScorecard.post.requestBody.content["application/json"].examples.quickStart.value.minScore, 70);
+  assert.ok(Array.isArray(leadValidationScorecard.post.requestBody.content["application/json"].examples.quickStart.value.leads));
   assert.equal(companyShortName.post["x-arcigy-requiresApproval"], false);
   assert.equal(companyShortName.post.requestBody.content["application/json"].examples.quickStart.value.sourceName, "kuchyne-na-mieru");
   assert.ok(Array.isArray(companyShortName.post.requestBody.content["application/json"].examples.quickStart.value.leads));
@@ -1887,6 +1894,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_local_lead_register_update_preview" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.apply_local_lead_register_update" && call.approvalRequired === true));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_lead_identity_repair_preview" && call.approvalRequired === false));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_lead_validation_scorecard_preview" && call.approvalRequired === false && call.body.minScore === 70));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_company_short_name_preview" && call.approvalRequired === false && Array.isArray(call.body.leads)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_ai_icebreaker_writeback_preview" && call.approvalRequired === false && typeof call.body.resultJsonText === "string"));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.lookup_public_email_profile" && call.body.email === "jan.novak@example.com" && call.approvalRequired === false));
@@ -5106,6 +5114,41 @@ test("lead quality scoring and dedupe prepare imports safely", () => {
   });
   assert.equal(deduped.unique.length, 2);
   assert.equal(deduped.duplicates.length, 2);
+});
+
+test("lead validation scorecard previews inject gating without writing", () => {
+  const preview = buildLeadValidationScorecardPreview({
+    minScore: 70,
+    niche: { slug: "kuchynske-studia", name: "Kuchynske studia", campaignId: "123456" },
+    leads: [
+      {
+        id: "lead-1",
+        email: "majitel@ready.sk",
+        companyName: "Ready Studio",
+        website: "https://ready.sk",
+        decisionMakerName: "Jan Novak",
+        registerVerified: true,
+        personalizedIntro: "Zaujalo ma, ze prepajate showroom s navrhmi kuchyn.",
+      },
+      { id: "lead-2", email: "info@kontakt.sk", companyName: "Kontakt Studio", website: "https://kontakt.sk" },
+      { id: "lead-3", email: "sent@ready.sk", companyName: "Sent Studio", website: "https://sent.sk", sentToSmartlead: true },
+    ],
+  });
+
+  assert.equal(preview.mode, "lead-validation-scorecard-preview");
+  assert.equal(preview.status, "attention");
+  assert.equal(preview.totals.input, 3);
+  assert.equal(preview.totals.scored, 2);
+  assert.equal(preview.totals.passed, 1);
+  assert.equal(preview.totals.failed, 1);
+  assert.equal(preview.totals.excludedSentToSmartlead, 1);
+  assert.equal(preview.qualifiedLeads.length, 1);
+  assert.equal(preview.smartleadPrepared.leadList.length, 1);
+  assert.equal(preview.injectionPlan?.addLeadsApprovalPayload?.campaignId, "123456");
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.prepare_smartlead_leads" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_smartlead_injection_plan" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_manual_review_queue" && !call.approvalRequired));
+  assert.match(preview.summary, /Ziadny DB zapis ani upload/);
 });
 
 test("suppression list preview builds blacklist filters from bounces and negative replies", () => {

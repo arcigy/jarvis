@@ -143,6 +143,7 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.build_slovak_salutation_preview`: builds Slovak `pan`/`pani` Smartlead custom fields like `last_name_with_salutation` and `greeting` for a lead batch without writes.
 - `arcigy.build_lead_identity_repair_preview`: infers decision-maker names from personal emails, cleans `company_name_short`, and prepares Smartlead-safe identity fields without writes.
 - `arcigy.score_lead_quality`: scores lead candidates 0-100 using email type, website, `.sk` domain, decision maker, register verification, AI intro, and validation status.
+- `arcigy.build_lead_validation_scorecard_preview`: builds a validate/inject-style batch scorecard with score buckets, min-score filtering, sent-lead exclusions, and Smartlead injection next steps without writes.
 - `arcigy.dedupe_lead_candidates`: deduplicates lead candidates by email, website, phone, or company name before import.
 - `arcigy.build_suppression_list_preview`: builds a read-only suppression/blacklist filter from bounces, unsubscribes, negative replies, and manual rules.
 - `arcigy.build_niche_leadgen_plan`: returns niche-specific Google Maps and Serper query plans with blacklist keywords.

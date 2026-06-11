@@ -173,6 +173,7 @@ const capabilityDefinitions: CapabilityDefinition[] = [
       "arcigy.build_slovak_salutation_preview",
       "arcigy.build_lead_identity_repair_preview",
       "arcigy.score_lead_quality",
+      "arcigy.build_lead_validation_scorecard_preview",
       "arcigy.dedupe_lead_candidates",
       "arcigy.build_suppression_list_preview",
       "arcigy.build_smartlead_history_suppression_preview",

@@ -38,6 +38,7 @@ import {
   buildUrlIntelligenceQueuePreview,
   buildLeadRepairQueuePreview,
   buildLeadIdentityRepairPreview,
+  buildLeadValidationScorecardPreview,
   buildSlovakRegisterBatchPreview,
   buildSlovakSalutationPreview,
   buildNicheOpsDashboardPreview,
@@ -2365,6 +2366,54 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(scoreLeadQuality(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_lead_validation_scorecard_preview",
+    {
+      title: "Build lead validation scorecard preview",
+      description: "Batch score enriched leads before Smartlead injection, report validate.ts-style buckets, exclude already-sent leads, and prepare read-only injection next steps.",
+      inputSchema: {
+        leads: z.array(z.object({
+          id: z.union([z.string(), z.number()]).optional(),
+          email: z.string().optional(),
+          companyName: z.string().optional(),
+          firstName: z.string().optional(),
+          lastName: z.string().optional(),
+          website: z.string().optional(),
+          phone: z.string().optional(),
+          source: z.string().optional(),
+          personalizedIntro: z.string().optional(),
+          decisionMakerName: z.string().optional(),
+          decision_maker_name: z.string().optional(),
+          registerVerified: z.boolean().optional(),
+          sentToSmartlead: z.boolean().optional(),
+          sent_to_smartlead: z.boolean().optional(),
+          verificationStatus: z.enum(["ok", "flagged", "failed", "verified"]).optional(),
+          verification_status: z.enum(["ok", "flagged", "failed", "verified"]).optional(),
+          customFields: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
+        }).passthrough()).min(1).max(1000),
+        minScore: z.number().int().min(0).max(100).default(50),
+        niche: z.object({
+          id: z.string().optional(),
+          slug: z.string().min(1),
+          name: z.string().min(1),
+          campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+        }).optional(),
+        campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+        defaultSource: z.string().optional(),
+        includeSentToSmartlead: z.boolean().default(false),
+        batchSize: z.number().int().min(1).max(500).default(50),
+        maxNextCalls: z.number().int().min(1).max(500).default(100),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildLeadValidationScorecardPreview(input as Parameters<typeof buildLeadValidationScorecardPreview>[0]))
   );
 
   server.registerTool(

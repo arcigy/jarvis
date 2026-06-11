@@ -37,6 +37,7 @@ import {
   buildUrlIntelligenceQueuePreview,
   buildLeadRepairQueuePreview,
   buildLeadIdentityRepairPreview,
+  buildLeadValidationScorecardPreview,
   buildSlovakRegisterBatchPreview,
   buildSlovakSalutationPreview,
   buildNicheOpsDashboardPreview,
@@ -1762,6 +1763,21 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
       result: scoreLeadQuality({
         minScore: typeof payload.minScore === "number" ? payload.minScore : undefined,
         leads: (payload.leads ?? []) as Parameters<typeof scoreLeadQuality>[0]["leads"],
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_lead_validation_scorecard_preview") {
+    writeJson(response, 200, {
+      result: buildLeadValidationScorecardPreview({
+        leads: (payload.leads ?? []) as Parameters<typeof buildLeadValidationScorecardPreview>[0]["leads"],
+        minScore: typeof payload.minScore === "number" ? payload.minScore : undefined,
+        niche: payload.niche as Parameters<typeof buildLeadValidationScorecardPreview>[0]["niche"],
+        campaignId: typeof payload.campaignId === "string" || typeof payload.campaignId === "number" || payload.campaignId === null ? payload.campaignId : undefined,
+        defaultSource: optionalString(payload.defaultSource),
+        includeSentToSmartlead: payload.includeSentToSmartlead === true,
+        batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
+        maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
       }),
     });
     return;

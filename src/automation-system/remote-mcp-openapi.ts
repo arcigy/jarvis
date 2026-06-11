@@ -499,6 +499,18 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
   if (toolName === "arcigy.score_lead_quality") {
     return { minScore: 70, leads: [{ email: "majitel@example.sk", website: "https://example.sk", decisionMaker: "Jan Novak", registerVerified: true, personalizedIntro: "Kratke AI intro." }] };
   }
+  if (toolName === "arcigy.build_lead_validation_scorecard_preview") {
+    return {
+      minScore: 70,
+      niche: { slug: "kuchynske-studia", name: "Kuchynske studia", campaignId: "123456" },
+      leads: [
+        { id: "lead-1", email: "majitel@ready.sk", companyName: "Ready Studio", website: "https://ready.sk", decisionMakerName: "Jan Novak", registerVerified: true, personalizedIntro: "Zaujalo ma, ze prepajate showroom s navrhmi kuchyn." },
+        { id: "lead-2", email: "info@kontakt.sk", companyName: "Kontakt Studio", website: "https://kontakt.sk" },
+        { id: "lead-3", email: "sent@ready.sk", companyName: "Sent Studio", website: "https://sent.sk", sentToSmartlead: true },
+      ],
+      batchSize: 50,
+    };
+  }
   if (toolName === "arcigy.dedupe_lead_candidates") return { leads: [{ email: "lead@example.com", companyName: "Modelova Firma" }, { email: "lead@example.com", companyName: "Duplicita" }] };
   if (toolName === "arcigy.build_suppression_list_preview") {
     return {
