@@ -529,6 +529,17 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       maxLeads: 5,
     };
   }
+  if (toolName === "arcigy.build_smartlead_sequence_variable_repair_preview") {
+    return {
+      campaignId: "123456",
+      sequences: [{
+        seq_number: 1,
+        seq_delay_details: { delay_in_days: 0 },
+        seq_variants: [{ variant_label: "A", subject: "Otazka k {{company_name}}", email_body: "<p>{{personalized_intro}}</p><p>%signature%</p>" }],
+      }],
+      leads: [{ email: "jan.novak@example.com", company_name: "Modelova Firma", custom_fields: { company_name_short: "Modelova Firma", personalized_intro: "Kratke AI intro." } }],
+    };
+  }
   if (toolName === "arcigy.preview_manual_review_pickup") {
     return {
       minScore: 50,

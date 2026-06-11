@@ -1031,6 +1031,22 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Repair Smartlead sequence variables",
+      tool: "arcigy.build_smartlead_sequence_variable_repair_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_smartlead_sequence_variable_repair_preview"),
+      body: {
+        campaignId: "123456",
+        sequences: [{
+          seq_number: 1,
+          seq_delay_details: { delay_in_days: 0 },
+          seq_variants: [{ variant_label: "A", subject: "Otazka k {{company_name}}", email_body: "<p>{{personalized_intro}}</p><p>%signature%</p>" }],
+        }],
+        leads: [{ email: "jan.novak@example.com", company_name: "Modelova Firma", custom_fields: { company_name_short: "Modelova Firma", personalized_intro: "Kratke AI intro." } }],
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Parse lead CSV text without writing",
       tool: "arcigy.parse_leads_csv",
       method: "POST",

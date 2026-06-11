@@ -66,6 +66,7 @@ import {
   buildLeadCsvMappingPreview,
   parseLeadsCsv,
   previewSmartleadEmailRendering,
+  buildSmartleadSequenceVariableRepairPreview,
   previewLeadEnrichmentBatch,
   buildLeadEnrichmentMergePreview,
   prepareSmartleadLeads,
@@ -2339,6 +2340,44 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(previewSmartleadEmailRendering(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_smartlead_sequence_variable_repair_preview",
+    {
+      title: "Build Smartlead sequence variable repair preview",
+      description: "Rewrite Smartlead sequence subjects from company_name to company_name_short and prepare an approval-gated configure payload without writing.",
+      inputSchema: {
+        campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+        sequences: z.array(z.object({
+          seq_number: z.number().int().min(1),
+          seq_delay_details: z.object({ delay_in_days: z.number().int().min(0) }),
+          seq_variants: z.array(z.object({
+            variant_label: z.string().min(1),
+            subject: z.string(),
+            email_body: z.string(),
+          })).min(1),
+        })).min(1),
+        targetVariable: z.string().optional(),
+        replacementVariable: z.string().optional(),
+        includeConfigurePayload: z.boolean().default(true),
+        leads: z.array(z.object({
+          email: z.string().min(1),
+          first_name: z.string().optional(),
+          last_name: z.string().optional(),
+          company_name: z.string().optional(),
+          website: z.string().optional(),
+          custom_fields: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
+        })).optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildSmartleadSequenceVariableRepairPreview(input))
   );
 
   server.registerTool(

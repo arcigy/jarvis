@@ -314,6 +314,20 @@ export type SmartleadCampaignQaPreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type SmartleadSequenceVariableRepairPreview = {
+  mode: "smartlead-sequence-variable-repair-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  totals: { sequences: number; variants: number; subjectsChanged: number; bodyOccurrences: number; unchangedVariants: number };
+  targetVariable: string;
+  replacementVariable: string;
+  rewrittenSequences: SmartleadSequence[];
+  changes: Array<{ sequenceNumber: number; variantLabel: string; beforeSubject: string; afterSubject: string; bodyOccurrences: number }>;
+  warnings: string[];
+  configureCampaignApprovalPayload?: { campaignId: string | number; sequences: SmartleadSequence[]; approval: { approved: true } };
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type SmartleadEmailRenderingPreview = {
   mode: "smartlead-email-rendering-preview";
   summary: string;
@@ -2657,6 +2671,85 @@ export function buildSmartleadCampaignQaPreview(input: {
     requiredVariables,
     missingVariables,
     nextToolCalls,
+  };
+}
+
+export function buildSmartleadSequenceVariableRepairPreview(input: {
+  sequences: SmartleadSequence[];
+  campaignId?: string | number | null;
+  targetVariable?: string;
+  replacementVariable?: string;
+  includeConfigurePayload?: boolean;
+  leads?: SmartleadLead[];
+}): SmartleadSequenceVariableRepairPreview {
+  const targetVariable = input.targetVariable ?? "{{company_name}}";
+  const replacementVariable = input.replacementVariable ?? "{{company_name_short}}";
+  const changes: SmartleadSequenceVariableRepairPreview["changes"] = [];
+  let bodyOccurrences = 0;
+  let unchangedVariants = 0;
+  const rewrittenSequences = input.sequences.map((sequence) => ({
+    ...sequence,
+    seq_variants: sequence.seq_variants.map((variant) => {
+      const beforeSubject = variant.subject ?? "";
+      const afterSubject = beforeSubject.split(targetVariable).join(replacementVariable);
+      const bodyCount = countOccurrences(variant.email_body ?? "", targetVariable);
+      bodyOccurrences += bodyCount;
+      if (beforeSubject !== afterSubject) {
+        changes.push({
+          sequenceNumber: sequence.seq_number,
+          variantLabel: variant.variant_label,
+          beforeSubject,
+          afterSubject,
+          bodyOccurrences: bodyCount,
+        });
+      } else {
+        unchangedVariants += 1;
+      }
+      return { ...variant, subject: afterSubject };
+    }),
+  }));
+  const campaignId = input.campaignId ?? undefined;
+  const configureCampaignApprovalPayload = campaignId && input.includeConfigurePayload !== false && changes.length
+    ? { campaignId, sequences: rewrittenSequences, approval: { approved: true as const } }
+    : undefined;
+  const nextToolCalls: SmartleadSequenceVariableRepairPreview["nextToolCalls"] = [];
+  if (configureCampaignApprovalPayload) {
+    nextToolCalls.push({
+      tool: "arcigy.configure_smartlead_campaign",
+      payload: configureCampaignApprovalPayload as unknown as Record<string, unknown>,
+      reason: `Po schvaleni prepis Smartlead sequence subjecty z ${targetVariable} na ${replacementVariable}.`,
+      approvalRequired: true,
+    });
+  }
+  nextToolCalls.push({
+    tool: "arcigy.build_smartlead_campaign_qa_preview",
+    payload: { campaignId, sequences: rewrittenSequences, leads: input.leads ?? [] },
+    reason: "Po oprave premennych znovu skontroluj kampan pred odoslanim alebo uploadom leadov.",
+    approvalRequired: false,
+  });
+  const warnings: string[] = [];
+  if (bodyOccurrences > 0) warnings.push(`${targetVariable} sa stale nachadza v email_body ${bodyOccurrences} krat; tento preview meni iba subjecty.`);
+  if (changes.length > 0) warnings.push(`Leady musia mat custom_fields.${replacementVariable.replace(/[{}]/g, "")} pred spustenim kampane.`);
+  const totals = {
+    sequences: input.sequences.length,
+    variants: input.sequences.reduce((sum, sequence) => sum + sequence.seq_variants.length, 0),
+    subjectsChanged: changes.length,
+    bodyOccurrences,
+    unchangedVariants,
+  };
+  const status: SmartleadSequenceVariableRepairPreview["status"] = input.sequences.length === 0 ? "blocked" : changes.length > 0 ? "ready" : bodyOccurrences > 0 ? "attention" : "attention";
+  return {
+    mode: "smartlead-sequence-variable-repair-preview",
+    status,
+    summary: `Smartlead sequence variable repair: ${totals.subjectsChanged} subjectov prepisanych z ${targetVariable} na ${replacementVariable}, ${totals.bodyOccurrences} body vyskytov ostava na kontrolu. Ziadny Smartlead zapis neprebehol.`,
+    totals,
+    targetVariable,
+    replacementVariable,
+    rewrittenSequences,
+    changes,
+    warnings,
+    configureCampaignApprovalPayload,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls),
   };
 }
 
@@ -5863,6 +5956,11 @@ function cleanupAiIntroSentence(intro: string | undefined, decisionMakerName?: s
 
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function countOccurrences(value: string, needle: string): number {
+  if (!needle) return 0;
+  return value.split(needle).length - 1;
 }
 
 function leadRepairIssues(lead: LeadRepairQueueLead, duplicateKeys: Set<string>): string[] {

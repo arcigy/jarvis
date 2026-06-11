@@ -65,6 +65,7 @@ import {
   buildLeadCsvMappingPreview,
   parseLeadsCsv,
   previewSmartleadEmailRendering,
+  buildSmartleadSequenceVariableRepairPreview,
   previewLeadEnrichmentBatch,
   buildLeadEnrichmentMergePreview,
   prepareSmartleadLeads,
@@ -1692,6 +1693,19 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         signature: optionalString(payload.signature),
         maxLeads: typeof payload.maxLeads === "number" ? payload.maxLeads : undefined,
         maxRendered: typeof payload.maxRendered === "number" ? payload.maxRendered : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_smartlead_sequence_variable_repair_preview") {
+    writeJson(response, 200, {
+      result: buildSmartleadSequenceVariableRepairPreview({
+        campaignId: typeof payload.campaignId === "string" || typeof payload.campaignId === "number" || payload.campaignId === null ? payload.campaignId : undefined,
+        sequences: (payload.sequences ?? []) as Parameters<typeof buildSmartleadSequenceVariableRepairPreview>[0]["sequences"],
+        targetVariable: optionalString(payload.targetVariable),
+        replacementVariable: optionalString(payload.replacementVariable),
+        includeConfigurePayload: payload.includeConfigurePayload !== false,
+        leads: Array.isArray(payload.leads) ? payload.leads as Parameters<typeof buildSmartleadSequenceVariableRepairPreview>[0]["leads"] : undefined,
       }),
     });
     return;

@@ -77,6 +77,7 @@ export type JarvisMcpToolName =
   | "arcigy.build_region_expansion_queue_preview"
   | "arcigy.draft_smartlead_campaign_sequence"
   | "arcigy.preview_smartlead_email_rendering"
+  | "arcigy.build_smartlead_sequence_variable_repair_preview"
   | "arcigy.preview_manual_review_pickup"
   | "arcigy.build_smartlead_injection_plan"
   | "arcigy.build_smartlead_import_audit_preview"
@@ -521,6 +522,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.preview_smartlead_email_rendering",
       description: "Vyrenderuje Smartlead sekvencie pre konkretne leady a ukaze chybajuce premenne bez odoslania.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_smartlead_sequence_variable_repair_preview",
+      description: "Prepise Smartlead subject premenne z company_name na company_name_short a pripravi schvalovaci configure payload bez zapisu.",
       requiresApproval: false,
     },
     {
