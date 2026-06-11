@@ -337,6 +337,29 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
   if (toolName === "arcigy.get_smartlead_campaign_webhooks") return { campaignId: "123456" };
   if (toolName === "arcigy.upsert_smartlead_campaign_webhook") return { campaignId: "123456", url: "https://jarvis.example/webhook/smartlead-ai-reply", name: "Jarvis AI Reply Webhook", eventTypes: ["EMAIL_REPLY", "LEAD_CATEGORY_UPDATED"], approval: { approved: true } };
   if (toolName === "arcigy.get_smartlead_message_history") return { campaignId: "123456", email: "lead@example.com" };
+  if (toolName === "arcigy.build_smartlead_message_history_audit_preview") {
+    return {
+      campaignId: "123456",
+      campaignName: "Kuchyne SK",
+      leads: [
+        { id: "map-1", email: "lead@example.com", replied: true, categoryName: "Interested" },
+        { id: "map-2", email: "no-history@example.com", replied: false },
+        { email: "missing-map@example.com", replied: true },
+      ],
+      histories: [
+        {
+          email: "lead@example.com",
+          campaignLeadMapId: "map-1",
+          messages: [
+            { type: "EMAIL_SENT", subject: "Otazka", email_body: "Dobry den" },
+            { type: "LEAD_REPLY", subject: "Re: Otazka", email_body: "Dobry den, poslite mi prosim ukazku." },
+          ],
+        },
+      ],
+      maxHistoryFetches: 20,
+      maxNextCalls: 30,
+    };
+  }
   if (toolName === "arcigy.classify_outreach_reply") return { replyBody: "Dobry den, poslite mi prosim ukazku.", useAi: false };
   if (toolName === "arcigy.build_outreach_reply_triage_preview") {
     return {

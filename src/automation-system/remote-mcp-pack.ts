@@ -2353,6 +2353,34 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Audit Smartlead message histories",
+      tool: "arcigy.build_smartlead_message_history_audit_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_smartlead_message_history_audit_preview"),
+      body: {
+        campaignId: "123456",
+        campaignName: "Kuchyne SK",
+        leads: [
+          { id: "map-1", email: "lead@example.com", replied: true, categoryName: "Interested" },
+          { id: "map-2", email: "no-history@example.com", replied: false },
+          { email: "missing-map@example.com", replied: true },
+        ],
+        histories: [
+          {
+            email: "lead@example.com",
+            campaignLeadMapId: "map-1",
+            messages: [
+              { type: "EMAIL_SENT", subject: "Otazka", email_body: "Dobry den" },
+              { type: "LEAD_REPLY", subject: "Re: Otazka", email_body: "Dobry den, poslite mi prosim ukazku." },
+            ],
+          },
+        ],
+        maxHistoryFetches: 20,
+        maxNextCalls: 30,
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Classify outreach reply before any draft",
       tool: "arcigy.classify_outreach_reply",
       method: "POST",

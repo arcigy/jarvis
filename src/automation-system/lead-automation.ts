@@ -565,6 +565,38 @@ export type SmartleadCampaignAuditPreview = {
   warnings: string[];
 };
 
+export type SmartleadMessageHistoryAuditPreview = {
+  mode: "smartlead-message-history-audit-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  operatorBrief: string;
+  campaignId?: string | number;
+  totals: {
+    leads: number;
+    withHistory: number;
+    missingHistory: number;
+    replied: number;
+    positiveSignals: number;
+    needsHistoryFetch: number;
+    missingLeadMapId: number;
+  };
+  leads: Array<{
+    email?: string;
+    leadId?: string | number;
+    campaignLeadMapId?: string | number;
+    historyCount: number;
+    lastMessageType?: string;
+    lastSubject?: string;
+    replied: boolean;
+    positiveSignal: boolean;
+    issues: string[];
+    nextAction: string;
+  }>;
+  historyFetchQueue: Array<{ campaignId?: string | number; email?: string; leadId?: string | number; campaignLeadMapId?: string | number; reason: string }>;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+  warnings: string[];
+};
+
 export type GmailOutreachReadinessPreview = {
   mode: "gmail-outreach-readiness-preview";
   status: "ready" | "attention" | "blocked";
@@ -5901,6 +5933,183 @@ export function buildSmartleadCampaignAuditPreview(input: {
     operatorBrief,
     totals,
     campaigns,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls).slice(0, maxNextCalls),
+    warnings,
+  };
+}
+
+export function buildSmartleadMessageHistoryAuditPreview(input: {
+  campaignId?: string | number;
+  campaignName?: string;
+  leads?: Array<Record<string, unknown> & {
+    id?: string | number;
+    leadId?: string | number;
+    campaignLeadMapId?: string | number;
+    campaign_lead_map_id?: string | number;
+    email?: string;
+    leadEmail?: string;
+    replied?: boolean;
+    replyCount?: number;
+    categoryName?: string;
+    category_name?: string;
+  }>;
+  histories?: Array<{
+    email?: string;
+    leadId?: string | number;
+    campaignLeadMapId?: string | number;
+    messages?: Array<Record<string, unknown> & { type?: string; subject?: string; email_body?: string; body?: string; created_at?: string; send_time?: string }>;
+  }>;
+  maxHistoryFetches?: number;
+  includeReplyTriage?: boolean;
+  includeNonReplyCalls?: boolean;
+  maxNextCalls?: number;
+}): SmartleadMessageHistoryAuditPreview {
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 30), 1), 100);
+  const maxHistoryFetches = Math.min(Math.max(Math.trunc(input.maxHistoryFetches ?? 20), 1), 100);
+  const historyByEmail = new Map((input.histories ?? []).flatMap((history) => {
+    const email = history.email?.trim().toLowerCase();
+    return email ? [[email, history] as const] : [];
+  }));
+  const historyById = new Map((input.histories ?? []).flatMap((history) => {
+    const id = String(history.campaignLeadMapId ?? history.leadId ?? "");
+    return id ? [[id, history] as const] : [];
+  }));
+
+  const leads = (input.leads ?? []).map((lead) => {
+    const email = lead.email ?? lead.leadEmail ?? stringField(lead, "lead_email", "primary_email");
+    const leadId = lead.leadId ?? lead.id ?? stringField(lead, "lead_id");
+    const campaignLeadMapId = lead.campaignLeadMapId ?? lead.campaign_lead_map_id ?? stringField(lead, "campaign_lead_map_id");
+    const history = (email ? historyByEmail.get(email.trim().toLowerCase()) : undefined) ?? historyById.get(String(campaignLeadMapId ?? leadId ?? ""));
+    const messages = history?.messages ?? [];
+    const lastMessage = messages[messages.length - 1];
+    const allHistoryText = messages.map((message) => `${message.type ?? ""} ${message.subject ?? ""} ${message.email_body ?? message.body ?? ""}`).join(" ");
+    const category = String(lead.categoryName ?? lead.category_name ?? stringField(lead, "lead_category", "category") ?? "").toLowerCase();
+    const replied = lead.replied === true || Number(lead.replyCount ?? numberField(lead, "reply_count", "replies") ?? 0) > 0 || /reply|lead_reply|replied/i.test(allHistoryText);
+    const positiveSignal = /positive|interested|meeting|demo|zaujem|poslite|send|call|ukazku/.test(category)
+      || /\b(poslite|send|demo|ukazku|zaujem|termin|meeting|call)\b/i.test(allHistoryText.normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
+    const issues: string[] = [];
+    if (!campaignLeadMapId && !leadId) issues.push("missing_lead_map_id");
+    if (!messages.length) issues.push("missing_history");
+    if (replied && !messages.length) issues.push("reply_without_history");
+    const nextAction = !campaignLeadMapId && !leadId
+      ? "Fetch campaign leads first to recover campaign_lead_map_id."
+      : !messages.length
+        ? "Fetch Smartlead message history for this lead."
+        : positiveSignal
+          ? "Prepare reply/showcase draft preview and wait for approval."
+          : replied
+            ? "Run reply triage before drafting."
+            : "Keep for non-replier follow-up or monitoring.";
+    return {
+      email,
+      leadId,
+      campaignLeadMapId,
+      historyCount: messages.length,
+      lastMessageType: lastMessage?.type ?? stringField(lastMessage ?? {}, "event_type", "message_type"),
+      lastSubject: lastMessage?.subject ?? stringField(lastMessage ?? {}, "email_subject", "subject"),
+      replied,
+      positiveSignal,
+      issues,
+      nextAction,
+    };
+  });
+
+  const historyFetchQueue = leads
+    .filter((lead) => lead.issues.includes("missing_history") && (lead.campaignLeadMapId || lead.leadId || lead.email))
+    .slice(0, maxHistoryFetches)
+    .map((lead) => ({
+      campaignId: input.campaignId,
+      email: lead.email,
+      leadId: lead.leadId,
+      campaignLeadMapId: lead.campaignLeadMapId,
+      reason: lead.issues.includes("reply_without_history") ? "Reply flag exists but no message history was supplied." : "No message history supplied for this lead.",
+    }));
+
+  const nextToolCalls: SmartleadMessageHistoryAuditPreview["nextToolCalls"] = [];
+  if (input.campaignId && leads.some((lead) => lead.issues.includes("missing_lead_map_id"))) {
+    nextToolCalls.push({
+      tool: "arcigy.get_smartlead_campaign_leads",
+      payload: { campaignId: input.campaignId, offset: 0, limit: 100 },
+      reason: "Recover campaign_lead_map_id values before batch message-history fetch.",
+      approvalRequired: false,
+    });
+  }
+  for (const item of historyFetchQueue.slice(0, maxNextCalls)) {
+    nextToolCalls.push({
+      tool: "arcigy.get_smartlead_message_history",
+      payload: { campaignId: input.campaignId, email: item.email, leadId: item.campaignLeadMapId ?? item.leadId },
+      reason: item.reason,
+      approvalRequired: false,
+    });
+  }
+  const repliedLeads = leads.filter((lead) => lead.replied || lead.positiveSignal);
+  if (input.includeReplyTriage !== false && repliedLeads.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_outreach_reply_triage_preview",
+      payload: {
+        replies: repliedLeads.slice(0, maxNextCalls).map((lead) => ({
+          source: "smartlead",
+          email: lead.email,
+          campaignId: input.campaignId,
+          replyBody: lead.positiveSignal ? "Positive signal found in Smartlead history/category." : "Reply signal found in Smartlead history/category.",
+        })),
+        useAiClassification: false,
+      },
+      reason: "Turn replied leads into draft-only reply triage without sending.",
+      approvalRequired: false,
+    });
+  }
+  if (input.includeNonReplyCalls !== false && leads.some((lead) => !lead.replied)) {
+    nextToolCalls.push({
+      tool: "arcigy.build_smartlead_nonreply_call_list_preview",
+      payload: { leads: leads.filter((lead) => !lead.replied).slice(0, maxNextCalls), sourceName: input.campaignName ?? "smartlead-message-history-audit", sourceType: "smartlead" },
+      reason: "Prepare phone/call follow-up list for sent leads without replies.",
+      approvalRequired: false,
+    });
+  }
+  if (input.campaignId) {
+    nextToolCalls.push({
+      tool: "arcigy.build_cold_outreach_monitor_runbook_preview",
+      payload: { windowLabel: input.campaignName ?? "smartlead-message-history-audit", replyEvents: repliedLeads.slice(0, maxNextCalls).map((lead) => ({ source: "smartlead", campaignId: input.campaignId, email: lead.email, category: lead.positiveSignal ? "positive" : "neutral", replyBody: lead.positiveSignal ? "Positive Smartlead history/category signal." : "Smartlead reply signal." })) },
+      reason: "Summarize reply/history findings into Jarvis cold outreach style.",
+      approvalRequired: false,
+    });
+  }
+
+  const totals = {
+    leads: leads.length,
+    withHistory: leads.filter((lead) => lead.historyCount > 0).length,
+    missingHistory: leads.filter((lead) => lead.issues.includes("missing_history")).length,
+    replied: leads.filter((lead) => lead.replied).length,
+    positiveSignals: leads.filter((lead) => lead.positiveSignal).length,
+    needsHistoryFetch: historyFetchQueue.length,
+    missingLeadMapId: leads.filter((lead) => lead.issues.includes("missing_lead_map_id")).length,
+  };
+  const warnings: string[] = [];
+  if (!leads.length) warnings.push("No Smartlead leads supplied; call get_smartlead_campaign_leads first.");
+  if (totals.missingLeadMapId) warnings.push("Some leads are missing campaign_lead_map_id; fetch campaign leads before message-history calls.");
+  if (totals.missingHistory) warnings.push("Some leads need message-history fetch before reply decisions.");
+  const status: SmartleadMessageHistoryAuditPreview["status"] = !leads.length
+    ? "blocked"
+    : totals.positiveSignals || totals.replied || totals.missingHistory || totals.missingLeadMapId
+      ? "attention"
+      : "ready";
+  const operatorBrief = [
+    `Skontroloval som ${totals.leads} leadov v Smartlead kampani${input.campaignId ? ` ${input.campaignId}` : ""}.`,
+    `${totals.withHistory} ma message history, ${totals.needsHistoryFetch} potrebuje history fetch.`,
+    `${totals.replied} ma reply signal, z toho ${totals.positiveSignals} vyzera pozitivne.`,
+    "Ziadny Smartlead update, reply ani upload neprebehol.",
+  ].join(" ");
+
+  return {
+    mode: "smartlead-message-history-audit-preview",
+    status,
+    summary: `Smartlead message history audit ${status}: ${totals.leads} leads, ${totals.withHistory} with history, ${totals.needsHistoryFetch} need history fetch, ${totals.replied} replied, ${totals.positiveSignals} positive. Ziadny Smartlead zapis neprebehol.`,
+    operatorBrief,
+    campaignId: input.campaignId,
+    totals,
+    leads,
+    historyFetchQueue,
     nextToolCalls: dedupeNextToolCalls(nextToolCalls).slice(0, maxNextCalls),
     warnings,
   };

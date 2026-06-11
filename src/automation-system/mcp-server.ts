@@ -93,6 +93,7 @@ import {
   buildSmartleadSenderCapacityPreview,
   buildSmartleadDeliverabilityGuardPreview,
   buildSmartleadCampaignAuditPreview,
+  buildSmartleadMessageHistoryAuditPreview,
   buildColdOutreachCsvImportPreview,
   buildFullLeadgenPipelineRunbookPreview,
   dedupeLeadCandidates,
@@ -1816,6 +1817,40 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(await getSmartleadMessageHistory(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_smartlead_message_history_audit_preview",
+    {
+      title: "Build Smartlead message history audit preview",
+      description: "Build a read-only batch audit for Smartlead campaign leads: who has message history, who needs history fetch, reply/positive signals, non-replier follow-up, and safe next MCP calls without sending or uploading.",
+      inputSchema: {
+        campaignId: z.union([z.string(), z.number()]).optional(),
+        campaignName: z.string().optional(),
+        leads: z.array(z.record(z.string(), z.unknown())).optional(),
+        histories: z.array(z.object({
+          email: z.string().optional(),
+          leadId: z.union([z.string(), z.number()]).optional(),
+          campaignLeadMapId: z.union([z.string(), z.number()]).optional(),
+          messages: z.array(z.record(z.string(), z.unknown())).optional(),
+        })).optional(),
+        maxHistoryFetches: z.number().int().min(1).max(100).default(20),
+        includeReplyTriage: z.boolean().default(true),
+        includeNonReplyCalls: z.boolean().default(true),
+        maxNextCalls: z.number().int().min(1).max(100).default(30),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildSmartleadMessageHistoryAuditPreview({
+      ...input,
+      leads: input.leads as Parameters<typeof buildSmartleadMessageHistoryAuditPreview>[0]["leads"],
+      histories: input.histories as Parameters<typeof buildSmartleadMessageHistoryAuditPreview>[0]["histories"],
+    }))
   );
 
   const replyHistoryItemSchema = z.object({

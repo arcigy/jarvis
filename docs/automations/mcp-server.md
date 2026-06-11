@@ -120,6 +120,7 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.get_smartlead_campaign_webhooks`: read-only Smartlead webhook audit for a campaign before enabling AI replies or launch automation.
 - `arcigy.upsert_smartlead_campaign_webhook`: approval-required Smartlead write that adds or updates campaign webhook events such as `EMAIL_REPLY` and `LEAD_CATEGORY_UPDATED`.
 - `arcigy.get_smartlead_message_history`: read-only fetch of one lead's Smartlead message history plus latest sent-email reply metadata.
+- `arcigy.build_smartlead_message_history_audit_preview`: read-only batch audit for Smartlead lead message histories, reply/positive signals, missing history fetch queue, and safe next MCP calls.
 - `arcigy.classify_outreach_reply`: classifies lead replies as `POSITIVE`, `NEGATIVE`, `ALREADY_SENT`, or `NEUTRAL` before any draft or send action.
 - `arcigy.build_outreach_reply_triage_preview`: read-only batch triage for Smartlead/Gmail replies with safe draft next-step payloads and no sending.
 - `arcigy.build_smartlead_reply_followup_queue_preview`: read-only queue builder from raw Smartlead webhooks or reply exports into message-history fetches, AI reply previews, and draft next steps without sending.

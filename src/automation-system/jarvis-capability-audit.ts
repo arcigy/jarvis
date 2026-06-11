@@ -268,6 +268,7 @@ const capabilityDefinitions: CapabilityDefinition[] = [
       "arcigy.get_smartlead_campaign_webhooks",
       "arcigy.upsert_smartlead_campaign_webhook",
       "arcigy.get_smartlead_message_history",
+      "arcigy.build_smartlead_message_history_audit_preview",
       "arcigy.classify_outreach_reply",
       "arcigy.build_outreach_reply_triage_preview",
       "arcigy.build_smartlead_reply_followup_queue_preview",

@@ -61,6 +61,7 @@ export type JarvisMcpToolName =
   | "arcigy.get_smartlead_campaign_webhooks"
   | "arcigy.upsert_smartlead_campaign_webhook"
   | "arcigy.get_smartlead_message_history"
+  | "arcigy.build_smartlead_message_history_audit_preview"
   | "arcigy.classify_outreach_reply"
   | "arcigy.build_outreach_reply_triage_preview"
   | "arcigy.build_smartlead_reply_followup_queue_preview"
@@ -505,6 +506,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.get_smartlead_message_history",
       description: "Read-only nacita Smartlead message history pre lead email a pripravi metadata posledneho odoslaneho emailu pre reply flow.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_smartlead_message_history_audit_preview",
+      description: "Read-only batch audit Smartlead lead message history: history fetch queue, reply/positive signaly, non-replier follow-up a cold outreach summary bez odoslania alebo uploadu.",
       requiresApproval: false,
     },
     {

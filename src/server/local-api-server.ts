@@ -92,6 +92,7 @@ import {
   buildSmartleadSenderCapacityPreview,
   buildSmartleadDeliverabilityGuardPreview,
   buildSmartleadCampaignAuditPreview,
+  buildSmartleadMessageHistoryAuditPreview,
   buildColdOutreachCsvImportPreview,
   buildFullLeadgenPipelineRunbookPreview,
   dedupeLeadCandidates,
@@ -1545,6 +1546,21 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
       result: await getSmartleadMessageHistory({
         campaignId: (payload.campaignId ?? "") as string | number,
         email: String(payload.email ?? ""),
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_smartlead_message_history_audit_preview") {
+    writeJson(response, 200, {
+      result: buildSmartleadMessageHistoryAuditPreview({
+        campaignId: typeof payload.campaignId === "string" || typeof payload.campaignId === "number" ? payload.campaignId : undefined,
+        campaignName: optionalString(payload.campaignName),
+        leads: Array.isArray(payload.leads) ? payload.leads as Parameters<typeof buildSmartleadMessageHistoryAuditPreview>[0]["leads"] : undefined,
+        histories: Array.isArray(payload.histories) ? payload.histories as Parameters<typeof buildSmartleadMessageHistoryAuditPreview>[0]["histories"] : undefined,
+        maxHistoryFetches: typeof payload.maxHistoryFetches === "number" ? payload.maxHistoryFetches : undefined,
+        includeReplyTriage: payload.includeReplyTriage !== false,
+        includeNonReplyCalls: payload.includeNonReplyCalls !== false,
+        maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
       }),
     });
     return;

@@ -3210,6 +3210,7 @@ function listWebMcpTools() {
     { name: "arcigy.get_smartlead_campaign_webhooks", requiresApproval: false },
     { name: "arcigy.upsert_smartlead_campaign_webhook", requiresApproval: true },
     { name: "arcigy.get_smartlead_message_history", requiresApproval: false },
+    { name: "arcigy.build_smartlead_message_history_audit_preview", requiresApproval: false },
     { name: "arcigy.classify_outreach_reply", requiresApproval: false },
     { name: "arcigy.build_outreach_reply_triage_preview", requiresApproval: false },
     { name: "arcigy.build_smartlead_reply_followup_queue_preview", requiresApproval: false },
