@@ -154,6 +154,7 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.build_batch_niche_discovery_plan`: plans read-only discovery, scraping, AI intros, runbooks, and Smartlead prep across multiple niches/regions without executing.
 - `arcigy.build_lead_discovery_matrix_preview`: builds a keyword-region Google Maps/Serper discovery matrix with blacklist, dedupe context, and next MCP calls before scraping or import.
 - `arcigy.build_maps_city_sweep_preview`: plans a Google Maps city sweep for one niche, including city x keyword batches, import next steps, and optional cold-calling export preview.
+- `arcigy.build_international_market_leadgen_preview`: plans AU/UK/US-style market leadgen with Places/Serper discovery, import, scrape, AI intro work packets, and Smartlead package next steps.
 - `arcigy.build_leadgen_execution_queue_preview`: prioritizes today's leadgen work across niches, regions, quotas, discovery, enrichment, and Smartlead handoff without executing.
 - `arcigy.build_sticky_niche_leadgen_decision_preview`: read-only decides whether to continue the last worked niche/region or move to the next active niche, then prepares runbook and closure next calls.
 - `arcigy.build_daily_leadgen_run_closure_preview`: prepares a daily post-run ledger with discovered/enriched/qualified/sent/failed stats, region advance, exhaustion decision, and `record_local_niche_run` approval payload without writing.

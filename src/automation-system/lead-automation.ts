@@ -2088,6 +2088,42 @@ export type MapsCitySweepPreview = {
   warnings: string[];
 };
 
+export type InternationalMarketLeadgenPreview = {
+  mode: "international-market-leadgen-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  market: {
+    name: string;
+    country: string;
+    regionCode: string;
+    languageCode: string;
+    sourceName: string;
+  };
+  niche: { id?: string; slug: string; name: string; campaignId?: string | number | null };
+  target: { targetCount: number; resultsPerSearch: number; maxSearchCalls: number; maxRegions: number; maxKeywordsPerRegion: number };
+  totals: {
+    regions: number;
+    keywords: number;
+    placesSearchCalls: number;
+    serperSearchCalls: number;
+    estimatedResultSlots: number;
+    nextCalls: number;
+  };
+  regions: string[];
+  keywords: string[];
+  placesQueries: Array<{ order: number; region: string; keyword: string; query: string; maxResults: number; priority: number }>;
+  serperQueries: Array<{ order: number; region: string; keyword: string; query: string; priority: number }>;
+  smartleadCampaign?: {
+    name: string;
+    offer: string;
+    painPoint: string;
+    emailAccountIds?: Array<string | number>;
+  };
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+  safetyGates: string[];
+  warnings: string[];
+};
+
 export type LeadgenExecutionQueuePreview = {
   mode: "leadgen-execution-queue-preview";
   summary: string;
@@ -10656,6 +10692,204 @@ export function buildMapsCitySweepPreview(input: {
       "Po kazdom batchi deduplikuj placeId, telefon a domenu pred dalsim exportom.",
       "Cold-calling CSV aj Smartlead upload ostavaju approval-gated.",
       "Ak quota alebo provider zlyha, uloz ciastocne vysledky a pokracuj dalsim mestom.",
+    ],
+    warnings,
+  };
+}
+
+export function buildInternationalMarketLeadgenPreview(input: {
+  marketName?: string;
+  country?: string;
+  regionCode?: string;
+  languageCode?: string;
+  niche: { id?: string; slug?: string; name: string; campaignId?: string | number | null; smartleadCampaignId?: string | number | null };
+  keywords?: string[];
+  regions?: string[];
+  excludeKeywords?: string[];
+  sourceName?: string;
+  targetCount?: number;
+  resultsPerSearch?: number;
+  maxRegions?: number;
+  maxKeywordsPerRegion?: number;
+  maxSearchCalls?: number;
+  maxNextCalls?: number;
+  includeSerper?: boolean;
+  includeSmartleadPackage?: boolean;
+  campaignName?: string;
+  emailAccountIds?: Array<string | number>;
+  offer?: string;
+  painPoint?: string;
+}): InternationalMarketLeadgenPreview {
+  const country = (input.country ?? input.regionCode ?? "AU").toUpperCase();
+  const regionCode = (input.regionCode ?? country).toUpperCase();
+  const languageCode = (input.languageCode ?? (country === "SK" ? "sk" : "en")).toLowerCase();
+  const marketName = input.marketName?.trim() || `${country} market`;
+  const niche = {
+    id: input.niche.id,
+    slug: input.niche.slug?.trim() || slugify(input.niche.name),
+    name: input.niche.name,
+    campaignId: input.niche.campaignId ?? input.niche.smartleadCampaignId ?? null,
+  };
+  const sourceName = input.sourceName?.trim() || `${niche.slug}-${country.toLowerCase()}-market-leadgen`;
+  const targetCount = Math.min(Math.max(Math.trunc(input.targetCount ?? 300), 1), 10_000);
+  const resultsPerSearch = Math.min(Math.max(Math.trunc(input.resultsPerSearch ?? 20), 1), 50);
+  const maxRegions = Math.min(Math.max(Math.trunc(input.maxRegions ?? 50), 1), 200);
+  const maxKeywordsPerRegion = Math.min(Math.max(Math.trunc(input.maxKeywordsPerRegion ?? 10), 1), 50);
+  const maxSearchCalls = Math.min(Math.max(Math.trunc(input.maxSearchCalls ?? 250), 1), 1000);
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 40), 1), 200);
+  const plan = buildNicheLeadgenPlan({ niche: niche.name, customKeywords: input.keywords });
+  const defaultRegions = country === "AU"
+    ? ["Sydney NSW Australia", "Melbourne VIC Australia", "Brisbane QLD Australia", "Perth WA Australia", "Adelaide SA Australia", "Gold Coast QLD Australia", "Canberra ACT Australia", "Newcastle NSW Australia"]
+    : country === "US"
+      ? ["New York NY USA", "Los Angeles CA USA", "Chicago IL USA", "Houston TX USA", "Phoenix AZ USA", "Dallas TX USA", "Miami FL USA", "Seattle WA USA"]
+      : country === "UK"
+        ? ["London UK", "Manchester UK", "Birmingham UK", "Leeds UK", "Glasgow UK", "Liverpool UK", "Bristol UK", "Sheffield UK"]
+        : [`${country}`];
+  const regions = unique((input.regions?.length ? input.regions : defaultRegions).map((region) => region.trim()).filter(Boolean)).slice(0, maxRegions);
+  const keywords = unique([...(input.keywords ?? []), ...plan.mapsQueries].map((keyword) => keyword.trim()).filter(Boolean)).slice(0, maxKeywordsPerRegion);
+  const allPlacesQueries = regions.flatMap((region, regionIndex) =>
+    keywords.map((keyword, keywordIndex) => ({
+      order: regionIndex * keywords.length + keywordIndex + 1,
+      region,
+      keyword,
+      query: `${keyword} ${region}`.trim(),
+      maxResults: resultsPerSearch,
+      priority: regionIndex * 100 + keywordIndex,
+    }))
+  );
+  const placesQueries = allPlacesQueries.slice(0, maxSearchCalls);
+  const includeSerper = input.includeSerper !== false;
+  const serperQueries = includeSerper
+    ? placesQueries.slice(0, Math.min(placesQueries.length, Math.ceil(maxSearchCalls / 3))).map((item) => ({
+        order: item.order,
+        region: item.region,
+        keyword: item.keyword,
+        query: `${item.keyword} ${item.region} contact email`.trim(),
+        priority: item.priority,
+      }))
+    : [];
+  const offer = input.offer?.trim() || (country === "AU" ? "quote automation for custom joinery and cabinetry" : "AI automation and quote follow-up system");
+  const painPoint = input.painPoint?.trim() || (country === "AU" ? "slow custom quote preparation and manual follow-up" : "manual lead qualification and follow-up");
+  const campaignName = input.campaignName?.trim() || `${country} ${niche.name} - Outreach`;
+  const blacklistKeywords = unique([...plan.blacklistKeywords, ...(input.excludeKeywords ?? [])]);
+  const warnings: string[] = [];
+  if (!regions.length) warnings.push("No market regions were provided.");
+  if (!keywords.length) warnings.push("No discovery keywords were provided.");
+  if (allPlacesQueries.length > maxSearchCalls) warnings.push(`Places search plan capped from ${allPlacesQueries.length} to ${maxSearchCalls} calls.`);
+  if (placesQueries.length * resultsPerSearch < targetCount) warnings.push("Estimated result slots are below targetCount; increase maxSearchCalls, regions, or resultsPerSearch.");
+  if (languageCode !== "en" && country !== "SK") warnings.push("Non-English international campaign selected; review sequence copy before Smartlead setup.");
+  const nextToolCalls: InternationalMarketLeadgenPreview["nextToolCalls"] = [
+    ...placesQueries.slice(0, maxNextCalls).map((item) => ({
+      tool: "arcigy.search_google_places",
+      payload: { query: item.query, maxResults: item.maxResults, languageCode, regionCode },
+      reason: `International Places search ${item.order}: ${item.keyword} / ${item.region}.`,
+      approvalRequired: false,
+    })),
+  ];
+  for (const item of serperQueries.slice(0, Math.max(0, maxNextCalls - nextToolCalls.length))) {
+    nextToolCalls.push({
+      tool: "arcigy.search_serper",
+      payload: { query: item.query, num: 10, gl: country.toLowerCase(), hl: languageCode },
+      reason: `Fallback web search for contact pages: ${item.keyword} / ${item.region}.`,
+      approvalRequired: false,
+    });
+  }
+  nextToolCalls.push(
+    {
+      tool: "arcigy.build_research_results_import_preview",
+      payload: {
+        sourceName,
+        sourceType: "mixed",
+        placesResults: [],
+        serperResults: [],
+        niche,
+        country,
+        defaultRegion: regions[0],
+        blacklistKeywords,
+        offer,
+        language: languageCode === "sk" ? "sk" : "en",
+        maxResults: targetCount,
+      },
+      reason: "Po Places/Serper vysledkoch normalizuj leady, deduplikuj domeny a priprav scrape, AI intro a Smartlead queue.",
+      approvalRequired: false,
+    },
+    {
+      tool: "arcigy.build_company_research_queue_preview",
+      payload: {
+        sourceName,
+        leads: [],
+        niche,
+        defaultRegion: regions[0],
+        country,
+        offer,
+        language: languageCode === "sk" ? "sk" : "en",
+        includeGooglePlaces: false,
+        includeSerper: false,
+        includeDispatch: true,
+      },
+      reason: "Po importe partial leadov priprav website scrape, AI intro a Smartlead dispatch plan.",
+      approvalRequired: false,
+    },
+    {
+      tool: "arcigy.build_bulk_ai_intro_work_queue_preview",
+      payload: {
+        groups: [{ sourceName, niche: niche.name, leads: [] }],
+        offer,
+        language: languageCode === "sk" ? "sk" : "en",
+        maxLeadsPerPacket: 50,
+      },
+      reason: "Rozdel obohatene leady do AI intro work packetov pre ChatGPT/Claude.",
+      approvalRequired: false,
+    }
+  );
+  if (input.includeSmartleadPackage !== false) {
+    nextToolCalls.push({
+      tool: "arcigy.build_smartlead_fixed_campaign_package_preview",
+      payload: {
+        niche,
+        campaignName,
+        offer,
+        painPoint,
+        language: languageCode === "sk" ? "sk" : "en",
+        emailAccountIds: input.emailAccountIds,
+        leads: [],
+      },
+      reason: "Priprav international Smartlead campaign package a approval payloady az po doplneni obohatenych leadov.",
+      approvalRequired: false,
+    });
+  }
+  const status: InternationalMarketLeadgenPreview["status"] = !regions.length || !keywords.length
+    ? "blocked"
+    : warnings.length
+      ? "attention"
+      : "ready";
+  return {
+    mode: "international-market-leadgen-preview",
+    status,
+    summary: `International market leadgen ${status}: ${marketName}, ${placesQueries.length} Places calls, ${serperQueries.length} Serper calls, target ${targetCount}, Smartlead ${input.includeSmartleadPackage === false ? "skipped" : "planned"}. Ziadny fetch, AI call, zapis ani upload neprebehol.`,
+    market: { name: marketName, country, regionCode, languageCode, sourceName },
+    niche,
+    target: { targetCount, resultsPerSearch, maxSearchCalls, maxRegions, maxKeywordsPerRegion },
+    totals: {
+      regions: regions.length,
+      keywords: keywords.length,
+      placesSearchCalls: placesQueries.length,
+      serperSearchCalls: serperQueries.length,
+      estimatedResultSlots: placesQueries.length * resultsPerSearch,
+      nextCalls: nextToolCalls.length,
+    },
+    regions,
+    keywords,
+    placesQueries,
+    serperQueries,
+    smartleadCampaign: input.includeSmartleadPackage === false ? undefined : { name: campaignName, offer, painPoint, emailAccountIds: input.emailAccountIds },
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls),
+    safetyGates: [
+      "Spustaj international Places search po batchoch a sleduj API quota.",
+      "Pred scrape/importom deduplikuj podla place_id, domeny, telefonu a emailu.",
+      "Pre non-local trhy skontroluj jazyk, offer, pravne formulacie a unsubscribe pravidla pred Smartleadom.",
+      "Smartlead upload, CSV export a realne odoslanie ostavaju approval-gated.",
+      "Ak provider vrati irelevantne katalogy alebo skoly, pridaj ich do excludeKeywords/blacklistKeywords a rerun preview.",
     ],
     warnings,
   };

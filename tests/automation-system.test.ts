@@ -21,6 +21,7 @@ import {
   buildStickyNicheLeadgenDecisionPreview,
   buildLeadDiscoveryMatrixPreview,
   buildMapsCitySweepPreview,
+  buildInternationalMarketLeadgenPreview,
   buildNicheLeadgenPlan,
   buildDailyLeadgenRunClosurePreview,
   buildAiIntroQualityAuditPreview,
@@ -252,6 +253,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.build_batch_niche_discovery_plan",
     "arcigy.build_lead_discovery_matrix_preview",
     "arcigy.build_maps_city_sweep_preview",
+    "arcigy.build_international_market_leadgen_preview",
     "arcigy.build_leadgen_execution_queue_preview",
     "arcigy.build_sticky_niche_leadgen_decision_preview",
     "arcigy.build_daily_leadgen_run_closure_preview",
@@ -536,8 +538,9 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.ok(paths.includes("/api/mcp/arcigy.build_lead_identity_repair_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_lead_validation_scorecard_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_company_short_name_preview"));
-  assert.ok(paths.includes("/api/mcp/arcigy.build_leadgen_to_smartlead_dispatch_preview"));
-  assert.ok(paths.includes("/api/mcp/arcigy.build_company_research_queue_preview"));
+    assert.ok(paths.includes("/api/mcp/arcigy.build_leadgen_to_smartlead_dispatch_preview"));
+    assert.ok(paths.includes("/api/mcp/arcigy.build_international_market_leadgen_preview"));
+    assert.ok(paths.includes("/api/mcp/arcigy.build_company_research_queue_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_research_results_import_preview"));
     assert.ok(paths.includes("/api/mcp/arcigy.build_bulk_smartlead_upload_queue_preview"));
     assert.ok(paths.includes("/api/mcp/arcigy.build_smartlead_send_readiness_queue_preview"));
@@ -1962,6 +1965,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_lead_validation_scorecard_preview" && call.approvalRequired === false && call.body.minScore === 70));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_company_short_name_preview" && call.approvalRequired === false && Array.isArray(call.body.leads)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_maps_city_sweep_preview" && call.approvalRequired === false && call.body.niche === "fotovoltaika"));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_international_market_leadgen_preview" && call.approvalRequired === false && call.body.country === "AU"));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_leadgen_to_smartlead_dispatch_preview" && call.approvalRequired === false && Array.isArray(call.body.groups)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_company_research_queue_preview" && call.approvalRequired === false && Array.isArray(call.body.leads)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_research_results_import_preview" && call.approvalRequired === false && Array.isArray(call.body.placesResults)));
@@ -3680,6 +3684,31 @@ test("Maps city sweep preview plans old photovoltaic city search workflow withou
   assert.ok(sweep.nextToolCalls.some((call) => call.tool === "arcigy.build_research_results_import_preview" && !call.approvalRequired));
   assert.ok(sweep.nextToolCalls.some((call) => call.tool === "arcigy.build_maps_cold_calling_export_preview" && !call.approvalRequired));
   assert.match(sweep.summary, /Ziadne Google Maps API volanie ani export/);
+});
+
+test("international market leadgen preview plans AU discovery enrichment and Smartlead", () => {
+  const preview = buildInternationalMarketLeadgenPreview({
+    marketName: "Australia carpenters",
+    country: "AU",
+    regionCode: "AU",
+    languageCode: "en",
+    niche: { slug: "au-carpenters", name: "Carpenters and joinery", campaignId: "123456" },
+    keywords: ["carpentry services", "cabinet maker"],
+    regions: ["Sydney NSW Australia", "Melbourne VIC Australia"],
+    campaignName: "AU Carpenters Joinery - Quote Automation",
+    emailAccountIds: [14382544, 14382530],
+    targetCount: 100,
+    maxSearchCalls: 10,
+  });
+
+  assert.equal(preview.mode, "international-market-leadgen-preview");
+  assert.equal(preview.market.regionCode, "AU");
+  assert.equal(preview.totals.placesSearchCalls, 6);
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.search_google_places" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_research_results_import_preview" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_bulk_ai_intro_work_queue_preview" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_smartlead_fixed_campaign_package_preview" && !call.approvalRequired));
+  assert.match(preview.summary, /Ziadny fetch, AI call, zapis ani upload/);
 });
 
 test("leadgen execution queue preview prioritizes daily niche work without writes", () => {

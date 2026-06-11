@@ -25,6 +25,7 @@ import {
   buildStickyNicheLeadgenDecisionPreview,
   buildLeadDiscoveryMatrixPreview,
   buildMapsCitySweepPreview,
+  buildInternationalMarketLeadgenPreview,
   buildNicheLeadgenPlan,
   buildLeadgenGapReport,
   buildLeadgenStatusBoardPreview,
@@ -2900,6 +2901,50 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildMapsCitySweepPreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_international_market_leadgen_preview",
+    {
+      title: "Build international market leadgen preview",
+      description: "Plan read-only international leadgen for AU/UK/US-style markets: Places/Serper discovery, import, scrape, AI intro work packets, and Smartlead campaign package.",
+      inputSchema: {
+        marketName: z.string().optional(),
+        country: z.string().default("AU"),
+        regionCode: z.string().optional(),
+        languageCode: z.string().default("en"),
+        niche: z.object({
+          id: z.string().optional(),
+          slug: z.string().optional(),
+          name: z.string().min(1),
+          campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+          smartleadCampaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+        }),
+        keywords: z.array(z.string()).optional(),
+        regions: z.array(z.string()).optional(),
+        excludeKeywords: z.array(z.string()).optional(),
+        sourceName: z.string().optional(),
+        targetCount: z.number().int().min(1).max(10000).default(300),
+        resultsPerSearch: z.number().int().min(1).max(50).default(20),
+        maxRegions: z.number().int().min(1).max(200).default(50),
+        maxKeywordsPerRegion: z.number().int().min(1).max(50).default(10),
+        maxSearchCalls: z.number().int().min(1).max(1000).default(250),
+        maxNextCalls: z.number().int().min(1).max(200).default(40),
+        includeSerper: z.boolean().default(true),
+        includeSmartleadPackage: z.boolean().default(true),
+        campaignName: z.string().optional(),
+        emailAccountIds: z.array(z.union([z.string(), z.number()])).optional(),
+        offer: z.string().optional(),
+        painPoint: z.string().optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildInternationalMarketLeadgenPreview(input))
   );
 
   server.registerTool(

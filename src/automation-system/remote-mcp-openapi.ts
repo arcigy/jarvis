@@ -646,6 +646,20 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       includeColdCallingExport: true,
     };
   }
+  if (toolName === "arcigy.build_international_market_leadgen_preview") {
+    return {
+      marketName: "Australia carpenters and joinery",
+      country: "AU",
+      regionCode: "AU",
+      languageCode: "en",
+      niche: { slug: "au-carpenters", name: "Carpenters and joinery", campaignId: "123456" },
+      keywords: ["carpentry services", "cabinet maker", "custom cabinets", "joinery services", "kitchen cabinets"],
+      regions: ["Sydney NSW Australia", "Melbourne VIC Australia", "Brisbane QLD Australia"],
+      campaignName: "AU Carpenters Joinery - Quote Automation",
+      emailAccountIds: [14382544, 14382530, 14382508, 14382300],
+      targetCount: 300,
+    };
+  }
   if (toolName === "arcigy.build_leadgen_execution_queue_preview") {
     return {
       date: "2026-06-10",

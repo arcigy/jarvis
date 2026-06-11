@@ -655,6 +655,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(openApiBody.paths["/api/mcp/arcigy.build_gmail_name_enrichment_queue_preview"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.build_lead_identity_repair_preview"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.build_leadgen_to_smartlead_dispatch_preview"]);
+    assert.ok(openApiBody.paths["/api/mcp/arcigy.build_international_market_leadgen_preview"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.build_company_research_queue_preview"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.build_research_results_import_preview"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.build_bulk_smartlead_upload_queue_preview"]);
@@ -913,6 +914,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_smartlead_local_reconciliation_preview" && call.approvalRequired === false && Array.isArray(call.body.localLeads)));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_leadgen_to_smartlead_dispatch_preview" && call.approvalRequired === false && Array.isArray(call.body.groups)));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_maps_city_sweep_preview" && call.approvalRequired === false && call.body.niche === "fotovoltaika"));
+    assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_international_market_leadgen_preview" && call.approvalRequired === false && call.body.country === "AU"));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_company_research_queue_preview" && call.approvalRequired === false && Array.isArray(call.body.leads)));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_research_results_import_preview" && call.approvalRequired === false && Array.isArray(call.body.placesResults)));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_maps_cold_calling_export_preview" && call.approvalRequired === false && Array.isArray(call.body.placesResults)));

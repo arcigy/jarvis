@@ -24,6 +24,7 @@ import {
   buildStickyNicheLeadgenDecisionPreview,
   buildLeadDiscoveryMatrixPreview,
   buildMapsCitySweepPreview,
+  buildInternationalMarketLeadgenPreview,
   buildNicheLeadgenPlan,
   buildLeadgenGapReport,
   buildLeadgenStatusBoardPreview,
@@ -2014,6 +2015,34 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         maxSearchCalls: typeof payload.maxSearchCalls === "number" ? payload.maxSearchCalls : undefined,
         maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
         includeColdCallingExport: payload.includeColdCallingExport !== false,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_international_market_leadgen_preview") {
+    writeJson(response, 200, {
+      result: buildInternationalMarketLeadgenPreview({
+        marketName: optionalString(payload.marketName),
+        country: optionalString(payload.country),
+        regionCode: optionalString(payload.regionCode),
+        languageCode: optionalString(payload.languageCode),
+        niche: (payload.niche ?? {}) as Parameters<typeof buildInternationalMarketLeadgenPreview>[0]["niche"],
+        keywords: Array.isArray(payload.keywords) ? payload.keywords.map(String) : undefined,
+        regions: Array.isArray(payload.regions) ? payload.regions.map(String) : undefined,
+        excludeKeywords: Array.isArray(payload.excludeKeywords) ? payload.excludeKeywords.map(String) : undefined,
+        sourceName: optionalString(payload.sourceName),
+        targetCount: typeof payload.targetCount === "number" ? payload.targetCount : undefined,
+        resultsPerSearch: typeof payload.resultsPerSearch === "number" ? payload.resultsPerSearch : undefined,
+        maxRegions: typeof payload.maxRegions === "number" ? payload.maxRegions : undefined,
+        maxKeywordsPerRegion: typeof payload.maxKeywordsPerRegion === "number" ? payload.maxKeywordsPerRegion : undefined,
+        maxSearchCalls: typeof payload.maxSearchCalls === "number" ? payload.maxSearchCalls : undefined,
+        maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
+        includeSerper: payload.includeSerper !== false,
+        includeSmartleadPackage: payload.includeSmartleadPackage !== false,
+        campaignName: optionalString(payload.campaignName),
+        emailAccountIds: Array.isArray(payload.emailAccountIds) ? (payload.emailAccountIds as Array<string | number>) : undefined,
+        offer: optionalString(payload.offer),
+        painPoint: optionalString(payload.painPoint),
       }),
     });
     return;
