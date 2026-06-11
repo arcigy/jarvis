@@ -677,6 +677,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(openApiBody.paths["/api/mcp/arcigy.build_pricing_proposal_preview"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.build_service_capacity_preview"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.build_showcase_reply_preview"]);
+    assert.ok(openApiBody.paths["/api/mcp/arcigy.build_gmail_ai_reply_safety_runbook_preview"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.build_smartlead_fixed_campaign_package_preview"]);
     const openApiOperator = openApiBody.paths["/api/mcp/arcigy.get_operator_briefing"] as OpenApiPathFixture;
     const openApiAttentionDigest = openApiBody.paths["/api/mcp/arcigy.get_proactive_attention_digest"] as OpenApiPathFixture;
@@ -700,6 +701,7 @@ test("local web bridge serves UI and API health", async () => {
     const openApiPricingProposalPreview = openApiBody.paths["/api/mcp/arcigy.build_pricing_proposal_preview"] as OpenApiPathFixture;
     const openApiServiceCapacityPreview = openApiBody.paths["/api/mcp/arcigy.build_service_capacity_preview"] as OpenApiPathFixture;
     const openApiShowcaseReplyPreview = openApiBody.paths["/api/mcp/arcigy.build_showcase_reply_preview"] as OpenApiPathFixture;
+    const openApiGmailAiReplySafetyRunbook = openApiBody.paths["/api/mcp/arcigy.build_gmail_ai_reply_safety_runbook_preview"] as OpenApiPathFixture;
     const openApiContract = openApiBody.paths["/api/mcp/arcigy.generate_contract_documents"] as OpenApiPathFixture;
     assert.equal(openApiCompletionScore.post.requestBody.content["application/json"].examples.quickStart.value.live, false);
     assert.equal(openApiSlackSend.post["x-arcigy-requiresApproval"], true);
@@ -729,6 +731,8 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(openApiPricingProposalPreview.post.requestBody.content["application/json"].examples.quickStart.value.items.length, 2);
     assert.equal(openApiServiceCapacityPreview.post.requestBody.content["application/json"].examples.quickStart.value.services.length, 3);
     assert.equal(openApiShowcaseReplyPreview.post.requestBody.content["application/json"].examples.quickStart.value.leadEmail, "lead@example.com");
+    assert.equal(openApiGmailAiReplySafetyRunbook.post.requestBody.content["application/json"].examples.quickStart.value.targetLabel, "COLD-OUTREACH");
+    assert.ok(Array.isArray(openApiGmailAiReplySafetyRunbook.post.requestBody.content["application/json"].examples.quickStart.value.messages));
     assert.equal(openApiSmartleadWebhookUpsert.post["x-arcigy-requiresApproval"], true);
     assert.equal(openApiSmartleadWebhookUpsert.post.requestBody.content["application/json"].examples.quickStart.value.approval.approved, true);
     assert.equal(openApiContract.post["x-arcigy-requiresApproval"], true);
@@ -969,6 +973,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_ai_icebreaker_writeback_preview" && call.approvalRequired === false && typeof call.body.resultJsonText === "string"));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_flagged_lead_review_preview" && call.approvalRequired === false && typeof call.body.csvText === "string"));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_showcase_reply_preview" && call.approvalRequired === false && call.body.leadEmail === "lead@example.com"));
+    assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_gmail_ai_reply_safety_runbook_preview" && call.approvalRequired === false && Array.isArray(call.body.messages)));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_company_short_name_preview" && call.approvalRequired === false && Array.isArray(call.body.leads)));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_leadgen_db_status_preview" && call.approvalRequired === false && Array.isArray(call.body.resumeStates)));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_leadgen_maintenance_runbook_preview" && call.approvalRequired === false && Array.isArray(call.body.gmailAccounts)));

@@ -68,6 +68,7 @@ export type JarvisMcpToolName =
   | "arcigy.build_showcase_reply_preview"
   | "arcigy.preview_smartlead_ai_reply"
   | "arcigy.preview_gmail_ai_reply"
+  | "arcigy.build_gmail_ai_reply_safety_runbook_preview"
   | "arcigy.draft_smartlead_thread_reply"
   | "arcigy.send_smartlead_thread_reply"
   | "arcigy.create_smartlead_campaign"
@@ -543,6 +544,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.preview_gmail_ai_reply",
       description: "Preview Gmail AI reply workflowu: overi znameho leada, thread, human-in-loop a pozitivny signal bez odoslania.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_gmail_ai_reply_safety_runbook_preview",
+      description: "Read-only Gmail AI reply safety runbook: paused/processed/known lead/thread/human-in-loop/positive guards a draft/label next steps bez odoslania.",
       requiresApproval: false,
     },
     {

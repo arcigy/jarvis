@@ -277,6 +277,7 @@ const capabilityDefinitions: CapabilityDefinition[] = [
       "arcigy.build_showcase_reply_preview",
       "arcigy.preview_smartlead_ai_reply",
       "arcigy.preview_gmail_ai_reply",
+      "arcigy.build_gmail_ai_reply_safety_runbook_preview",
       "arcigy.get_gmail_lead_context",
       "arcigy.lookup_public_email_profile",
       "arcigy.get_gmail_unread_triage",

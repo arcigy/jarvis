@@ -88,6 +88,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(names.includes("arcigy.build_showcase_reply_preview"));
   assert.ok(names.includes("arcigy.preview_smartlead_ai_reply"));
   assert.ok(names.includes("arcigy.preview_gmail_ai_reply"));
+  assert.ok(names.includes("arcigy.build_gmail_ai_reply_safety_runbook_preview"));
   assert.ok(names.includes("arcigy.draft_smartlead_thread_reply"));
   assert.ok(names.includes("arcigy.send_smartlead_thread_reply"));
   assert.ok(names.includes("arcigy.create_smartlead_campaign"));
@@ -504,6 +505,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.lookup_public_email_profile" && call.approvalRequired === false && call.body.email === "jan.novak@example.com"));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_gmail_unread_triage" && call.approvalRequired === false && call.body.query === "is:unread category:primary"));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_gmail_outreach_readiness_preview" && call.approvalRequired === false && Array.isArray(call.body.accounts)));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_gmail_ai_reply_safety_runbook_preview" && call.approvalRequired === false && Array.isArray(call.body.messages)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_leadgen_progress_watchdog_preview" && call.approvalRequired === false && call.body.targetReadyLeads === 50));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_leadgen_target_backfill_preview" && call.approvalRequired === false && call.body.minReadyLeads === 50));
   assert.ok(

@@ -133,7 +133,7 @@ import { buildProductionCompletionScore, summarizeProductionCompletionScoreForVo
 import { buildProductionReadinessReport } from "./production-readiness.ts";
 import { getProductionVerificationEvidence } from "./production-verification-evidence.ts";
 import { lookupPublicEmailProfile } from "./public-profile.ts";
-import { buildOutreachReplyTriagePreview, buildShowcaseReplyPreview, buildSmartleadReplyFollowupQueuePreview, classifyOutreachReply, previewGmailAiReply, previewSmartleadAiReply } from "./reply-decision.ts";
+import { buildGmailAiReplySafetyRunbookPreview, buildOutreachReplyTriagePreview, buildShowcaseReplyPreview, buildSmartleadReplyFollowupQueuePreview, classifyOutreachReply, previewGmailAiReply, previewSmartleadAiReply } from "./reply-decision.ts";
 import { buildRemoteMcpConnectionPack } from "./remote-mcp-pack.ts";
 import { runRemoteMcpSmoke } from "./remote-mcp-smoke.ts";
 import {
@@ -2071,6 +2071,46 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(await previewGmailAiReply(input))
+  );
+
+  const gmailAiReplySafetyMessageSchema = z.object({
+    senderEmail: z.string().email(),
+    fromEmail: z.string().email().optional(),
+    fromHeader: z.string().optional(),
+    subject: z.string().optional(),
+    body: z.string().optional(),
+    threadId: z.string().optional(),
+    messageId: z.string().optional(),
+    leadName: z.string().optional(),
+    companyName: z.string().optional(),
+    history: z.array(replyHistoryItemSchema).optional(),
+    leadKnown: z.boolean().optional(),
+    threadStartedByUs: z.boolean().optional(),
+    aiRepliesActive: z.boolean().optional(),
+    alreadyProcessed: z.boolean().optional(),
+    alreadySent: z.boolean().optional(),
+    labelReady: z.boolean().optional(),
+  });
+
+  server.registerTool(
+    "arcigy.build_gmail_ai_reply_safety_runbook_preview",
+    {
+      title: "Build Gmail AI reply safety runbook preview",
+      description: "Read-only Gmail AI reply safety runbook from the old gmail-ai-reply flow: paused, processed, known lead, thread origin, duplicate, human-in-loop, positive classification, draft preview and approval-gated label next steps without sending.",
+      inputSchema: {
+        messages: z.array(gmailAiReplySafetyMessageSchema).max(100).default([]),
+        aiRepliesActive: z.boolean().default(true),
+        targetLabel: z.string().default("COLD-OUTREACH"),
+        maxMessages: z.number().int().min(1).max(100).default(50),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (input) => jsonResult(buildGmailAiReplySafetyRunbookPreview(input))
   );
 
   server.registerTool(

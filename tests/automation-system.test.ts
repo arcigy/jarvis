@@ -153,7 +153,7 @@ import { buildLeadgenDailyReport, buildLeadgenEveningSummary, buildLeadgenOpsDig
 import { sendSlackMessage } from "../src/automation-system/slack.ts";
 import { buildPricingProposalPreview, buildServiceCapacityPreview, draftPriceOfferIntake } from "../src/automation-system/price-offer.ts";
 import { buildProactiveAttentionDigest } from "../src/automation-system/proactive-attention-digest.ts";
-import { buildOutreachReplyTriagePreview, buildShowcaseReplyPreview, buildSmartleadReplyFollowupQueuePreview, classifyOutreachReply, previewGmailAiReply, previewSmartleadAiReply } from "../src/automation-system/reply-decision.ts";
+import { buildGmailAiReplySafetyRunbookPreview, buildOutreachReplyTriagePreview, buildShowcaseReplyPreview, buildSmartleadReplyFollowupQueuePreview, classifyOutreachReply, previewGmailAiReply, previewSmartleadAiReply } from "../src/automation-system/reply-decision.ts";
 import { buildJarvisCapabilityAudit } from "../src/automation-system/jarvis-capability-audit.ts";
 import { buildProductionCompletionScore, summarizeProductionCompletionScoreForVoice } from "../src/automation-system/production-completion-score.ts";
 import { jarvisAutomations } from "../src/automation-system/jarvis-automations.ts";
@@ -231,6 +231,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.build_showcase_reply_preview",
     "arcigy.preview_smartlead_ai_reply",
     "arcigy.preview_gmail_ai_reply",
+    "arcigy.build_gmail_ai_reply_safety_runbook_preview",
     "arcigy.draft_smartlead_thread_reply",
     "arcigy.send_smartlead_thread_reply",
     "arcigy.create_smartlead_campaign",
@@ -578,6 +579,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
     assert.ok(paths.includes("/api/mcp/arcigy.build_service_capacity_preview"));
     assert.ok(paths.includes("/api/mcp/arcigy.build_smartlead_reply_followup_queue_preview"));
     assert.ok(paths.includes("/api/mcp/arcigy.build_showcase_reply_preview"));
+    assert.ok(paths.includes("/api/mcp/arcigy.build_gmail_ai_reply_safety_runbook_preview"));
     assert.ok(paths.includes("/api/mcp/arcigy.build_smartlead_fixed_campaign_package_preview"));
   const operatorBriefing = document.paths["/api/mcp/arcigy.get_operator_briefing"] as OpenApiPathFixture;
   const attentionDigest = document.paths["/api/mcp/arcigy.get_proactive_attention_digest"] as OpenApiPathFixture;
@@ -605,6 +607,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   const serviceCapacityPreview = document.paths["/api/mcp/arcigy.build_service_capacity_preview"] as OpenApiPathFixture;
   const smartleadReplyFollowupQueue = document.paths["/api/mcp/arcigy.build_smartlead_reply_followup_queue_preview"] as OpenApiPathFixture;
   const showcaseReplyPreview = document.paths["/api/mcp/arcigy.build_showcase_reply_preview"] as OpenApiPathFixture;
+  const gmailAiReplySafetyRunbook = document.paths["/api/mcp/arcigy.build_gmail_ai_reply_safety_runbook_preview"] as OpenApiPathFixture;
   const contractGenerate = document.paths["/api/mcp/arcigy.generate_contract_documents"] as OpenApiPathFixture;
   assert.equal(operatorBriefing.post.requestBody.content["application/json"].examples.quickStart.value.live, false);
   assert.equal(attentionDigest.post.requestBody.content["application/json"].examples.quickStart.value.syncGmail, false);
@@ -648,6 +651,8 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.equal(serviceCapacityPreview.post.requestBody.content["application/json"].examples.quickStart.value.services.length, 3);
   assert.equal(smartleadReplyFollowupQueue.post.requestBody.content["application/json"].examples.quickStart.value.events[0].lead_email, "lead@example.com");
   assert.equal(showcaseReplyPreview.post.requestBody.content["application/json"].examples.quickStart.value.leadEmail, "lead@example.com");
+  assert.equal(gmailAiReplySafetyRunbook.post.requestBody.content["application/json"].examples.quickStart.value.targetLabel, "COLD-OUTREACH");
+  assert.ok(Array.isArray(gmailAiReplySafetyRunbook.post.requestBody.content["application/json"].examples.quickStart.value.messages));
   assert.equal(contractGenerate.post["x-arcigy-requiresApproval"], true);
   assert.equal(contractGenerate.post.requestBody.content["application/json"].examples.quickStart.value.approval.approved, true);
   assert.equal(JSON.stringify(document).includes("<JARVIS_WEB_TOKEN>"), true);
@@ -2008,6 +2013,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_smartlead_workspace_diagnostic_preview" && call.approvalRequired === false && Array.isArray(call.body.endpointChecks)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_smartlead_message_history_audit_preview" && call.approvalRequired === false && Array.isArray(call.body.leads)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_gmail_outreach_readiness_preview" && call.approvalRequired === false && Array.isArray(call.body.accounts)));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_gmail_ai_reply_safety_runbook_preview" && call.approvalRequired === false && Array.isArray(call.body.messages)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_campaign_webhooks" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_leadgen_db_status_preview" && call.approvalRequired === false && Array.isArray(call.body.blacklistDomains)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_leadgen_progress_watchdog_preview" && call.approvalRequired === false && call.body.targetReadyLeads === 50));
@@ -5106,6 +5112,50 @@ test("outreach reply triage builds batch draft next steps without sending", asyn
   assert.equal(triage.nextToolCalls[0].approvalRequired, false);
   assert.equal((triage.nextToolCalls[0].payload as { email?: string }).email, "lead@example.com");
   assert.match(triage.summary, /Nic nebolo odoslane/);
+});
+
+test("Gmail AI reply safety runbook guards old Gmail automation before drafts", () => {
+  const preview = buildGmailAiReplySafetyRunbookPreview({
+    aiRepliesActive: true,
+    targetLabel: "COLD-OUTREACH",
+    messages: [
+      {
+        senderEmail: "andrej@arcigy.group",
+        fromEmail: "lead@example.com",
+        subject: "Re: Otazka",
+        body: "Dobry den, poslite mi prosim ukazku.",
+        threadId: "thread-123",
+        messageId: "msg-123",
+        leadName: "Jan Novak",
+        companyName: "Modelova Firma",
+        leadKnown: true,
+        threadStartedByUs: true,
+        alreadyProcessed: false,
+        alreadySent: false,
+        labelReady: false,
+        history: [
+          { type: "EMAIL_SENT", from_email: "andrej@arcigy.group", email_body: "Dobry den, chcete vidiet ukazku?" },
+          { type: "EMAIL_REPLY", from_email: "lead@example.com", email_body: "Dobry den, poslite mi prosim ukazku." },
+        ],
+      },
+      { senderEmail: "andrej@arcigy.group", fromEmail: "unknown@example.com", subject: "Info", body: "Prosim viac info", threadId: "thread-unknown", messageId: "msg-unknown", leadKnown: false },
+      { senderEmail: "andrej@arcigy.group", fromEmail: "handled@example.com", subject: "Re", body: "Dakujem", threadId: "thread-handled", messageId: "msg-handled", alreadyProcessed: true },
+    ],
+  });
+
+  assert.equal(preview.mode, "gmail-ai-reply-safety-runbook-preview");
+  assert.equal(preview.status, "attention");
+  assert.equal(preview.totals.messages, 3);
+  assert.equal(preview.totals.positive, 1);
+  assert.equal(preview.totals.draftCandidates, 1);
+  assert.equal(preview.totals.labelCandidates, 1);
+  assert.equal(preview.totals.unknownSenders, 1);
+  assert.equal(preview.totals.alreadyProcessed, 1);
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.get_gmail_lead_context" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.preview_gmail_ai_reply" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.label_gmail_thread" && call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.lookup_public_email_profile" && !call.approvalRequired));
+  assert.match(preview.summary, /Ziadny Gmail label ani email/);
 });
 
 test("Smartlead reply follow-up queue normalizes webhooks into safe preview and draft next steps", async () => {

@@ -127,6 +127,7 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.build_showcase_reply_preview`: read-only prepares the deterministic Slovak showcase-link reply for clear positive interest, with approval payload and no sending.
 - `arcigy.preview_smartlead_ai_reply`: previews the Smartlead AI reply webhook decision, including event/body guards, duplicate/human-in-loop checks, and safe next payloads.
 - `arcigy.preview_gmail_ai_reply`: previews Gmail AI reply decisions for known leads and cold outreach threads without sending.
+- `arcigy.build_gmail_ai_reply_safety_runbook_preview`: read-only Gmail AI reply safety runbook with paused/processed/known lead/thread/human-in-loop/positive guards and approval-gated draft/label next steps.
 - `arcigy.draft_smartlead_thread_reply`: drafts a Smartlead thread reply from message history without sending.
 - `arcigy.send_smartlead_thread_reply`: approval-gated send into an existing Smartlead thread through `reply-email-thread`.
 - `arcigy.create_smartlead_campaign`: approval-gated Smartlead campaign creation with optional sequences, email accounts, schedule, settings, webhook, and leads.

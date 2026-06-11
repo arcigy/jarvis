@@ -56,6 +56,61 @@ export type GmailAiReplyPreview = {
   summary: string;
 };
 
+export type GmailAiReplySafetyMessageInput = {
+  senderEmail: string;
+  fromEmail?: string;
+  fromHeader?: string;
+  subject?: string;
+  body?: string;
+  threadId?: string;
+  messageId?: string;
+  leadName?: string;
+  companyName?: string;
+  history?: ReplyHistoryItem[];
+  leadKnown?: boolean;
+  threadStartedByUs?: boolean;
+  aiRepliesActive?: boolean;
+  alreadyProcessed?: boolean;
+  alreadySent?: boolean;
+  labelReady?: boolean;
+};
+
+export type GmailAiReplySafetyRunbookPreview = {
+  mode: "gmail-ai-reply-safety-runbook-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  operatorBrief: string;
+  targetLabel: string;
+  totals: {
+    messages: number;
+    knownLeads: number;
+    unknownSenders: number;
+    alreadyProcessed: number;
+    threadNotStartedByUs: number;
+    humanReplied: number;
+    alreadySent: number;
+    positive: number;
+    skipped: number;
+    draftCandidates: number;
+    labelCandidates: number;
+    manualReview: number;
+  };
+  items: Array<{
+    senderEmail: string;
+    fromEmail?: string;
+    subject?: string;
+    threadId?: string;
+    messageId?: string;
+    category?: OutreachReplyCategory;
+    confidence?: OutreachReplyClassification["confidence"];
+    recommendedAction: "skip" | "fetch_context" | "preview_gmail_ai_reply" | "manual_review";
+    reason: string;
+    nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; approvalRequired: boolean }>;
+  }>;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; approvalRequired: boolean }>;
+  warnings: string[];
+};
+
 export type ShowcaseReplyPreview = {
   mode: "showcase-reply-preview";
   action: "skip" | "prepare_showcase_reply";
@@ -312,6 +367,167 @@ export async function previewGmailAiReply(
     classification,
     draft,
     summary: draft ? `Gmail reply draft is ready for ${input.fromEmail}; send only after approval.` : "Gmail reply is positive; generate a draft before any send.",
+  };
+}
+
+export function buildGmailAiReplySafetyRunbookPreview(input: {
+  messages: GmailAiReplySafetyMessageInput[];
+  aiRepliesActive?: boolean;
+  targetLabel?: string;
+  maxMessages?: number;
+}): GmailAiReplySafetyRunbookPreview {
+  const maxMessages = Math.min(Math.max(Math.trunc(input.maxMessages ?? 50), 1), 100);
+  const targetLabel = input.targetLabel?.trim() || "COLD-OUTREACH";
+  const messages = input.messages.slice(0, maxMessages);
+  const warnings: string[] = [];
+  const items: GmailAiReplySafetyRunbookPreview["items"] = [];
+
+  for (const message of messages) {
+    const fromEmail = normalizeEmail(message.fromEmail ?? extractEmailFromHeader(message.fromHeader ?? ""));
+    const body = message.body?.trim() ?? "";
+    const leadKnown = message.leadKnown !== false && Boolean(fromEmail);
+    const threadStartedByUs = message.threadStartedByUs !== false;
+    const aiRepliesActive = input.aiRepliesActive !== false && message.aiRepliesActive !== false;
+    const nextToolCalls: GmailAiReplySafetyRunbookPreview["nextToolCalls"] = [];
+
+    if (!aiRepliesActive) {
+      items.push(gmailSafetyItem(message, fromEmail, "skip", "AI replies are paused.", nextToolCalls));
+      continue;
+    }
+    if (message.alreadyProcessed === true) {
+      items.push(gmailSafetyItem(message, fromEmail, "skip", "Gmail message already processed.", nextToolCalls));
+      continue;
+    }
+    if (!fromEmail || leadKnown === false) {
+      if (fromEmail) {
+        nextToolCalls.push({
+          tool: "arcigy.lookup_public_email_profile",
+          payload: { email: fromEmail, sourceName: "gmail-ai-reply-safety" },
+          approvalRequired: false,
+        });
+      }
+      items.push(gmailSafetyItem(message, fromEmail, "fetch_context", "Sender is not a known lead; enrich or register before any AI reply.", nextToolCalls));
+      continue;
+    }
+    if (!threadStartedByUs) {
+      items.push(gmailSafetyItem(message, fromEmail, "skip", "Thread was not started by Arcigy cold outreach.", nextToolCalls));
+      continue;
+    }
+    if (message.alreadySent === true) {
+      items.push(gmailSafetyItem(message, fromEmail, "skip", "AI reply already sent to this lead.", nextToolCalls));
+      continue;
+    }
+    if (hasOurReplyAfterLatestLead(message.history ?? [], message.senderEmail)) {
+      items.push(gmailSafetyItem(message, fromEmail, "skip", "Human-in-the-loop detected after latest lead reply.", nextToolCalls));
+      continue;
+    }
+    if (!body) {
+      nextToolCalls.push({
+        tool: "arcigy.get_gmail_lead_context",
+        payload: { leadEmail: fromEmail, includeBody: true, maxMessages: 10 },
+        approvalRequired: false,
+      });
+      items.push(gmailSafetyItem(message, fromEmail, "fetch_context", "Missing Gmail body; fetch thread context before classification.", nextToolCalls));
+      continue;
+    }
+
+    const classificationResult = classifyOutreachReplyHeuristic(body, message.history ?? []);
+    if (classificationResult.category !== "POSITIVE") {
+      items.push({
+        ...gmailSafetyItem(message, fromEmail, "skip", `Reply classified as ${classificationResult.category}.`, nextToolCalls),
+        category: classificationResult.category,
+        confidence: classificationResult.confidence,
+      });
+      continue;
+    }
+
+    if (!message.threadId || !message.messageId) {
+      warnings.push(`Positive Gmail reply from ${fromEmail} is missing threadId or messageId.`);
+      items.push({
+        ...gmailSafetyItem(message, fromEmail, "manual_review", "Positive reply is missing Gmail threadId/messageId metadata.", nextToolCalls),
+        category: classificationResult.category,
+        confidence: classificationResult.confidence,
+      });
+      continue;
+    }
+
+    nextToolCalls.push({
+      tool: "arcigy.get_gmail_lead_context",
+      payload: { leadEmail: fromEmail, includeBody: true, maxMessages: 10 },
+      approvalRequired: false,
+    });
+    nextToolCalls.push({
+      tool: "arcigy.preview_gmail_ai_reply",
+      payload: {
+        senderEmail: message.senderEmail,
+        fromEmail,
+        subject: message.subject ?? "",
+        body,
+        threadId: message.threadId,
+        messageId: message.messageId,
+        leadName: message.leadName,
+        history: message.history,
+        leadKnown: true,
+        threadStartedByUs: true,
+        aiRepliesActive: true,
+        alreadyProcessed: false,
+        alreadySent: false,
+        generateDraft: false,
+        useAiClassification: false,
+      },
+      approvalRequired: false,
+    });
+    if (message.labelReady !== true) {
+      nextToolCalls.push({
+        tool: "arcigy.label_gmail_thread",
+        payload: { accountEnvKey: `GMAIL_REFRESH_TOKEN_${message.senderEmail.toUpperCase().replace(/[^A-Z0-9]/g, "_")}`, threadId: message.threadId, labelName: targetLabel, markRead: false },
+        approvalRequired: true,
+      });
+    }
+    items.push({
+      senderEmail: message.senderEmail,
+      fromEmail,
+      subject: message.subject,
+      threadId: message.threadId,
+      messageId: message.messageId,
+      category: classificationResult.category,
+      confidence: classificationResult.confidence,
+      recommendedAction: "preview_gmail_ai_reply",
+      reason: "Positive known-lead reply; preview/draft only, then require explicit send approval later.",
+      nextToolCalls,
+    });
+  }
+
+  const nextToolCalls = dedupeToolCalls(items.flatMap((item) => item.nextToolCalls));
+  const totals = {
+    messages: items.length,
+    knownLeads: items.filter((item) => item.fromEmail && !item.reason.includes("not a known lead")).length,
+    unknownSenders: items.filter((item) => item.reason.includes("not a known lead")).length,
+    alreadyProcessed: items.filter((item) => item.reason.includes("already processed")).length,
+    threadNotStartedByUs: items.filter((item) => item.reason.includes("not started by Arcigy")).length,
+    humanReplied: items.filter((item) => item.reason.includes("Human-in-the-loop")).length,
+    alreadySent: items.filter((item) => item.reason.includes("already sent")).length,
+    positive: items.filter((item) => item.category === "POSITIVE").length,
+    skipped: items.filter((item) => item.recommendedAction === "skip").length,
+    draftCandidates: items.filter((item) => item.nextToolCalls.some((call) => call.tool === "arcigy.preview_gmail_ai_reply")).length,
+    labelCandidates: items.filter((item) => item.nextToolCalls.some((call) => call.tool === "arcigy.label_gmail_thread")).length,
+    manualReview: items.filter((item) => item.recommendedAction === "manual_review").length,
+  };
+  const status: GmailAiReplySafetyRunbookPreview["status"] = !messages.length
+    ? "blocked"
+    : totals.draftCandidates || totals.labelCandidates || totals.manualReview || warnings.length
+      ? "attention"
+      : "ready";
+  return {
+    mode: "gmail-ai-reply-safety-runbook-preview",
+    status,
+    summary: `Gmail AI reply safety runbook ${status}: ${totals.messages} messages, ${totals.positive} positive, ${totals.draftCandidates} draft candidates, ${totals.labelCandidates} label candidates, ${totals.skipped} skipped. Ziadny Gmail label ani email nebol odoslany.`,
+    operatorBrief: `Gmail AI replies: ${totals.messages} sprav, ${totals.positive} pozitivnych, ${totals.draftCandidates} pripravit ako draft, ${totals.skipped} preskocit. Label/write/send kroky cakaju na tvoje schvalenie.`,
+    targetLabel,
+    totals,
+    items,
+    nextToolCalls,
+    warnings,
   };
 }
 
@@ -835,6 +1051,35 @@ function normalizeSmartleadReplyEvent(event: SmartleadReplyFollowupEventInput): 
 function stringFrom(value: string | number | undefined): string | undefined {
   if (typeof value === "number") return String(value);
   return value;
+}
+
+function normalizeEmail(value?: string): string | undefined {
+  const trimmed = value?.trim().toLowerCase();
+  return trimmed && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed) ? trimmed : undefined;
+}
+
+function extractEmailFromHeader(value: string): string | undefined {
+  const match = /<([^>]+)>/.exec(value);
+  return normalizeEmail(match?.[1] ?? value);
+}
+
+function gmailSafetyItem(
+  message: GmailAiReplySafetyMessageInput,
+  fromEmail: string | undefined,
+  recommendedAction: GmailAiReplySafetyRunbookPreview["items"][number]["recommendedAction"],
+  reason: string,
+  nextToolCalls: GmailAiReplySafetyRunbookPreview["nextToolCalls"]
+): GmailAiReplySafetyRunbookPreview["items"][number] {
+  return {
+    senderEmail: message.senderEmail,
+    fromEmail,
+    subject: message.subject,
+    threadId: message.threadId,
+    messageId: message.messageId,
+    recommendedAction,
+    reason,
+    nextToolCalls,
+  };
 }
 
 function dedupeToolCalls<T extends { tool: string; payload: Record<string, unknown>; approvalRequired: boolean }>(calls: T[]): T[] {

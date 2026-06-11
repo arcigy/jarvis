@@ -128,7 +128,7 @@ import { buildProductionCompletionScore, summarizeProductionCompletionScoreForVo
 import { buildProductionReadinessReport } from "../automation-system/production-readiness.ts";
 import { getProductionVerificationEvidence } from "../automation-system/production-verification-evidence.ts";
 import { lookupPublicEmailProfile } from "../automation-system/public-profile.ts";
-import { buildOutreachReplyTriagePreview, buildShowcaseReplyPreview, buildSmartleadReplyFollowupQueuePreview, classifyOutreachReply, previewGmailAiReply, previewSmartleadAiReply } from "../automation-system/reply-decision.ts";
+import { buildGmailAiReplySafetyRunbookPreview, buildOutreachReplyTriagePreview, buildShowcaseReplyPreview, buildSmartleadReplyFollowupQueuePreview, classifyOutreachReply, previewGmailAiReply, previewSmartleadAiReply } from "../automation-system/reply-decision.ts";
 import { buildRemoteMcpOpenApiDocument } from "../automation-system/remote-mcp-openapi.ts";
 import { buildRemoteMcpConnectionPack } from "../automation-system/remote-mcp-pack.ts";
 import { runRemoteMcpSmoke } from "../automation-system/remote-mcp-smoke.ts";
@@ -1658,6 +1658,17 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         alreadySent: typeof payload.alreadySent === "boolean" ? payload.alreadySent : undefined,
         generateDraft: payload.generateDraft === true,
         useAiClassification: payload.useAiClassification === true,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_gmail_ai_reply_safety_runbook_preview") {
+    writeJson(response, 200, {
+      result: buildGmailAiReplySafetyRunbookPreview({
+        messages: Array.isArray(payload.messages) ? payload.messages as Parameters<typeof buildGmailAiReplySafetyRunbookPreview>[0]["messages"] : [],
+        aiRepliesActive: typeof payload.aiRepliesActive === "boolean" ? payload.aiRepliesActive : undefined,
+        targetLabel: optionalString(payload.targetLabel),
+        maxMessages: typeof payload.maxMessages === "number" ? payload.maxMessages : undefined,
       }),
     });
     return;

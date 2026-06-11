@@ -417,6 +417,36 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       generateDraft: false,
     };
   }
+  if (toolName === "arcigy.build_gmail_ai_reply_safety_runbook_preview") {
+    return {
+      targetLabel: "COLD-OUTREACH",
+      aiRepliesActive: true,
+      messages: [
+        {
+          senderEmail: "andrej@arcigy.group",
+          fromEmail: "lead@example.com",
+          subject: "Re: Otazka",
+          body: "Dobry den, poslite mi prosim ukazku.",
+          threadId: "thread-123",
+          messageId: "msg-123",
+          leadName: "Jan Novak",
+          companyName: "Modelova Firma",
+          leadKnown: true,
+          threadStartedByUs: true,
+          alreadyProcessed: false,
+          alreadySent: false,
+          labelReady: false,
+          history: [
+            { type: "EMAIL_SENT", from_email: "andrej@arcigy.group", email_body: "Dobry den, chcete vidiet ukazku?" },
+            { type: "EMAIL_REPLY", from_email: "lead@example.com", email_body: "Dobry den, poslite mi prosim ukazku." },
+          ],
+        },
+        { senderEmail: "andrej@arcigy.group", fromEmail: "unknown@example.com", subject: "Info", body: "Prosim viac info", threadId: "thread-unknown", messageId: "msg-unknown", leadKnown: false },
+        { senderEmail: "andrej@arcigy.group", fromEmail: "handled@example.com", subject: "Re", body: "Dakujem", threadId: "thread-handled", messageId: "msg-handled", alreadyProcessed: true },
+      ],
+      maxMessages: 50,
+    };
+  }
   if (toolName === "arcigy.draft_smartlead_thread_reply") {
     return {
       campaignId: "123456",
