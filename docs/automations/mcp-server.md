@@ -100,6 +100,7 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.select_next_niche`: previews the next niche-manager niche/region selection without advancing the database index.
 - `arcigy.generate_ai_reply`: uses Gemini to draft a client reply without sending it.
 - `arcigy.sync_gmail_recent_messages`: fetches Gmail messages and ingests client requests into SQLite.
+- `arcigy.get_gmail_lead_context`: read-only Gmail lookup for one lead email across configured accounts, returning display name, sorted message context, latest lead reply, and safe next reply-preview calls without writing.
 - `arcigy.get_smartlead_campaign_status`: reads Smartlead campaigns or campaign statistics.
 - `arcigy.get_smartlead_outreach_brief`: normalizes one Smartlead campaign, or aggregates recent campaign statistics when `campaignId` is omitted, into one Jarvis cold outreach briefing.
 - `arcigy.get_smartlead_campaign_leads`: read-only fetch of campaign leads with offset/limit for audit and import checks.

@@ -12,7 +12,7 @@ import { draftContractIntake } from "./contract-intake-draft.ts";
 import { runIntegrationDiagnostics } from "./diagnostics.ts";
 import { getIntegrationHealth, loadLocalEnv, summarizeIntegrationHealth } from "./env.ts";
 import { buildClientReplyPrompt, buildPositiveOutreachReplyPrompt, generateGeminiText } from "./gemini.ts";
-import { defaultGmailBriefingQuery, defaultGmailSyncQuery, listConfiguredGmailAccounts, listRecentGmailMessageEvents, sendGmailTextMessage } from "./gmail.ts";
+import { defaultGmailBriefingQuery, defaultGmailSyncQuery, fetchGmailLeadContext, listConfiguredGmailAccounts, listRecentGmailMessageEvents, sendGmailTextMessage } from "./gmail.ts";
 import { batchFetchPublicUrlPreviews, fetchPublicUrlPreview } from "./http-fetch.ts";
 import { handleJarvisVoiceEvent, type JarvisVoiceSession } from "./jarvis-voice.ts";
 import { buildJarvisCapabilityAudit, summarizeJarvisCapabilityAuditForVoice } from "./jarvis-capability-audit.ts";
@@ -1253,6 +1253,28 @@ export function createJarvisMcpServer(): McpServer {
       }
       return jsonResult({ dryRun, synced });
     }
+  );
+
+  server.registerTool(
+    "arcigy.get_gmail_lead_context",
+    {
+      title: "Get Gmail lead context",
+      description: "Read-only Gmail lookup for one lead email across configured accounts. Returns display name, message/thread context, latest lead reply, and safe next MCP calls without sending or storing.",
+      inputSchema: {
+        leadEmail: z.string().email(),
+        accountEnvKey: z.string().optional(),
+        query: z.string().optional(),
+        maxMessages: z.number().int().min(1).max(50).default(10),
+        includeBody: z.boolean().default(true),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (input) => jsonResult(await fetchGmailLeadContext(input))
   );
 
   server.registerTool(

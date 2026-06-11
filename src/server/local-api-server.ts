@@ -11,7 +11,7 @@ import { draftContractIntake } from "../automation-system/contract-intake-draft.
 import { runIntegrationDiagnostics } from "../automation-system/diagnostics.ts";
 import { getIntegrationHealth, loadLocalEnv } from "../automation-system/env.ts";
 import { buildClientReplyPrompt, buildPositiveOutreachReplyPrompt, generateGeminiText } from "../automation-system/gemini.ts";
-import { defaultGmailBriefingQuery, defaultGmailSyncQuery, listConfiguredGmailAccounts, listRecentGmailMessageEvents, sendGmailTextMessage } from "../automation-system/gmail.ts";
+import { defaultGmailBriefingQuery, defaultGmailSyncQuery, fetchGmailLeadContext, listConfiguredGmailAccounts, listRecentGmailMessageEvents, sendGmailTextMessage } from "../automation-system/gmail.ts";
 import { batchFetchPublicUrlPreviews, fetchPublicUrlPreview } from "../automation-system/http-fetch.ts";
 import { containsWakeWord, extractCommandAfterWakeWord, type JarvisVoiceSession } from "../automation-system/jarvis-voice.ts";
 import { buildJarvisCapabilityAudit, summarizeJarvisCapabilityAuditForVoice } from "../automation-system/jarvis-capability-audit.ts";
@@ -1292,6 +1292,18 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
   }
   if (name === "arcigy.sync_gmail_recent_messages") {
     writeJson(response, 200, { result: await syncGmailRecentMessages(payload) });
+    return;
+  }
+  if (name === "arcigy.get_gmail_lead_context") {
+    writeJson(response, 200, {
+      result: await fetchGmailLeadContext({
+        leadEmail: String(payload.leadEmail ?? ""),
+        accountEnvKey: optionalString(payload.accountEnvKey),
+        query: optionalString(payload.query),
+        maxMessages: typeof payload.maxMessages === "number" ? payload.maxMessages : undefined,
+        includeBody: payload.includeBody !== false,
+      }),
+    });
     return;
   }
   if (name === "arcigy.get_smartlead_campaign_status") {

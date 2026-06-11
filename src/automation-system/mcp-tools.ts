@@ -41,6 +41,7 @@ export type JarvisMcpToolName =
   | "arcigy.select_next_niche"
   | "arcigy.generate_ai_reply"
   | "arcigy.sync_gmail_recent_messages"
+  | "arcigy.get_gmail_lead_context"
   | "arcigy.get_smartlead_campaign_status"
   | "arcigy.get_smartlead_outreach_brief"
   | "arcigy.get_smartlead_campaign_leads"
@@ -353,6 +354,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.sync_gmail_recent_messages",
       description: "Nacita posledne Gmail spravy a ulozi klientske potreby do lokalnej databazy.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.get_gmail_lead_context",
+      description: "Read-only vyhlada lead email v Gmail uctoch, vrati display name, historiu threadu a safe dalsi preview_gmail_ai_reply krok bez zapisu.",
       requiresApproval: false,
     },
     {

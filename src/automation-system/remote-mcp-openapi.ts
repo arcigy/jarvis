@@ -274,6 +274,7 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
   }
   if (toolName === "arcigy.generate_ai_reply") return { message: "Potrebujem upravit onboarding automatizaciu do piatku.", language: "sk", tone: "executive" };
   if (toolName === "arcigy.sync_gmail_recent_messages") return { dryRun: true, maxResults: 5 };
+  if (toolName === "arcigy.get_gmail_lead_context") return { leadEmail: "lead@example.com", maxMessages: 10, includeBody: true };
   if (toolName === "arcigy.get_smartlead_outreach_brief") return { periodLabel: "poslednych 7 dni" };
   if (toolName === "arcigy.get_smartlead_campaign_leads") return { campaignId: "123456", offset: 0, limit: 100 };
   if (toolName === "arcigy.preview_smartlead_lead_sync") return { campaignIds: ["123456"], limitPerCampaign: 100 };

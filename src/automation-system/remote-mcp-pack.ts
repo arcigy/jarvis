@@ -1961,6 +1961,14 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Get Gmail context for one lead",
+      tool: "arcigy.get_gmail_lead_context",
+      method: "POST",
+      url: toolUrl("arcigy.get_gmail_lead_context"),
+      body: { leadEmail: "lead@example.com", maxMessages: 10, includeBody: true },
+      approvalRequired: false,
+    },
+    {
       label: "Generate contract documents after approval",
       tool: "arcigy.generate_contract_documents",
       method: "POST",

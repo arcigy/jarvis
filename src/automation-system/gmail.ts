@@ -35,7 +35,43 @@ type GmailMessageResponse = {
   internalDate?: string;
   payload?: {
     headers?: Array<{ name: string; value: string }>;
+    mimeType?: string;
+    body?: { data?: string };
+    parts?: GmailMessageResponse["payload"][];
   };
+};
+
+export type GmailLeadContextMessage = {
+  accountEnvKey: string;
+  accountLabel: string;
+  messageId: string;
+  threadId: string;
+  from: string;
+  to: string;
+  fromEmail: string;
+  toEmails: string[];
+  displayName?: string;
+  subject?: string;
+  date?: string;
+  occurredAt?: string;
+  snippet?: string;
+  body?: string;
+  isFromLead: boolean;
+  isFromUs: boolean;
+};
+
+export type GmailLeadContextResult = {
+  mode: "gmail-lead-context";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  leadEmail: string;
+  query: string;
+  totals: { accountsChecked: number; accountsWithMessages: number; messages: number; leadReplies: number; sentByUs: number };
+  inferredDisplayName?: string;
+  accounts: Array<{ envKey: string; label: string; status: "ready" | "empty" | "failed"; messageCount: number; error?: string }>;
+  messages: GmailLeadContextMessage[];
+  latestLeadMessage?: GmailLeadContextMessage;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
 export type GmailSendInput = {
@@ -146,6 +182,102 @@ export async function listRecentGmailMessageEvents(
   return events.filter((event) => event.fromEmail && event.text);
 }
 
+export async function fetchGmailLeadContext(
+  input: { leadEmail: string; accountEnvKey?: string; query?: string; maxMessages?: number; includeBody?: boolean },
+  env: RuntimeEnv = process.env,
+  fetchImpl: FetchLike = fetch
+): Promise<GmailLeadContextResult> {
+  const leadEmail = input.leadEmail.trim().toLowerCase();
+  if (!leadEmail || !leadEmail.includes("@")) {
+    throw new Error("leadEmail must be a valid email address.");
+  }
+  const maxMessages = Math.min(Math.max(Math.trunc(input.maxMessages ?? 10), 1), 50);
+  const query = input.query?.trim() || leadEmail;
+  const accounts = listConfiguredGmailAccounts(env).filter((account) => !input.accountEnvKey || account.envKey === input.accountEnvKey);
+  if (!accounts.length) {
+    throw new Error(input.accountEnvKey ? `Configured Gmail account not found: ${input.accountEnvKey}` : "No configured Gmail accounts found.");
+  }
+  const accountResults: GmailLeadContextResult["accounts"] = [];
+  const messages: GmailLeadContextMessage[] = [];
+  for (const account of accounts) {
+    try {
+      const accessToken = await refreshGoogleAccessToken(account.refreshToken, env, fetchImpl);
+      const params = new URLSearchParams({ maxResults: String(maxMessages), q: query });
+      const listResponse = await gmailFetch<GmailListResponse>(
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages?${params.toString()}`,
+        accessToken,
+        fetchImpl
+      );
+      const ids = listResponse.messages ?? [];
+      for (const item of ids) {
+        const detail = await gmailFetch<GmailMessageResponse>(
+          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(item.id)}?format=${input.includeBody === false ? "metadata" : "full"}&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date`,
+          accessToken,
+          fetchImpl
+        );
+        messages.push(normalizeGmailLeadMessage(detail, account, leadEmail, input.includeBody !== false));
+      }
+      accountResults.push({ envKey: account.envKey, label: account.label, status: ids.length ? "ready" : "empty", messageCount: ids.length });
+    } catch (error) {
+      accountResults.push({
+        envKey: account.envKey,
+        label: account.label,
+        status: "failed",
+        messageCount: 0,
+        error: redactSensitiveText(error instanceof Error ? error.message : String(error)),
+      });
+    }
+  }
+  const sorted = messages
+    .filter((message) => message.fromEmail === leadEmail || message.toEmails.includes(leadEmail) || JSON.stringify(message).toLowerCase().includes(leadEmail))
+    .sort((a, b) => new Date(a.occurredAt ?? a.date ?? 0).getTime() - new Date(b.occurredAt ?? b.date ?? 0).getTime());
+  const latestLeadMessage = [...sorted].reverse().find((message) => message.isFromLead);
+  const inferredDisplayName = sorted.find((message) => message.isFromLead && message.displayName)?.displayName
+    ?? sorted.find((message) => message.toEmails.includes(leadEmail) && message.displayName)?.displayName;
+  const nextToolCalls: GmailLeadContextResult["nextToolCalls"] = [];
+  if (latestLeadMessage) {
+    nextToolCalls.push({
+      tool: "arcigy.preview_gmail_ai_reply",
+      payload: {
+        senderEmail: latestLeadMessage.accountLabel,
+        fromEmail: leadEmail,
+        subject: latestLeadMessage.subject,
+        body: latestLeadMessage.body || latestLeadMessage.snippet || "",
+        threadId: latestLeadMessage.threadId,
+        messageId: latestLeadMessage.messageId,
+        leadName: inferredDisplayName,
+        history: sorted.map((message) => ({ body: message.body || message.snippet, fromEmail: message.fromEmail, isMe: message.isFromUs, created_at: message.occurredAt ?? message.date })),
+        leadKnown: true,
+        threadStartedByUs: sorted.some((message) => message.isFromUs),
+        generateDraft: false,
+      },
+      reason: "Latest Gmail message from the lead can be safely classified and drafted before any send.",
+      approvalRequired: false,
+    });
+  }
+  const totals = {
+    accountsChecked: accountResults.length,
+    accountsWithMessages: accountResults.filter((account) => account.messageCount > 0).length,
+    messages: sorted.length,
+    leadReplies: sorted.filter((message) => message.isFromLead).length,
+    sentByUs: sorted.filter((message) => message.isFromUs).length,
+  };
+  const status: GmailLeadContextResult["status"] = sorted.length ? "ready" : accountResults.some((account) => account.status === "failed") ? "attention" : "blocked";
+  return {
+    mode: "gmail-lead-context",
+    status,
+    summary: `Gmail lead context ${status}: ${totals.messages} message(s) for ${leadEmail} across ${totals.accountsChecked} account(s), ${totals.leadReplies} from lead, ${totals.sentByUs} sent by Arcigy. Ziadny zapis ani odoslanie neprebehlo.`,
+    leadEmail,
+    query,
+    totals,
+    inferredDisplayName,
+    accounts: accountResults,
+    messages: sorted,
+    latestLeadMessage,
+    nextToolCalls,
+  };
+}
+
 export async function sendGmailTextMessage(
   account: GmailAccount,
   input: GmailSendInput,
@@ -211,4 +343,50 @@ export function parseFromHeader(header: string): { email: string; displayName?: 
     displayName: match[1]?.trim() || undefined,
     email: match[2].trim().toLowerCase(),
   };
+}
+
+function normalizeGmailLeadMessage(detail: GmailMessageResponse, account: GmailAccount, leadEmail: string, includeBody: boolean): GmailLeadContextMessage {
+  const headers = new Map((detail.payload?.headers ?? []).map((header) => [header.name.toLowerCase(), header.value]));
+  const from = headers.get("from") ?? "";
+  const to = headers.get("to") ?? "";
+  const parsedFrom = parseFromHeader(from);
+  const toEmails = extractEmails(to);
+  const body = includeBody ? extractGmailBody(detail.payload) : undefined;
+  return {
+    accountEnvKey: account.envKey,
+    accountLabel: account.label,
+    messageId: detail.id,
+    threadId: detail.threadId,
+    from,
+    to,
+    fromEmail: parsedFrom.email,
+    toEmails,
+    displayName: parsedFrom.displayName,
+    subject: headers.get("subject"),
+    date: headers.get("date"),
+    occurredAt: detail.internalDate ? new Date(Number(detail.internalDate)).toISOString() : headers.get("date"),
+    snippet: detail.snippet,
+    body,
+    isFromLead: parsedFrom.email === leadEmail,
+    isFromUs: parsedFrom.email !== leadEmail,
+  };
+}
+
+function extractEmails(value: string): string[] {
+  return [...value.matchAll(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi)].map((match) => match[0].toLowerCase());
+}
+
+function extractGmailBody(payload: GmailMessageResponse["payload"]): string | undefined {
+  if (!payload) return undefined;
+  if (payload.mimeType === "text/plain" && payload.body?.data) return decodeGmailBody(payload.body.data);
+  for (const part of payload.parts ?? []) {
+    const value = extractGmailBody(part);
+    if (value) return value;
+  }
+  if (payload.body?.data) return decodeGmailBody(payload.body.data).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  return undefined;
+}
+
+function decodeGmailBody(value: string): string {
+  return Buffer.from(value.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf-8").replace(/\s+/g, " ").trim();
 }

@@ -552,6 +552,7 @@ function hasSafeOpenApiExample(toolName: string, value: unknown): boolean {
   if (toolName === "arcigy.get_operator_briefing") return payload.live === false && payload.syncGmail === false;
   if (toolName === "arcigy.get_proactive_attention_digest") return payload.live === false && payload.syncGmail === false;
   if (toolName === "arcigy.sync_gmail_recent_messages") return payload.dryRun === true;
+  if (toolName === "arcigy.get_gmail_lead_context") return typeof payload.leadEmail === "string" && payload.leadEmail.includes("@");
   if (toolName === "arcigy.identify_email") return typeof payload.email === "string" && payload.email.includes("@");
   if (toolName === "arcigy.generate_contract_documents") return (payload.approval as { approved?: unknown } | undefined)?.approved === true && typeof payload.intake === "object";
   if (toolName === "arcigy.generate_price_offer_document") return (payload.approval as { approved?: unknown } | undefined)?.approved === true && typeof payload.offer === "object";

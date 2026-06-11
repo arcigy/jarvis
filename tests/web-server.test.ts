@@ -619,15 +619,18 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(openApiBody.paths["/api/mcp/arcigy.generate_contract_documents"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.get_production_completion_score"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.get_jarvis_capability_audit"]);
+    assert.ok(openApiBody.paths["/api/mcp/arcigy.get_gmail_lead_context"]);
     const openApiOperator = openApiBody.paths["/api/mcp/arcigy.get_operator_briefing"] as OpenApiPathFixture;
     const openApiAttentionDigest = openApiBody.paths["/api/mcp/arcigy.get_proactive_attention_digest"] as OpenApiPathFixture;
     const openApiCompletionScore = openApiBody.paths["/api/mcp/arcigy.get_production_completion_score"] as OpenApiPathFixture;
     const openApiGmailSync = openApiBody.paths["/api/mcp/arcigy.sync_gmail_recent_messages"] as OpenApiPathFixture;
+    const openApiGmailLeadContext = openApiBody.paths["/api/mcp/arcigy.get_gmail_lead_context"] as OpenApiPathFixture;
     const openApiContract = openApiBody.paths["/api/mcp/arcigy.generate_contract_documents"] as OpenApiPathFixture;
     assert.equal(openApiCompletionScore.post.requestBody.content["application/json"].examples.quickStart.value.live, false);
     assert.equal(openApiAttentionDigest.post.requestBody.content["application/json"].examples.quickStart.value.syncGmail, false);
     assert.equal(openApiOperator.post.requestBody.content["application/json"].examples.quickStart.value.syncGmail, false);
     assert.equal(openApiGmailSync.post.requestBody.content["application/json"].examples.quickStart.value.dryRun, true);
+    assert.equal(openApiGmailLeadContext.post.requestBody.content["application/json"].examples.quickStart.value.leadEmail, "lead@example.com");
     assert.equal(openApiContract.post["x-arcigy-requiresApproval"], true);
     assert.equal(openApiContract.post.requestBody.content["application/json"].examples.quickStart.value.approval.approved, true);
 
@@ -798,6 +801,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.prepare_positive_outreach_reply" && call.body.leadEmail === "lead@example.com"));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.send_approved_outreach_reply" && call.approvalRequired === true));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.sync_gmail_recent_messages" && call.body.dryRun === true));
+    assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_gmail_lead_context" && call.body.leadEmail === "lead@example.com"));
     assert.ok(
       remotePackBody.quickStartCalls.some(
         (call) => call.tool === "arcigy.draft_contract_intake" && call.approvalRequired === false && typeof call.body.brief === "string"
