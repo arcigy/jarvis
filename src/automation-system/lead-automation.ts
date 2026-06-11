@@ -99,6 +99,46 @@ export type AiIntroCleanupPreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type LeadBatchQaPreview = {
+  mode: "lead-batch-qa-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  source: { campaignTag?: string; createdSince?: string; defaultSource?: string };
+  totals: {
+    input: number;
+    readyForSmartlead: number;
+    repair: number;
+    manualReview: number;
+    rejected: number;
+    introCleaned: number;
+    namesCleared: number;
+    emailsCleared: number;
+    blockedSources: number;
+    companyShortUpdated: number;
+    flagged: number;
+  };
+  items: Array<{
+    lead: LeadRepairQueueLead & { companyNameShort?: string; company_name_short?: string; official_company_name?: string; original_name?: string; decision_maker_last_name?: string };
+    status: "ready" | "repair" | "manual_review" | "rejected";
+    issues: string[];
+    updates: {
+      email?: string | null;
+      companyName?: string;
+      companyNameShort?: string;
+      firstName?: string;
+      lastName?: string;
+      personalizedIntro?: string | null;
+      verificationStatus: "ok" | "flagged" | "failed";
+      customFields: Record<string, string | number | boolean | null | undefined>;
+    };
+  }>;
+  readyLeads: PreparedSmartleadLeadInput[];
+  repairLeads: LeadRepairQueueLead[];
+  rejectedLeads: LeadRepairQueueLead[];
+  smartleadPrepared: ReturnType<typeof prepareSmartleadLeads>;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type PreparedSmartleadLeadInput = {
   email: string;
   companyName?: string;
@@ -1477,6 +1517,169 @@ export function buildAiIntroCleanupPreview(input: {
     items,
     cleanedLeads,
     redraftInputs,
+    smartleadPrepared,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls),
+  };
+}
+
+export function buildLeadBatchQaPreview(input: {
+  leads: Array<LeadRepairQueueLead & { companyNameShort?: string; company_name_short?: string; official_company_name?: string; original_name?: string; decision_maker_last_name?: string }>;
+  campaignTag?: string;
+  createdSince?: string;
+  defaultSource?: string;
+  campaignId?: string | number | null;
+  offer?: string;
+  language?: "sk" | "en";
+  maxNextCalls?: number;
+}): LeadBatchQaPreview {
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 50), 1), 200);
+  const items: LeadBatchQaPreview["items"] = input.leads.map((lead) => {
+    const custom = lead.customFields ?? {};
+    const website = lead.website ?? stringField(custom, "website", "domain");
+    const originalCompany = lead.companyName ?? stringField(lead, "official_company_name", "original_name", "company_name_short", "companyNameShort") ?? stringField(custom, "official_company_name", "original_name", "company_name_short");
+    const originalShort = stringField(lead, "companyNameShort", "company_name_short") ?? stringField(custom, "company_name_short") ?? originalCompany;
+    const companyNameShort = cleanLeadCompanyShort(originalShort, website, originalCompany);
+    const decisionMaker = decisionMakerForLead(lead);
+    const looksBusiness = looksLikeBusinessAlias(decisionMaker);
+    const cleanup = cleanupAiIntroSentence(extractLeadIntro(lead), decisionMaker, stringField(lead, "decision_maker_last_name") ?? stringField(custom, "decision_maker_last_name", "last_name_with_salutation"));
+    const blockedSource = website ? isBlockedLeadSourceDomain(website) : false;
+    const usableEmail = isUsableBatchQaEmail(lead.email);
+    const issues: string[] = [];
+    let verificationStatus: "ok" | "flagged" | "failed" = (lead.verificationStatus ?? stringField(custom, "verification_status") as "ok" | "flagged" | "failed" | undefined) ?? "ok";
+    let email: string | null | undefined = lead.email?.trim() || undefined;
+    let firstName = lead.firstName;
+    let lastName = lead.lastName;
+    if (looksBusiness) {
+      issues.push("decision_maker_looks_like_business_alias");
+      verificationStatus = "flagged";
+      firstName = undefined;
+      lastName = undefined;
+    }
+    if (blockedSource) {
+      issues.push("blocked_source_domain");
+      verificationStatus = "failed";
+      email = null;
+      firstName = undefined;
+      lastName = undefined;
+    } else if (!usableEmail) {
+      issues.push(email ? "invalid_or_low_quality_email" : "missing_email");
+      verificationStatus = "failed";
+      email = null;
+    }
+    if (!website) issues.push("missing_website");
+    if (!originalCompany) issues.push("missing_company_name");
+    if (!cleanup.cleanedIntro) issues.push("missing_or_bad_intro");
+    if (companyNameShort !== originalShort) issues.push("company_short_cleaned");
+    if (cleanup.changed) issues.push("intro_cleaned");
+    const status: LeadBatchQaPreview["items"][number]["status"] = verificationStatus === "failed"
+      ? "rejected"
+      : issues.some((issue) => ["missing_website", "missing_company_name"].includes(issue))
+        ? "manual_review"
+        : issues.some((issue) => ["missing_or_bad_intro", "decision_maker_looks_like_business_alias"].includes(issue))
+          ? "repair"
+          : "ready";
+    return {
+      lead,
+      status,
+      issues,
+      updates: {
+        email,
+        companyName: originalCompany,
+        companyNameShort,
+        firstName,
+        lastName,
+        personalizedIntro: cleanup.cleanedIntro ?? null,
+        verificationStatus,
+        customFields: {
+          ...custom,
+          campaign_tag: input.campaignTag ?? stringField(custom, "campaign_tag"),
+          company_name_short: companyNameShort,
+          personalized_intro: cleanup.cleanedIntro ?? null,
+          icebreaker_sentence: cleanup.cleanedIntro ?? null,
+          verification_status: verificationStatus,
+        },
+      },
+    };
+  });
+  const readyLeads: PreparedSmartleadLeadInput[] = items
+    .filter((item) => item.status === "ready" && item.updates.email)
+    .map((item) => ({
+      email: item.updates.email as string,
+      companyName: item.updates.companyName,
+      firstName: item.updates.firstName,
+      lastName: item.updates.lastName,
+      website: item.lead.website,
+      phone: item.lead.phone,
+      source: input.defaultSource ?? input.campaignTag ?? item.lead.source,
+      personalizedIntro: item.updates.personalizedIntro ?? undefined,
+      customFields: item.updates.customFields,
+    }));
+  const repairLeads = items.filter((item) => item.status === "repair" || item.status === "manual_review").map((item) => item.lead);
+  const rejectedLeads = items.filter((item) => item.status === "rejected").map((item) => item.lead);
+  const smartleadPrepared = prepareSmartleadLeads({ leads: readyLeads, defaultSource: input.defaultSource ?? input.campaignTag ?? "lead-batch-qa" });
+  const nextToolCalls: LeadBatchQaPreview["nextToolCalls"] = [];
+  const scrapeUrls = unique(items
+    .filter((item) => item.issues.some((issue) => ["missing_email", "invalid_or_low_quality_email"].includes(issue)) && item.lead.website)
+    .map((item) => item.lead.website as string))
+    .slice(0, maxNextCalls);
+  if (scrapeUrls.length) {
+    nextToolCalls.push({
+      tool: "arcigy.batch_scrape_website_contacts",
+      payload: { urls: scrapeUrls, includePriorityPages: true, maxPages: 4, maxSites: scrapeUrls.length },
+      reason: "Dohladat emaily pre leady, ktore batch QA vycistil alebo oznacil ako missing/invalid.",
+      approvalRequired: false,
+    });
+  }
+  const redraftInputs = items
+    .filter((item) => item.issues.includes("missing_or_bad_intro") && item.updates.companyName)
+    .slice(0, maxNextCalls)
+    .map((item) => ({ companyName: item.updates.companyName as string, website: item.lead.website, context: item.lead.context ?? item.lead.scraped?.textPreview, offer: input.offer, language: input.language ?? "sk" }));
+  if (redraftInputs.length) {
+    nextToolCalls.push({
+      tool: "arcigy.batch_draft_lead_intros",
+      payload: { leads: redraftInputs, offer: input.offer, language: input.language ?? "sk", maxLeads: Math.min(redraftInputs.length, 50) },
+      reason: "Doplnit alebo prerobit AI intro pred Smartlead uploadom.",
+      approvalRequired: false,
+    });
+  }
+  nextToolCalls.push({
+    tool: "arcigy.build_lead_repair_queue_preview",
+    payload: { leads: repairLeads.slice(0, maxNextCalls), offer: input.offer, language: input.language ?? "sk", maxNextCalls },
+    reason: "Rozdelit problemove leady na scrape, intro, register a manual review kroky.",
+    approvalRequired: false,
+  });
+  if (input.campaignId && smartleadPrepared.leadList.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_smartlead_import_audit_preview",
+      payload: { campaignId: input.campaignId, leads: smartleadPrepared.leadList },
+      reason: "Pred uploadom overit duplicity a existujuce Smartlead zaznamy.",
+      approvalRequired: false,
+    });
+  }
+  const totals = {
+    input: input.leads.length,
+    readyForSmartlead: readyLeads.length,
+    repair: items.filter((item) => item.status === "repair").length,
+    manualReview: items.filter((item) => item.status === "manual_review").length,
+    rejected: rejectedLeads.length,
+    introCleaned: items.filter((item) => item.issues.includes("intro_cleaned")).length,
+    namesCleared: items.filter((item) => item.issues.includes("decision_maker_looks_like_business_alias")).length,
+    emailsCleared: items.filter((item) => item.issues.includes("invalid_or_low_quality_email") || item.issues.includes("missing_email")).length,
+    blockedSources: items.filter((item) => item.issues.includes("blocked_source_domain")).length,
+    companyShortUpdated: items.filter((item) => item.issues.includes("company_short_cleaned")).length,
+    flagged: items.filter((item) => item.updates.verificationStatus === "flagged" || item.updates.verificationStatus === "failed").length,
+  };
+  const status: LeadBatchQaPreview["status"] = input.leads.length === 0 ? "blocked" : totals.readyForSmartlead > 0 && totals.rejected === 0 ? "ready" : totals.readyForSmartlead > 0 ? "attention" : "blocked";
+  return {
+    mode: "lead-batch-qa-preview",
+    status,
+    summary: `Lead batch QA ${status}: ${totals.readyForSmartlead} ready pre Smartlead, ${totals.repair} repair, ${totals.manualReview} manual review, ${totals.rejected} rejected. Ziadny DB zapis ani upload neprebehol.`,
+    source: { campaignTag: input.campaignTag, createdSince: input.createdSince, defaultSource: input.defaultSource },
+    totals,
+    items,
+    readyLeads,
+    repairLeads,
+    rejectedLeads,
     smartleadPrepared,
     nextToolCalls: dedupeNextToolCalls(nextToolCalls),
   };
@@ -5961,6 +6164,70 @@ function escapeRegex(value: string): string {
 function countOccurrences(value: string, needle: string): number {
   if (!needle) return 0;
   return value.split(needle).length - 1;
+}
+
+function isUsableBatchQaEmail(email: string | undefined): boolean {
+  const value = email?.trim().toLowerCase();
+  if (!value) return false;
+  if (!/^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}$/i.test(value)) return false;
+  if (value.includes("example") || value.includes("sentry.") || /%[0-9a-f]{2}/i.test(value)) return false;
+  if (/\.(png|jpg|jpeg|svg|gif|webp|avif|webm)$/i.test(value)) return false;
+  if (/^(e-?shop|support|podpora|reklamace|webmaster|marketing|newsletter|license|noreply|no-reply)@/i.test(value)) return false;
+  if (/(adresa\.cz|domena\.cz|e-mail\.cz|php\.net|freebiesxpress|rambler\.ru|a\.an)$/i.test(value)) return false;
+  return true;
+}
+
+function looksLikeBusinessAlias(name: string | undefined): boolean {
+  const value = normalizeNameToken(name ?? "");
+  if (!value) return false;
+  return [
+    "truhlar", "stolar", "kuchyn", "interier", "nabytok", "nabytek", "studio", "showroom", "design",
+    "atelier", "wood", "team", "group", "company", "firma", "praha", "brno", "ostrava", "doprava",
+    "restaurace", "menu", "eshop", "kontakt", "kvalitni", "lokalni",
+  ].some((token) => value.includes(token));
+}
+
+function isBlockedLeadSourceDomain(website: string): boolean {
+  const domain = normalizeWebsiteIdentity(website);
+  if (!domain) return false;
+  const blocked = new Set([
+    "firmuj.cz", "hledat.cz", "epoptavka.cz", "jooble.org", "waze.com", "casopisobydleni.cz", "baumax.cz",
+    "bazos.cz", "sbazar.cz", "facebook.com", "instagram.com", "favi.cz", "heureka.cz", "mapy.cz", "firmy.cz",
+    "idatabaze.cz", "zivefirmy.cz", "najisto.cz", "modrastrecha.cz", "starofservice.cz", "stavportal.cz",
+    "bydlo.cz", "doporucenefirmy.cz", "easy-prace.cz", "alza.sk", "mall.sk", "booking.com", "tripadvisor.com",
+  ]);
+  return blocked.has(domain) || domain.endsWith(".pl") || /^(info-|katalog-)/i.test(domain);
+}
+
+function cleanLeadCompanyShort(value: string | undefined, website?: string, fallbackName?: string): string | undefined {
+  const fallback = fallbackName?.trim() || brandFromWebsite(website);
+  let raw = value?.replace(/\s+/g, " ").trim() || fallback;
+  if (!raw) return undefined;
+  raw = raw
+    .replace(/\s+[-–—]\s+(kompletni|kompletne|vyroba|realizace|kuchyne|nabytok|nabytek).*$/iu, "")
+    .replace(/:\s*(vyrobime|stolarstvo|truhlarstvi|kuchyne|nabytek|vyroba).*$/iu, "")
+    .replace(/[^\p{L}\p{N}\s.&-]/gu, "")
+    .trim();
+  const normalized = normalizeNameToken(raw);
+  if (
+    raw.length < 3 ||
+    raw.length > 38 ||
+    ["vestavene skrine", "kuchyne praha", "kuchyne a nabytek", "nabytek na miru", "zakazkova vyroba", "showroom", "kontakt", "eshop", "logo", "o nas", "uvod"].some((token) => normalized.includes(token)) ||
+    /\b(na|z|a|v)$/iu.test(raw) ||
+    /telefon|e-?mail|fakturace|www\.|http/i.test(raw)
+  ) {
+    return fallback;
+  }
+  return raw.replace(/^[,\-/:.\s]+|[,\-/:.\s]+$/g, "").trim() || fallback;
+}
+
+function brandFromWebsite(website: string | undefined): string | undefined {
+  if (!website) return undefined;
+  const domain = normalizeWebsiteIdentity(website);
+  const raw = domain.split(".")[0]?.replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
+  const cleaned = raw?.replace(/\b(kuchyne|kuchyn|truhlarstvi|stolarstvi|nabytek|interiery|studio)\b/gi, "").replace(/\s+/g, " ").trim();
+  const brand = cleaned && cleaned.length >= 3 ? cleaned : raw;
+  return brand ? brand.replace(/\b\w/g, (char) => char.toUpperCase()) : undefined;
 }
 
 function leadRepairIssues(lead: LeadRepairQueueLead, duplicateKeys: Set<string>): string[] {

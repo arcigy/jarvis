@@ -1047,6 +1047,24 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Run lead batch QA before Smartlead",
+      tool: "arcigy.build_lead_batch_qa_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_lead_batch_qa_preview"),
+      body: {
+        campaignTag: "kuchyne-na-mieru",
+        campaignId: "123456",
+        leads: [
+          { id: "lead-1", email: "jan@ready.sk", companyName: "Ready Studio", companyNameShort: "Ready Studio - Kuchyne na mieru", firstName: "Jan", lastName: "Novak", website: "https://ready.sk", personalizedIntro: "Dobry den Jan, zaujali ma vase realizacie kuchyn na mieru." },
+          { id: "lead-2", email: "noreply@needs-email.sk", companyName: "Needs Email", website: "https://needs-email.sk", personalizedIntro: "Kratke AI intro." },
+          { id: "lead-3", email: "info@katalog.cz", companyName: "Katalog Lead", website: "https://firmy.cz/katalog-lead", personalizedIntro: "Zaujalo ma, ze mate pekny web." },
+        ],
+        offer: "AI asistent na odpovede a follow-up",
+        language: "sk",
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Parse lead CSV text without writing",
       tool: "arcigy.parse_leads_csv",
       method: "POST",

@@ -67,6 +67,7 @@ import {
   parseLeadsCsv,
   previewSmartleadEmailRendering,
   buildSmartleadSequenceVariableRepairPreview,
+  buildLeadBatchQaPreview,
   previewLeadEnrichmentBatch,
   buildLeadEnrichmentMergePreview,
   prepareSmartleadLeads,
@@ -2378,6 +2379,42 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildSmartleadSequenceVariableRepairPreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_lead_batch_qa_preview",
+    {
+      title: "Build lead batch QA preview",
+      description: "Run the old lead batch QA preflight as a read-only preview: validate emails, blocked source domains, company short names, AI intros, and Smartlead next steps without DB writes.",
+      inputSchema: {
+        leads: z.array(manualReviewPickupLeadSchema.extend({
+          company_name_short: z.string().optional(),
+          official_company_name: z.string().optional(),
+          original_name: z.string().optional(),
+          decision_maker_last_name: z.string().optional(),
+          scraped: z.object({
+            textPreview: z.string().optional(),
+            emails: z.array(z.string()).optional(),
+            phones: z.array(z.string()).optional(),
+          }).partial().optional(),
+          context: z.string().optional(),
+        })).min(1).max(1000),
+        campaignTag: z.string().optional(),
+        createdSince: z.string().optional(),
+        defaultSource: z.string().optional(),
+        campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+        offer: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        maxNextCalls: z.number().int().min(1).max(200).default(50),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildLeadBatchQaPreview(input))
   );
 
   server.registerTool(

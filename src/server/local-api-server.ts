@@ -66,6 +66,7 @@ import {
   parseLeadsCsv,
   previewSmartleadEmailRendering,
   buildSmartleadSequenceVariableRepairPreview,
+  buildLeadBatchQaPreview,
   previewLeadEnrichmentBatch,
   buildLeadEnrichmentMergePreview,
   prepareSmartleadLeads,
@@ -1706,6 +1707,21 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         replacementVariable: optionalString(payload.replacementVariable),
         includeConfigurePayload: payload.includeConfigurePayload !== false,
         leads: Array.isArray(payload.leads) ? payload.leads as Parameters<typeof buildSmartleadSequenceVariableRepairPreview>[0]["leads"] : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_lead_batch_qa_preview") {
+    writeJson(response, 200, {
+      result: buildLeadBatchQaPreview({
+        leads: (payload.leads ?? []) as Parameters<typeof buildLeadBatchQaPreview>[0]["leads"],
+        campaignTag: optionalString(payload.campaignTag),
+        createdSince: optionalString(payload.createdSince),
+        defaultSource: optionalString(payload.defaultSource),
+        campaignId: typeof payload.campaignId === "string" || typeof payload.campaignId === "number" || payload.campaignId === null ? payload.campaignId : undefined,
+        offer: optionalString(payload.offer),
+        language: payload.language === "en" ? "en" : "sk",
+        maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
       }),
     });
     return;

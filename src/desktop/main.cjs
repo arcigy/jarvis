@@ -3053,6 +3053,7 @@ function listWebMcpTools() {
     { name: "arcigy.draft_smartlead_campaign_sequence", requiresApproval: false },
     { name: "arcigy.preview_smartlead_email_rendering", requiresApproval: false },
     { name: "arcigy.build_smartlead_sequence_variable_repair_preview", requiresApproval: false },
+    { name: "arcigy.build_lead_batch_qa_preview", requiresApproval: false },
     { name: "arcigy.preview_manual_review_pickup", requiresApproval: false },
     { name: "arcigy.build_smartlead_injection_plan", requiresApproval: false },
     { name: "arcigy.build_smartlead_import_audit_preview", requiresApproval: false },

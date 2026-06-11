@@ -540,6 +540,19 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       leads: [{ email: "jan.novak@example.com", company_name: "Modelova Firma", custom_fields: { company_name_short: "Modelova Firma", personalized_intro: "Kratke AI intro." } }],
     };
   }
+  if (toolName === "arcigy.build_lead_batch_qa_preview") {
+    return {
+      campaignTag: "kuchyne-na-mieru",
+      campaignId: "123456",
+      leads: [
+        { id: "lead-1", email: "jan@ready.sk", companyName: "Ready Studio", companyNameShort: "Ready Studio - Kuchyne na mieru", firstName: "Jan", lastName: "Novak", website: "https://ready.sk", personalizedIntro: "Dobry den Jan, zaujali ma vase realizacie kuchyn na mieru." },
+        { id: "lead-2", email: "noreply@needs-email.sk", companyName: "Needs Email", website: "https://needs-email.sk", personalizedIntro: "Kratke AI intro." },
+        { id: "lead-3", email: "info@katalog.cz", companyName: "Katalog Lead", website: "https://firmy.cz/katalog-lead", personalizedIntro: "Zaujalo ma, ze mate pekny web." },
+      ],
+      offer: "AI asistent na odpovede a follow-up",
+      language: "sk",
+    };
+  }
   if (toolName === "arcigy.preview_manual_review_pickup") {
     return {
       minScore: 50,
