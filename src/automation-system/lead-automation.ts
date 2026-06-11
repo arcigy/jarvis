@@ -485,6 +485,37 @@ export type LeadRepairQueuePreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type SlovakRegisterBatchPreview = {
+  mode: "slovak-register-batch-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  source: { name?: string; parsedRows: number; warnings: string[] };
+  totals: {
+    input: number;
+    unique: number;
+    duplicates: number;
+    alreadyVerified: number;
+    needsLookup: number;
+    byIco: number;
+    byName: number;
+    missingLookupKey: number;
+    missingDecisionMaker: number;
+    mergeCandidates: number;
+  };
+  lookupQueue: Array<{
+    leadKey: string;
+    ico?: string;
+    companyName?: string;
+    reason: string;
+    priority: number;
+    lead: LeadRepairQueueLead;
+  }>;
+  alreadyVerified: LeadRepairQueueLead[];
+  missingLookupKey: LeadRepairQueueLead[];
+  duplicates: ReturnType<typeof dedupeLeadCandidates>["duplicates"];
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type OrphanLeadAssignmentPreview = {
   mode: "orphan-lead-assignment-preview";
   status: "ready" | "attention" | "blocked";
@@ -3482,6 +3513,104 @@ export function buildLeadRepairQueuePreview(input: {
     duplicates: deduped.duplicates,
     repairBatches: { websitesToScrape, introsToDraft, registerLookups },
     nextToolCalls: dedupeNextToolCalls(nextToolCalls).slice(0, maxNextCalls),
+  };
+}
+
+export function buildSlovakRegisterBatchPreview(input: {
+  leads?: LeadRepairQueueLead[];
+  csvText?: string;
+  delimiter?: "," | ";";
+  maxRows?: number;
+  sourceName?: string;
+  includeAlreadyVerified?: boolean;
+  maxLookups?: number;
+  offer?: string;
+  language?: "sk" | "en";
+  minScore?: number;
+}): SlovakRegisterBatchPreview {
+  const parsed = input.csvText ? parseLeadsCsv({ csvText: input.csvText, delimiter: input.delimiter, maxRows: input.maxRows }) : { leads: [] as LeadCsvRow[], skipped: [] as Array<{ rowNumber: number; reason: string }>, headers: [] as string[] };
+  const sourceLeads = [...(input.leads ?? []), ...parsed.leads].map((lead) => normalizePipelineLead(lead, input.sourceName, input.sourceName) as LeadRepairQueueLead);
+  const deduped = dedupeLeadCandidates({ leads: sourceLeads });
+  const includeAlreadyVerified = input.includeAlreadyVerified === true;
+  const maxLookups = Math.min(Math.max(Math.trunc(input.maxLookups ?? 25), 1), 80);
+  const alreadyVerified: LeadRepairQueueLead[] = [];
+  const missingLookupKey: LeadRepairQueueLead[] = [];
+  const lookupQueue: SlovakRegisterBatchPreview["lookupQueue"] = [];
+
+  for (const lead of deduped.unique as LeadRepairQueueLead[]) {
+    const registerFound = lead.register?.found === true || booleanField(lead.customFields ?? {}, "register_verified", "orsr_verified") === true;
+    const decisionMaker = decisionMakerForLead(lead) ?? lead.register?.executives?.[0] ?? stringField(lead.customFields ?? {}, "decision_maker_name");
+    if (registerFound && !includeAlreadyVerified) {
+      alreadyVerified.push(lead);
+      continue;
+    }
+    const ico = stringField(lead, "ico") ?? stringField(lead.customFields ?? {}, "ico", "ICO");
+    const companyName = companyNameForLead(lead) ?? stringField(lead.customFields ?? {}, "company", "company_name", "official_company_name");
+    if (!ico && !companyName) {
+      missingLookupKey.push(lead);
+      continue;
+    }
+    const leadKey = leadIdentityKey(lead)?.value ?? `${ico ?? ""}|${companyName ?? ""}`.toLowerCase();
+    const priority = (ico ? 60 : 35) + (decisionMaker ? 0 : 25) + (lead.email ? 5 : 0) + (lead.website ? 5 : 0);
+    lookupQueue.push({
+      leadKey,
+      ico,
+      companyName,
+      reason: decisionMaker ? "register verification and official company fields" : "missing decision maker / konatel",
+      priority,
+      lead,
+    });
+  }
+
+  lookupQueue.sort((a, b) => b.priority - a.priority || (a.companyName ?? "").localeCompare(b.companyName ?? ""));
+  const limitedLookups = lookupQueue.slice(0, maxLookups);
+  const nextToolCalls: SlovakRegisterBatchPreview["nextToolCalls"] = limitedLookups.slice(0, 10).map((item) => ({
+    tool: "arcigy.enrich_slovak_company_register",
+    payload: item.ico ? { ico: item.ico, companyName: item.companyName } : { companyName: item.companyName },
+    reason: item.reason,
+    approvalRequired: false,
+  }));
+  if (deduped.unique.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_lead_repair_queue_preview",
+      payload: { leads: deduped.unique, offer: input.offer, language: input.language ?? "sk", minScore: input.minScore ?? 70 },
+      reason: "Po register lookupoch znovu zisti, ktore leady este potrebuju email, intro alebo manual review.",
+      approvalRequired: false,
+    });
+  }
+  if (limitedLookups.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_lead_enrichment_merge_preview",
+      payload: { leads: deduped.unique, defaultSource: input.sourceName ?? "slovak-register-batch", minScore: input.minScore ?? 70 },
+      reason: "Po doplneni register vysledkov zluc enrichment data pred Smartlead importom.",
+      approvalRequired: false,
+    });
+  }
+  const missingDecisionMaker = (deduped.unique as LeadRepairQueueLead[]).filter((lead) => !decisionMakerForLead(lead) && !lead.register?.executives?.length && !stringField(lead.customFields ?? {}, "decision_maker_name")).length;
+  const totals = {
+    input: sourceLeads.length,
+    unique: deduped.unique.length,
+    duplicates: deduped.duplicates.length,
+    alreadyVerified: alreadyVerified.length,
+    needsLookup: lookupQueue.length,
+    byIco: lookupQueue.filter((item) => item.ico).length,
+    byName: lookupQueue.filter((item) => !item.ico && item.companyName).length,
+    missingLookupKey: missingLookupKey.length,
+    missingDecisionMaker,
+    mergeCandidates: limitedLookups.length,
+  };
+  const status: SlovakRegisterBatchPreview["status"] = totals.unique === 0 || (totals.needsLookup === 0 && totals.alreadyVerified === 0) ? "blocked" : totals.missingLookupKey > 0 ? "attention" : "ready";
+  return {
+    mode: "slovak-register-batch-preview",
+    status,
+    summary: `Slovak register batch: ${status}, ${totals.needsLookup} lookupov (${totals.byIco} ICO, ${totals.byName} nazov), ${totals.alreadyVerified} uz overenych, ${totals.missingLookupKey} bez ICO/nazvu. Ziadny zapis ani upload neprebehol.`,
+    source: { name: input.sourceName, parsedRows: parsed.leads.length, warnings: parsed.skipped.length ? [`Skipped ${parsed.skipped.length} CSV rows.`] : [] },
+    totals,
+    lookupQueue: limitedLookups,
+    alreadyVerified,
+    missingLookupKey,
+    duplicates: deduped.duplicates,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls),
   };
 }
 

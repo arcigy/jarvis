@@ -915,6 +915,21 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Build Slovak register batch enrichment queue",
+      tool: "arcigy.build_slovak_register_batch_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_slovak_register_batch_preview"),
+      body: {
+        sourceName: "kuchyne_sk_google_maps_2026-04-27.csv",
+        leads: [
+          { companyName: "Ready Studio s.r.o.", website: "https://ready.sk", ico: "12345678" },
+          { companyName: "Needs Konatel s.r.o.", website: "https://needs-konatel.sk" },
+        ],
+        maxLookups: 10,
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Score lead quality before import",
       tool: "arcigy.score_lead_quality",
       method: "POST",

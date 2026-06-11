@@ -33,6 +33,7 @@ import {
   buildOrphanLeadAssignmentPreview,
   buildUrlIntelligenceQueuePreview,
   buildLeadRepairQueuePreview,
+  buildSlovakRegisterBatchPreview,
   buildNicheOpsDashboardPreview,
   buildSuppressionListPreview,
   buildSmartleadHistorySuppressionPreview,
@@ -1787,6 +1788,33 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(await enrichSlovakCompanyRegister(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_slovak_register_batch_preview",
+    {
+      title: "Build Slovak register batch preview",
+      description: "Prepare a read-only ORSR/Slovak register enrichment queue for many leads, including ICO/name lookup calls and repair/merge next steps.",
+      inputSchema: {
+        leads: z.array(z.object({}).passthrough()).optional(),
+        csvText: z.string().optional(),
+        delimiter: z.enum([",", ";"]).optional(),
+        maxRows: z.number().int().min(1).max(10_000).default(1000),
+        sourceName: z.string().optional(),
+        includeAlreadyVerified: z.boolean().default(false),
+        maxLookups: z.number().int().min(1).max(80).default(25),
+        offer: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        minScore: z.number().int().min(0).max(100).default(70),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildSlovakRegisterBatchPreview(input as Parameters<typeof buildSlovakRegisterBatchPreview>[0]))
   );
 
   server.registerTool(

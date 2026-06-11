@@ -34,6 +34,7 @@ import {
   buildLeadSourceBundleCampaignLaunchPreview,
   buildUrlIntelligenceQueuePreview,
   buildLeadRepairQueuePreview,
+  buildSlovakRegisterBatchPreview,
   buildOrphanLeadAssignmentPreview,
   buildNicheOpsDashboardPreview,
   buildColdOutreachCsvImportPreview,
@@ -172,6 +173,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.scrape_website_contacts",
     "arcigy.batch_scrape_website_contacts",
     "arcigy.enrich_slovak_company_register",
+    "arcigy.build_slovak_register_batch_preview",
     "arcigy.score_lead_quality",
     "arcigy.dedupe_lead_candidates",
     "arcigy.build_suppression_list_preview",
@@ -1469,7 +1471,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 110 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 111 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -3294,6 +3296,32 @@ test("lead repair queue preview detects broken leads and proposes safe fixes", (
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_scrape_website_contacts" && !call.approvalRequired));
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_draft_lead_intros" && !call.approvalRequired));
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_manual_review_queue" && !call.approvalRequired));
+  assert.match(preview.summary, /Ziadny zapis ani upload/);
+});
+
+test("Slovak register batch preview prepares ORSR lookup queue without writes", () => {
+  const preview = buildSlovakRegisterBatchPreview({
+    sourceName: "old-google-maps-export",
+    leads: [
+      { companyName: "Ready Studio s.r.o.", website: "https://ready.sk", ico: "12345678" },
+      { companyName: "Needs Konatel s.r.o.", website: "https://needs-konatel.sk", email: "info@needs-konatel.sk" },
+      { website: "https://missing-name.sk" },
+      { companyName: "Verified s.r.o.", register: { found: true, executives: ["Jan Novak"] } },
+    ],
+    maxLookups: 5,
+  });
+
+  assert.equal(preview.mode, "slovak-register-batch-preview");
+  assert.equal(preview.totals.input, 4);
+  assert.equal(preview.totals.needsLookup, 2);
+  assert.equal(preview.totals.byIco, 1);
+  assert.equal(preview.totals.byName, 1);
+  assert.equal(preview.totals.alreadyVerified, 1);
+  assert.equal(preview.totals.missingLookupKey, 1);
+  assert.ok(preview.lookupQueue[0].priority >= preview.lookupQueue[1].priority);
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.enrich_slovak_company_register" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_lead_repair_queue_preview" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_lead_enrichment_merge_preview" && !call.approvalRequired));
   assert.match(preview.summary, /Ziadny zapis ani upload/);
 });
 

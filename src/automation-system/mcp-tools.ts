@@ -63,6 +63,7 @@ export type JarvisMcpToolName =
   | "arcigy.scrape_website_contacts"
   | "arcigy.batch_scrape_website_contacts"
   | "arcigy.enrich_slovak_company_register"
+  | "arcigy.build_slovak_register_batch_preview"
   | "arcigy.score_lead_quality"
   | "arcigy.dedupe_lead_candidates"
   | "arcigy.build_suppression_list_preview"
@@ -448,6 +449,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.enrich_slovak_company_register",
       description: "Read-only vyhlada slovensku firmu v ORSR podla ICO alebo nazvu a vytiahne firmu, adresu a konatelov.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_slovak_register_batch_preview",
+      description: "Pripravi batch ORSR/register enrichment frontu pre leady s ICO/nazvom, next lookup calls a repair/merge krokmi bez zapisu.",
       requiresApproval: false,
     },
     {

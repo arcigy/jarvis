@@ -32,6 +32,7 @@ import {
   buildOrphanLeadAssignmentPreview,
   buildUrlIntelligenceQueuePreview,
   buildLeadRepairQueuePreview,
+  buildSlovakRegisterBatchPreview,
   buildNicheOpsDashboardPreview,
   buildSuppressionListPreview,
   buildSmartleadHistorySuppressionPreview,
@@ -1479,6 +1480,23 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
       result: await enrichSlovakCompanyRegister({
         ico: optionalString(payload.ico),
         companyName: optionalString(payload.companyName),
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_slovak_register_batch_preview") {
+    writeJson(response, 200, {
+      result: buildSlovakRegisterBatchPreview({
+        leads: Array.isArray(payload.leads) ? payload.leads as Parameters<typeof buildSlovakRegisterBatchPreview>[0]["leads"] : undefined,
+        csvText: optionalString(payload.csvText),
+        delimiter: payload.delimiter === ";" ? ";" : payload.delimiter === "," ? "," : undefined,
+        maxRows: typeof payload.maxRows === "number" ? payload.maxRows : undefined,
+        sourceName: optionalString(payload.sourceName),
+        includeAlreadyVerified: payload.includeAlreadyVerified === true,
+        maxLookups: typeof payload.maxLookups === "number" ? payload.maxLookups : undefined,
+        offer: optionalString(payload.offer),
+        language: payload.language === "en" ? "en" : "sk",
+        minScore: typeof payload.minScore === "number" ? payload.minScore : undefined,
       }),
     });
     return;
