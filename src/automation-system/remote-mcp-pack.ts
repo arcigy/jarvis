@@ -1986,6 +1986,14 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Triage unread Gmail inbox",
+      tool: "arcigy.get_gmail_unread_triage",
+      method: "POST",
+      url: toolUrl("arcigy.get_gmail_unread_triage"),
+      body: { query: "is:unread category:primary", maxResults: 10, includeBody: true, maxNextCalls: 10 },
+      approvalRequired: false,
+    },
+    {
       label: "Generate contract documents after approval",
       tool: "arcigy.generate_contract_documents",
       method: "POST",

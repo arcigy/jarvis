@@ -4,6 +4,7 @@ import type { FetchLike } from "./gemini.ts";
 
 export const defaultGmailSyncQuery = "in:inbox newer_than:7d";
 export const defaultGmailBriefingQuery = "in:inbox newer_than:2d";
+export const defaultGmailUnreadTriageQuery = "is:unread category:primary";
 const googleOAuthTokenUrls = ["https://oauth2.googleapis.com/token", "https://www.googleapis.com/oauth2/v4/token"];
 
 export type GmailAccount = {
@@ -71,6 +72,44 @@ export type GmailLeadContextResult = {
   accounts: Array<{ envKey: string; label: string; status: "ready" | "empty" | "failed"; messageCount: number; error?: string }>;
   messages: GmailLeadContextMessage[];
   latestLeadMessage?: GmailLeadContextMessage;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
+export type GmailUnreadTriageMessage = {
+  accountEnvKey: string;
+  accountLabel: string;
+  messageId: string;
+  threadId: string;
+  from: string;
+  to: string;
+  fromEmail: string;
+  toEmails: string[];
+  displayName?: string;
+  subject?: string;
+  date?: string;
+  occurredAt?: string;
+  snippet?: string;
+  body?: string;
+  category: "likely_lead_reply" | "automated" | "internal" | "unknown";
+  reasons: string[];
+};
+
+export type GmailUnreadTriageResult = {
+  mode: "gmail-unread-triage-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  query: string;
+  totals: {
+    accountsChecked: number;
+    accountsWithUnread: number;
+    messages: number;
+    likelyLeadReplies: number;
+    automated: number;
+    internal: number;
+    unknown: number;
+  };
+  accounts: Array<{ envKey: string; label: string; status: "ready" | "empty" | "failed"; messageCount: number; error?: string }>;
+  messages: GmailUnreadTriageMessage[];
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
@@ -278,6 +317,108 @@ export async function fetchGmailLeadContext(
   };
 }
 
+export async function fetchGmailUnreadTriage(
+  input: { accountEnvKey?: string; query?: string; maxResults?: number; includeBody?: boolean; maxNextCalls?: number } = {},
+  env: RuntimeEnv = process.env,
+  fetchImpl: FetchLike = fetch
+): Promise<GmailUnreadTriageResult> {
+  const maxResults = Math.min(Math.max(Math.trunc(input.maxResults ?? 20), 1), 50);
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 20), 1), 50);
+  const query = input.query?.trim() || defaultGmailUnreadTriageQuery;
+  const accounts = listConfiguredGmailAccounts(env).filter((account) => !input.accountEnvKey || account.envKey === input.accountEnvKey);
+  if (!accounts.length) {
+    throw new Error(input.accountEnvKey ? `Configured Gmail account not found: ${input.accountEnvKey}` : "No configured Gmail accounts found.");
+  }
+  const accountResults: GmailUnreadTriageResult["accounts"] = [];
+  const messages: GmailUnreadTriageMessage[] = [];
+  for (const account of accounts) {
+    try {
+      const accessToken = await refreshGoogleAccessToken(account.refreshToken, env, fetchImpl);
+      const params = new URLSearchParams({ maxResults: String(maxResults), q: query });
+      const listResponse = await gmailFetch<GmailListResponse>(
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages?${params.toString()}`,
+        accessToken,
+        fetchImpl
+      );
+      const ids = listResponse.messages ?? [];
+      for (const item of ids) {
+        const detail = await gmailFetch<GmailMessageResponse>(
+          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(item.id)}?format=${input.includeBody === false ? "metadata" : "full"}&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date`,
+          accessToken,
+          fetchImpl
+        );
+        messages.push(normalizeGmailUnreadMessage(detail, account, input.includeBody !== false));
+      }
+      accountResults.push({ envKey: account.envKey, label: account.label, status: ids.length ? "ready" : "empty", messageCount: ids.length });
+    } catch (error) {
+      accountResults.push({
+        envKey: account.envKey,
+        label: account.label,
+        status: "failed",
+        messageCount: 0,
+        error: redactSensitiveText(error instanceof Error ? error.message : String(error)),
+      });
+    }
+  }
+  const sorted = messages.sort((a, b) => new Date(b.occurredAt ?? b.date ?? 0).getTime() - new Date(a.occurredAt ?? a.date ?? 0).getTime());
+  const nextToolCalls: GmailUnreadTriageResult["nextToolCalls"] = [];
+  for (const message of sorted.filter((item) => item.category === "likely_lead_reply").slice(0, maxNextCalls)) {
+    nextToolCalls.push(
+      {
+        tool: "arcigy.get_gmail_lead_context",
+        payload: { leadEmail: message.fromEmail, accountEnvKey: message.accountEnvKey, maxMessages: 10, includeBody: true },
+        reason: "Najst celu Gmail historiu leadu pred navrhom odpovede.",
+        approvalRequired: false,
+      },
+      {
+        tool: "arcigy.preview_gmail_ai_reply",
+        payload: {
+          senderEmail: message.accountLabel,
+          fromEmail: message.fromEmail,
+          subject: message.subject,
+          body: message.body || message.snippet || "",
+          threadId: message.threadId,
+          messageId: message.messageId,
+          leadName: message.displayName,
+          leadKnown: false,
+          threadStartedByUs: false,
+          generateDraft: false,
+        },
+        reason: "Pripravit bezpecny draft odpovede na unread Gmail spravu bez odoslania.",
+        approvalRequired: false,
+      }
+    );
+  }
+  if (sorted.length) {
+    nextToolCalls.push({
+      tool: "arcigy.sync_gmail_recent_messages",
+      payload: { dryRun: true, query, maxResults },
+      reason: "Volitelne porovnat unread triage so sync workflowom najprv v dry-run rezime.",
+      approvalRequired: false,
+    });
+  }
+  const totals = {
+    accountsChecked: accountResults.length,
+    accountsWithUnread: accountResults.filter((account) => account.messageCount > 0).length,
+    messages: sorted.length,
+    likelyLeadReplies: sorted.filter((message) => message.category === "likely_lead_reply").length,
+    automated: sorted.filter((message) => message.category === "automated").length,
+    internal: sorted.filter((message) => message.category === "internal").length,
+    unknown: sorted.filter((message) => message.category === "unknown").length,
+  };
+  const status: GmailUnreadTriageResult["status"] = totals.messages ? "ready" : accountResults.some((account) => account.status === "failed") ? "attention" : "blocked";
+  return {
+    mode: "gmail-unread-triage-preview",
+    status,
+    summary: `Gmail unread triage ${status}: ${totals.messages} unread message(s), ${totals.likelyLeadReplies} likely lead replies, ${totals.automated} automated, ${totals.internal} internal. Ziadny zapis, label ani odoslanie neprebehlo.`,
+    query,
+    totals,
+    accounts: accountResults,
+    messages: sorted,
+    nextToolCalls: dedupeGmailNextToolCalls(nextToolCalls),
+  };
+}
+
 export async function sendGmailTextMessage(
   account: GmailAccount,
   input: GmailSendInput,
@@ -372,8 +513,68 @@ function normalizeGmailLeadMessage(detail: GmailMessageResponse, account: GmailA
   };
 }
 
+function normalizeGmailUnreadMessage(detail: GmailMessageResponse, account: GmailAccount, includeBody: boolean): GmailUnreadTriageMessage {
+  const headers = new Map((detail.payload?.headers ?? []).map((header) => [header.name.toLowerCase(), header.value]));
+  const from = headers.get("from") ?? "";
+  const to = headers.get("to") ?? "";
+  const parsedFrom = parseFromHeader(from);
+  const body = includeBody ? extractGmailBody(detail.payload) : undefined;
+  const classification = classifyGmailUnreadMessage(parsedFrom.email, headers.get("subject") ?? "", body || detail.snippet || "");
+  return {
+    accountEnvKey: account.envKey,
+    accountLabel: account.label,
+    messageId: detail.id,
+    threadId: detail.threadId,
+    from,
+    to,
+    fromEmail: parsedFrom.email,
+    toEmails: extractEmails(to),
+    displayName: parsedFrom.displayName,
+    subject: headers.get("subject"),
+    date: headers.get("date"),
+    occurredAt: detail.internalDate ? new Date(Number(detail.internalDate)).toISOString() : headers.get("date"),
+    snippet: detail.snippet,
+    body,
+    category: classification.category,
+    reasons: classification.reasons,
+  };
+}
+
+function classifyGmailUnreadMessage(fromEmail: string, subject: string, text: string): { category: GmailUnreadTriageMessage["category"]; reasons: string[] } {
+  const lower = `${fromEmail} ${subject} ${text}`.toLowerCase();
+  const reasons: string[] = [];
+  if (!fromEmail || !fromEmail.includes("@")) {
+    return { category: "unknown", reasons: ["missing_from_email"] };
+  }
+  if (/(^|[+._-])(no-?reply|noreply|mailer-daemon|notification|notifications|bounce|postmaster)@/.test(fromEmail) || /unsubscribe|delivery status notification|automatick|auto.?reply|out of office/i.test(lower)) {
+    reasons.push("automated_sender_or_content");
+    return { category: "automated", reasons };
+  }
+  if (/@arcigy\./i.test(fromEmail) || /@arcigy\.group$/i.test(fromEmail)) {
+    reasons.push("arcigy_internal_sender");
+    return { category: "internal", reasons };
+  }
+  if (/re:|odpoved|reply|pros[ií]m|zaujem|m[aá]m z[aá]ujem|po[sš]lite|uk[aá][zž]ku|kontaktujte|ponuku/i.test(`${subject} ${text}`)) {
+    reasons.push("reply_or_interest_language");
+  }
+  if (!/^(info|kontakt|office|admin|mail|hello)@/i.test(fromEmail)) {
+    reasons.push("person_like_sender");
+  }
+  return { category: reasons.length ? "likely_lead_reply" : "unknown", reasons: reasons.length ? reasons : ["no_clear_signal"] };
+}
+
 function extractEmails(value: string): string[] {
   return [...value.matchAll(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi)].map((match) => match[0].toLowerCase());
+}
+
+function dedupeGmailNextToolCalls(calls: GmailUnreadTriageResult["nextToolCalls"]): GmailUnreadTriageResult["nextToolCalls"] {
+  const seen = new Set<string>();
+  return calls.filter((call) => {
+    const key = `${call.tool}:${JSON.stringify(call.payload)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function extractGmailBody(payload: GmailMessageResponse["payload"]): string | undefined {

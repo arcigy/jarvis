@@ -12,7 +12,7 @@ import { draftContractIntake, parseJsonObject } from "../src/automation-system/c
 import { runIntegrationDiagnostics } from "../src/automation-system/diagnostics.ts";
 import { getIntegrationHealth } from "../src/automation-system/env.ts";
 import { buildClientReplyPrompt, buildPositiveOutreachReplyPrompt, generateGeminiText } from "../src/automation-system/gemini.ts";
-import { defaultGmailSyncQuery, encodeGmailRawMessage, fetchGmailLeadContext, listRecentGmailMessageEvents, parseFromHeader, refreshGoogleAccessToken, sendGmailTextMessage } from "../src/automation-system/gmail.ts";
+import { defaultGmailSyncQuery, encodeGmailRawMessage, fetchGmailLeadContext, fetchGmailUnreadTriage, listRecentGmailMessageEvents, parseFromHeader, refreshGoogleAccessToken, sendGmailTextMessage } from "../src/automation-system/gmail.ts";
 import { batchFetchPublicUrlPreviews, fetchPublicUrlPreview } from "../src/automation-system/http-fetch.ts";
 import { appendRowsToGoogleSheet, discoverLeads, replaceGoogleSheetRows, searchGooglePlaces, searchSerper } from "../src/automation-system/lead-discovery.ts";
 import {
@@ -166,6 +166,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.generate_ai_reply",
     "arcigy.sync_gmail_recent_messages",
     "arcigy.get_gmail_lead_context",
+    "arcigy.get_gmail_unread_triage",
     "arcigy.get_smartlead_campaign_status",
     "arcigy.get_smartlead_outreach_brief",
     "arcigy.get_smartlead_campaign_leads",
@@ -440,11 +441,13 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.ok(paths.includes("/api/mcp/arcigy.get_production_completion_score"));
   assert.ok(paths.includes("/api/mcp/arcigy.get_jarvis_capability_audit"));
   assert.ok(paths.includes("/api/mcp/arcigy.get_gmail_lead_context"));
+  assert.ok(paths.includes("/api/mcp/arcigy.get_gmail_unread_triage"));
   const operatorBriefing = document.paths["/api/mcp/arcigy.get_operator_briefing"] as OpenApiPathFixture;
   const attentionDigest = document.paths["/api/mcp/arcigy.get_proactive_attention_digest"] as OpenApiPathFixture;
   const completionScore = document.paths["/api/mcp/arcigy.get_production_completion_score"] as OpenApiPathFixture;
   const gmailSync = document.paths["/api/mcp/arcigy.sync_gmail_recent_messages"] as OpenApiPathFixture;
   const gmailLeadContext = document.paths["/api/mcp/arcigy.get_gmail_lead_context"] as OpenApiPathFixture;
+  const gmailUnreadTriage = document.paths["/api/mcp/arcigy.get_gmail_unread_triage"] as OpenApiPathFixture;
   const contractGenerate = document.paths["/api/mcp/arcigy.generate_contract_documents"] as OpenApiPathFixture;
   assert.equal(operatorBriefing.post.requestBody.content["application/json"].examples.quickStart.value.live, false);
   assert.equal(attentionDigest.post.requestBody.content["application/json"].examples.quickStart.value.syncGmail, false);
@@ -452,6 +455,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.equal(operatorBriefing.post.requestBody.content["application/json"].examples.quickStart.value.syncGmail, false);
   assert.equal(gmailSync.post.requestBody.content["application/json"].examples.quickStart.value.dryRun, true);
   assert.equal(gmailLeadContext.post.requestBody.content["application/json"].examples.quickStart.value.leadEmail, "lead@example.com");
+  assert.equal(gmailUnreadTriage.post.requestBody.content["application/json"].examples.quickStart.value.query, "is:unread category:primary");
   assert.equal(contractGenerate.post["x-arcigy-requiresApproval"], true);
   assert.equal(contractGenerate.post.requestBody.content["application/json"].examples.quickStart.value.approval.approved, true);
   assert.equal(JSON.stringify(document).includes("<JARVIS_WEB_TOKEN>"), true);
@@ -1517,7 +1521,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 127 toolov, 13 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 128 toolov, 13 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -2458,6 +2462,73 @@ test("Gmail lead context fetches display name history and reply preview call", a
   assert.ok(result.nextToolCalls.some((call) => call.tool === "arcigy.preview_gmail_ai_reply" && !call.approvalRequired));
   assert.ok(calls.some((url) => url.includes("q=lead%40example.com")));
   assert.match(result.summary, /Ziadny zapis ani odoslanie/);
+});
+
+test("Gmail unread triage separates lead replies from automated messages", async () => {
+  const calls: string[] = [];
+  const leadBody = "Dobry den, poslite mi prosim ukazku.";
+  const fetchImpl = async (url: string | URL | Request) => {
+    const target = String(url);
+    calls.push(target);
+    if (target.includes("oauth2.googleapis.com")) return responseJson({ access_token: "gmail-access" });
+    if (target.includes("/gmail/v1/users/me/messages?")) {
+      return responseJson({ messages: [{ id: "msg-lead", threadId: "thread-lead" }, { id: "msg-auto", threadId: "thread-auto" }] });
+    }
+    if (target.includes("/messages/msg-lead")) {
+      return responseJson({
+        id: "msg-lead",
+        threadId: "thread-lead",
+        internalDate: "1780003600000",
+        snippet: leadBody,
+        payload: {
+          mimeType: "text/plain",
+          headers: [
+            { name: "From", value: "Jan Novak <lead@example.com>" },
+            { name: "To", value: "Branislav <branislav@arcigy.group>" },
+            { name: "Subject", value: "Re: Otazka" },
+            { name: "Date", value: "Mon, 01 Jun 2026 11:00:00 +0000" },
+          ],
+          body: { data: Buffer.from(leadBody, "utf-8").toString("base64url") },
+        },
+      });
+    }
+    if (target.includes("/messages/msg-auto")) {
+      return responseJson({
+        id: "msg-auto",
+        threadId: "thread-auto",
+        internalDate: "1780007200000",
+        snippet: "Delivery status notification",
+        payload: {
+          mimeType: "text/plain",
+          headers: [
+            { name: "From", value: "no-reply@example.com" },
+            { name: "To", value: "Branislav <branislav@arcigy.group>" },
+            { name: "Subject", value: "Delivery status notification" },
+            { name: "Date", value: "Mon, 01 Jun 2026 12:00:00 +0000" },
+          ],
+          body: { data: Buffer.from("Automated delivery status notification.", "utf-8").toString("base64url") },
+        },
+      });
+    }
+    throw new Error(`Unexpected URL: ${target}`);
+  };
+
+  const result = await fetchGmailUnreadTriage(
+    { accountEnvKey: "GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP", maxResults: 5 },
+    { GOOGLE_CLIENT_ID: "client", GOOGLE_CLIENT_SECRET: "secret", GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP: "refresh" },
+    fetchImpl as typeof fetch
+  );
+
+  assert.equal(result.mode, "gmail-unread-triage-preview");
+  assert.equal(result.status, "ready");
+  assert.equal(result.totals.messages, 2);
+  assert.equal(result.totals.likelyLeadReplies, 1);
+  assert.equal(result.totals.automated, 1);
+  assert.equal(result.messages.find((message) => message.messageId === "msg-lead")?.category, "likely_lead_reply");
+  assert.ok(result.nextToolCalls.some((call) => call.tool === "arcigy.get_gmail_lead_context" && call.payload.leadEmail === "lead@example.com"));
+  assert.ok(result.nextToolCalls.some((call) => call.tool === "arcigy.preview_gmail_ai_reply" && !call.approvalRequired));
+  assert.ok(calls.some((url) => new URL(url).searchParams.get("q") === "is:unread category:primary"));
+  assert.match(result.summary, /Ziadny zapis, label ani odoslanie/);
 });
 
 test("Gmail helper sends raw text messages through Gmail API", async () => {

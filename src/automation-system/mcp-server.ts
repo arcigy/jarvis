@@ -12,7 +12,7 @@ import { draftContractIntake } from "./contract-intake-draft.ts";
 import { runIntegrationDiagnostics } from "./diagnostics.ts";
 import { getIntegrationHealth, loadLocalEnv, summarizeIntegrationHealth } from "./env.ts";
 import { buildClientReplyPrompt, buildPositiveOutreachReplyPrompt, generateGeminiText } from "./gemini.ts";
-import { defaultGmailBriefingQuery, defaultGmailSyncQuery, fetchGmailLeadContext, listConfiguredGmailAccounts, listRecentGmailMessageEvents, sendGmailTextMessage } from "./gmail.ts";
+import { defaultGmailBriefingQuery, defaultGmailSyncQuery, defaultGmailUnreadTriageQuery, fetchGmailLeadContext, fetchGmailUnreadTriage, listConfiguredGmailAccounts, listRecentGmailMessageEvents, sendGmailTextMessage } from "./gmail.ts";
 import { batchFetchPublicUrlPreviews, fetchPublicUrlPreview } from "./http-fetch.ts";
 import { handleJarvisVoiceEvent, type JarvisVoiceSession } from "./jarvis-voice.ts";
 import { buildJarvisCapabilityAudit, summarizeJarvisCapabilityAuditForVoice } from "./jarvis-capability-audit.ts";
@@ -1276,6 +1276,28 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(await fetchGmailLeadContext(input))
+  );
+
+  server.registerTool(
+    "arcigy.get_gmail_unread_triage",
+    {
+      title: "Get Gmail unread triage",
+      description: "Read-only triage for unread primary Gmail messages across configured accounts. Separates likely lead replies from automated/internal mail and prepares safe context/reply-preview next calls without labels, writes, or sends.",
+      inputSchema: {
+        accountEnvKey: z.string().optional(),
+        query: z.string().default(defaultGmailUnreadTriageQuery),
+        maxResults: z.number().int().min(1).max(50).default(20),
+        includeBody: z.boolean().default(true),
+        maxNextCalls: z.number().int().min(1).max(50).default(20),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (input) => jsonResult(await fetchGmailUnreadTriage(input))
   );
 
   server.registerTool(
