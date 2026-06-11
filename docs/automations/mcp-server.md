@@ -105,6 +105,7 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.generate_ai_reply`: uses Gemini to draft a client reply without sending it.
 - `arcigy.sync_gmail_recent_messages`: fetches Gmail messages and ingests client requests into SQLite.
 - `arcigy.get_gmail_lead_context`: read-only Gmail lookup for one lead email across configured accounts, returning display name, sorted message context, latest lead reply, and safe next reply-preview calls without writing.
+- `arcigy.lookup_public_email_profile`: read-only public Gravatar lookup for a lead email, returning name/avatar hints and an identity-repair next call without writing.
 - `arcigy.get_gmail_unread_triage`: read-only unread primary inbox triage across configured Gmail accounts, separating likely lead replies from automated/internal mail and preparing context/reply-preview next calls without labels, writes, or sends.
 - `arcigy.label_gmail_thread`: approval-required Gmail write that creates or finds a label, applies it to a thread, and can mark it read after the operator confirms the exact payload.
 - `arcigy.get_smartlead_campaign_status`: reads Smartlead campaigns or campaign statistics.

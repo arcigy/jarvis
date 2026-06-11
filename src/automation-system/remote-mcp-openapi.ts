@@ -279,6 +279,7 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
   if (toolName === "arcigy.generate_ai_reply") return { message: "Potrebujem upravit onboarding automatizaciu do piatku.", language: "sk", tone: "executive" };
   if (toolName === "arcigy.sync_gmail_recent_messages") return { dryRun: true, maxResults: 5 };
   if (toolName === "arcigy.get_gmail_lead_context") return { leadEmail: "lead@example.com", maxMessages: 10, includeBody: true };
+  if (toolName === "arcigy.lookup_public_email_profile") return { email: "jan.novak@example.com", companyName: "Modelova Firma", website: "https://example.com", sourceName: "lead-enrichment" };
   if (toolName === "arcigy.get_gmail_unread_triage") return { query: "is:unread category:primary", maxResults: 10, includeBody: true, maxNextCalls: 10 };
   if (toolName === "arcigy.label_gmail_thread") return { accountEnvKey: "GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP", threadId: "thread-123", labelName: "Jarvis/Handled", markRead: true, approval: { approved: true } };
   if (toolName === "arcigy.build_local_lead_register_update_preview") return { primaryEmail: "lead@example.com", companyName: "Arcigy s. r. o.", ico: "12345678", data: { source: "manual-review" } };

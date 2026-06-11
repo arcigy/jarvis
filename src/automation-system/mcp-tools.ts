@@ -46,6 +46,7 @@ export type JarvisMcpToolName =
   | "arcigy.generate_ai_reply"
   | "arcigy.sync_gmail_recent_messages"
   | "arcigy.get_gmail_lead_context"
+  | "arcigy.lookup_public_email_profile"
   | "arcigy.get_gmail_unread_triage"
   | "arcigy.label_gmail_thread"
   | "arcigy.get_smartlead_campaign_status"
@@ -395,6 +396,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.get_gmail_lead_context",
       description: "Read-only vyhlada lead email v Gmail uctoch, vrati display name, historiu threadu a safe dalsi preview_gmail_ai_reply krok bez zapisu.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.lookup_public_email_profile",
+      description: "Read-only vyhlada verejny email profil cez Gravatar, vrati meno/avatar signaly a identity repair next call bez zapisu.",
       requiresApproval: false,
     },
     {

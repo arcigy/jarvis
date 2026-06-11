@@ -100,6 +100,7 @@ import { buildProactiveAttentionDigest } from "./proactive-attention-digest.ts";
 import { buildProductionCompletionScore, summarizeProductionCompletionScoreForVoice } from "./production-completion-score.ts";
 import { buildProductionReadinessReport } from "./production-readiness.ts";
 import { getProductionVerificationEvidence } from "./production-verification-evidence.ts";
+import { lookupPublicEmailProfile } from "./public-profile.ts";
 import { buildOutreachReplyTriagePreview, classifyOutreachReply, previewGmailAiReply, previewSmartleadAiReply } from "./reply-decision.ts";
 import { buildRemoteMcpConnectionPack } from "./remote-mcp-pack.ts";
 import { runRemoteMcpSmoke } from "./remote-mcp-smoke.ts";
@@ -1394,6 +1395,27 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(await fetchGmailLeadContext(input))
+  );
+
+  server.registerTool(
+    "arcigy.lookup_public_email_profile",
+    {
+      title: "Lookup public email profile",
+      description: "Read-only public profile lookup for a lead email via Gravatar. Returns public display/avatar hints and a safe lead identity repair next call without storing anything.",
+      inputSchema: {
+        email: z.string().email(),
+        companyName: z.string().optional(),
+        website: z.string().optional(),
+        sourceName: z.string().optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (input) => jsonResult(await lookupPublicEmailProfile(input))
   );
 
   server.registerTool(

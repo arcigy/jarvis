@@ -115,6 +115,7 @@ import {
 } from "../src/automation-system/jarvis-voice.ts";
 import { answerJarvisIntent, resolveJarvisIntentFromTranscript } from "../src/automation-system/jarvis-intents.ts";
 import { buildProductionReadinessReport } from "../src/automation-system/production-readiness.ts";
+import { lookupPublicEmailProfile } from "../src/automation-system/public-profile.ts";
 import { buildOperatorBriefing } from "../src/automation-system/operator-briefing.ts";
 import { buildLeadgenDailyReport, buildLeadgenEveningSummary, buildLeadgenOpsDigest, buildLeadgenSlackReportPreview, selectNextNiche } from "../src/automation-system/leadgen-report.ts";
 import { sendSlackMessage } from "../src/automation-system/slack.ts";
@@ -176,6 +177,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.generate_ai_reply",
     "arcigy.sync_gmail_recent_messages",
     "arcigy.get_gmail_lead_context",
+    "arcigy.lookup_public_email_profile",
     "arcigy.get_gmail_unread_triage",
     "arcigy.label_gmail_thread",
     "arcigy.get_smartlead_campaign_status",
@@ -468,6 +470,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.ok(paths.includes("/api/mcp/arcigy.get_local_niche_queue"));
   assert.ok(paths.includes("/api/mcp/arcigy.record_local_niche_run"));
   assert.ok(paths.includes("/api/mcp/arcigy.get_gmail_lead_context"));
+  assert.ok(paths.includes("/api/mcp/arcigy.lookup_public_email_profile"));
   assert.ok(paths.includes("/api/mcp/arcigy.get_gmail_unread_triage"));
   assert.ok(paths.includes("/api/mcp/arcigy.label_gmail_thread"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_local_lead_register_update_preview"));
@@ -485,6 +488,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   const localNicheRun = document.paths["/api/mcp/arcigy.record_local_niche_run"] as OpenApiPathFixture;
   const gmailSync = document.paths["/api/mcp/arcigy.sync_gmail_recent_messages"] as OpenApiPathFixture;
   const gmailLeadContext = document.paths["/api/mcp/arcigy.get_gmail_lead_context"] as OpenApiPathFixture;
+  const publicEmailProfile = document.paths["/api/mcp/arcigy.lookup_public_email_profile"] as OpenApiPathFixture;
   const gmailUnreadTriage = document.paths["/api/mcp/arcigy.get_gmail_unread_triage"] as OpenApiPathFixture;
   const gmailLabelThread = document.paths["/api/mcp/arcigy.label_gmail_thread"] as OpenApiPathFixture;
   const localLeadRegisterPreview = document.paths["/api/mcp/arcigy.build_local_lead_register_update_preview"] as OpenApiPathFixture;
@@ -509,6 +513,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.equal(operatorBriefing.post.requestBody.content["application/json"].examples.quickStart.value.syncGmail, false);
   assert.equal(gmailSync.post.requestBody.content["application/json"].examples.quickStart.value.dryRun, true);
   assert.equal(gmailLeadContext.post.requestBody.content["application/json"].examples.quickStart.value.leadEmail, "lead@example.com");
+  assert.equal(publicEmailProfile.post.requestBody.content["application/json"].examples.quickStart.value.email, "jan.novak@example.com");
   assert.equal(gmailUnreadTriage.post.requestBody.content["application/json"].examples.quickStart.value.query, "is:unread category:primary");
   assert.equal(gmailLabelThread.post["x-arcigy-requiresApproval"], true);
   assert.equal(gmailLabelThread.post.requestBody.content["application/json"].examples.quickStart.value.labelName, "Jarvis/Handled");
@@ -1853,6 +1858,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_local_lead_register_update_preview" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.apply_local_lead_register_update" && call.approvalRequired === true));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_lead_identity_repair_preview" && call.approvalRequired === false));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.lookup_public_email_profile" && call.body.email === "jan.novak@example.com" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.preview_smartlead_lead_sync" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_email_accounts" && call.body.requestedDailyLimit === 80 && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_campaign_webhooks" && call.approvalRequired === false));
@@ -3844,6 +3850,37 @@ test("lead identity repair preview infers names and prepares safe next steps", (
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_slovak_salutation_preview" && !call.approvalRequired));
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_manual_review_queue" && !call.approvalRequired));
   assert.match(preview.summary, /Ziadny zapis ani upload/);
+});
+
+test("public email profile lookup returns Gravatar hints without writes", async () => {
+  const calls: string[] = [];
+  const lookup = await lookupPublicEmailProfile(
+    { email: "Jan.Novak@example.com", companyName: "Modelova Firma", website: "https://example.com", sourceName: "lead-enrichment" },
+    (async (url: string) => {
+      calls.push(url);
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          entry: [{
+            displayName: "Jan Novak",
+            preferredUsername: "jnovak",
+            profileUrl: "https://gravatar.com/jnovak",
+            thumbnailUrl: "https://secure.gravatar.com/avatar/hash",
+          }],
+        }),
+      } as Response;
+    }) as typeof fetch
+  );
+
+  assert.equal(lookup.mode, "public-email-profile-lookup");
+  assert.equal(lookup.email, "jan.novak@example.com");
+  assert.equal(lookup.found, true);
+  assert.equal(lookup.leadHints.decisionMakerName, "Jan Novak");
+  assert.equal(lookup.leadHints.confidence, "high");
+  assert.match(calls[0], /^https:\/\/en\.gravatar\.com\/[a-f0-9]{32}\.json$/);
+  assert.ok(lookup.nextToolCalls.some((call) => call.tool === "arcigy.build_lead_identity_repair_preview" && !call.approvalRequired));
+  assert.match(lookup.summary, /Ziadny zapis/);
 });
 
 test("orphan lead assignment preview infers niche and prepares repair/import steps", () => {

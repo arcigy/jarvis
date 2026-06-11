@@ -95,6 +95,7 @@ import { buildProactiveAttentionDigest } from "../automation-system/proactive-at
 import { buildProductionCompletionScore, summarizeProductionCompletionScoreForVoice } from "../automation-system/production-completion-score.ts";
 import { buildProductionReadinessReport } from "../automation-system/production-readiness.ts";
 import { getProductionVerificationEvidence } from "../automation-system/production-verification-evidence.ts";
+import { lookupPublicEmailProfile } from "../automation-system/public-profile.ts";
 import { buildOutreachReplyTriagePreview, classifyOutreachReply, previewGmailAiReply, previewSmartleadAiReply } from "../automation-system/reply-decision.ts";
 import { buildRemoteMcpOpenApiDocument } from "../automation-system/remote-mcp-openapi.ts";
 import { buildRemoteMcpConnectionPack } from "../automation-system/remote-mcp-pack.ts";
@@ -1355,6 +1356,17 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         query: optionalString(payload.query),
         maxMessages: typeof payload.maxMessages === "number" ? payload.maxMessages : undefined,
         includeBody: payload.includeBody !== false,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.lookup_public_email_profile") {
+    writeJson(response, 200, {
+      result: await lookupPublicEmailProfile({
+        email: String(payload.email ?? ""),
+        companyName: optionalString(payload.companyName),
+        website: optionalString(payload.website),
+        sourceName: optionalString(payload.sourceName),
       }),
     });
     return;

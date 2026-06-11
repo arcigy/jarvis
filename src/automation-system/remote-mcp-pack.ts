@@ -2085,6 +2085,14 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Lookup public email profile",
+      tool: "arcigy.lookup_public_email_profile",
+      method: "POST",
+      url: toolUrl("arcigy.lookup_public_email_profile"),
+      body: { email: "jan.novak@example.com", companyName: "Modelova Firma", website: "https://example.com", sourceName: "lead-enrichment" },
+      approvalRequired: false,
+    },
+    {
       label: "Triage unread Gmail inbox",
       tool: "arcigy.get_gmail_unread_triage",
       method: "POST",

@@ -642,6 +642,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(openApiBody.paths["/api/mcp/arcigy.get_local_niche_queue"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.record_local_niche_run"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.get_gmail_lead_context"]);
+    assert.ok(openApiBody.paths["/api/mcp/arcigy.lookup_public_email_profile"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.get_gmail_unread_triage"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.label_gmail_thread"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.build_local_lead_register_update_preview"]);
@@ -659,6 +660,7 @@ test("local web bridge serves UI and API health", async () => {
     const openApiLocalNicheRun = openApiBody.paths["/api/mcp/arcigy.record_local_niche_run"] as OpenApiPathFixture;
     const openApiGmailSync = openApiBody.paths["/api/mcp/arcigy.sync_gmail_recent_messages"] as OpenApiPathFixture;
     const openApiGmailLeadContext = openApiBody.paths["/api/mcp/arcigy.get_gmail_lead_context"] as OpenApiPathFixture;
+    const openApiPublicEmailProfile = openApiBody.paths["/api/mcp/arcigy.lookup_public_email_profile"] as OpenApiPathFixture;
     const openApiGmailUnreadTriage = openApiBody.paths["/api/mcp/arcigy.get_gmail_unread_triage"] as OpenApiPathFixture;
     const openApiGmailLabelThread = openApiBody.paths["/api/mcp/arcigy.label_gmail_thread"] as OpenApiPathFixture;
     const openApiLocalLeadRegisterPreview = openApiBody.paths["/api/mcp/arcigy.build_local_lead_register_update_preview"] as OpenApiPathFixture;
@@ -680,6 +682,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(openApiOperator.post.requestBody.content["application/json"].examples.quickStart.value.syncGmail, false);
     assert.equal(openApiGmailSync.post.requestBody.content["application/json"].examples.quickStart.value.dryRun, true);
     assert.equal(openApiGmailLeadContext.post.requestBody.content["application/json"].examples.quickStart.value.leadEmail, "lead@example.com");
+    assert.equal(openApiPublicEmailProfile.post.requestBody.content["application/json"].examples.quickStart.value.email, "jan.novak@example.com");
     assert.equal(openApiGmailUnreadTriage.post.requestBody.content["application/json"].examples.quickStart.value.query, "is:unread category:primary");
     assert.equal(openApiGmailLabelThread.post["x-arcigy-requiresApproval"], true);
     assert.equal(openApiGmailLabelThread.post.requestBody.content["application/json"].examples.quickStart.value.approval.approved, true);
@@ -885,6 +888,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.send_approved_outreach_reply" && call.approvalRequired === true));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.sync_gmail_recent_messages" && call.body.dryRun === true));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_gmail_lead_context" && call.body.leadEmail === "lead@example.com"));
+    assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.lookup_public_email_profile" && call.body.email === "jan.novak@example.com"));
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.get_gmail_unread_triage" && call.body.query === "is:unread category:primary"));
     assert.ok(
       remotePackBody.quickStartCalls.some(
