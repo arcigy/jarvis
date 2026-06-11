@@ -3200,6 +3200,7 @@ function listWebMcpTools() {
     { name: "arcigy.label_gmail_thread", requiresApproval: true },
     { name: "arcigy.get_smartlead_campaign_status", requiresApproval: false },
     { name: "arcigy.get_smartlead_outreach_brief", requiresApproval: false },
+    { name: "arcigy.build_cold_outreach_monitor_runbook_preview", requiresApproval: false },
     { name: "arcigy.get_smartlead_campaign_leads", requiresApproval: false },
     { name: "arcigy.get_smartlead_email_accounts", requiresApproval: false },
     { name: "arcigy.preview_smartlead_lead_sync", requiresApproval: false },

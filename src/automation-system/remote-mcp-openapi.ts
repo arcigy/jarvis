@@ -309,6 +309,18 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
   if (toolName === "arcigy.build_local_lead_register_update_preview") return { primaryEmail: "lead@example.com", companyName: "Arcigy s. r. o.", ico: "12345678", data: { source: "manual-review" } };
   if (toolName === "arcigy.apply_local_lead_register_update") return { primaryEmail: "lead@example.com", kind: "lead", companyName: "Arcigy s. r. o.", data: { ico: "12345678", orsr_verified: true, decision_maker_name: "Jan Novak" }, approval: { approved: true } };
   if (toolName === "arcigy.get_smartlead_outreach_brief") return { periodLabel: "poslednych 7 dni" };
+  if (toolName === "arcigy.build_cold_outreach_monitor_runbook_preview") {
+    return {
+      windowLabel: "dnes",
+      campaigns: [{ campaignId: "123456", name: "Kuchyne SK", sent: 120, opened: 66, replies: 8, positiveReplies: 2, bounced: 1, unsubscribed: 0, nonRepliers: 112 }],
+      replyEvents: [
+        { source: "smartlead", campaignId: "123456", email: "lead@example.com", leadName: "Jan Novak", companyName: "Modelova Firma", replyBody: "Dobry den, poslite mi prosim ukazku.", category: "positive" },
+      ],
+      preparedReplies: [{ leadEmail: "lead@example.com", campaignId: "123456", draft: "Dobry den, posielam kratku ukazku..." }],
+      nonReplyLeads: [{ email: "no-reply@example.com", companyName: "No Reply Firma", website: "https://example.com", sentToSmartlead: true }],
+      maxNextCalls: 30,
+    };
+  }
   if (toolName === "arcigy.get_smartlead_campaign_leads") return { campaignId: "123456", offset: 0, limit: 100 };
   if (toolName === "arcigy.get_smartlead_email_accounts") return { includeInactive: false, requestedDailyLimit: 80, campaignId: "123456" };
   if (toolName === "arcigy.preview_smartlead_lead_sync") return { campaignIds: ["123456"], limitPerCampaign: 100 };

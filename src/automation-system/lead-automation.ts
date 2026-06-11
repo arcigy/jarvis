@@ -436,6 +436,53 @@ export type LeadgenMaintenanceRunbookPreview = {
   warnings: string[];
 };
 
+export type ColdOutreachMonitorRunbookPreview = {
+  mode: "cold-outreach-monitor-runbook-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  operatorBrief: string;
+  window: { label?: string; from?: string; to?: string };
+  totals: {
+    campaigns: number;
+    sent: number;
+    opened: number;
+    openRate: number;
+    replies: number;
+    replyRate: number;
+    positiveReplies: number;
+    positiveRate: number;
+    negativeReplies: number;
+    bounced: number;
+    unsubscribed: number;
+    nonRepliers: number;
+    preparedPositiveReplies: number;
+  };
+  campaigns: Array<{
+    campaignId?: string | number;
+    name?: string;
+    status?: string;
+    sent: number;
+    opened: number;
+    replies: number;
+    positiveReplies: number;
+    nonRepliers: number;
+    issues: string[];
+    nextAction: string;
+  }>;
+  positiveReplies: Array<{
+    source: "smartlead" | "gmail" | "manual";
+    campaignId?: string | number;
+    email?: string;
+    leadName?: string;
+    companyName?: string;
+    replyBody: string;
+    confidence: "high" | "medium" | "low";
+    nextAction: string;
+  }>;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+  warnings: string[];
+};
+
 export type LeadBatchQaPreview = {
   mode: "lead-batch-qa-preview";
   status: "ready" | "attention" | "blocked";
@@ -5012,6 +5059,242 @@ export function buildLeadgenMaintenanceRunbookPreview(input: {
       "Po AI intro cleanup/importe spusti lead batch QA a az potom Smartlead injection/import audit.",
       "Po ORSR/ICO opravach obnov Google Sheet review export, aby operator videl aktualny stav.",
     ],
+    warnings,
+  };
+}
+
+export function buildColdOutreachMonitorRunbookPreview(input: {
+  windowLabel?: string;
+  from?: string;
+  to?: string;
+  campaigns?: Array<Record<string, unknown> & {
+    campaignId?: string | number;
+    id?: string | number;
+    name?: string;
+    status?: string;
+    sent?: number;
+    sentCount?: number;
+    opened?: number;
+    openedCount?: number;
+    replies?: number;
+    replyCount?: number;
+    positiveReplies?: number;
+    negativeReplies?: number;
+    bounced?: number;
+    unsubscribed?: number;
+    totalLeads?: number;
+    nonRepliers?: number;
+  }>;
+  replyEvents?: Array<Record<string, unknown> & {
+    source?: "smartlead" | "gmail" | "manual";
+    campaignId?: string | number;
+    email?: string;
+    leadEmail?: string;
+    leadName?: string;
+    companyName?: string;
+    replyBody?: string;
+    body?: string;
+    classification?: string;
+    category?: string;
+    threadId?: string;
+    messageId?: string;
+    accountEnvKey?: string;
+    leadId?: string | number;
+  }>;
+  preparedReplies?: Array<{ email?: string; leadEmail?: string; campaignId?: string | number; body?: string; draft?: string }>;
+  nonReplyLeads?: Array<LeadCandidateInput & { sentToSmartlead?: boolean; sent_to_smartlead?: boolean }>;
+  includeReplyDrafts?: boolean;
+  includeNonReplyCalls?: boolean;
+  includeDeliverabilityGuard?: boolean;
+  maxNextCalls?: number;
+}): ColdOutreachMonitorRunbookPreview {
+  const campaignsInput = input.campaigns ?? [];
+  const replyEvents = input.replyEvents ?? [];
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 30), 1), 100);
+  const eventCampaignIds = new Set(replyEvents.map((event) => event.campaignId).filter((value) => value !== undefined).map(String));
+  const campaignRows = campaignsInput.map((campaign) => {
+    const campaignId = campaign.campaignId ?? campaign.id ?? stringField(campaign, "campaign_id");
+    const sent = metricNumber(campaign, "sent", "sentCount", "sent_count", "unique_sent_count", "emails_sent");
+    const opened = metricNumber(campaign, "opened", "openedCount", "opened_count", "unique_opened_count", "opens");
+    const replies = metricNumber(campaign, "replies", "replyCount", "reply_count", "unique_replied_count", "replied");
+    const positiveReplies = metricNumber(campaign, "positiveReplies", "positive_replies", "interested", "interested_count");
+    const negativeReplies = metricNumber(campaign, "negativeReplies", "negative_replies", "not_interested_count");
+    const bounced = metricNumber(campaign, "bounced", "bounce_count", "bounced_count");
+    const unsubscribed = metricNumber(campaign, "unsubscribed", "unsubscribe_count", "unsubscribed_count");
+    const totalLeads = metricNumber(campaign, "totalLeads", "total_leads", "lead_count");
+    const explicitNonRepliers = metricNumber(campaign, "nonRepliers", "non_repliers");
+    const nonRepliers = explicitNonRepliers || Math.max(sent - replies - bounced - unsubscribed, 0);
+    const issues: string[] = [];
+    if (sent > 0 && replies === 0) issues.push("no_replies");
+    if (percent(bounced, sent) >= 5) issues.push("high_bounce_rate");
+    if (percent(unsubscribed, sent) >= 2) issues.push("unsubscribe_attention");
+    if (totalLeads && sent < totalLeads && !/active|running|draft/i.test(String(campaign.status ?? ""))) issues.push("not_fully_sent");
+    if (campaignId && eventCampaignIds.has(String(campaignId)) && replies === 0) issues.push("reply_events_not_in_stats");
+    const nextAction = issues.includes("high_bounce_rate") || issues.includes("unsubscribe_attention")
+      ? "Check deliverability before sending more."
+      : positiveReplies > 0
+        ? "Fetch reply histories and prepare positive reply drafts."
+        : nonRepliers > 0
+          ? "Prepare non-replier phone/call follow-up list."
+          : sent > 0
+            ? "Keep monitoring opens and replies."
+            : "Fetch campaign status before deciding next action.";
+    return {
+      campaignId,
+      name: campaign.name ?? stringField(campaign, "campaign_name", "name"),
+      status: campaign.status ?? stringField(campaign, "status"),
+      sent,
+      opened,
+      replies,
+      positiveReplies,
+      negativeReplies,
+      bounced,
+      unsubscribed,
+      nonRepliers,
+      issues,
+      nextAction,
+    };
+  });
+
+  const eventPositiveReplies = replyEvents
+    .map((event) => classifyMonitorReply(event))
+    .filter((event) => event.category === "positive");
+  const eventNegativeReplies = replyEvents
+    .map((event) => classifyMonitorReply(event))
+    .filter((event) => event.category === "negative");
+  const sent = sum(campaignRows.map((campaign) => campaign.sent));
+  const opened = sum(campaignRows.map((campaign) => campaign.opened));
+  const campaignReplies = sum(campaignRows.map((campaign) => campaign.replies));
+  const replies = Math.max(campaignReplies, replyEvents.length);
+  const campaignPositiveReplies = sum(campaignRows.map((campaign) => campaign.positiveReplies));
+  const positiveRepliesCount = Math.max(campaignPositiveReplies, eventPositiveReplies.length);
+  const negativeReplies = Math.max(sum(campaignRows.map((campaign) => campaign.negativeReplies)), eventNegativeReplies.length);
+  const bounced = sum(campaignRows.map((campaign) => campaign.bounced));
+  const unsubscribed = sum(campaignRows.map((campaign) => campaign.unsubscribed));
+  const nonRepliers = input.nonReplyLeads?.length || sum(campaignRows.map((campaign) => campaign.nonRepliers));
+  const preparedPositiveReplies = input.preparedReplies?.filter((reply) => reply.body || reply.draft).length ?? 0;
+  const positiveReplyItems: ColdOutreachMonitorRunbookPreview["positiveReplies"] = eventPositiveReplies.slice(0, maxNextCalls).map((event) => ({
+    source: event.source,
+    campaignId: event.campaignId,
+    email: event.email,
+    leadName: event.leadName,
+    companyName: event.companyName,
+    replyBody: event.replyBody,
+    confidence: event.confidence,
+    nextAction: preparedPositiveReplies ? "Prepared reply exists; wait for operator approval before sending." : "Prepare reply draft and wait for operator approval.",
+  }));
+
+  const nextToolCalls: ColdOutreachMonitorRunbookPreview["nextToolCalls"] = [];
+  for (const campaign of campaignRows.filter((row) => row.campaignId).slice(0, Math.min(5, maxNextCalls))) {
+    nextToolCalls.push({
+      tool: "arcigy.get_smartlead_outreach_brief",
+      payload: { campaignId: campaign.campaignId },
+      reason: `Refresh Smartlead outreach stats for ${campaign.name ?? campaign.campaignId}.`,
+      approvalRequired: false,
+    });
+    if (campaign.replies || campaign.positiveReplies || campaign.issues.includes("reply_events_not_in_stats")) {
+      nextToolCalls.push({
+        tool: "arcigy.get_smartlead_campaign_leads",
+        payload: { campaignId: campaign.campaignId, limit: 100 },
+        reason: "Fetch campaign leads to locate replied leads and campaign_lead_map_id before message-history fetch.",
+        approvalRequired: false,
+      });
+    }
+  }
+  if (input.includeReplyDrafts !== false && replyEvents.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_smartlead_reply_followup_queue_preview",
+      payload: { events: replyEvents.slice(0, maxNextCalls), aiRepliesActive: true, useAiClassification: false },
+      reason: "Normalize reply events into history fetch, AI reply preview, and draft next steps without sending.",
+      approvalRequired: false,
+    });
+    nextToolCalls.push({
+      tool: "arcigy.build_outreach_reply_triage_preview",
+      payload: {
+        replies: replyEvents.slice(0, maxNextCalls).map((event) => ({
+          source: event.source === "gmail" ? "gmail" : "smartlead",
+          email: event.email ?? event.leadEmail,
+          leadName: event.leadName,
+          companyName: event.companyName,
+          replyBody: event.replyBody ?? event.body ?? "",
+          campaignId: event.campaignId,
+          threadId: event.threadId,
+          messageId: event.messageId,
+          accountEnvKey: event.accountEnvKey,
+          leadId: event.leadId,
+        })),
+        aiRepliesActive: true,
+        useAiClassification: false,
+      },
+      reason: "Classify replies and prepare draft-only next calls for positives.",
+      approvalRequired: false,
+    });
+  }
+  if (input.includeNonReplyCalls !== false && (input.nonReplyLeads?.length || nonRepliers > 0)) {
+    nextToolCalls.push({
+      tool: "arcigy.build_smartlead_nonreply_call_list_preview",
+      payload: { leads: input.nonReplyLeads ?? [], sourceName: input.windowLabel ?? "cold-outreach-monitor", sourceType: "smartlead", maxRows: Math.max(nonRepliers, 1) },
+      reason: "Prepare call/phone follow-up list for leads that were sent but did not reply.",
+      approvalRequired: false,
+    });
+  }
+  if (input.includeDeliverabilityGuard !== false && (bounced || unsubscribed || campaignRows.some((campaign) => campaign.issues.includes("high_bounce_rate")))) {
+    for (const campaign of campaignRows.filter((row) => row.campaignId).slice(0, Math.min(3, maxNextCalls))) {
+      nextToolCalls.push({
+        tool: "arcigy.build_smartlead_deliverability_guard_preview",
+        payload: { campaignId: campaign.campaignId, metrics: { sent: campaign.sent, bounced: campaign.bounced, unsubscribed: campaign.unsubscribed, replied: campaign.replies } },
+        reason: "Check bounce/unsubscribe risk before more sends or uploads.",
+        approvalRequired: false,
+      });
+    }
+  }
+
+  const totals = {
+    campaigns: campaignRows.length,
+    sent,
+    opened,
+    openRate: percent(opened, sent),
+    replies,
+    replyRate: percent(replies, sent),
+    positiveReplies: positiveRepliesCount,
+    positiveRate: percent(positiveRepliesCount, replies),
+    negativeReplies,
+    bounced,
+    unsubscribed,
+    nonRepliers,
+    preparedPositiveReplies,
+  };
+  const warnings: string[] = [];
+  if (!campaignRows.length && !replyEvents.length) warnings.push("No campaign stats or reply events supplied.");
+  if (campaignRows.some((campaign) => campaign.issues.includes("reply_events_not_in_stats"))) warnings.push("Reply events exist but campaign stats show zero replies; refresh Smartlead stats.");
+  if (totals.openRate === 0 && totals.sent > 0) warnings.push("Open tracking may be disabled or missing; do not over-read open rate.");
+  const status: ColdOutreachMonitorRunbookPreview["status"] = !campaignRows.length && !replyEvents.length
+    ? "blocked"
+    : totals.positiveReplies || totals.bounced || totals.unsubscribed || warnings.length
+      ? "attention"
+      : "ready";
+  const operatorBrief = [
+    `Napisali sme ${totals.sent} ludom.`,
+    `${totals.openRate}% si to otvorilo.`,
+    `${totals.replies} ludi odpisalo, z toho ${totals.positiveReplies} pozitivne.`,
+    totals.positiveReplies > 0
+      ? preparedPositiveReplies > 0
+        ? `Pripravil som ${preparedPositiveReplies} odpovedi na pozitivne reakcie; poslu sa az na tvoje znamenie.`
+        : "Pozitivne reakcie su pripravene na draft odpovedi; nic neposielam bez tvojho schvalenia."
+      : "Zatial nemame pozitivnu odpoved na odoslanie.",
+    totals.nonRepliers > 0 ? `${totals.nonRepliers} ludi zatial neodpovedalo; pripravil som follow-up/call-list dalsie kroky.` : "",
+  ].filter(Boolean).join(" ");
+
+  return {
+    mode: "cold-outreach-monitor-runbook-preview",
+    status,
+    summary: `Cold outreach monitor ${status}: ${totals.sent} sent, ${totals.openRate}% open rate, ${totals.replies} replies, ${totals.positiveReplies} positive, ${totals.nonRepliers} non-repliers. Ziadny fetch, reply ani export neprebehol.`,
+    operatorBrief,
+    window: { label: input.windowLabel, from: input.from, to: input.to },
+    totals,
+    campaigns: campaignRows.map(({ bounced: _bounced, unsubscribed: _unsubscribed, negativeReplies: _negativeReplies, ...campaign }) => campaign),
+    positiveReplies: positiveReplyItems,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls).slice(0, maxNextCalls),
     warnings,
   };
 }
@@ -12553,6 +12836,53 @@ function numberField(record: Record<string, unknown>, ...keys: string[]): number
     if (typeof value === "string" && value.trim() && Number.isFinite(Number(value))) return Number(value);
   }
   return undefined;
+}
+
+function metricNumber(record: Record<string, unknown>, ...keys: string[]): number {
+  return Math.max(0, Math.trunc(numberField(record, ...keys) ?? 0));
+}
+
+function classifyMonitorReply(event: Record<string, unknown> & {
+  source?: "smartlead" | "gmail" | "manual";
+  campaignId?: string | number;
+  email?: string;
+  leadEmail?: string;
+  leadName?: string;
+  companyName?: string;
+  replyBody?: string;
+  body?: string;
+  classification?: string;
+  category?: string;
+}): {
+  source: "smartlead" | "gmail" | "manual";
+  campaignId?: string | number;
+  email?: string;
+  leadName?: string;
+  companyName?: string;
+  replyBody: string;
+  category: "positive" | "negative" | "neutral";
+  confidence: "high" | "medium" | "low";
+} {
+  const source = event.source === "gmail" || event.source === "manual" ? event.source : "smartlead";
+  const replyBody = String(event.replyBody ?? event.body ?? stringField(event, "email_body", "latestLeadReply", "latest_lead_reply") ?? "").trim();
+  const label = String(event.classification ?? event.category ?? stringField(event, "categoryName", "category_name", "lead_category") ?? "").toLowerCase();
+  const normalizedBody = replyBody.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const negative = /negative|not interested|unsubscribe|unsubscribed|nezaujem|stop|spam/.test(label)
+    || /\b(nie|nemame zaujem|nezaujem|odhlasit|unsubscribe|stop|spam)\b/.test(normalizedBody);
+  const positive = /positive|interested|zaujem|ano|áno|poslite|pošlite|send|call|meeting|termin|stretn|ukaz|demo/.test(label)
+    || /\b(ano|poslite|send|call|meeting|termin|demo|zaujima|zaujem|ukazku|showcase)\b/.test(normalizedBody);
+  const category = negative ? "negative" : positive ? "positive" : "neutral";
+  const confidence = label ? "high" : replyBody.length > 30 ? "medium" : "low";
+  return {
+    source,
+    campaignId: event.campaignId ?? stringField(event, "campaign_id"),
+    email: event.email ?? event.leadEmail ?? stringField(event, "lead_email", "to_email", "from_email"),
+    leadName: event.leadName ?? stringField(event, "lead_name", "first_name"),
+    companyName: event.companyName ?? stringField(event, "company_name", "company"),
+    replyBody,
+    category,
+    confidence,
+  };
 }
 
 function sum(values: number[]): number {

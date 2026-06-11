@@ -58,6 +58,7 @@ const capabilityDefinitions: CapabilityDefinition[] = [
     title: "Cold outreach status, replies, and approvals",
     tools: [
       "arcigy.get_smartlead_outreach_brief",
+      "arcigy.build_cold_outreach_monitor_runbook_preview",
       "arcigy.get_cold_outreach_brief_from_db",
       "arcigy.prepare_positive_outreach_reply",
       "arcigy.get_prepared_outreach_replies",

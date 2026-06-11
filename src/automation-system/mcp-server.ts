@@ -31,6 +31,7 @@ import {
   buildLeadgenStatusBoardPreview,
   buildLeadgenDbStatusPreview,
   buildLeadgenMaintenanceRunbookPreview,
+  buildColdOutreachMonitorRunbookPreview,
   buildGoogleSheetSyncPreview,
   buildLeadgenCampaignPipelinePreview,
   buildLeadgenToSmartleadDispatchPreview,
@@ -1595,6 +1596,45 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(await getSmartleadOutreachBrief(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_cold_outreach_monitor_runbook_preview",
+    {
+      title: "Build cold outreach monitor runbook preview",
+      description: "Combine Smartlead campaign stats, reply events, prepared replies, and non-replier leads into a Jarvis-style operator brief plus safe next MCP calls without fetching, sending, or exporting.",
+      inputSchema: {
+        windowLabel: z.string().optional(),
+        from: z.string().optional(),
+        to: z.string().optional(),
+        campaigns: z.array(z.record(z.string(), z.unknown())).optional(),
+        replyEvents: z.array(z.record(z.string(), z.unknown())).optional(),
+        preparedReplies: z.array(z.object({
+          email: z.string().optional(),
+          leadEmail: z.string().optional(),
+          campaignId: z.union([z.string(), z.number()]).optional(),
+          body: z.string().optional(),
+          draft: z.string().optional(),
+        })).optional(),
+        nonReplyLeads: z.array(z.record(z.string(), z.unknown())).optional(),
+        includeReplyDrafts: z.boolean().default(true),
+        includeNonReplyCalls: z.boolean().default(true),
+        includeDeliverabilityGuard: z.boolean().default(true),
+        maxNextCalls: z.number().int().min(1).max(100).default(30),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildColdOutreachMonitorRunbookPreview({
+      ...input,
+      campaigns: input.campaigns as Parameters<typeof buildColdOutreachMonitorRunbookPreview>[0]["campaigns"],
+      replyEvents: input.replyEvents as Parameters<typeof buildColdOutreachMonitorRunbookPreview>[0]["replyEvents"],
+      nonReplyLeads: input.nonReplyLeads as Parameters<typeof buildColdOutreachMonitorRunbookPreview>[0]["nonReplyLeads"],
+    }))
   );
 
   server.registerTool(

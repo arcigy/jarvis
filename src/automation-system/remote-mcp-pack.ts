@@ -671,6 +671,23 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Build cold outreach monitor runbook",
+      tool: "arcigy.build_cold_outreach_monitor_runbook_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_cold_outreach_monitor_runbook_preview"),
+      body: {
+        windowLabel: "dnes",
+        campaigns: [{ campaignId: "123456", name: "Kuchyne SK", sent: 120, opened: 66, replies: 8, positiveReplies: 2, bounced: 1, unsubscribed: 0, nonRepliers: 112 }],
+        replyEvents: [
+          { source: "smartlead", campaignId: "123456", email: "lead@example.com", leadName: "Jan Novak", companyName: "Modelova Firma", replyBody: "Dobry den, poslite mi prosim ukazku.", category: "positive" },
+        ],
+        preparedReplies: [{ leadEmail: "lead@example.com", campaignId: "123456", draft: "Dobry den, posielam kratku ukazku..." }],
+        nonReplyLeads: [{ email: "no-reply@example.com", companyName: "No Reply Firma", website: "https://example.com", sentToSmartlead: true }],
+        maxNextCalls: 30,
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Build leadgen daily report without Slack",
       tool: "arcigy.get_leadgen_daily_report",
       method: "POST",

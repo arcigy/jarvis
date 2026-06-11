@@ -30,6 +30,7 @@ import {
   buildLeadgenStatusBoardPreview,
   buildLeadgenDbStatusPreview,
   buildLeadgenMaintenanceRunbookPreview,
+  buildColdOutreachMonitorRunbookPreview,
   buildGoogleSheetSyncPreview,
   buildLeadgenCampaignPipelinePreview,
   buildLeadgenToSmartleadDispatchPreview,
@@ -1454,6 +1455,24 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
   }
   if (name === "arcigy.get_smartlead_outreach_brief") {
     writeJson(response, 200, { result: await getSmartleadOutreachBrief(toSmartleadOutreachBriefInput(payload)) });
+    return;
+  }
+  if (name === "arcigy.build_cold_outreach_monitor_runbook_preview") {
+    writeJson(response, 200, {
+      result: buildColdOutreachMonitorRunbookPreview({
+        windowLabel: optionalString(payload.windowLabel),
+        from: optionalString(payload.from),
+        to: optionalString(payload.to),
+        campaigns: Array.isArray(payload.campaigns) ? payload.campaigns as Parameters<typeof buildColdOutreachMonitorRunbookPreview>[0]["campaigns"] : undefined,
+        replyEvents: Array.isArray(payload.replyEvents) ? payload.replyEvents as Parameters<typeof buildColdOutreachMonitorRunbookPreview>[0]["replyEvents"] : undefined,
+        preparedReplies: Array.isArray(payload.preparedReplies) ? payload.preparedReplies as Parameters<typeof buildColdOutreachMonitorRunbookPreview>[0]["preparedReplies"] : undefined,
+        nonReplyLeads: Array.isArray(payload.nonReplyLeads) ? payload.nonReplyLeads as Parameters<typeof buildColdOutreachMonitorRunbookPreview>[0]["nonReplyLeads"] : undefined,
+        includeReplyDrafts: payload.includeReplyDrafts !== false,
+        includeNonReplyCalls: payload.includeNonReplyCalls !== false,
+        includeDeliverabilityGuard: payload.includeDeliverabilityGuard !== false,
+        maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
+      }),
+    });
     return;
   }
   if (name === "arcigy.get_smartlead_campaign_leads") {

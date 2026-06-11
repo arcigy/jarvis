@@ -56,6 +56,7 @@ import {
   buildLeadgenStatusBoardPreview,
   buildLeadgenDbStatusPreview,
   buildLeadgenMaintenanceRunbookPreview,
+  buildColdOutreachMonitorRunbookPreview,
   buildGoogleSheetSyncPreview,
   buildWebsiteScrapeQualityAuditPreview,
   buildFailedScrapeRecoveryQueuePreview,
@@ -209,6 +210,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.label_gmail_thread",
     "arcigy.get_smartlead_campaign_status",
     "arcigy.get_smartlead_outreach_brief",
+    "arcigy.build_cold_outreach_monitor_runbook_preview",
     "arcigy.get_smartlead_campaign_leads",
     "arcigy.get_smartlead_email_accounts",
     "arcigy.preview_smartlead_lead_sync",
@@ -551,8 +553,9 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
     assert.ok(paths.includes("/api/mcp/arcigy.build_ai_icebreaker_writeback_preview"));
     assert.ok(paths.includes("/api/mcp/arcigy.build_smartlead_campaign_delete_safety_preview"));
     assert.ok(paths.includes("/api/mcp/arcigy.get_smartlead_campaign_webhooks"));
-  assert.ok(paths.includes("/api/mcp/arcigy.upsert_smartlead_campaign_webhook"));
-  assert.ok(paths.includes("/api/mcp/arcigy.get_smartlead_email_accounts"));
+    assert.ok(paths.includes("/api/mcp/arcigy.upsert_smartlead_campaign_webhook"));
+    assert.ok(paths.includes("/api/mcp/arcigy.get_smartlead_email_accounts"));
+    assert.ok(paths.includes("/api/mcp/arcigy.build_cold_outreach_monitor_runbook_preview"));
     assert.ok(paths.includes("/api/mcp/arcigy.build_pricing_proposal_preview"));
     assert.ok(paths.includes("/api/mcp/arcigy.build_service_capacity_preview"));
     assert.ok(paths.includes("/api/mcp/arcigy.build_smartlead_reply_followup_queue_preview"));
@@ -1982,6 +1985,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.preview_smartlead_lead_sync" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_smartlead_local_reconciliation_preview" && call.approvalRequired === false && Array.isArray(call.body.localLeads)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_email_accounts" && call.body.requestedDailyLimit === 80 && call.approvalRequired === false));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_cold_outreach_monitor_runbook_preview" && call.approvalRequired === false && Array.isArray(call.body.replyEvents)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_campaign_webhooks" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_leadgen_db_status_preview" && call.approvalRequired === false && Array.isArray(call.body.blacklistDomains)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_leadgen_maintenance_runbook_preview" && call.approvalRequired === false && Array.isArray(call.body.campaigns)));
@@ -2974,6 +2978,37 @@ test("Smartlead outreach brief uses singular reply labels", () => {
 
   assert.match(brief.summary, /Pripravil som ti 1 odpoved na pozitivne reakcie/);
   assert.match(brief.summary, /Caka 1 odpoved na schvalenie/);
+});
+
+test("cold outreach monitor runbook summarizes stats replies and next actions", () => {
+  const preview = buildColdOutreachMonitorRunbookPreview({
+    windowLabel: "dnes",
+    campaigns: [
+      { campaignId: "123456", name: "Kuchyne SK", sent: 120, opened: 66, replies: 8, positiveReplies: 2, bounced: 1, unsubscribed: 0, nonRepliers: 112 },
+    ],
+    replyEvents: [
+      { source: "smartlead", campaignId: "123456", email: "lead@example.com", leadName: "Jan Novak", companyName: "Modelova Firma", replyBody: "Dobry den, poslite mi prosim ukazku.", category: "positive" },
+      { source: "gmail", email: "negative@example.com", replyBody: "Nie dakujem, nemame zaujem.", category: "negative" },
+    ],
+    preparedReplies: [{ leadEmail: "lead@example.com", campaignId: "123456", draft: "Dobry den, posielam ukazku." }],
+    nonReplyLeads: [{ email: "no-reply@example.com", companyName: "No Reply Firma", website: "https://example.com", sentToSmartlead: true }],
+  });
+
+  assert.equal(preview.mode, "cold-outreach-monitor-runbook-preview");
+  assert.equal(preview.status, "attention");
+  assert.equal(preview.totals.sent, 120);
+  assert.equal(preview.totals.openRate, 55);
+  assert.equal(preview.totals.replies, 8);
+  assert.equal(preview.totals.positiveReplies, 2);
+  assert.equal(preview.totals.negativeReplies, 1);
+  assert.equal(preview.totals.nonRepliers, 1);
+  assert.match(preview.operatorBrief, /Napisali sme 120 ludom/);
+  assert.match(preview.operatorBrief, /55% si to otvorilo/);
+  assert.match(preview.operatorBrief, /8 ludi odpisalo, z toho 2 pozitivne/);
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.get_smartlead_outreach_brief" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_smartlead_reply_followup_queue_preview" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_smartlead_nonreply_call_list_preview" && !call.approvalRequired));
+  assert.match(preview.summary, /Ziadny fetch, reply ani export/);
 });
 
 test("Smartlead outreach brief aggregates campaigns when campaignId is omitted", async () => {

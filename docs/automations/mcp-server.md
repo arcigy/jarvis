@@ -112,6 +112,7 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.label_gmail_thread`: approval-required Gmail write that creates or finds a label, applies it to a thread, and can mark it read after the operator confirms the exact payload.
 - `arcigy.get_smartlead_campaign_status`: reads Smartlead campaigns or campaign statistics.
 - `arcigy.get_smartlead_outreach_brief`: normalizes one Smartlead campaign, or aggregates recent campaign statistics when `campaignId` is omitted, into one Jarvis cold outreach briefing.
+- `arcigy.build_cold_outreach_monitor_runbook_preview`: combines campaign stats, reply events, prepared replies, and non-repliers into the operator-style "napisali sme..., otvorilo..., odpisalo..." briefing with safe reply/non-replier/deliverability next steps.
 - `arcigy.get_smartlead_campaign_leads`: read-only fetch of campaign leads with offset/limit for audit and import checks.
 - `arcigy.get_smartlead_email_accounts`: read-only fetch of Smartlead sender accounts, warmup statuses, limits, and a sender-capacity preview payload.
 - `arcigy.preview_smartlead_lead_sync`: read-only Smartlead status sync preview that returns local update candidates without writing to the database.

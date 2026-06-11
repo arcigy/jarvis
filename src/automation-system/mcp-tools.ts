@@ -53,6 +53,7 @@ export type JarvisMcpToolName =
   | "arcigy.label_gmail_thread"
   | "arcigy.get_smartlead_campaign_status"
   | "arcigy.get_smartlead_outreach_brief"
+  | "arcigy.build_cold_outreach_monitor_runbook_preview"
   | "arcigy.get_smartlead_campaign_leads"
   | "arcigy.get_smartlead_email_accounts"
   | "arcigy.preview_smartlead_lead_sync"
@@ -461,6 +462,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.get_smartlead_outreach_brief",
       description: "Normalizuje Smartlead statistiky kampane do hotoveho Jarvis cold outreach briefu.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_cold_outreach_monitor_runbook_preview",
+      description: "Spoji Smartlead campaign stats, reply eventy a non-replier leady do operator briefu v style 'napisali sme..., otvorilo..., odpisalo...' s dalsimi safe MCP krokmi bez fetchu alebo odoslania.",
       requiresApproval: false,
     },
     {
