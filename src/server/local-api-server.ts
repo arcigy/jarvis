@@ -29,6 +29,7 @@ import {
   buildLeadgenGapReport,
   buildLeadgenStatusBoardPreview,
   buildLeadgenDbStatusPreview,
+  buildLeadgenProgressWatchdogPreview,
   buildLeadgenMaintenanceRunbookPreview,
   buildColdOutreachMonitorRunbookPreview,
   buildGmailOutreachReadinessPreview,
@@ -2606,6 +2607,22 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         nicheFilter: optionalString(payload.nicheFilter),
         minEnrichedPercent: typeof payload.minEnrichedPercent === "number" ? payload.minEnrichedPercent : undefined,
         minVerifiedPercent: typeof payload.minVerifiedPercent === "number" ? payload.minVerifiedPercent : undefined,
+        maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_leadgen_progress_watchdog_preview") {
+    writeJson(response, 200, {
+      result: buildLeadgenProgressWatchdogPreview({
+        leads: Array.isArray(payload.leads) ? payload.leads as Parameters<typeof buildLeadgenProgressWatchdogPreview>[0]["leads"] : undefined,
+        csvText: optionalString(payload.csvText),
+        delimiter: payload.delimiter === ";" ? ";" : payload.delimiter === "," ? "," : undefined,
+        sourceName: optionalString(payload.sourceName),
+        groupBy: payload.groupBy === "niche" || payload.groupBy === "source" ? payload.groupBy : "campaign",
+        targetReadyLeads: typeof payload.targetReadyLeads === "number" ? payload.targetReadyLeads : undefined,
+        minCompletionPercent: typeof payload.minCompletionPercent === "number" ? payload.minCompletionPercent : undefined,
+        includeSmartleadPlan: payload.includeSmartleadPlan !== false,
         maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
       }),
     });

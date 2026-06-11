@@ -30,6 +30,7 @@ import {
   buildLeadgenGapReport,
   buildLeadgenStatusBoardPreview,
   buildLeadgenDbStatusPreview,
+  buildLeadgenProgressWatchdogPreview,
   buildLeadgenMaintenanceRunbookPreview,
   buildColdOutreachMonitorRunbookPreview,
   buildGmailOutreachReadinessPreview,
@@ -4334,6 +4335,50 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildLeadgenDbStatusPreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_leadgen_progress_watchdog_preview",
+    {
+      title: "Build leadgen progress watchdog preview",
+      description: "Build a read-only progress watchdog from lead rows or CSV. Calculates completion percent, grouped bottlenecks, ready-for-Smartlead count, and exact scrape/fetch/AI/QA/Smartlead next calls without writing or uploading.",
+      inputSchema: {
+        leads: z.array(pipelineLeadSchema.extend({
+          raw: z.record(z.string(), z.string()).optional(),
+          primary_email: z.string().optional(),
+          decision_maker_name: z.string().optional(),
+          personalized_intro: z.string().optional(),
+          icebreaker_sentence: z.string().optional(),
+          verificationStatus: z.string().optional(),
+          verification_status: z.string().optional(),
+          sentToSmartlead: z.boolean().optional(),
+          sent_to_smartlead: z.boolean().optional(),
+          campaignTag: z.string().optional(),
+          campaign_tag: z.string().optional(),
+          nicheSlug: z.string().optional(),
+          niche_slug: z.string().optional(),
+          address: z.string().optional(),
+          official_company_name: z.string().optional(),
+          ico: z.string().optional(),
+          verification_notes: z.string().optional(),
+        }).passthrough()).optional(),
+        csvText: z.string().optional(),
+        delimiter: z.enum([",", ";"]).optional(),
+        sourceName: z.string().optional(),
+        groupBy: z.enum(["campaign", "niche", "source"]).default("campaign"),
+        targetReadyLeads: z.number().int().min(0).default(0),
+        minCompletionPercent: z.number().int().min(0).max(100).default(80),
+        includeSmartleadPlan: z.boolean().default(true),
+        maxNextCalls: z.number().int().min(1).max(100).default(30),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildLeadgenProgressWatchdogPreview(input))
   );
 
   server.registerTool(

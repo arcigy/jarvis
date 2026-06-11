@@ -1110,6 +1110,16 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       minVerifiedPercent: 40,
     };
   }
+  if (toolName === "arcigy.build_leadgen_progress_watchdog_preview") {
+    return {
+      sourceName: "kuchyne-sk-progress",
+      groupBy: "campaign",
+      targetReadyLeads: 50,
+      minCompletionPercent: 80,
+      csvText: "company,campaign_tag,primary_email,website,decision_maker_name,icebreaker_sentence,sent_to_smartlead,verification_status\nReady Studio,kuchyne,jan@ready.sk,https://ready.sk,Jan Novak,Vsimol som si vase realizacie kuchyn.,false,verified\nNeeds Email,kuchyne,,https://needs-email.sk,,,false,\nNeeds Intro,kuchyne,info@needs-intro.sk,https://needs-intro.sk,Eva Horna,,false,\nAlready Sent,kuchyne,sent@ready.sk,https://sent.sk,Peter Sent,Vsimol som si showroom.,true,verified\nFailed Lead,kuchyne,fail@example.com,https://fail.sk,,,false,failed",
+      maxNextCalls: 30,
+    };
+  }
   if (toolName === "arcigy.build_leadgen_maintenance_runbook_preview") {
     return {
       sourceName: "local-leadgen-maintenance",

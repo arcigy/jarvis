@@ -436,6 +436,54 @@ export type LeadgenMaintenanceRunbookPreview = {
   warnings: string[];
 };
 
+export type LeadgenProgressWatchdogPreview = {
+  mode: "leadgen-progress-watchdog-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  operatorBrief: string;
+  source: { name?: string; parsedFromCsv: number; groupBy: "campaign" | "niche" | "source"; generatedAt: string };
+  totals: {
+    inputLeads: number;
+    scraped: number;
+    withEmail: number;
+    withDecisionMaker: number;
+    withIntro: number;
+    verified: number;
+    readyForSmartlead: number;
+    sentToSmartlead: number;
+    failed: number;
+    remaining: number;
+    completionPercent: number;
+    enrichmentPercent: number;
+    emailPercent: number;
+    introPercent: number;
+    smartleadPercent: number;
+  };
+  groups: Array<{
+    key: string;
+    label: string;
+    total: number;
+    completionPercent: number;
+    readyForSmartlead: number;
+    sentToSmartlead: number;
+    failed: number;
+    bottleneck: string;
+    nextAction: string;
+  }>;
+  bottlenecks: Array<{ id: string; label: string; count: number; severity: "info" | "warning" | "critical"; nextAction: string }>;
+  queues: {
+    needsScrape: LeadCandidateInput[];
+    missingEmail: LeadCandidateInput[];
+    missingDecisionMaker: LeadCandidateInput[];
+    missingIntro: LeadCandidateInput[];
+    needsVerification: LeadCandidateInput[];
+    readyForSmartlead: LeadCandidateInput[];
+    failed: LeadCandidateInput[];
+  };
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+  warnings: string[];
+};
+
 export type ColdOutreachMonitorRunbookPreview = {
   mode: "cold-outreach-monitor-runbook-preview";
   status: "ready" | "attention" | "blocked";
@@ -4853,6 +4901,264 @@ export function buildLeadgenDbStatusPreview(input: {
     })),
     blacklistDomains,
     nextToolCalls: dedupeNextToolCalls(nextToolCalls),
+  };
+}
+
+export function buildLeadgenProgressWatchdogPreview(input: {
+  leads?: Array<LeadCandidateInput & {
+    raw?: Record<string, string>;
+    primary_email?: string;
+    decisionMakerName?: string;
+    decision_maker_name?: string;
+    personalized_intro?: string;
+    icebreaker_sentence?: string;
+    verificationStatus?: string;
+    verification_status?: string;
+    sentToSmartlead?: boolean;
+    sent_to_smartlead?: boolean;
+    campaignTag?: string;
+    campaign_tag?: string;
+    nicheSlug?: string;
+    niche_slug?: string;
+    scraped?: { emails?: string[]; phones?: string[]; textPreview?: string };
+    address?: string;
+    official_company_name?: string;
+    ico?: string;
+    verification_notes?: string;
+  }>;
+  csvText?: string;
+  delimiter?: "," | ";";
+  sourceName?: string;
+  groupBy?: "campaign" | "niche" | "source";
+  targetReadyLeads?: number;
+  minCompletionPercent?: number;
+  includeSmartleadPlan?: boolean;
+  maxNextCalls?: number;
+}): LeadgenProgressWatchdogPreview {
+  const parsed = input.csvText?.trim() ? parseLeadsCsv({ csvText: input.csvText, delimiter: input.delimiter }) : undefined;
+  const leads = [...(input.leads ?? []), ...(parsed?.leads ?? [])] as NonNullable<typeof input.leads>;
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 30), 1), 100);
+  const groupBy = input.groupBy ?? "campaign";
+  const targetReadyLeads = Math.max(Math.trunc(input.targetReadyLeads ?? 0), 0);
+  const minCompletionPercent = Math.min(Math.max(Math.trunc(input.minCompletionPercent ?? 80), 0), 100);
+
+  const emailFor = (lead: NonNullable<typeof input.leads>[number]) => lead.email ?? lead.primary_email ?? leadgenStatusField(lead, "email", "primary_email", "smartlead_emails");
+  const websiteFor = (lead: NonNullable<typeof input.leads>[number]) => lead.website ?? leadgenStatusField(lead, "website", "web", "url");
+  const decisionMakerFor = (lead: NonNullable<typeof input.leads>[number]) => lead.decisionMakerName ?? lead.decision_maker_name ?? leadgenStatusField(lead, "decision_maker_name", "decisionMakerName", "contact_name", "full_name");
+  const introFor = (lead: NonNullable<typeof input.leads>[number]) => lead.personalizedIntro ?? lead.personalized_intro ?? lead.icebreaker_sentence ?? leadgenStatusField(lead, "personalized_intro", "icebreaker_sentence", "icebreaker");
+  const verifiedFor = (lead: NonNullable<typeof input.leads>[number]) => /verified|ready|ok/i.test(String(lead.verificationStatus ?? lead.verification_status ?? leadgenStatusField(lead, "verification_status", "status") ?? ""));
+  const failedFor = (lead: NonNullable<typeof input.leads>[number]) => /failed|error|rejected|invalid/i.test(String(lead.verificationStatus ?? lead.verification_status ?? leadgenStatusField(lead, "verification_status", "status") ?? ""));
+  const sentFor = (lead: NonNullable<typeof input.leads>[number]) => lead.sentToSmartlead === true || lead.sent_to_smartlead === true || /true|sent|uploaded/i.test(String(leadgenStatusField(lead, "sent_to_smartlead", "sentToSmartlead", "smartlead_status") ?? ""));
+  const scrapedFor = (lead: NonNullable<typeof input.leads>[number]) => Boolean(
+    lead.scraped?.textPreview ||
+    lead.scraped?.emails?.length ||
+    lead.scraped?.phones?.length ||
+    lead.address ||
+    lead.official_company_name ||
+    lead.ico ||
+    leadgenStatusField(lead, "address", "official_company_name", "ico", "scraped_text", "context_preview")
+  );
+  const readyForSmartlead = (lead: NonNullable<typeof input.leads>[number]) =>
+    Boolean(emailFor(lead) && introFor(lead) && !failedFor(lead) && !sentFor(lead));
+  const leadCompletion = (lead: NonNullable<typeof input.leads>[number]) => {
+    const milestones = [
+      scrapedFor(lead),
+      Boolean(emailFor(lead)),
+      Boolean(decisionMakerFor(lead)),
+      Boolean(introFor(lead)),
+      verifiedFor(lead) || readyForSmartlead(lead),
+      sentFor(lead),
+    ];
+    return percent(milestones.filter(Boolean).length, milestones.length);
+  };
+
+  const needsScrape = leads.filter((lead) => websiteFor(lead) && !scrapedFor(lead)).slice(0, maxNextCalls);
+  const missingEmail = leads.filter((lead) => !emailFor(lead) && !failedFor(lead)).slice(0, maxNextCalls);
+  const missingDecisionMaker = leads.filter((lead) => emailFor(lead) && !decisionMakerFor(lead) && !failedFor(lead)).slice(0, maxNextCalls);
+  const missingIntro = leads.filter((lead) => emailFor(lead) && !introFor(lead) && !failedFor(lead)).slice(0, maxNextCalls);
+  const needsVerification = leads.filter((lead) => emailFor(lead) && introFor(lead) && !verifiedFor(lead) && !failedFor(lead) && !sentFor(lead)).slice(0, maxNextCalls);
+  const ready = leads.filter((lead) => readyForSmartlead(lead)).slice(0, maxNextCalls);
+  const failed = leads.filter((lead) => failedFor(lead)).slice(0, maxNextCalls);
+  const sent = leads.filter((lead) => sentFor(lead)).length;
+  const total = leads.length;
+  const completionScores = leads.map((lead) => leadCompletion(lead));
+  const completionPercent = completionScores.length ? Math.round(sum(completionScores) / completionScores.length) : 0;
+
+  const groupKeyFor = (lead: NonNullable<typeof input.leads>[number]) => {
+    if (groupBy === "niche") return lead.nicheSlug ?? lead.niche_slug ?? leadgenStatusField(lead, "niche_slug", "niche", "niche_id") ?? "unknown-niche";
+    if (groupBy === "source") return lead.source ?? leadgenStatusField(lead, "source", "source_name") ?? input.sourceName ?? "unknown-source";
+    return lead.campaignTag ?? lead.campaign_tag ?? leadgenStatusField(lead, "campaign_tag", "campaign", "campaign_id") ?? "unknown-campaign";
+  };
+  const grouped = new Map<string, NonNullable<typeof input.leads>>();
+  for (const lead of leads) {
+    const key = String(groupKeyFor(lead));
+    grouped.set(key, [...(grouped.get(key) ?? []), lead]);
+  }
+  const groups = [...grouped.entries()].map(([key, rows]) => {
+    const rowScores = rows.map((lead) => leadCompletion(lead));
+    const groupReady = rows.filter((lead) => readyForSmartlead(lead)).length;
+    const groupSent = rows.filter((lead) => sentFor(lead)).length;
+    const groupFailed = rows.filter((lead) => failedFor(lead)).length;
+    const missingEmailCount = rows.filter((lead) => !emailFor(lead) && !failedFor(lead)).length;
+    const missingIntroCount = rows.filter((lead) => emailFor(lead) && !introFor(lead) && !failedFor(lead)).length;
+    const needsScrapeCount = rows.filter((lead) => websiteFor(lead) && !scrapedFor(lead)).length;
+    const bottleneck = groupFailed
+      ? "failed"
+      : missingEmailCount
+        ? "missing_email"
+        : missingIntroCount
+          ? "missing_intro"
+          : needsScrapeCount
+            ? "needs_scrape"
+            : groupReady
+              ? "ready_for_smartlead"
+              : "monitor";
+    const nextAction = bottleneck === "failed"
+      ? "Repair failed leads before counting this group ready."
+      : bottleneck === "missing_email"
+        ? "Run company research/contact scrape for missing emails."
+        : bottleneck === "missing_intro"
+          ? "Build AI intro work packet for missing intros."
+          : bottleneck === "needs_scrape"
+            ? "Scrape websites before enrichment and intro generation."
+            : bottleneck === "ready_for_smartlead"
+              ? "Prepare Smartlead injection/import audit for ready leads."
+              : "Monitor replies and campaign status.";
+    return {
+      key,
+      label: key,
+      total: rows.length,
+      completionPercent: rowScores.length ? Math.round(sum(rowScores) / rowScores.length) : 0,
+      readyForSmartlead: groupReady,
+      sentToSmartlead: groupSent,
+      failed: groupFailed,
+      bottleneck,
+      nextAction,
+    };
+  }).sort((a, b) => a.completionPercent - b.completionPercent || b.total - a.total);
+
+  const bottlenecks = [
+    { id: "failed", label: "Failed leads", count: failed.length, severity: "critical" as const, nextAction: "Run lead repair queue and inspect latest verification notes." },
+    { id: "missing_email", label: "Missing email", count: missingEmail.length, severity: "critical" as const, nextAction: "Run company research and website/contact scraping." },
+    { id: "missing_intro", label: "Missing AI intro", count: missingIntro.length, severity: "warning" as const, nextAction: "Build AI intro work packets or batch draft intros." },
+    { id: "missing_decision_maker", label: "Missing decision maker", count: missingDecisionMaker.length, severity: "warning" as const, nextAction: "Run Gmail name enrichment and identity repair." },
+    { id: "needs_verification", label: "Needs QA/verification", count: needsVerification.length, severity: "warning" as const, nextAction: "Run lead validation scorecard before upload." },
+    { id: "ready_for_smartlead", label: "Ready for Smartlead", count: ready.length, severity: "info" as const, nextAction: "Prepare Smartlead injection/import audit." },
+  ].filter((item) => item.count > 0);
+
+  const nextToolCalls: LeadgenProgressWatchdogPreview["nextToolCalls"] = [];
+  if (leads.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_leadgen_status_board_preview",
+      payload: { leads: leads.slice(0, maxNextCalls), sourceName: input.sourceName, groupBy },
+      reason: "Otvor detailny status board pre vsetky leady a repair buckets.",
+      approvalRequired: false,
+    });
+  }
+  if (needsScrape.length) {
+    nextToolCalls.push({
+      tool: "arcigy.batch_scrape_website_contacts",
+      payload: { websites: needsScrape.map((lead) => websiteFor(lead)).filter(Boolean).slice(0, maxNextCalls), maxSites: Math.min(needsScrape.length, maxNextCalls) },
+      reason: "Scrapni weby, ktore maju URL, ale este nemaju enrichment/scrape data.",
+      approvalRequired: false,
+    });
+  }
+  if (missingEmail.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_company_research_queue_preview",
+      payload: { leads: missingEmail, sourceName: input.sourceName, includeGooglePlaces: true, includeSerper: true, includeDispatch: true },
+      reason: "Najdi email/web pre leady bez kontaktu.",
+      approvalRequired: false,
+    });
+  }
+  if (missingDecisionMaker.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_gmail_name_enrichment_queue_preview",
+      payload: { leads: missingDecisionMaker, sourceName: input.sourceName },
+      reason: "Dopln decision-maker mena cez Gmail/public hints pred salutation a intro cleanup.",
+      approvalRequired: false,
+    });
+  }
+  if (missingIntro.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_bulk_ai_intro_work_queue_preview",
+      payload: { groups: [{ sourceName: input.sourceName ?? "progress-watchdog", niche: groupBy, leads: missingIntro }], language: "sk" },
+      reason: "Priprav AI work packet pre chybajuce intra.",
+      approvalRequired: false,
+    });
+  }
+  if (needsVerification.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_lead_validation_scorecard_preview",
+      payload: { leads: needsVerification, minScore: 70, excludeSent: true },
+      reason: "Skontroluj ready-looking leady pred uploadom do Smartlead.",
+      approvalRequired: false,
+    });
+  }
+  if (input.includeSmartleadPlan !== false && ready.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_smartlead_injection_plan",
+      payload: { leads: ready, campaignId: undefined, batchSize: Math.min(ready.length, 50) },
+      reason: "Priprav approval-gated Smartlead upload payload pre ready leady bez uploadu.",
+      approvalRequired: false,
+    });
+  }
+  if (failed.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_lead_repair_queue_preview",
+      payload: { leads: failed, sourceName: input.sourceName },
+      reason: "Oprav failed leady a vrat ich do enrichment/QA queue.",
+      approvalRequired: false,
+    });
+  }
+
+  const totals = {
+    inputLeads: total,
+    scraped: leads.filter((lead) => scrapedFor(lead)).length,
+    withEmail: leads.filter((lead) => emailFor(lead)).length,
+    withDecisionMaker: leads.filter((lead) => decisionMakerFor(lead)).length,
+    withIntro: leads.filter((lead) => introFor(lead)).length,
+    verified: leads.filter((lead) => verifiedFor(lead)).length,
+    readyForSmartlead: ready.length,
+    sentToSmartlead: sent,
+    failed: failed.length,
+    remaining: Math.max(total - sent, 0),
+    completionPercent,
+    enrichmentPercent: percent(leads.filter((lead) => scrapedFor(lead)).length, total),
+    emailPercent: percent(leads.filter((lead) => emailFor(lead)).length, total),
+    introPercent: percent(leads.filter((lead) => introFor(lead)).length, total),
+    smartleadPercent: percent(sent, total),
+  };
+  const warnings: string[] = [];
+  if (!total) warnings.push("No leads supplied; export DB/CSV first.");
+  if (targetReadyLeads && totals.readyForSmartlead < targetReadyLeads) warnings.push(`Ready leads below target: ${totals.readyForSmartlead}/${targetReadyLeads}.`);
+  if (totals.completionPercent < minCompletionPercent && total) warnings.push(`Completion below target: ${totals.completionPercent}%/${minCompletionPercent}%.`);
+  const status: LeadgenProgressWatchdogPreview["status"] = !total
+    ? "blocked"
+    : totals.failed || totals.readyForSmartlead || totals.completionPercent < minCompletionPercent || warnings.length
+      ? "attention"
+      : "ready";
+  const topBottleneck = bottlenecks.find((item) => item.id !== "ready_for_smartlead") ?? bottlenecks[0];
+  const operatorBrief = [
+    `Leadgen je na ${totals.completionPercent}%.`,
+    `${totals.sentToSmartlead}/${totals.inputLeads} leadov je v Smartlead (${totals.smartleadPercent}%).`,
+    `${totals.readyForSmartlead} leadov je pripravenych na upload.`,
+    topBottleneck ? `Najvacsi bottleneck: ${topBottleneck.label} (${topBottleneck.count}).` : "Bez vacsieho bottlenecku.",
+    "Ziadny scrape, AI call, DB zapis ani Smartlead upload neprebehol.",
+  ].join(" ");
+
+  return {
+    mode: "leadgen-progress-watchdog-preview",
+    status,
+    summary: `Leadgen progress ${status}: ${totals.completionPercent}% complete, ${totals.readyForSmartlead} ready, ${totals.sentToSmartlead} sent, ${totals.failed} failed, ${totals.remaining} remaining. Ziadny zapis ani upload neprebehol.`,
+    operatorBrief,
+    source: { name: input.sourceName, parsedFromCsv: parsed?.leads.length ?? 0, groupBy, generatedAt: new Date().toISOString() },
+    totals,
+    groups,
+    bottlenecks,
+    queues: { needsScrape, missingEmail, missingDecisionMaker, missingIntro, needsVerification, readyForSmartlead: ready, failed },
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls).slice(0, maxNextCalls),
+    warnings,
   };
 }
 
