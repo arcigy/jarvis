@@ -160,6 +160,30 @@ export type AiIntroWorkPacketPreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type AiIntroImportPreview = {
+  mode: "ai-intro-import-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  source: { name?: string; niche?: string; resultFormat: "direct" | "json" | "csv" | "mixed"; parsedFromCsv: number; language: "sk" | "en"; offer?: string };
+  totals: {
+    leads: number;
+    parsedResults: number;
+    uniqueResults: number;
+    duplicateIds: number;
+    validCompleted: number;
+    invalidCompleted: number;
+    unknownLead: number;
+    mergedLeads: number;
+  };
+  parsedResults: Array<{ id: string; icebreaker?: string; source: "direct" | "json" | "csv"; rowNumber?: number }>;
+  duplicateIds: string[];
+  completedItems: AiIntroWorkPacketPreview["completedItems"];
+  invalidItems: AiIntroWorkPacketPreview["completedItems"];
+  mergedLeads: LeadCandidateInput[];
+  workPacket: AiIntroWorkPacketPreview;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type LeadgenStatusBoardPreview = {
   mode: "leadgen-status-board-preview";
   status: "ready" | "attention" | "blocked";
@@ -2292,6 +2316,189 @@ export function buildAiIntroWorkPacketPreview(input: {
     mergedLeads,
     nextToolCalls: dedupeNextToolCalls(nextToolCalls),
   };
+}
+
+export function buildAiIntroImportPreview(input: {
+  leads?: Array<LeadCandidateInput & { id?: string; raw?: Record<string, string>; scraped?: Partial<ScrapedWebsiteContacts>; context?: string; evidenceText?: string; businessFacts?: unknown }>;
+  csvText?: string;
+  delimiter?: "," | ";";
+  sourceName?: string;
+  niche?: string;
+  offer?: string;
+  language?: "sk" | "en";
+  maxLeads?: number;
+  maxContextChars?: number;
+  completedIntros?: Array<{ id: string; icebreaker?: string; personalizedIntro?: string }>;
+  resultJsonText?: string;
+  resultCsvText?: string;
+  resultDelimiter?: "," | ";";
+}): AiIntroImportPreview {
+  const parsedResults = parseAiIntroImportResults(input);
+  const seen = new Set<string>();
+  const duplicateIds: string[] = [];
+  const uniqueCompleted = parsedResults.flatMap((item) => {
+    if (!item.id) return [];
+    if (seen.has(item.id)) {
+      duplicateIds.push(item.id);
+      return [];
+    }
+    seen.add(item.id);
+    return [{ id: item.id, icebreaker: item.icebreaker }];
+  });
+  const workPacket = buildAiIntroWorkPacketPreview({
+    leads: input.leads,
+    csvText: input.csvText,
+    delimiter: input.delimiter,
+    sourceName: input.sourceName,
+    niche: input.niche,
+    offer: input.offer,
+    language: input.language,
+    maxLeads: input.maxLeads,
+    maxContextChars: input.maxContextChars,
+    completedIntros: uniqueCompleted,
+  });
+  const invalidItems = workPacket.completedItems.filter((item) => item.status !== "valid");
+  const resultFormat = input.completedIntros?.length && (input.resultJsonText?.trim() || input.resultCsvText?.trim())
+    ? "mixed"
+    : input.resultJsonText?.trim()
+      ? input.resultCsvText?.trim() ? "mixed" : "json"
+      : input.resultCsvText?.trim()
+        ? "csv"
+        : "direct";
+  const totals = {
+    leads: workPacket.totals.input,
+    parsedResults: parsedResults.length,
+    uniqueResults: uniqueCompleted.length,
+    duplicateIds: duplicateIds.length,
+    validCompleted: workPacket.totals.validCompleted,
+    invalidCompleted: workPacket.totals.invalidCompleted,
+    unknownLead: workPacket.completedItems.filter((item) => item.status === "unknown_lead").length,
+    mergedLeads: workPacket.mergedLeads.length,
+  };
+  const nextToolCalls: AiIntroImportPreview["nextToolCalls"] = [...workPacket.nextToolCalls];
+  if (workPacket.mergedLeads.length) {
+    nextToolCalls.push({
+      tool: "arcigy.prepare_smartlead_leads",
+      payload: { leads: workPacket.mergedLeads, source: input.sourceName, campaignId: null },
+      reason: "Po validacii a cisteni intr priprav Smartlead payload bez uploadu.",
+      approvalRequired: false,
+    });
+  }
+  if (invalidItems.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_ai_intro_work_packet_preview",
+      payload: {
+        leads: workPacket.packetItems
+          .filter((item) => invalidItems.some((invalid) => invalid.id === item.id))
+          .map((item) => item.lead),
+        sourceName: input.sourceName,
+        niche: input.niche,
+        offer: input.offer,
+        language: input.language ?? "sk",
+        maxLeads: Math.min(invalidItems.length, 50),
+      },
+      reason: "Neplatne alebo nezname AI intra vrat do noveho work packetu na opravu.",
+      approvalRequired: false,
+    });
+  }
+  const status: AiIntroImportPreview["status"] = totals.leads === 0 || totals.parsedResults === 0
+    ? "blocked"
+    : totals.validCompleted === 0 || totals.invalidCompleted > 0 || totals.duplicateIds > 0
+      ? "attention"
+      : "ready";
+  return {
+    mode: "ai-intro-import-preview",
+    status,
+    summary: `AI intro import ${status}: ${totals.validCompleted}/${totals.uniqueResults} vysledkov validnych, ${totals.mergedLeads} leadov pripravenych na cleanup/audit/export. Ziadny DB zapis ani Smartlead upload neprebehol.`,
+    source: { name: input.sourceName, niche: input.niche, resultFormat, parsedFromCsv: input.csvText?.trim() ? parseLeadsCsv({ csvText: input.csvText, delimiter: input.delimiter }).leads.length : 0, language: input.language ?? "sk", offer: input.offer },
+    totals,
+    parsedResults,
+    duplicateIds: unique(duplicateIds),
+    completedItems: workPacket.completedItems,
+    invalidItems,
+    mergedLeads: workPacket.mergedLeads,
+    workPacket,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls),
+  };
+}
+
+function parseAiIntroImportResults(input: {
+  completedIntros?: Array<{ id: string; icebreaker?: string; personalizedIntro?: string }>;
+  resultJsonText?: string;
+  resultCsvText?: string;
+  resultDelimiter?: "," | ";";
+}): AiIntroImportPreview["parsedResults"] {
+  const direct = (input.completedIntros ?? []).map((item) => ({
+    id: String(item.id ?? "").trim(),
+    icebreaker: (item.icebreaker ?? item.personalizedIntro ?? "").replace(/\s+/g, " ").trim(),
+    source: "direct" as const,
+  }));
+  const json = input.resultJsonText?.trim()
+    ? parseAiIntroJsonRows(input.resultJsonText).map((item) => ({
+      id: aiIntroResultString(item, "id", "leadId", "lead_id", "ai_intro_work_packet_id", "uuid"),
+      icebreaker: aiIntroResultString(item, "icebreaker", "personalizedIntro", "personalized_intro", "intro", "icebreaker_sentence", "text"),
+      source: "json" as const,
+    }))
+    : [];
+  const csv = input.resultCsvText?.trim() ? parseAiIntroCsvRows(input.resultCsvText, input.resultDelimiter) : [];
+  return [...direct, ...json, ...csv]
+    .map((item) => ({ ...item, id: item.id.trim(), icebreaker: item.icebreaker?.replace(/\s+/g, " ").trim() }))
+    .filter((item) => item.id || item.icebreaker);
+}
+
+function parseAiIntroJsonRows(text: string): Record<string, unknown>[] {
+  const cleaned = text.replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
+  const candidates = [
+    cleaned,
+    cleaned.slice(cleaned.indexOf("["), cleaned.lastIndexOf("]") + 1),
+    cleaned.slice(cleaned.indexOf("{"), cleaned.lastIndexOf("}") + 1),
+  ].filter((candidate) => candidate.trim().length > 1);
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate) as unknown;
+      return aiIntroJsonRows(parsed);
+    } catch {
+      // Try the next candidate.
+    }
+  }
+  return [];
+}
+
+function aiIntroJsonRows(value: unknown): Record<string, unknown>[] {
+  if (Array.isArray(value)) return value.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item));
+  if (!value || typeof value !== "object") return [];
+  const record = value as Record<string, unknown>;
+  for (const key of ["completedIntros", "icebreakers", "intros", "results", "data"]) {
+    const rows = aiIntroJsonRows(record[key]);
+    if (rows.length) return rows;
+  }
+  return [record];
+}
+
+function parseAiIntroCsvRows(csvText: string, delimiter?: "," | ";"): AiIntroImportPreview["parsedResults"] {
+  const rows = parseCsv(csvText, delimiter);
+  if (rows.length < 2) return [];
+  const headers = rows[0].map((header) => slugify(header).replace(/-/g, "_"));
+  const idIndex = firstHeaderIndex(headers, ["id", "lead_id", "leadid", "ai_intro_work_packet_id", "uuid"]);
+  const introIndex = firstHeaderIndex(headers, ["icebreaker", "personalized_intro", "personalizedintro", "intro", "icebreaker_sentence", "text"]);
+  return rows.slice(1).map((row, index) => ({
+    id: idIndex >= 0 ? String(row[idIndex] ?? "").trim() : "",
+    icebreaker: introIndex >= 0 ? String(row[introIndex] ?? "").replace(/\s+/g, " ").trim() : undefined,
+    source: "csv" as const,
+    rowNumber: index + 2,
+  }));
+}
+
+function firstHeaderIndex(headers: string[], candidates: string[]): number {
+  return candidates.map((candidate) => headers.indexOf(candidate)).find((index) => index >= 0) ?? -1;
+}
+
+function aiIntroResultString(record: Record<string, unknown>, ...keys: string[]): string {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" || typeof value === "number") return String(value);
+  }
+  return "";
 }
 
 export function buildLeadgenStatusBoardPreview(input: {

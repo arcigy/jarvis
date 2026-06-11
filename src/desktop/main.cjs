@@ -3105,6 +3105,7 @@ function listWebMcpTools() {
     { name: "arcigy.batch_draft_lead_intros", requiresApproval: false },
     { name: "arcigy.build_ai_intro_quality_audit_preview", requiresApproval: false },
     { name: "arcigy.build_ai_intro_work_packet_preview", requiresApproval: false },
+    { name: "arcigy.build_ai_intro_import_preview", requiresApproval: false },
     { name: "arcigy.build_ai_intro_cleanup_preview", requiresApproval: false },
     { name: "arcigy.enrich_website_leads_preview", requiresApproval: false },
     { name: "arcigy.prepare_smartlead_leads", requiresApproval: false },

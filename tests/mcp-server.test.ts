@@ -141,6 +141,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(names.includes("arcigy.batch_draft_lead_intros"));
   assert.ok(names.includes("arcigy.build_ai_intro_quality_audit_preview"));
   assert.ok(names.includes("arcigy.build_ai_intro_work_packet_preview"));
+  assert.ok(names.includes("arcigy.build_ai_intro_import_preview"));
   assert.ok(names.includes("arcigy.build_ai_intro_cleanup_preview"));
   assert.ok(names.includes("arcigy.enrich_website_leads_preview"));
   assert.ok(names.includes("arcigy.prepare_smartlead_leads"));
@@ -410,6 +411,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_outreach_brief" && !("campaignId" in call.body)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.sync_gmail_recent_messages" && call.body.dryRun === true));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_gmail_lead_context" && call.approvalRequired === false && call.body.leadEmail === "lead@example.com"));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_ai_intro_import_preview" && call.approvalRequired === false && typeof call.body.resultJsonText === "string"));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.send_approved_outreach_reply" && call.approvalRequired === true));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_google_sheet_sync_preview" && call.approvalRequired === false && typeof call.body.csvText === "string"));
   assert.ok(

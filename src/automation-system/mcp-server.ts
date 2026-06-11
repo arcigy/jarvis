@@ -48,6 +48,7 @@ import {
   buildAiIntroQualityAuditPreview,
   buildAiIntroCleanupPreview,
   buildAiIntroWorkPacketPreview,
+  buildAiIntroImportPreview,
   buildManualReviewPickupPlan,
   buildManualReviewQueue,
   buildSmartleadCampaignLaunchPreview,
@@ -3795,6 +3796,55 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildAiIntroWorkPacketPreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_ai_intro_import_preview",
+    {
+      title: "Build AI intro import preview",
+      description: "Parse ChatGPT/Claude JSON or CSV icebreaker results, match them to AI intro work packet leads, validate quality, and prepare cleanup/audit/export/Smartlead next steps without DB writes.",
+      inputSchema: {
+        leads: z.array(leadCandidateSchema.extend({
+          id: z.string().optional(),
+          raw: z.record(z.string(), z.string()).optional(),
+          context: z.string().optional(),
+          evidenceText: z.string().optional(),
+          businessFacts: z.unknown().optional(),
+          scraped: z.object({
+            url: z.string().optional(),
+            finalUrl: z.string().optional(),
+            title: z.string().optional(),
+            description: z.string().optional(),
+            textPreview: z.string().optional(),
+            emails: z.array(z.string()).optional(),
+            phones: z.array(z.string()).optional(),
+          }).optional(),
+        }).passthrough()).optional(),
+        csvText: z.string().optional(),
+        delimiter: z.enum([",", ";"]).optional(),
+        sourceName: z.string().optional(),
+        niche: z.string().optional(),
+        offer: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        maxLeads: z.number().int().min(1).max(200).default(50),
+        maxContextChars: z.number().int().min(200).max(5000).default(1200),
+        completedIntros: z.array(z.object({
+          id: z.string().min(1),
+          icebreaker: z.string().optional(),
+          personalizedIntro: z.string().optional(),
+        })).optional(),
+        resultJsonText: z.string().optional(),
+        resultCsvText: z.string().optional(),
+        resultDelimiter: z.enum([",", ";"]).optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildAiIntroImportPreview(input))
   );
 
   server.registerTool(
