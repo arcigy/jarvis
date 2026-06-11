@@ -3286,6 +3286,7 @@ function listWebMcpTools() {
     { name: "arcigy.build_leadgen_autopilot_batch_preview", requiresApproval: false },
     { name: "arcigy.build_lead_repair_queue_preview", requiresApproval: false },
     { name: "arcigy.build_phone_enrichment_queue_preview", requiresApproval: false },
+    { name: "arcigy.build_phone_enrichment_writeback_preview", requiresApproval: false },
     { name: "arcigy.build_orphan_lead_assignment_preview", requiresApproval: false },
     { name: "arcigy.build_niche_ops_dashboard_preview", requiresApproval: false },
     { name: "arcigy.build_cold_outreach_csv_import_preview", requiresApproval: false },

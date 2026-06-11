@@ -553,6 +553,37 @@ export type PhoneEnrichmentQueuePreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type PhoneEnrichmentWritebackPreview = {
+  mode: "phone-enrichment-writeback-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  source: { name?: string; type: "scrape" | "csv" | "manual" | "mixed"; parsedFromCsv: number };
+  totals: {
+    inputLeads: number;
+    phoneResults: number;
+    enriched: number;
+    unchanged: number;
+    conflicts: number;
+    missingMatch: number;
+    existingPhoneKept: number;
+  };
+  items: Array<{
+    lead: LeadCandidateInput;
+    status: "enriched" | "existing_phone_kept" | "conflict" | "no_phone_match";
+    phone?: string;
+    candidates: string[];
+    matchedBy: string[];
+    sourceUrls: string[];
+    reason: string;
+  }>;
+  enrichedLeads: LeadCandidateInput[];
+  unchangedLeads: LeadCandidateInput[];
+  conflicts: Array<{ lead: LeadCandidateInput; candidates: string[]; sourceUrls: string[]; reason: string }>;
+  unmatchedResults: Array<Record<string, unknown>>;
+  exportPreview: ReturnType<typeof serializeLeadsCsv>;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type PreparedSmartleadLeadInput = {
   email: string;
   companyName?: string;
@@ -3074,6 +3105,127 @@ export function buildPhoneEnrichmentQueuePreview(input: {
     items,
     enrichedLeads,
     scrapeUrls,
+    exportPreview,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls),
+  };
+}
+
+export function buildPhoneEnrichmentWritebackPreview(input: {
+  leads?: LeadCandidateInput[];
+  csvText?: string;
+  delimiter?: "," | ";";
+  maxRows?: number;
+  phoneResults?: Array<Partial<ScrapedWebsiteContacts> & Record<string, unknown>>;
+  scrapedResults?: Array<Partial<ScrapedWebsiteContacts> & Record<string, unknown>>;
+  batch?: { results?: Array<Partial<ScrapedWebsiteContacts> & Record<string, unknown>> };
+  sourceName?: string;
+  sourceType?: "scrape" | "csv" | "manual" | "mixed";
+  overwriteExisting?: boolean;
+  maxNextCalls?: number;
+}): PhoneEnrichmentWritebackPreview {
+  const parsed = input.csvText?.trim() ? parseLeadsCsv({ csvText: input.csvText, delimiter: input.delimiter, maxRows: input.maxRows }) : undefined;
+  const leads = [...(input.leads ?? []), ...(parsed?.leads ?? [])];
+  const phoneResults = [...(input.phoneResults ?? []), ...(input.scrapedResults ?? []), ...(input.batch?.results ?? [])];
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 50), 1), 200);
+  const usedResults = new Set<number>();
+  const items: PhoneEnrichmentWritebackPreview["items"] = leads.map((lead) => {
+    const existingPhone = lead.phone ?? stringField(lead.customFields ?? {}, "phone", "international_phone", "phone_number");
+    const matches = phoneResults
+      .map((result, index) => ({ result, index, match: phoneResultMatchesLead(result, lead) }))
+      .filter((item) => item.match.matchedBy.length);
+    const candidates = unique(matches.flatMap((item) => phoneResultPhones(item.result)));
+    const sourceUrls = unique(matches.flatMap((item) => phoneResultUrls(item.result)));
+    const matchedBy = unique(matches.flatMap((item) => item.match.matchedBy));
+    if (existingPhone && !input.overwriteExisting) {
+      matches.forEach((item) => usedResults.add(item.index));
+      return { lead, status: "existing_phone_kept", phone: existingPhone, candidates, matchedBy, sourceUrls, reason: "phone already present; overwriteExisting is false" };
+    }
+    if (!candidates.length) {
+      return { lead, status: "no_phone_match", candidates: [], matchedBy: [], sourceUrls: [], reason: "no matching phone result found" };
+    }
+    matches.forEach((item) => usedResults.add(item.index));
+    if (candidates.length > 1) {
+      return { lead, status: "conflict", candidates, matchedBy, sourceUrls, reason: "multiple different phone candidates need manual review" };
+    }
+    return { lead, status: "enriched", phone: candidates[0], candidates, matchedBy, sourceUrls, reason: existingPhone ? "phone overwritten from approved enrichment result" : "phone merged from enrichment result" };
+  });
+  const enrichedLeads = items
+    .filter((item) => item.status === "enriched" && item.phone)
+    .map((item) => ({
+      ...item.lead,
+      phone: item.phone,
+      source: item.lead.source ?? input.sourceName,
+      customFields: {
+        ...item.lead.customFields,
+        phone_source_urls: item.sourceUrls.join("; ") || item.lead.customFields?.phone_source_urls,
+        phone_match_method: item.matchedBy.join("; "),
+        phone_candidates: item.candidates.join("; "),
+      },
+    }));
+  const unchangedLeads = items
+    .filter((item) => item.status === "existing_phone_kept" || item.status === "no_phone_match")
+    .map((item) => item.lead);
+  const conflicts = items
+    .filter((item) => item.status === "conflict")
+    .map((item) => ({ lead: item.lead, candidates: item.candidates, sourceUrls: item.sourceUrls, reason: item.reason }));
+  const unmatchedResults = phoneResults
+    .map((result, index) => ({ result, index }))
+    .filter((item) => !usedResults.has(item.index) && phoneResultPhones(item.result).length)
+    .map((item) => item.result as Record<string, unknown>);
+  const exportPreview = serializeLeadsCsv({
+    leads: [...enrichedLeads, ...unchangedLeads],
+    columns: ["companyName", "email", "website", "phone", "source", "phone_source_urls", "phone_match_method", "phone_candidates"],
+  });
+  const missingPhoneLeads = items
+    .filter((item) => item.status === "no_phone_match" && isScrapableLeadWebsite(item.lead.website))
+    .map((item) => item.lead)
+    .slice(0, maxNextCalls);
+  const nextToolCalls: PhoneEnrichmentWritebackPreview["nextToolCalls"] = [];
+  if (missingPhoneLeads.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_phone_enrichment_queue_preview",
+      payload: { leads: missingPhoneLeads, sourceName: input.sourceName, maxNextCalls },
+      reason: "Dohladat telefony pre leady, ktore nemali match vo vysledkoch.",
+      approvalRequired: false,
+    });
+  }
+  if (enrichedLeads.length) {
+    nextToolCalls.push(
+      {
+        tool: "arcigy.build_smartlead_nonreply_call_list_preview",
+        payload: { leads: enrichedLeads, sourceName: input.sourceName, maxRows: maxNextCalls },
+        reason: "Z enriched leadov priprav call list pre non-reply follow-up.",
+        approvalRequired: false,
+      },
+      {
+        tool: "arcigy.export_leads_csv",
+        payload: { leads: [...enrichedLeads, ...unchangedLeads], columns: exportPreview.columns },
+        reason: "Export phone-enriched CSV az po kontrole operatorom.",
+        approvalRequired: true,
+      }
+    );
+  }
+  const totals = {
+    inputLeads: leads.length,
+    phoneResults: phoneResults.length,
+    enriched: enrichedLeads.length,
+    unchanged: unchangedLeads.length,
+    conflicts: conflicts.length,
+    missingMatch: items.filter((item) => item.status === "no_phone_match").length,
+    existingPhoneKept: items.filter((item) => item.status === "existing_phone_kept").length,
+  };
+  const status: PhoneEnrichmentWritebackPreview["status"] = totals.inputLeads === 0 ? "blocked" : totals.conflicts || totals.missingMatch ? "attention" : "ready";
+  return {
+    mode: "phone-enrichment-writeback-preview",
+    status,
+    summary: `Phone enrichment writeback ${status}: ${totals.enriched} doplnenych, ${totals.existingPhoneKept} ponechanych, ${totals.conflicts} konfliktov, ${totals.missingMatch} bez matchu. Ziadny zapis ani export neprebehol.`,
+    source: { name: input.sourceName, type: input.sourceType ?? "mixed", parsedFromCsv: parsed?.leads.length ?? 0 },
+    totals,
+    items,
+    enrichedLeads,
+    unchangedLeads,
+    conflicts,
+    unmatchedResults,
     exportPreview,
     nextToolCalls: dedupeNextToolCalls(nextToolCalls),
   };
@@ -10696,6 +10848,56 @@ function extractPhones(text: string): string[] {
     .filter((phone) => phone.replace(/\D/g, "").length >= 9);
 }
 
+function phoneResultPhones(result: Record<string, unknown>): string[] {
+  const phones = [
+    ...(Array.isArray(result.phones) ? result.phones.map(String) : []),
+    stringField(result, "phone", "international_phone", "phone_number", "tel"),
+  ].filter((phone): phone is string => Boolean(phone));
+  return unique(phones.map(normalizePhoneCandidate).filter((phone): phone is string => Boolean(phone)));
+}
+
+function normalizePhoneCandidate(phone: string): string | undefined {
+  const cleaned = phone.replace(/\s+/g, " ").trim();
+  return cleaned.replace(/\D/g, "").length >= 7 ? cleaned : undefined;
+}
+
+function phoneResultUrls(result: Record<string, unknown>): string[] {
+  return unique([
+    stringField(result, "url"),
+    stringField(result, "finalUrl"),
+    stringField(result, "website"),
+    stringField(result, "domain"),
+  ].filter((url): url is string => Boolean(url)));
+}
+
+function phoneResultEmails(result: Record<string, unknown>): string[] {
+  return unique([
+    ...(Array.isArray(result.emails) ? result.emails.map(String) : []),
+    stringField(result, "email", "primary_email"),
+  ].filter((email): email is string => Boolean(email)).map((email) => email.trim().toLowerCase()));
+}
+
+function phoneResultMatchesLead(result: Record<string, unknown>, lead: LeadCandidateInput): { matchedBy: string[] } {
+  const matchedBy: string[] = [];
+  const resultDomains = new Set([
+    ...phoneResultUrls(result).map(normalizeDomain),
+    ...phoneResultEmails(result).map((email) => normalizeDomain(email.split("@")[1] ?? "")),
+  ].filter(Boolean));
+  const leadDomains = unique([
+    lead.website ? normalizeDomain(lead.website) : "",
+    lead.email ? normalizeDomain(lead.email.split("@")[1] ?? "") : "",
+  ].filter(Boolean));
+  if (leadDomains.some((domain) => resultDomains.has(domain))) matchedBy.push("domain");
+  const leadEmail = lead.email?.trim().toLowerCase();
+  if (leadEmail && phoneResultEmails(result).includes(leadEmail)) matchedBy.push("email");
+  const leadCompany = slugify(lead.companyName ?? "");
+  const resultCompany = slugify(stringField(result, "companyName", "company_name", "name", "title") ?? "");
+  if (leadCompany && resultCompany && (leadCompany === resultCompany || leadCompany.includes(resultCompany) || resultCompany.includes(leadCompany))) {
+    matchedBy.push("company");
+  }
+  return { matchedBy: unique(matchedBy) };
+}
+
 function stringField(record: Record<string, unknown>, ...keys: string[]): string | undefined {
   for (const key of keys) {
     const value = record[key];
@@ -12304,6 +12506,8 @@ const csvCustomFieldKeys = new Set([
   "lead_category_id",
   "matched_queries",
   "phone_source_urls",
+  "phone_match_method",
+  "phone_candidates",
   "priority_score",
   "rating",
   "reviews",

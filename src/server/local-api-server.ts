@@ -37,6 +37,7 @@ import {
   buildLeadgenRunResumePreview,
   buildDailyLeadgenRunClosurePreview,
   buildPhoneEnrichmentQueuePreview,
+  buildPhoneEnrichmentWritebackPreview,
   buildLeadSourceImportQueuePreview,
   buildLeadSourceBundlePreview,
   buildLeadSourceBundleCampaignLaunchPreview,
@@ -2682,6 +2683,24 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         sourceName: optionalString(payload.sourceName),
         countryFilter: optionalString(payload.countryFilter),
         scrapedResults: Array.isArray(payload.scrapedResults) ? payload.scrapedResults as Parameters<typeof buildPhoneEnrichmentQueuePreview>[0]["scrapedResults"] : undefined,
+        maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_phone_enrichment_writeback_preview") {
+    writeJson(response, 200, {
+      result: buildPhoneEnrichmentWritebackPreview({
+        leads: Array.isArray(payload.leads) ? payload.leads as Parameters<typeof buildPhoneEnrichmentWritebackPreview>[0]["leads"] : undefined,
+        csvText: optionalString(payload.csvText),
+        delimiter: payload.delimiter === ";" ? ";" : payload.delimiter === "," ? "," : undefined,
+        maxRows: typeof payload.maxRows === "number" ? payload.maxRows : undefined,
+        phoneResults: Array.isArray(payload.phoneResults) ? payload.phoneResults as Parameters<typeof buildPhoneEnrichmentWritebackPreview>[0]["phoneResults"] : undefined,
+        scrapedResults: Array.isArray(payload.scrapedResults) ? payload.scrapedResults as Parameters<typeof buildPhoneEnrichmentWritebackPreview>[0]["scrapedResults"] : undefined,
+        batch: payload.batch && typeof payload.batch === "object" ? payload.batch as Parameters<typeof buildPhoneEnrichmentWritebackPreview>[0]["batch"] : undefined,
+        sourceName: optionalString(payload.sourceName),
+        sourceType: payload.sourceType === "scrape" || payload.sourceType === "csv" || payload.sourceType === "manual" || payload.sourceType === "mixed" ? payload.sourceType : undefined,
+        overwriteExisting: payload.overwriteExisting === true,
         maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
       }),
     });

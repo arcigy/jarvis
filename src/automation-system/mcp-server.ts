@@ -38,6 +38,7 @@ import {
   buildLeadgenRunResumePreview,
   buildDailyLeadgenRunClosurePreview,
   buildPhoneEnrichmentQueuePreview,
+  buildPhoneEnrichmentWritebackPreview,
   buildLeadSourceImportQueuePreview,
   buildLeadSourceBundlePreview,
   buildLeadSourceBundleCampaignLaunchPreview,
@@ -4689,6 +4690,36 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildPhoneEnrichmentQueuePreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_phone_enrichment_writeback_preview",
+    {
+      title: "Build phone enrichment writeback preview",
+      description: "Merge scraped or CSV phone results back into leads, flag conflicts, and prepare reviewed call-list/export next steps without writing.",
+      inputSchema: {
+        leads: z.array(leadCandidateSchema).optional(),
+        csvText: z.string().optional(),
+        delimiter: z.enum([",", ";"]).optional(),
+        maxRows: z.number().int().min(1).max(10000).optional(),
+        phoneResults: z.array(z.record(z.string(), z.unknown())).optional(),
+        scrapedResults: z.array(z.record(z.string(), z.unknown())).optional(),
+        batch: z.object({
+          results: z.array(z.record(z.string(), z.unknown())).optional(),
+        }).partial().optional(),
+        sourceName: z.string().optional(),
+        sourceType: z.enum(["scrape", "csv", "manual", "mixed"]).optional(),
+        overwriteExisting: z.boolean().optional(),
+        maxNextCalls: z.number().int().min(1).max(200).default(50),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildPhoneEnrichmentWritebackPreview(input))
   );
 
   server.registerTool(

@@ -50,6 +50,7 @@ import {
   buildUrlIntelligenceQueuePreview,
   buildLeadRepairQueuePreview,
   buildPhoneEnrichmentQueuePreview,
+  buildPhoneEnrichmentWritebackPreview,
   buildLeadgenStatusBoardPreview,
   buildLeadgenDbStatusPreview,
   buildGoogleSheetSyncPreview,
@@ -288,6 +289,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.build_leadgen_autopilot_batch_preview",
     "arcigy.build_lead_repair_queue_preview",
     "arcigy.build_phone_enrichment_queue_preview",
+    "arcigy.build_phone_enrichment_writeback_preview",
     "arcigy.build_orphan_lead_assignment_preview",
     "arcigy.build_niche_ops_dashboard_preview",
     "arcigy.build_cold_outreach_csv_import_preview",
@@ -4238,6 +4240,41 @@ test("phone enrichment queue preview plans scrape and merges supplied phone resu
   assert.ok(preview.enrichedLeads.some((lead) => lead.phone === "+421 900 222 333"));
   assert.ok(preview.scrapeUrls.includes("https://needs-scrape.sk"));
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.batch_scrape_website_contacts" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.export_leads_csv" && call.approvalRequired));
+  assert.match(preview.summary, /Ziadny zapis ani export/);
+});
+
+test("phone enrichment writeback preview merges phones and flags conflicts without writes", () => {
+  const preview = buildPhoneEnrichmentWritebackPreview({
+    sourceName: "phone-scrape-results",
+    sourceType: "scrape",
+    leads: [
+      { companyName: "Needs Phone", website: "https://needs-phone.sk", email: "info@needs-phone.sk" },
+      { companyName: "Ready Firma", website: "https://ready.sk", email: "jan@ready.sk", phone: "+421 900 111 222" },
+      { companyName: "Conflict Firma", website: "https://conflict.sk", email: "info@conflict.sk" },
+      { companyName: "Missing Firma", website: "https://missing.sk", email: "info@missing.sk" },
+    ],
+    scrapedResults: [
+      { url: "https://needs-phone.sk", finalUrl: "https://needs-phone.sk/kontakt", phones: ["+421 900 222 333"], emails: ["info@needs-phone.sk"] },
+      { url: "https://ready.sk", phones: ["+421 900 999 999"], emails: ["jan@ready.sk"] },
+      { url: "https://conflict.sk", phones: ["+421 900 444 111", "+421 900 444 222"], emails: ["info@conflict.sk"] },
+      { url: "https://unmatched.sk", phones: ["+421 900 555 666"], emails: ["info@unmatched.sk"] },
+    ],
+  });
+
+  assert.equal(preview.mode, "phone-enrichment-writeback-preview");
+  assert.equal(preview.status, "attention");
+  assert.equal(preview.totals.inputLeads, 4);
+  assert.equal(preview.totals.enriched, 1);
+  assert.equal(preview.totals.existingPhoneKept, 1);
+  assert.equal(preview.totals.conflicts, 1);
+  assert.equal(preview.totals.missingMatch, 1);
+  assert.equal(preview.enrichedLeads[0]?.phone, "+421 900 222 333");
+  assert.equal(preview.unchangedLeads.some((lead) => lead.companyName === "Ready Firma"), true);
+  assert.equal(preview.conflicts[0]?.candidates.length, 2);
+  assert.equal(preview.unmatchedResults.length, 1);
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_phone_enrichment_queue_preview" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_smartlead_nonreply_call_list_preview" && !call.approvalRequired));
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.export_leads_csv" && call.approvalRequired));
   assert.match(preview.summary, /Ziadny zapis ani export/);
 });

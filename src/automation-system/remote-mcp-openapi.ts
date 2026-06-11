@@ -1172,6 +1172,24 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       ],
     };
   }
+  if (toolName === "arcigy.build_phone_enrichment_writeback_preview") {
+    return {
+      sourceName: "phone-scrape-results",
+      sourceType: "scrape",
+      leads: [
+        { companyName: "Needs Phone", website: "https://needs-phone.sk", email: "info@needs-phone.sk" },
+        { companyName: "Ready Firma", website: "https://ready.sk", email: "jan@ready.sk", phone: "+421 900 111 222" },
+      ],
+      scrapedResults: [
+        {
+          url: "https://needs-phone.sk",
+          finalUrl: "https://needs-phone.sk/kontakt",
+          phones: ["+421 900 222 333"],
+          emails: ["info@needs-phone.sk"],
+        },
+      ],
+    };
+  }
   if (toolName === "arcigy.build_orphan_lead_assignment_preview") {
     return {
       sourceName: "orphan-leads-db-export",

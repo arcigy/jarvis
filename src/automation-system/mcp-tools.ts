@@ -139,6 +139,7 @@ export type JarvisMcpToolName =
   | "arcigy.build_leadgen_autopilot_batch_preview"
   | "arcigy.build_lead_repair_queue_preview"
   | "arcigy.build_phone_enrichment_queue_preview"
+  | "arcigy.build_phone_enrichment_writeback_preview"
   | "arcigy.build_orphan_lead_assignment_preview"
   | "arcigy.build_niche_ops_dashboard_preview"
   | "arcigy.build_cold_outreach_csv_import_preview"
@@ -884,6 +885,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.build_phone_enrichment_queue_preview",
       description: "Pripravi phone enrichment queue z CSV alebo leadov: filtruje krajinu, preskoci existujuce telefony, naplanuje scrape a export bez zapisu.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_phone_enrichment_writeback_preview",
+      description: "Zluci najdene telefony zo scrape/CSV vysledkov spat do leadov, oznaci konflikty a pripravi call-list/export next kroky bez zapisu.",
       requiresApproval: false,
     },
     {
