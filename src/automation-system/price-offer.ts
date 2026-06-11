@@ -87,6 +87,53 @@ export type PricingProposalPreview = {
   summary: string;
 };
 
+export type ServiceCapacityItem = {
+  serviceId?: string;
+  name: string;
+  requestedQuantity?: number;
+  availableQuantity?: number;
+  unitLabel?: string;
+  unitPriceEur?: number;
+  unitCostEur?: number;
+  minHealthyQuantity?: number;
+  category?: string;
+};
+
+export type ServiceCapacityPreviewInput = {
+  clientName?: string;
+  projectName?: string;
+  services: ServiceCapacityItem[];
+  defaultMinHealthyQuantity?: number;
+};
+
+export type ServiceCapacityPreview = {
+  mode: "service-capacity-preview";
+  clientName: string | null;
+  projectName: string | null;
+  status: "ready" | "attention" | "blocked";
+  checkedAt: string;
+  services: Array<{
+    serviceId: string | null;
+    name: string;
+    category: string | null;
+    requestedQuantity: number;
+    availableQuantity: number;
+    reservedQuantity: number;
+    remainingQuantity: number;
+    unitLabel: string;
+    status: "in_stock" | "low_stock" | "out_of_stock";
+    message: string;
+  }>;
+  blockedServices: string[];
+  lowCapacityServices: string[];
+  nextToolCalls: Array<{
+    tool: "arcigy.build_pricing_proposal_preview";
+    approvalRequired: false;
+    payload: Record<string, unknown>;
+  }>;
+  summary: string;
+};
+
 export async function draftPriceOfferIntake(
   input: PriceOfferDraftInput,
   env: RuntimeEnv = process.env,
@@ -232,6 +279,86 @@ export function buildPricingProposalPreview(input: PricingProposalPreviewInput):
     ],
     summary: `Cenovy preview: ${netTotalEur.toFixed(2)} EUR bez DPH, marza ${marginPercent.toFixed(1)}%, zlava ${appliedPercent.toFixed(1)}%. Dokument negenerujem bez schvalenia.`,
   };
+}
+
+export function buildServiceCapacityPreview(input: ServiceCapacityPreviewInput): ServiceCapacityPreview {
+  if (!Array.isArray(input.services) || input.services.length === 0) {
+    throw new Error("At least one service capacity item is required.");
+  }
+  const defaultMinHealthyQuantity = positiveNumber(input.defaultMinHealthyQuantity ?? 3, "defaultMinHealthyQuantity");
+  const services = input.services.map((service) => normalizeCapacityItem(service, defaultMinHealthyQuantity));
+  const blockedServices = services.filter((service) => service.status === "out_of_stock").map((service) => service.name);
+  const lowCapacityServices = services.filter((service) => service.status === "low_stock").map((service) => service.name);
+  const status = blockedServices.length ? "blocked" : lowCapacityServices.length ? "attention" : "ready";
+  const pricedItems = input.services
+    .filter((service) => Number.isFinite(Number(service.unitPriceEur)))
+    .map((service) => ({
+      id: cleanText(service.serviceId) ?? cleanText(service.name) ?? "service",
+      name: cleanText(service.name) ?? "Service",
+      quantity: positiveNumber(service.requestedQuantity ?? 1, "service requestedQuantity"),
+      unitPriceEur: nonnegativeNumber(service.unitPriceEur, "service unitPriceEur"),
+      unitCostEur: service.unitCostEur === undefined ? undefined : nonnegativeNumber(service.unitCostEur, "service unitCostEur"),
+      category: cleanText(service.category) ?? undefined,
+    }));
+
+  return {
+    mode: "service-capacity-preview",
+    clientName: cleanText(input.clientName),
+    projectName: cleanText(input.projectName),
+    status,
+    checkedAt: new Date().toISOString(),
+    services,
+    blockedServices,
+    lowCapacityServices,
+    nextToolCalls: pricedItems.length
+      ? [
+          {
+            tool: "arcigy.build_pricing_proposal_preview",
+            approvalRequired: false,
+            payload: {
+              clientName: cleanText(input.clientName) ?? undefined,
+              projectName: cleanText(input.projectName) ?? undefined,
+              items: pricedItems,
+            },
+          },
+        ]
+      : [],
+    summary: capacitySummary(status, services.length, blockedServices.length, lowCapacityServices.length),
+  };
+}
+
+function normalizeCapacityItem(item: ServiceCapacityItem, defaultMinHealthyQuantity: number): ServiceCapacityPreview["services"][number] {
+  const name = cleanText(item.name);
+  if (!name) throw new Error("Service name is required.");
+  const requestedQuantity = positiveNumber(item.requestedQuantity ?? 1, "service requestedQuantity");
+  const availableQuantity = Math.max(0, Number.isFinite(Number(item.availableQuantity)) ? Number(item.availableQuantity) : requestedQuantity);
+  const minHealthyQuantity = Math.max(0, Number.isFinite(Number(item.minHealthyQuantity)) ? Number(item.minHealthyQuantity) : defaultMinHealthyQuantity);
+  const remainingQuantity = roundMoney(availableQuantity - requestedQuantity);
+  const status = remainingQuantity < 0 ? "out_of_stock" : remainingQuantity < minHealthyQuantity ? "low_stock" : "in_stock";
+  return {
+    serviceId: cleanText(item.serviceId),
+    name,
+    category: cleanText(item.category),
+    requestedQuantity,
+    availableQuantity: roundMoney(availableQuantity),
+    reservedQuantity: requestedQuantity,
+    remainingQuantity,
+    unitLabel: cleanText(item.unitLabel) ?? "slot",
+    status,
+    message: capacityMessage(status, name, remainingQuantity, cleanText(item.unitLabel) ?? "slot"),
+  };
+}
+
+function capacitySummary(status: ServiceCapacityPreview["status"], count: number, blocked: number, low: number): string {
+  if (status === "blocked") return `Kapacitny preview: ${blocked}/${count} sluzieb nema dost kapacity. Najprv uprav scope alebo termin.`;
+  if (status === "attention") return `Kapacitny preview: ${low}/${count} sluzieb je nizko na kapacite. Ponuku mozes pripravit, ale oznac riziko.`;
+  return `Kapacitny preview: ${count}/${count} sluzieb ma dost kapacity. Mozes pokracovat pricing preview.`;
+}
+
+function capacityMessage(status: "in_stock" | "low_stock" | "out_of_stock", name: string, remaining: number, unit: string): string {
+  if (status === "out_of_stock") return `${name}: chyba ${Math.abs(remaining).toFixed(1)} ${unit}.`;
+  if (status === "low_stock") return `${name}: ostava iba ${remaining.toFixed(1)} ${unit}.`;
+  return `${name}: kapacita je v poriadku, ostava ${remaining.toFixed(1)} ${unit}.`;
 }
 
 function normalizePricingItem(item: PricingProposalItem): PricingProposalPreview["lineItems"][number] {

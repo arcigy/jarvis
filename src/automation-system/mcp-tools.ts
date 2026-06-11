@@ -7,6 +7,7 @@ export type JarvisMcpToolName =
   | "arcigy.draft_contract_intake"
   | "arcigy.draft_price_offer_intake"
   | "arcigy.build_pricing_proposal_preview"
+  | "arcigy.build_service_capacity_preview"
   | "arcigy.generate_price_offer_document"
   | "arcigy.get_cold_outreach_brief"
   | "arcigy.get_cold_outreach_brief_from_db"
@@ -197,6 +198,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
       name: "arcigy.build_pricing_proposal_preview",
       description: "Read-only vypocita cenovu ponuku, zlavove pravidla, DPH a marzu a pripravi schvalovaci next call na DOCX.",
       inputSchemaRef: "docs/pricing/price-offer.schema.json",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_service_capacity_preview",
+      description: "Read-only skontroluje kapacitu Arcigy sluzieb pred ponukou a pripravi pricing preview next call.",
       requiresApproval: false,
     },
     {

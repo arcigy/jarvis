@@ -668,7 +668,7 @@ const coreWebWorkflowSurfaces = [
   {
     id: "contract-workflow",
     title: "Contract automation workflow",
-    tools: ["arcigy.draft_contract_intake", "arcigy.generate_contract_documents", "arcigy.draft_price_offer_intake", "arcigy.build_pricing_proposal_preview", "arcigy.generate_price_offer_document"],
+    tools: ["arcigy.draft_contract_intake", "arcigy.generate_contract_documents", "arcigy.draft_price_offer_intake", "arcigy.build_pricing_proposal_preview", "arcigy.build_service_capacity_preview", "arcigy.generate_price_offer_document"],
     approvalRequired: ["arcigy.generate_contract_documents", "arcigy.generate_price_offer_document"],
     proof: "Gemini intake drafts and approval-gated DOCX contract/price-offer generation are registered.",
   },
@@ -1196,7 +1196,7 @@ function jarvisCapabilityDefinitions() {
     {
       id: "contracts",
       title: "Universal Arcigy contract automation",
-      tools: ["arcigy.draft_contract_intake", "arcigy.generate_contract_documents", "arcigy.draft_price_offer_intake", "arcigy.build_pricing_proposal_preview", "arcigy.generate_price_offer_document"],
+      tools: ["arcigy.draft_contract_intake", "arcigy.generate_contract_documents", "arcigy.draft_price_offer_intake", "arcigy.build_pricing_proposal_preview", "arcigy.build_service_capacity_preview", "arcigy.generate_price_offer_document"],
       approvalRequired: ["arcigy.generate_contract_documents", "arcigy.generate_price_offer_document"],
       evidence: ["contract-template-safety", "tests", "ui-smoke"],
       envKeys: ["gemini"],
@@ -2113,6 +2113,22 @@ function buildRemoteMcpQuickStartCalls(baseUrl) {
         ],
         manualDiscountPercent: 5,
         vatPercent: 20,
+      },
+      approvalRequired: false,
+    },
+    {
+      label: "Check service capacity before pricing",
+      tool: "arcigy.build_service_capacity_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_service_capacity_preview"),
+      body: {
+        clientName: "Modelova Firma s.r.o.",
+        projectName: "Leadgen a follow-up automatizacia",
+        services: [
+          { serviceId: "setup", name: "Implementacia automatizacie", requestedQuantity: 1, availableQuantity: 3, unitLabel: "slot", unitPriceEur: 2000, unitCostEur: 900 },
+          { serviceId: "scraping", name: "Scraping leadov", requestedQuantity: 500, availableQuantity: 1200, unitLabel: "lead", unitPriceEur: 1.5, unitCostEur: 0.4, minHealthyQuantity: 100 },
+          { serviceId: "intro", name: "AI intra", requestedQuantity: 500, availableQuantity: 600, unitLabel: "intro", unitPriceEur: 1, unitCostEur: 0.2, minHealthyQuantity: 50 },
+        ],
       },
       approvalRequired: false,
     },
@@ -3137,6 +3153,7 @@ function listWebMcpTools() {
     { name: "arcigy.draft_contract_intake", requiresApproval: false },
     { name: "arcigy.draft_price_offer_intake", requiresApproval: false },
     { name: "arcigy.build_pricing_proposal_preview", requiresApproval: false },
+    { name: "arcigy.build_service_capacity_preview", requiresApproval: false },
     { name: "arcigy.generate_price_offer_document", requiresApproval: true },
     { name: "arcigy.get_cold_outreach_brief", requiresApproval: false },
     { name: "arcigy.get_cold_outreach_brief_from_db", requiresApproval: false },

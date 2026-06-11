@@ -90,7 +90,7 @@ import {
 } from "../automation-system/lead-automation.ts";
 import { buildContractGenerationCommand, getColdOutreachMcpAnswer, listJarvisMcpTools, localStateWriteToolNames } from "../automation-system/mcp-tools.ts";
 import { buildOperatorBriefing } from "../automation-system/operator-briefing.ts";
-import { buildPricingProposalPreview, draftPriceOfferIntake } from "../automation-system/price-offer.ts";
+import { buildPricingProposalPreview, buildServiceCapacityPreview, draftPriceOfferIntake } from "../automation-system/price-offer.ts";
 import { buildProactiveAttentionDigest } from "../automation-system/proactive-attention-digest.ts";
 import { buildProductionCompletionScore, summarizeProductionCompletionScoreForVoice } from "../automation-system/production-completion-score.ts";
 import { buildProductionReadinessReport } from "../automation-system/production-readiness.ts";
@@ -1075,6 +1075,17 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         minTotalEur: optionalNumber(payload.minTotalEur),
         maxDiscountPercent: optionalNumber(payload.maxDiscountPercent),
         vip: payload.vip === true,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_service_capacity_preview") {
+    writeJson(response, 200, {
+      result: buildServiceCapacityPreview({
+        clientName: optionalString(payload.clientName),
+        projectName: optionalString(payload.projectName),
+        services: Array.isArray(payload.services) ? payload.services as never : [],
+        defaultMinHealthyQuantity: optionalNumber(payload.defaultMinHealthyQuantity),
       }),
     });
     return;

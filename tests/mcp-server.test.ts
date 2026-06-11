@@ -29,6 +29,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(names.includes("arcigy.draft_contract_intake"));
   assert.ok(names.includes("arcigy.draft_price_offer_intake"));
   assert.ok(names.includes("arcigy.build_pricing_proposal_preview"));
+  assert.ok(names.includes("arcigy.build_service_capacity_preview"));
   assert.ok(names.includes("arcigy.generate_price_offer_document"));
   assert.ok(names.includes("arcigy.get_cold_outreach_brief"));
   assert.ok(names.includes("arcigy.get_cold_outreach_brief_from_db"));
@@ -476,6 +477,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
     )
   );
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_pricing_proposal_preview" && call.approvalRequired === false && Array.isArray(call.body.items)));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_service_capacity_preview" && call.approvalRequired === false && Array.isArray(call.body.services)));
   const contractQuickStart = pack.quickStartCalls.find((call) => call.tool === "arcigy.generate_contract_documents");
   assert.equal(contractQuickStart?.approvalRequired, true);
   assert.equal((contractQuickStart?.body.approval as { approved?: boolean } | undefined)?.approved, true);

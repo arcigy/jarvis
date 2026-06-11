@@ -274,6 +274,17 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       vatPercent: 20,
     };
   }
+  if (toolName === "arcigy.build_service_capacity_preview") {
+    return {
+      clientName: "Modelova Firma s.r.o.",
+      projectName: "Leadgen a follow-up automatizacia",
+      services: [
+        { serviceId: "setup", name: "Implementacia automatizacie", requestedQuantity: 1, availableQuantity: 3, unitLabel: "slot", unitPriceEur: 2000, unitCostEur: 900 },
+        { serviceId: "scraping", name: "Scraping leadov", requestedQuantity: 500, availableQuantity: 1200, unitLabel: "lead", unitPriceEur: 1.5, unitCostEur: 0.4, minHealthyQuantity: 100 },
+        { serviceId: "intro", name: "AI intra", requestedQuantity: 500, availableQuantity: 600, unitLabel: "intro", unitPriceEur: 1, unitCostEur: 0.2, minHealthyQuantity: 50 },
+      ],
+    };
+  }
   if (toolName === "arcigy.generate_price_offer_document") {
     return {
       approval: { approved: true },

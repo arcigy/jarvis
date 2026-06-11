@@ -652,6 +652,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.ok(openApiBody.paths["/api/mcp/arcigy.upsert_smartlead_campaign_webhook"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.get_smartlead_email_accounts"]);
     assert.ok(openApiBody.paths["/api/mcp/arcigy.build_pricing_proposal_preview"]);
+    assert.ok(openApiBody.paths["/api/mcp/arcigy.build_service_capacity_preview"]);
     const openApiOperator = openApiBody.paths["/api/mcp/arcigy.get_operator_briefing"] as OpenApiPathFixture;
     const openApiAttentionDigest = openApiBody.paths["/api/mcp/arcigy.get_proactive_attention_digest"] as OpenApiPathFixture;
     const openApiCompletionScore = openApiBody.paths["/api/mcp/arcigy.get_production_completion_score"] as OpenApiPathFixture;
@@ -671,6 +672,7 @@ test("local web bridge serves UI and API health", async () => {
     const openApiSmartleadWebhookUpsert = openApiBody.paths["/api/mcp/arcigy.upsert_smartlead_campaign_webhook"] as OpenApiPathFixture;
     const openApiSmartleadEmailAccounts = openApiBody.paths["/api/mcp/arcigy.get_smartlead_email_accounts"] as OpenApiPathFixture;
     const openApiPricingProposalPreview = openApiBody.paths["/api/mcp/arcigy.build_pricing_proposal_preview"] as OpenApiPathFixture;
+    const openApiServiceCapacityPreview = openApiBody.paths["/api/mcp/arcigy.build_service_capacity_preview"] as OpenApiPathFixture;
     const openApiContract = openApiBody.paths["/api/mcp/arcigy.generate_contract_documents"] as OpenApiPathFixture;
     assert.equal(openApiCompletionScore.post.requestBody.content["application/json"].examples.quickStart.value.live, false);
     assert.equal(openApiSlackSend.post["x-arcigy-requiresApproval"], true);
@@ -697,6 +699,7 @@ test("local web bridge serves UI and API health", async () => {
     assert.equal(openApiSmartleadEmailAccounts.post.requestBody.content["application/json"].examples.quickStart.value.requestedDailyLimit, 80);
     assert.equal(openApiPricingProposalPreview.post.requestBody.content["application/json"].examples.quickStart.value.clientName, "Modelova Firma s.r.o.");
     assert.equal(openApiPricingProposalPreview.post.requestBody.content["application/json"].examples.quickStart.value.items.length, 2);
+    assert.equal(openApiServiceCapacityPreview.post.requestBody.content["application/json"].examples.quickStart.value.services.length, 3);
     assert.equal(openApiSmartleadWebhookUpsert.post["x-arcigy-requiresApproval"], true);
     assert.equal(openApiSmartleadWebhookUpsert.post.requestBody.content["application/json"].examples.quickStart.value.approval.approved, true);
     assert.equal(openApiContract.post["x-arcigy-requiresApproval"], true);
@@ -917,6 +920,7 @@ test("local web bridge serves UI and API health", async () => {
       )
     );
     assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_pricing_proposal_preview" && call.approvalRequired === false && Array.isArray(call.body.items)));
+    assert.ok(remotePackBody.quickStartCalls.some((call) => call.tool === "arcigy.build_service_capacity_preview" && call.approvalRequired === false && Array.isArray(call.body.services)));
     const contractQuickStart = remotePackBody.quickStartCalls.find((call) => call.tool === "arcigy.generate_contract_documents");
     assert.equal(contractQuickStart?.approvalRequired, true);
     assert.equal((contractQuickStart?.body.approval as { approved?: boolean } | undefined)?.approved, true);

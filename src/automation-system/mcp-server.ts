@@ -95,7 +95,7 @@ import {
   identifyEmailMcpAnswer,
 } from "./mcp-tools.ts";
 import { buildOperatorBriefing } from "./operator-briefing.ts";
-import { buildPricingProposalPreview, draftPriceOfferIntake } from "./price-offer.ts";
+import { buildPricingProposalPreview, buildServiceCapacityPreview, draftPriceOfferIntake } from "./price-offer.ts";
 import { buildProactiveAttentionDigest } from "./proactive-attention-digest.ts";
 import { buildProductionCompletionScore, summarizeProductionCompletionScoreForVoice } from "./production-completion-score.ts";
 import { buildProductionReadinessReport } from "./production-readiness.ts";
@@ -243,6 +243,37 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildPricingProposalPreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_service_capacity_preview",
+    {
+      title: "Build service capacity preview",
+      description: "Check Arcigy service capacity before a price offer, flag low or missing capacity, and prepare a pricing preview next call without writing files.",
+      inputSchema: {
+        clientName: z.string().min(1).optional(),
+        projectName: z.string().min(1).optional(),
+        services: z.array(z.object({
+          serviceId: z.string().min(1).optional(),
+          name: z.string().min(1),
+          requestedQuantity: z.number().positive().optional(),
+          availableQuantity: z.number().nonnegative().optional(),
+          unitLabel: z.string().min(1).optional(),
+          unitPriceEur: z.number().nonnegative().optional(),
+          unitCostEur: z.number().nonnegative().optional(),
+          minHealthyQuantity: z.number().nonnegative().optional(),
+          category: z.string().min(1).optional(),
+        })).min(1),
+        defaultMinHealthyQuantity: z.number().positive().optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildServiceCapacityPreview(input))
   );
 
   server.registerTool(
