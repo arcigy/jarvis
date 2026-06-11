@@ -66,6 +66,7 @@ import {
   buildManualReviewQueue,
   buildSmartleadCampaignLaunchPreview,
   buildBulkSmartleadUploadQueuePreview,
+  buildSmartleadSendReadinessQueuePreview,
   buildSmartleadCampaignQaPreview,
   buildSmartleadCampaignHandoffPackagePreview,
   buildSmartleadCampaignBackupPlan,
@@ -3291,6 +3292,46 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildBulkSmartleadUploadQueuePreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_smartlead_send_readiness_queue_preview",
+    {
+      title: "Build Smartlead send readiness queue preview",
+      description: "Combine batch QA, validation scoring, daily limits, and bulk upload planning across campaigns to show what can be sent today and what blocks the rest without writing or uploading.",
+      inputSchema: {
+        campaigns: z.array(z.object({
+          niche: z.object({
+            id: z.string().optional(),
+            slug: z.string().optional(),
+            name: z.string().min(1),
+            campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+            smartleadCampaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+          }),
+          leads: z.array(manualReviewPickupLeadSchema).min(0),
+          priority: z.number().int().min(1).max(99).optional(),
+          dailyLimit: z.number().int().min(1).max(500).optional(),
+          alreadySentToday: z.number().int().min(0).optional(),
+          paused: z.boolean().default(false),
+          defaultSource: z.string().optional(),
+          campaignTag: z.string().optional(),
+        })).min(1).max(50),
+        date: z.string().optional(),
+        offer: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        minScore: z.number().int().min(0).max(100).default(70),
+        batchSize: z.number().int().min(1).max(100).default(50),
+        defaultDailyLimit: z.number().int().min(1).max(500).default(50),
+        globalMaxUploads: z.number().int().min(1).max(5000).default(500),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildSmartleadSendReadinessQueuePreview(input))
   );
 
   server.registerTool(

@@ -757,16 +757,39 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
           priority: 1,
           dailyLimit: 30,
           alreadySentToday: 8,
-          leads: [{ email: "lead@example.com", decisionMakerName: "Jan Novak", companyName: "Modelova Firma", website: "https://example.com", personalizedIntro: "Kratke AI intro." }],
+          leads: [{ email: "jan@modelovafirma.sk", decisionMakerName: "Jan Novak", companyName: "Modelova Firma", companyNameShort: "Modelova", website: "https://modelovafirma.sk", personalizedIntro: "Zaujalo ma, ze servisujete firemne vozidla a mate jasne kontakty pre zakaznikov." }],
         },
         {
           niche: { id: "niche-2", slug: "kuchyne", name: "Kuchynske studia" },
           priority: 2,
-          leads: [{ email: "eva@example.com", decisionMakerName: "Eva Hruba", companyName: "Kuchyne Demo", website: "https://kuchyne.example", personalizedIntro: "Kratke AI intro." }],
+          leads: [{ email: "eva@kuchynedemo.sk", decisionMakerName: "Eva Hruba", companyName: "Kuchyne Demo", companyNameShort: "Kuchyne Demo", website: "https://kuchynedemo.sk", personalizedIntro: "Zaujalo ma, ze prepajate navrhy kuchyn so showroomom a realizaciou na mieru." }],
         },
       ],
       batchSize: 50,
       globalMaxUploads: 100,
+    };
+  }
+  if (toolName === "arcigy.build_smartlead_send_readiness_queue_preview") {
+    return {
+      date: "2026-06-10",
+      campaigns: [
+        {
+          niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456" },
+          priority: 1,
+          dailyLimit: 30,
+          alreadySentToday: 8,
+          leads: [{ email: "jan@modelovafirma.sk", decisionMakerName: "Jan Novak", companyName: "Modelova Firma", companyNameShort: "Modelova", website: "https://modelovafirma.sk", personalizedIntro: "Zaujalo ma, ze servisujete firemne vozidla a mate jasne kontakty pre zakaznikov." }],
+        },
+        {
+          niche: { id: "niche-2", slug: "kuchyne", name: "Kuchynske studia" },
+          priority: 2,
+          leads: [{ email: "eva@kuchynedemo.sk", decisionMakerName: "Eva Hruba", companyName: "Kuchyne Demo", companyNameShort: "Kuchyne Demo", website: "https://kuchynedemo.sk", personalizedIntro: "Zaujalo ma, ze prepajate navrhy kuchyn so showroomom a realizaciou na mieru." }],
+        },
+      ],
+      minScore: 70,
+      batchSize: 50,
+      offer: "AI asistent na dopyty a follow-up",
+      language: "sk",
     };
   }
   if (toolName === "arcigy.build_smartlead_import_audit_preview") {

@@ -199,6 +199,7 @@ const capabilityDefinitions: CapabilityDefinition[] = [
       "arcigy.preview_manual_review_pickup",
       "arcigy.build_smartlead_injection_plan",
       "arcigy.build_bulk_smartlead_upload_queue_preview",
+      "arcigy.build_smartlead_send_readiness_queue_preview",
       "arcigy.build_smartlead_import_audit_preview",
       "arcigy.build_smartlead_campaign_sync_plan_preview",
       "arcigy.build_smartlead_local_reconciliation_preview",

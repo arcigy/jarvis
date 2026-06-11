@@ -67,6 +67,7 @@ import {
   buildCompanyShortNamePreview,
   buildSmartleadCampaignHandoffPackagePreview,
   buildBulkSmartleadUploadQueuePreview,
+  buildSmartleadSendReadinessQueuePreview,
   buildSmartleadCampaignBackupPlan,
   buildSmartleadCampaignRestorePlan,
   buildSmartleadInjectionPlan,
@@ -252,6 +253,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.preview_manual_review_pickup",
     "arcigy.build_smartlead_injection_plan",
     "arcigy.build_bulk_smartlead_upload_queue_preview",
+    "arcigy.build_smartlead_send_readiness_queue_preview",
     "arcigy.build_smartlead_import_audit_preview",
     "arcigy.build_smartlead_campaign_sync_plan_preview",
     "arcigy.build_smartlead_local_reconciliation_preview",
@@ -515,6 +517,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.ok(paths.includes("/api/mcp/arcigy.build_lead_validation_scorecard_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_company_short_name_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_bulk_smartlead_upload_queue_preview"));
+  assert.ok(paths.includes("/api/mcp/arcigy.build_smartlead_send_readiness_queue_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_bulk_ai_intro_work_queue_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_ai_icebreaker_writeback_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.get_smartlead_campaign_webhooks"));
@@ -1929,6 +1932,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_lead_validation_scorecard_preview" && call.approvalRequired === false && call.body.minScore === 70));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_company_short_name_preview" && call.approvalRequired === false && Array.isArray(call.body.leads)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_bulk_smartlead_upload_queue_preview" && call.approvalRequired === false && Array.isArray(call.body.campaigns)));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_smartlead_send_readiness_queue_preview" && call.approvalRequired === false && Array.isArray(call.body.campaigns)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_bulk_ai_intro_work_queue_preview" && call.approvalRequired === false && Array.isArray(call.body.groups)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_ai_icebreaker_writeback_preview" && call.approvalRequired === false && typeof call.body.resultJsonText === "string"));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_flagged_lead_review_preview" && call.approvalRequired === false && typeof call.body.csvText === "string"));
@@ -3175,6 +3179,41 @@ test("bulk Smartlead upload queue plans multiple campaign uploads without writin
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.add_leads_to_smartlead_campaign" && call.approvalRequired));
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.draft_niche_smartlead_campaign_setup" && !call.approvalRequired));
   assert.match(preview.summary, /Ziadny upload ani zapis/);
+});
+
+test("Smartlead send readiness queue combines QA validation and upload planning", () => {
+  const preview = buildSmartleadSendReadinessQueuePreview({
+    date: "2026-06-10",
+    campaigns: [
+      {
+        niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456" },
+        priority: 1,
+        dailyLimit: 10,
+        alreadySentToday: 2,
+        leads: [
+          { email: "jan@modelovafirma.sk", decisionMakerName: "Jan Novak", companyName: "Modelova Firma", companyNameShort: "Modelova", website: "https://modelovafirma.sk", personalizedIntro: "Zaujalo ma, ze servisujete firemne vozidla a mate jasne kontakty pre zakaznikov." },
+        ],
+      },
+      {
+        niche: { id: "niche-2", slug: "kuchyne", name: "Kuchynske studia" },
+        priority: 2,
+        leads: [{ email: "eva@kuchynedemo.sk", decisionMakerName: "Eva Hruba", companyName: "Kuchyne Demo", companyNameShort: "Kuchyne Demo", website: "https://kuchynedemo.sk", personalizedIntro: "Zaujalo ma, ze prepajate navrhy kuchyn so showroomom a realizaciou na mieru." }],
+      },
+    ],
+    minScore: 50,
+    batchSize: 1,
+  });
+
+  assert.equal(preview.mode, "smartlead-send-readiness-queue-preview");
+  assert.equal(preview.status, "attention");
+  assert.equal(preview.totals.campaigns, 2);
+  assert.equal(preview.totals.readyCampaigns, 1);
+  assert.equal(preview.totals.attentionCampaigns, 1);
+  assert.ok(preview.totals.uploadReady >= 1);
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_lead_batch_qa_preview" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_lead_validation_scorecard_preview" && !call.approvalRequired));
+  assert.ok(preview.bulkUploadQueue.nextToolCalls.some((call) => call.tool === "arcigy.add_leads_to_smartlead_campaign" && call.approvalRequired));
+  assert.match(preview.summary, /Ziadny zapis ani upload/);
 });
 
 test("Smartlead import audit separates new duplicate and existing leads before upload", () => {

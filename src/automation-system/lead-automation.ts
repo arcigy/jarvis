@@ -737,6 +737,40 @@ export type BulkSmartleadUploadQueuePreview = {
   warnings: string[];
 };
 
+export type SmartleadSendReadinessQueuePreview = {
+  mode: "smartlead-send-readiness-queue-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  date: string;
+  totals: {
+    campaigns: number;
+    readyCampaigns: number;
+    attentionCampaigns: number;
+    blockedCampaigns: number;
+    inputLeads: number;
+    qaReady: number;
+    qualified: number;
+    uploadReady: number;
+    repair: number;
+    approvalPayloads: number;
+  };
+  queue: Array<{
+    order: number;
+    priority: number;
+    status: "ready" | "attention" | "blocked";
+    reason: string;
+    niche: { id?: string; slug: string; name: string; campaignId?: string | number | null };
+    dailyLimit: number;
+    alreadySentToday: number;
+    qaPreview: LeadBatchQaPreview;
+    scorecard: LeadValidationScorecardPreview;
+    uploadPlan?: SmartleadInjectionPlan;
+  }>;
+  bulkUploadQueue: BulkSmartleadUploadQueuePreview;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+  warnings: string[];
+};
+
 export type SmartleadImportAuditPreview = {
   mode: "smartlead-import-audit-preview";
   summary: string;
@@ -5564,6 +5598,154 @@ export function buildBulkSmartleadUploadQueuePreview(input: {
     totals,
     queue,
     approvalPayloads,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls),
+    warnings,
+  };
+}
+
+export function buildSmartleadSendReadinessQueuePreview(input: {
+  campaigns: Array<{
+    niche: { id?: string; slug?: string; name: string; campaignId?: string | number | null; smartleadCampaignId?: string | number | null };
+    leads: Array<LeadRepairQueueLead & { companyNameShort?: string; company_name_short?: string; official_company_name?: string; original_name?: string; decision_maker_last_name?: string; sentToSmartlead?: boolean; sent_to_smartlead?: boolean }>;
+    priority?: number;
+    dailyLimit?: number;
+    alreadySentToday?: number;
+    paused?: boolean;
+    defaultSource?: string;
+    campaignTag?: string;
+  }>;
+  date?: string;
+  offer?: string;
+  language?: "sk" | "en";
+  minScore?: number;
+  batchSize?: number;
+  defaultDailyLimit?: number;
+  globalMaxUploads?: number;
+}): SmartleadSendReadinessQueuePreview {
+  const defaultDailyLimit = Math.min(Math.max(Math.trunc(input.defaultDailyLimit ?? 50), 1), 500);
+  const batchSize = Math.min(Math.max(Math.trunc(input.batchSize ?? 50), 1), 100);
+  const minScore = Math.min(Math.max(Math.trunc(input.minScore ?? 70), 0), 100);
+  const sorted = input.campaigns
+    .map((campaign, index) => ({ ...campaign, index, priority: Math.min(Math.max(Math.trunc(campaign.priority ?? 50), 1), 99) }))
+    .sort((a, b) => a.priority - b.priority || a.index - b.index);
+
+  const queue: SmartleadSendReadinessQueuePreview["queue"] = sorted.map((campaign, index) => {
+    const slug = campaign.niche.slug?.trim() || slugify(campaign.niche.name);
+    const campaignId = campaign.niche.campaignId ?? campaign.niche.smartleadCampaignId ?? null;
+    const niche = { id: campaign.niche.id, slug, name: campaign.niche.name, campaignId };
+    const dailyLimit = Math.min(Math.max(Math.trunc(campaign.dailyLimit ?? defaultDailyLimit), 1), 500);
+    const alreadySentToday = Math.max(Math.trunc(campaign.alreadySentToday ?? 0), 0);
+    const qaPreview = buildLeadBatchQaPreview({
+      leads: campaign.leads,
+      campaignTag: campaign.campaignTag ?? slug,
+      defaultSource: campaign.defaultSource ?? slug,
+      campaignId,
+      offer: input.offer,
+      language: input.language,
+    });
+    const scorecard = buildLeadValidationScorecardPreview({
+      leads: qaPreview.readyLeads,
+      minScore,
+      niche,
+      campaignId,
+      defaultSource: campaign.defaultSource ?? slug,
+      batchSize,
+      includeSentToSmartlead: false,
+    });
+    const uploadPlan = scorecard.injectionPlan;
+    let status: SmartleadSendReadinessQueuePreview["queue"][number]["status"] = "ready";
+    let reason = `${scorecard.totals.smartleadReady} leadov pripravenych na Smartlead approval upload.`;
+    if (campaign.paused) {
+      status = "blocked";
+      reason = "Campaign is paused.";
+    } else if (!campaign.niche.name.trim() || !slug) {
+      status = "blocked";
+      reason = "Missing niche name or slug.";
+    } else if (!campaignId) {
+      status = "attention";
+      reason = "Missing Smartlead campaignId.";
+    } else if (alreadySentToday >= dailyLimit) {
+      status = "attention";
+      reason = "Daily send limit is already filled.";
+    } else if (qaPreview.totals.readyForSmartlead <= 0 || scorecard.totals.smartleadReady <= 0) {
+      status = "attention";
+      reason = "No lead passed QA and validation.";
+    } else if (qaPreview.totals.repair || qaPreview.totals.manualReview || scorecard.totals.failed) {
+      status = "attention";
+      reason = "Some leads need repair/manual review before upload.";
+    }
+    return {
+      order: index + 1,
+      priority: campaign.priority,
+      status,
+      reason,
+      niche,
+      dailyLimit,
+      alreadySentToday,
+      qaPreview,
+      scorecard,
+      uploadPlan,
+    };
+  });
+
+  const bulkUploadQueue = buildBulkSmartleadUploadQueuePreview({
+    campaigns: queue.map((item) => ({
+      niche: item.niche,
+      priority: item.priority,
+      dailyLimit: item.dailyLimit,
+      alreadySentToday: item.alreadySentToday,
+      paused: item.status === "blocked",
+      leads: item.scorecard.qualifiedLeads as ManualReviewPickupLead[],
+    })),
+    batchSize,
+    defaultDailyLimit,
+    globalMaxUploads: input.globalMaxUploads,
+  });
+  const warnings: string[] = [];
+  if (queue.some((item) => !item.niche.campaignId)) warnings.push("Some campaigns are missing Smartlead campaignId.");
+  if (queue.some((item) => item.qaPreview.totals.repair || item.qaPreview.totals.manualReview)) warnings.push("Some campaigns still have repair or manual-review leads.");
+  const totals = {
+    campaigns: queue.length,
+    readyCampaigns: queue.filter((item) => item.status === "ready").length,
+    attentionCampaigns: queue.filter((item) => item.status === "attention").length,
+    blockedCampaigns: queue.filter((item) => item.status === "blocked").length,
+    inputLeads: input.campaigns.reduce((sum, item) => sum + item.leads.length, 0),
+    qaReady: queue.reduce((sum, item) => sum + item.qaPreview.totals.readyForSmartlead, 0),
+    qualified: queue.reduce((sum, item) => sum + item.scorecard.totals.passed, 0),
+    uploadReady: bulkUploadQueue.totals.uploadLeads,
+    repair: queue.reduce((sum, item) => sum + item.qaPreview.totals.repair + item.qaPreview.totals.manualReview + item.scorecard.totals.failed, 0),
+    approvalPayloads: bulkUploadQueue.totals.approvalPayloads,
+  };
+  const status: SmartleadSendReadinessQueuePreview["status"] = totals.readyCampaigns === 0
+    ? "blocked"
+    : totals.attentionCampaigns || totals.blockedCampaigns || warnings.length
+      ? "attention"
+      : "ready";
+  const nextToolCalls: SmartleadSendReadinessQueuePreview["nextToolCalls"] = [
+    ...queue.flatMap((item) => [
+      {
+        tool: "arcigy.build_lead_batch_qa_preview",
+        payload: { leads: item.qaPreview.items.map((qa) => qa.lead), campaignTag: item.niche.slug, campaignId: item.niche.campaignId, offer: input.offer, language: input.language ?? "sk" },
+        reason: `Zopakuj QA pre kampan ${item.niche.name}, ak sa zmenili leady alebo opravy.`,
+        approvalRequired: false,
+      },
+      {
+        tool: "arcigy.build_lead_validation_scorecard_preview",
+        payload: { leads: item.qaPreview.readyLeads, niche: item.niche, campaignId: item.niche.campaignId, minScore, batchSize },
+        reason: `Prever score qualified leadov pre ${item.niche.name} pred uploadom.`,
+        approvalRequired: false,
+      },
+    ]),
+    ...bulkUploadQueue.nextToolCalls,
+  ];
+  return {
+    mode: "smartlead-send-readiness-queue-preview",
+    status,
+    summary: `Smartlead send readiness ${status}: ${totals.readyCampaigns}/${totals.campaigns} kampani ready, ${totals.uploadReady} leadov upload-ready, ${totals.repair} potrebuje opravu, ${totals.approvalPayloads} approval payloadov. Ziadny zapis ani upload neprebehol.`,
+    date: input.date ?? new Date().toISOString().slice(0, 10),
+    totals,
+    queue,
+    bulkUploadQueue,
     nextToolCalls: dedupeNextToolCalls(nextToolCalls),
     warnings,
   };
