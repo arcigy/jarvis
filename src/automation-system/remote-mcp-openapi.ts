@@ -416,6 +416,16 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       maxLookups: 10,
     };
   }
+  if (toolName === "arcigy.build_slovak_salutation_preview") {
+    return {
+      defaultSource: "kuchyne-sk",
+      campaignId: "123456",
+      leads: [
+        { companyName: "Ready Studio", email: "jan@ready.sk", firstName: "Jan", lastName: "Novak" },
+        { companyName: "Eva Interier", email: "eva@interier.sk", decisionMakerName: "Eva Horakova" },
+      ],
+    };
+  }
   if (toolName === "arcigy.score_lead_quality") {
     return { minScore: 70, leads: [{ email: "majitel@example.sk", website: "https://example.sk", decisionMaker: "Jan Novak", registerVerified: true, personalizedIntro: "Kratke AI intro." }] };
   }

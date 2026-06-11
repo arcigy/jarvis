@@ -33,6 +33,7 @@ import {
   buildUrlIntelligenceQueuePreview,
   buildLeadRepairQueuePreview,
   buildSlovakRegisterBatchPreview,
+  buildSlovakSalutationPreview,
   buildNicheOpsDashboardPreview,
   buildSuppressionListPreview,
   buildSmartleadHistorySuppressionPreview,
@@ -1497,6 +1498,18 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         offer: optionalString(payload.offer),
         language: payload.language === "en" ? "en" : "sk",
         minScore: typeof payload.minScore === "number" ? payload.minScore : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_slovak_salutation_preview") {
+    writeJson(response, 200, {
+      result: buildSlovakSalutationPreview({
+        leads: Array.isArray(payload.leads) ? payload.leads as Parameters<typeof buildSlovakSalutationPreview>[0]["leads"] : [],
+        defaultSource: optionalString(payload.defaultSource),
+        campaignId: typeof payload.campaignId === "string" || typeof payload.campaignId === "number" || payload.campaignId === null ? payload.campaignId : undefined,
+        includeSmartleadPreview: payload.includeSmartleadPreview !== false,
+        maxItems: typeof payload.maxItems === "number" ? payload.maxItems : undefined,
       }),
     });
     return;

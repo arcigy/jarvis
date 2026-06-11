@@ -930,6 +930,21 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Build Slovak Smartlead salutation fields",
+      tool: "arcigy.build_slovak_salutation_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_slovak_salutation_preview"),
+      body: {
+        defaultSource: "kuchyne-sk",
+        campaignId: "123456",
+        leads: [
+          { companyName: "Ready Studio", email: "jan@ready.sk", firstName: "Jan", lastName: "Novak" },
+          { companyName: "Eva Interier", email: "eva@interier.sk", decisionMakerName: "Eva Horakova" },
+        ],
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Score lead quality before import",
       tool: "arcigy.score_lead_quality",
       method: "POST",

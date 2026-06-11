@@ -64,6 +64,7 @@ export type JarvisMcpToolName =
   | "arcigy.batch_scrape_website_contacts"
   | "arcigy.enrich_slovak_company_register"
   | "arcigy.build_slovak_register_batch_preview"
+  | "arcigy.build_slovak_salutation_preview"
   | "arcigy.score_lead_quality"
   | "arcigy.dedupe_lead_candidates"
   | "arcigy.build_suppression_list_preview"
@@ -454,6 +455,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.build_slovak_register_batch_preview",
       description: "Pripravi batch ORSR/register enrichment frontu pre leady s ICO/nazvom, next lookup calls a repair/merge krokmi bez zapisu.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_slovak_salutation_preview",
+      description: "Pripravi pan/pani oslovenia a Smartlead custom fields last_name_with_salutation/greeting pre batch leadov bez zapisu.",
       requiresApproval: false,
     },
     {

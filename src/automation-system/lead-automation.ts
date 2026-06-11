@@ -442,6 +442,8 @@ export type LeadgenAutopilotBatchPreview = {
 export type LeadRepairQueueLead = LeadCandidateInput & {
   id?: string | number;
   ico?: string;
+  decisionMakerName?: string;
+  decision_maker_name?: string;
   verificationStatus?: "ok" | "flagged" | "failed";
   verificationNotes?: string;
   sentToSmartlead?: boolean;
@@ -513,6 +515,27 @@ export type SlovakRegisterBatchPreview = {
   alreadyVerified: LeadRepairQueueLead[];
   missingLookupKey: LeadRepairQueueLead[];
   duplicates: ReturnType<typeof dedupeLeadCandidates>["duplicates"];
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
+export type SlovakSalutationPreview = {
+  mode: "slovak-salutation-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  totals: { input: number; enriched: number; missingName: number; male: number; female: number; unknown: number; smartleadReady: number };
+  items: Array<{
+    lead: LeadRepairQueueLead;
+    status: "ready" | "missing_name";
+    fullName?: string;
+    firstName?: string;
+    lastName?: string;
+    gender: "male" | "female" | "unknown";
+    salutation?: "pan" | "pani";
+    lastNameWithSalutation?: string;
+    customFields?: Record<string, string | number | boolean | null | undefined>;
+  }>;
+  enhancedLeads: PreparedSmartleadLeadInput[];
+  smartleadPrepared: ReturnType<typeof prepareSmartleadLeads>;
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
@@ -3614,6 +3637,84 @@ export function buildSlovakRegisterBatchPreview(input: {
   };
 }
 
+export function buildSlovakSalutationPreview(input: {
+  leads: LeadRepairQueueLead[];
+  defaultSource?: string;
+  campaignId?: string | number | null;
+  includeSmartleadPreview?: boolean;
+  maxItems?: number;
+}): SlovakSalutationPreview {
+  const maxItems = Math.min(Math.max(Math.trunc(input.maxItems ?? 200), 1), 1000);
+  const leads = input.leads.slice(0, maxItems).map((lead) => normalizePipelineLead(lead, input.defaultSource, input.defaultSource) as LeadRepairQueueLead);
+  const items: SlovakSalutationPreview["items"] = leads.map((lead) => {
+    const fullName = decisionMakerForLead(lead) ?? lead.register?.executives?.[0] ?? stringField(lead.customFields ?? {}, "decision_maker_name", "decision_maker_full_name");
+    const split = splitNameForSalutation(fullName, lead);
+    if (!split.lastName) {
+      return { lead, status: "missing_name", fullName, firstName: split.firstName, lastName: split.lastName, gender: "unknown" };
+    }
+    const gender = normalizeGender(stringField(lead.customFields ?? {}, "decision_maker_gender", "gender")) ?? inferSlovakGender(split.firstName, split.lastName);
+    const salutation = gender === "female" ? "pani" : gender === "male" ? "pan" : inferSlovakGender(split.firstName, split.lastName) === "female" ? "pani" : "pan";
+    const lastNameWithSalutation = `${salutation} ${split.lastName}`;
+    const customFields = {
+      ...lead.customFields,
+      decision_maker_name: fullName,
+      decision_maker_first_name: split.firstName,
+      decision_maker_last_name: split.lastName,
+      decision_maker_gender: gender,
+      last_name_with_salutation: lastNameWithSalutation,
+      greeting: `Dobry den ${lastNameWithSalutation}`,
+    };
+    return { lead, status: "ready", fullName, firstName: split.firstName, lastName: split.lastName, gender, salutation, lastNameWithSalutation, customFields };
+  });
+  const enhancedLeads: PreparedSmartleadLeadInput[] = items
+    .filter((item) => item.status === "ready" && Boolean(item.lead.email))
+    .map((item) => ({
+      ...item.lead,
+      email: item.lead.email as string,
+      firstName: item.firstName ?? item.lead.firstName,
+      lastName: item.lastName ?? item.lead.lastName,
+      customFields: item.customFields,
+    }));
+  const smartleadPrepared = prepareSmartleadLeads({ leads: enhancedLeads, defaultSource: input.defaultSource ?? "slovak-salutation-preview" });
+  const nextToolCalls: SlovakSalutationPreview["nextToolCalls"] = [];
+  if (input.includeSmartleadPreview !== false && enhancedLeads.length) {
+    nextToolCalls.push({
+      tool: "arcigy.prepare_smartlead_leads",
+      payload: { leads: enhancedLeads, defaultSource: input.defaultSource ?? "slovak-salutation-preview" },
+      reason: "Skontroluj Smartlead lead payload s doplnenym last_name_with_salutation pred importom.",
+      approvalRequired: false,
+    });
+  }
+  if (input.campaignId && smartleadPrepared.leadList.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_smartlead_import_audit_preview",
+      payload: { campaignId: input.campaignId, leads: smartleadPrepared.leadList },
+      reason: "Pred uploadom porovnaj leady so Smartlead kampanou a priprav approval payload iba pre nove kontakty.",
+      approvalRequired: false,
+    });
+  }
+  const totals = {
+    input: leads.length,
+    enriched: items.filter((item) => item.status === "ready").length,
+    missingName: items.filter((item) => item.status === "missing_name").length,
+    male: items.filter((item) => item.gender === "male").length,
+    female: items.filter((item) => item.gender === "female").length,
+    unknown: items.filter((item) => item.gender === "unknown").length,
+    smartleadReady: smartleadPrepared.leadList.length,
+  };
+  const status: SlovakSalutationPreview["status"] = totals.input === 0 ? "blocked" : totals.missingName > 0 ? "attention" : "ready";
+  return {
+    mode: "slovak-salutation-preview",
+    status,
+    summary: `Slovak salutation preview: ${totals.enriched} leadov obohatenych o last_name_with_salutation, ${totals.missingName} bez mena, ${totals.smartleadReady} ready pre Smartlead. Ziadny zapis ani upload neprebehol.`,
+    totals,
+    items,
+    enhancedLeads,
+    smartleadPrepared,
+    nextToolCalls,
+  };
+}
+
 export function buildOrphanLeadAssignmentPreview(input: {
   leads?: LeadSourceImportQueueLead[];
   csvText?: string;
@@ -5718,6 +5819,39 @@ function unresolvedTemplateVariables(value: string): string[] {
 function splitName(value?: string): { firstName?: string; lastName?: string } {
   const parts = value?.split(/\s+/).filter(Boolean) ?? [];
   return { firstName: parts[0], lastName: parts.slice(1).join(" ") || undefined };
+}
+
+function splitNameForSalutation(value: string | undefined, lead: LeadRepairQueueLead): { firstName?: string; lastName?: string } {
+  const directFirst = stringField(lead, "firstName", "first_name") ?? stringField(lead.customFields ?? {}, "decision_maker_first_name", "first_name");
+  const directLast = stringField(lead, "lastName", "last_name") ?? stringField(lead.customFields ?? {}, "decision_maker_last_name", "last_name");
+  if (directLast) return { firstName: directFirst, lastName: directLast };
+  const titles = new Set(["ing", "mgr", "bc", "mudr", "judr", "rndr", "phd", "mba"]);
+  const parts = (value ?? "").replace(/[.,]/g, " ").split(/\s+/).filter(Boolean).filter((part) => !titles.has(normalizeNameToken(part)));
+  return { firstName: directFirst ?? parts[0], lastName: parts.length > 1 ? parts[parts.length - 1] : undefined };
+}
+
+function normalizeGender(value?: string): "male" | "female" | "unknown" | undefined {
+  const normalized = normalizeNameToken(value);
+  if (["male", "m", "muz", "pan"].includes(normalized)) return "male";
+  if (["female", "f", "zena", "pani"].includes(normalized)) return "female";
+  if (normalized === "unknown") return "unknown";
+  return undefined;
+}
+
+function inferSlovakGender(firstName?: string, lastName?: string): "male" | "female" | "unknown" {
+  const first = normalizeNameToken(firstName);
+  const last = normalizeNameToken(lastName);
+  if (!first && !last) return "unknown";
+  if (last.endsWith("ova") || last.endsWith("ska") || last.endsWith("cka") || last.endsWith("eva")) return "female";
+  const femaleNames = new Set(["anna", "eva", "jana", "maria", "monika", "zuzana", "katarina", "martina", "lenka", "ivana", "denisa", "miriam", "karin", "viktoria", "lucia", "petra"]);
+  const maleAEndings = new Set(["matusa", "misa", "laca", "pala", "palo", "miro", "mato", "kuba", "jura", "attila"]);
+  if (femaleNames.has(first)) return "female";
+  if (first.endsWith("a") && !maleAEndings.has(first)) return "female";
+  return "male";
+}
+
+function normalizeNameToken(value?: string): string {
+  return (value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 }
 
 function selectBestEmail(values: Array<string | undefined>): string | undefined {

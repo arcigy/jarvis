@@ -35,6 +35,7 @@ import {
   buildUrlIntelligenceQueuePreview,
   buildLeadRepairQueuePreview,
   buildSlovakRegisterBatchPreview,
+  buildSlovakSalutationPreview,
   buildOrphanLeadAssignmentPreview,
   buildNicheOpsDashboardPreview,
   buildColdOutreachCsvImportPreview,
@@ -174,6 +175,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.batch_scrape_website_contacts",
     "arcigy.enrich_slovak_company_register",
     "arcigy.build_slovak_register_batch_preview",
+    "arcigy.build_slovak_salutation_preview",
     "arcigy.score_lead_quality",
     "arcigy.dedupe_lead_candidates",
     "arcigy.build_suppression_list_preview",
@@ -1471,7 +1473,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 111 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 112 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -3322,6 +3324,32 @@ test("Slovak register batch preview prepares ORSR lookup queue without writes", 
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.enrich_slovak_company_register" && !call.approvalRequired));
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_lead_repair_queue_preview" && !call.approvalRequired));
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_lead_enrichment_merge_preview" && !call.approvalRequired));
+  assert.match(preview.summary, /Ziadny zapis ani upload/);
+});
+
+test("Slovak salutation preview prepares Smartlead custom fields", () => {
+  const preview = buildSlovakSalutationPreview({
+    campaignId: "123456",
+    defaultSource: "kuchyne-sk",
+    leads: [
+      { companyName: "Ready Studio", email: "jan@ready.sk", firstName: "Jan", lastName: "Novak" },
+      { companyName: "Eva Interier", email: "eva@interier.sk", decisionMakerName: "Eva Horakova" },
+      { companyName: "Missing Name", email: "info@missing.sk" },
+    ],
+  });
+
+  assert.equal(preview.mode, "slovak-salutation-preview");
+  assert.equal(preview.status, "attention");
+  assert.equal(preview.totals.input, 3);
+  assert.equal(preview.totals.enriched, 2);
+  assert.equal(preview.totals.missingName, 1);
+  assert.equal(preview.totals.male, 1);
+  assert.equal(preview.totals.female, 1);
+  assert.equal(preview.enhancedLeads[0].customFields?.last_name_with_salutation, "pan Novak");
+  assert.equal(preview.enhancedLeads[1].customFields?.last_name_with_salutation, "pani Horakova");
+  assert.equal(preview.smartleadPrepared.leadList[0].custom_fields?.last_name_with_salutation, "pan Novak");
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.prepare_smartlead_leads" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_smartlead_import_audit_preview" && !call.approvalRequired));
   assert.match(preview.summary, /Ziadny zapis ani upload/);
 });
 

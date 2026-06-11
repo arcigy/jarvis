@@ -34,6 +34,7 @@ import {
   buildUrlIntelligenceQueuePreview,
   buildLeadRepairQueuePreview,
   buildSlovakRegisterBatchPreview,
+  buildSlovakSalutationPreview,
   buildNicheOpsDashboardPreview,
   buildSuppressionListPreview,
   buildSmartleadHistorySuppressionPreview,
@@ -1815,6 +1816,28 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildSlovakRegisterBatchPreview(input as Parameters<typeof buildSlovakRegisterBatchPreview>[0]))
+  );
+
+  server.registerTool(
+    "arcigy.build_slovak_salutation_preview",
+    {
+      title: "Build Slovak salutation preview",
+      description: "Prepare Slovak pan/pani last-name Smartlead custom fields such as last_name_with_salutation and greeting for a batch of leads without writes.",
+      inputSchema: {
+        leads: z.array(z.object({}).passthrough()).min(1).max(1000),
+        defaultSource: z.string().optional(),
+        campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+        includeSmartleadPreview: z.boolean().default(true),
+        maxItems: z.number().int().min(1).max(1000).default(200),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildSlovakSalutationPreview(input as Parameters<typeof buildSlovakSalutationPreview>[0]))
   );
 
   server.registerTool(
