@@ -70,6 +70,8 @@ export type JarvisMcpToolName =
   | "arcigy.batch_scrape_website_contacts"
   | "arcigy.build_website_scrape_quality_audit_preview"
   | "arcigy.enrich_slovak_company_register"
+  | "arcigy.build_local_lead_register_update_preview"
+  | "arcigy.apply_local_lead_register_update"
   | "arcigy.build_slovak_register_batch_preview"
   | "arcigy.build_slovak_salutation_preview"
   | "arcigy.score_lead_quality"
@@ -150,6 +152,7 @@ export const localStateWriteToolNames = new Set<JarvisMcpToolName>([
   "arcigy.add_client_need_signal",
   "arcigy.ingest_client_message",
   "arcigy.update_client_need_status",
+  "arcigy.apply_local_lead_register_update",
   "arcigy.export_local_memory_snapshot",
   "arcigy.export_leads_csv",
   "arcigy.sync_gmail_recent_messages",
@@ -506,6 +509,16 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
       name: "arcigy.enrich_slovak_company_register",
       description: "Read-only vyhlada slovensku firmu v ORSR podla ICO alebo nazvu a vytiahne firmu, adresu a konatelov.",
       requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_local_lead_register_update_preview",
+      description: "Read-only ORSR enrichment pre jednu lokalnu osobu/leada: pripravi presny JSON data patch a approval payload bez zapisu.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.apply_local_lead_register_update",
+      description: "Po explicitnom schvaleni ulozi ORSR enrichment patch do lokalnej lead/client memory osoby cez existujuci JSON data payload.",
+      requiresApproval: true,
     },
     {
       name: "arcigy.build_slovak_register_batch_preview",

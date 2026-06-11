@@ -49,6 +49,7 @@ import {
   buildAiIntroCleanupPreview,
   buildAiIntroWorkPacketPreview,
   buildAiIntroImportPreview,
+  buildLocalLeadRegisterUpdatePreview,
   buildManualReviewPickupPlan,
   buildManualReviewQueue,
   buildSmartleadCampaignLaunchPreview,
@@ -1573,6 +1574,34 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         companyName: optionalString(payload.companyName),
       }),
     });
+    return;
+  }
+  if (name === "arcigy.build_local_lead_register_update_preview") {
+    writeJson(response, 200, {
+      result: await buildLocalLeadRegisterUpdatePreview({
+        primaryEmail: String(payload.primaryEmail ?? ""),
+        kind: ["client", "lead", "contact"].includes(String(payload.kind)) ? payload.kind as Parameters<typeof buildLocalLeadRegisterUpdatePreview>[0]["kind"] : "lead",
+        displayName: optionalString(payload.displayName),
+        companyName: optionalString(payload.companyName),
+        status: optionalString(payload.status),
+        data: isRecord(payload.data) ? payload.data : undefined,
+        ico: optionalString(payload.ico),
+        officialCompanyName: optionalString(payload.officialCompanyName),
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.apply_local_lead_register_update") {
+    const result = runDbTool("upsert-person", {
+      primaryEmail: payload.primaryEmail,
+      kind: payload.kind ?? "lead",
+      displayName: payload.displayName,
+      companyName: payload.companyName,
+      status: payload.status ?? "active",
+      data: isRecord(payload.data) ? payload.data : {},
+    });
+    addAuditEvent("arcigy.apply_local_lead_register_update", "updated", { primaryEmail: payload.primaryEmail, kind: payload.kind, companyName: payload.companyName }, result, true);
+    writeJson(response, 200, { result });
     return;
   }
   if (name === "arcigy.build_slovak_register_batch_preview") {

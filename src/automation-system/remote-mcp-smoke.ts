@@ -327,6 +327,7 @@ async function checkApprovalGates(fetchImpl: typeof fetch, baseUrl: string, bear
     ["arcigy.send_approved_outreach_reply", { preparedEventId: "smoke-prepared-reply" }],
     ["arcigy.update_client_need_status", { needSignalId: "smoke-client-need", status: "resolved" }],
     ["arcigy.export_local_memory_snapshot", { outputPath: "generated/local-memory/smoke.json" }],
+    ["arcigy.apply_local_lead_register_update", { primaryEmail: "smoke@example.com", data: { ico: "12345678" } }],
     ["arcigy.export_leads_csv", { outputPath: "generated/leads/smoke.csv", leads: [{ email: "smoke@example.com" }] }],
     ["arcigy.label_gmail_thread", { accountEnvKey: "GMAIL_REFRESH_TOKEN_BRANISLAV_ARCIGY_GROUP", threadId: "smoke-thread", labelName: "Jarvis/Handled" }],
     ["arcigy.send_slack_message", { channel: "#leadgen", text: "Smoke Slack message" }],
@@ -559,6 +560,7 @@ function hasSafeOpenApiExample(toolName: string, value: unknown): boolean {
   if (toolName === "arcigy.identify_email") return typeof payload.email === "string" && payload.email.includes("@");
   if (toolName === "arcigy.generate_contract_documents") return (payload.approval as { approved?: unknown } | undefined)?.approved === true && typeof payload.intake === "object";
   if (toolName === "arcigy.generate_price_offer_document") return (payload.approval as { approved?: unknown } | undefined)?.approved === true && typeof payload.offer === "object";
+  if (toolName === "arcigy.apply_local_lead_register_update") return (payload.approval as { approved?: unknown } | undefined)?.approved === true && typeof payload.primaryEmail === "string";
   if (toolName === "arcigy.export_leads_csv") return (payload.approval as { approved?: unknown } | undefined)?.approved === true && Array.isArray(payload.leads);
   if (toolName === "arcigy.append_leads_to_google_sheet") return (payload.approval as { approved?: unknown } | undefined)?.approved === true && Array.isArray(payload.rows);
   if (toolName === "arcigy.replace_google_sheet_rows") return (payload.approval as { approved?: unknown } | undefined)?.approved === true && Array.isArray(payload.rows);

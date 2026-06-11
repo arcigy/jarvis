@@ -90,6 +90,8 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(names.includes("arcigy.batch_scrape_website_contacts"));
   assert.ok(names.includes("arcigy.build_website_scrape_quality_audit_preview"));
   assert.ok(names.includes("arcigy.enrich_slovak_company_register"));
+  assert.ok(names.includes("arcigy.build_local_lead_register_update_preview"));
+  assert.ok(names.includes("arcigy.apply_local_lead_register_update"));
   assert.ok(names.includes("arcigy.build_slovak_register_batch_preview"));
   assert.ok(names.includes("arcigy.build_slovak_salutation_preview"));
   assert.ok(names.includes("arcigy.score_lead_quality"));
@@ -283,6 +285,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.replace_google_sheet_rows")));
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.label_gmail_thread")));
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.send_slack_message")));
+  assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.apply_local_lead_register_update")));
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.upsert_smartlead_campaign_webhook")));
   assert.doesNotMatch(JSON.stringify(audit), /AIza|GOCSPX|1\/\/|postgresql:\/\/|redis:\/\//);
 
@@ -419,6 +422,8 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(pack.agentSetupProfiles.every((profile) => profile.requiredProofGates.includes("pack-production-evidence-quick-start") && profile.requiredProofGates.includes("production-evidence-tool-call")));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_outreach_brief" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_outreach_brief" && !("campaignId" in call.body)));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_local_lead_register_update_preview" && call.approvalRequired === false));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.apply_local_lead_register_update" && call.approvalRequired === true));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_campaign_webhooks" && call.approvalRequired === false));
   assert.ok(
     pack.quickStartCalls.some(

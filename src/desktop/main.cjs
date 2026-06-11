@@ -1302,6 +1302,8 @@ function jarvisCapabilityDefinitions() {
         "arcigy.search_serper",
         "arcigy.search_google_places",
         "arcigy.discover_leads",
+        "arcigy.build_local_lead_register_update_preview",
+        "arcigy.apply_local_lead_register_update",
         "arcigy.scrape_website_contacts",
         "arcigy.draft_lead_intro",
         "arcigy.prepare_smartlead_leads",
@@ -1315,7 +1317,7 @@ function jarvisCapabilityDefinitions() {
         "arcigy.append_leads_to_google_sheet",
         "arcigy.replace_google_sheet_rows",
       ],
-      approvalRequired: ["arcigy.upsert_smartlead_campaign_webhook", "arcigy.add_leads_to_smartlead_campaign", "arcigy.append_leads_to_google_sheet", "arcigy.replace_google_sheet_rows"],
+      approvalRequired: ["arcigy.apply_local_lead_register_update", "arcigy.upsert_smartlead_campaign_webhook", "arcigy.add_leads_to_smartlead_campaign", "arcigy.append_leads_to_google_sheet", "arcigy.replace_google_sheet_rows"],
       evidence: ["tests", "doctor-live"],
       envKeys: ["serper", "googleMaps", "gemini", "smartlead", "googleSheets"],
     },
@@ -1329,6 +1331,7 @@ function jarvisCapabilityDefinitions() {
         "arcigy.approve_prepared_outreach_reply",
         "arcigy.send_approved_outreach_reply",
         "arcigy.update_client_need_status",
+        "arcigy.apply_local_lead_register_update",
         "arcigy.export_local_memory_snapshot",
         "arcigy.send_slack_message",
         "arcigy.send_smartlead_thread_reply",
@@ -1468,7 +1471,7 @@ async function getRemoteMcpPack(payload = {}) {
       "Call MCP tools with POST JSON to mcpToolCallPattern.",
       "Use the bearer auth header placeholder; the real token must be supplied by the operator and is never returned by this pack.",
       "Use tunnel.statusUrl to inspect public tunnel URLs from the redacted secure-tunnel log. Browser-launched tunnel start requires a strong JARVIS_WEB_TOKEN.",
-      "Treat generate_contract_documents, generate_price_offer_document, approve_prepared_outreach_reply, send_approved_outreach_reply, send_smartlead_thread_reply, upsert_smartlead_campaign_webhook, update_client_need_status, export_leads_csv, create_smartlead_campaign, configure_smartlead_campaign, add_leads_to_smartlead_campaign, append_leads_to_google_sheet, and replace_google_sheet_rows as approval-gated actions.",
+      "Treat generate_contract_documents, generate_price_offer_document, approve_prepared_outreach_reply, send_approved_outreach_reply, send_smartlead_thread_reply, upsert_smartlead_campaign_webhook, apply_local_lead_register_update, update_client_need_status, export_leads_csv, create_smartlead_campaign, configure_smartlead_campaign, add_leads_to_smartlead_campaign, append_leads_to_google_sheet, and replace_google_sheet_rows as approval-gated actions.",
       "Treat localStateWrite tools as local memory writes. Prefer dryRun: true for sync_gmail_recent_messages before ingesting messages.",
       "Use get_operator_briefing for a Jarvis-style daily status before making recommendations.",
     ],
@@ -1719,6 +1722,7 @@ const localStateWriteTools = new Set([
   "arcigy.add_client_need_signal",
   "arcigy.ingest_client_message",
   "arcigy.update_client_need_status",
+  "arcigy.apply_local_lead_register_update",
   "arcigy.sync_gmail_recent_messages",
 ]);
 
@@ -1860,6 +1864,22 @@ function buildRemoteMcpQuickStartCalls(baseUrl) {
       method: "POST",
       url: toolUrl("arcigy.export_local_memory_snapshot"),
       body: { outputPath: "generated/local-memory/local-memory-snapshot.json", limit: 10, approval: { approved: true } },
+      approvalRequired: true,
+    },
+    {
+      label: "Preview local lead ORSR update",
+      tool: "arcigy.build_local_lead_register_update_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_local_lead_register_update_preview"),
+      body: { primaryEmail: "lead@example.com", companyName: "Arcigy s. r. o.", ico: "12345678", data: { source: "manual-review" } },
+      approvalRequired: false,
+    },
+    {
+      label: "Apply approved local lead ORSR update",
+      tool: "arcigy.apply_local_lead_register_update",
+      method: "POST",
+      url: toolUrl("arcigy.apply_local_lead_register_update"),
+      body: { primaryEmail: "lead@example.com", kind: "lead", companyName: "Arcigy s. r. o.", data: { ico: "12345678", orsr_verified: true, decision_maker_name: "Jan Novak" }, approval: { approved: true } },
       approvalRequired: true,
     },
     {
@@ -2390,6 +2410,7 @@ async function checkApprovalGates(baseUrl, token, topLevelApproved) {
     ["arcigy.send_approved_outreach_reply", { preparedEventId: "smoke-prepared-reply" }],
     ["arcigy.update_client_need_status", { needSignalId: "smoke-client-need", status: "resolved" }],
     ["arcigy.export_local_memory_snapshot", { outputPath: "generated/local-memory/smoke.json" }],
+    ["arcigy.apply_local_lead_register_update", { primaryEmail: "smoke@example.com", data: { ico: "12345678" } }],
     ["arcigy.export_leads_csv", { outputPath: "generated/leads/smoke.csv", leads: [{ email: "smoke@example.com" }] }],
     ["arcigy.append_leads_to_google_sheet", { rows: [["Smoke", "https://example.com"]] }],
     ["arcigy.replace_google_sheet_rows", { rows: [["Smoke", "https://example.com"]] }],
@@ -2556,6 +2577,7 @@ function hasSafeOpenApiExample(toolName, value) {
   if (toolName === "arcigy.identify_email") return typeof value.email === "string" && value.email.includes("@");
   if (toolName === "arcigy.generate_contract_documents") return value.approval?.approved === true && typeof value.intake === "object";
   if (toolName === "arcigy.generate_price_offer_document") return value.approval?.approved === true && typeof value.offer === "object";
+  if (toolName === "arcigy.apply_local_lead_register_update") return value.approval?.approved === true && typeof value.primaryEmail === "string";
   if (toolName === "arcigy.export_leads_csv") return value.approval?.approved === true && Array.isArray(value.leads);
   if (toolName === "arcigy.append_leads_to_google_sheet") return value.approval?.approved === true && Array.isArray(value.rows);
   if (toolName === "arcigy.replace_google_sheet_rows") return value.approval?.approved === true && Array.isArray(value.rows);
@@ -3090,6 +3112,8 @@ function listWebMcpTools() {
     { name: "arcigy.batch_scrape_website_contacts", requiresApproval: false },
     { name: "arcigy.build_website_scrape_quality_audit_preview", requiresApproval: false },
     { name: "arcigy.enrich_slovak_company_register", requiresApproval: false },
+    { name: "arcigy.build_local_lead_register_update_preview", requiresApproval: false },
+    { name: "arcigy.apply_local_lead_register_update", requiresApproval: true },
     { name: "arcigy.build_slovak_register_batch_preview", requiresApproval: false },
     { name: "arcigy.build_slovak_salutation_preview", requiresApproval: false },
     { name: "arcigy.score_lead_quality", requiresApproval: false },

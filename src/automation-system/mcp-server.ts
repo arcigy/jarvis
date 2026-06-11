@@ -50,6 +50,7 @@ import {
   buildAiIntroCleanupPreview,
   buildAiIntroWorkPacketPreview,
   buildAiIntroImportPreview,
+  buildLocalLeadRegisterUpdatePreview,
   buildManualReviewPickupPlan,
   buildManualReviewQueue,
   buildSmartleadCampaignLaunchPreview,
@@ -1978,6 +1979,59 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(await enrichSlovakCompanyRegister(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_local_lead_register_update_preview",
+    {
+      title: "Build local lead register update preview",
+      description: "Read-only ORSR enrichment for one local lead/person. Returns a JSON data patch and an approval-required update payload without writing.",
+      inputSchema: {
+        primaryEmail: z.string().email(),
+        kind: z.enum(["client", "lead", "contact"]).default("lead"),
+        displayName: z.string().optional(),
+        companyName: z.string().optional(),
+        status: z.string().default("active"),
+        data: z.record(z.string(), z.unknown()).optional(),
+        ico: z.string().optional(),
+        officialCompanyName: z.string().optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async (input) => jsonResult(await buildLocalLeadRegisterUpdatePreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.apply_local_lead_register_update",
+    {
+      title: "Apply local lead register update",
+      description: "Approval-required local SQLite write. Stores the reviewed ORSR enrichment patch in the existing local person JSON data payload.",
+      inputSchema: {
+        primaryEmail: z.string().email(),
+        kind: z.enum(["client", "lead", "contact"]).default("lead"),
+        displayName: z.string().optional(),
+        companyName: z.string().optional(),
+        status: z.string().default("active"),
+        data: z.record(z.string(), z.unknown()),
+        approval: approvalSchema,
+        dbPath: z.string().optional(),
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async ({ dbPath, approval: _approval, ...payload }) => {
+      requireExplicitApproval("arcigy.apply_local_lead_register_update", { approval: _approval });
+      return jsonDbTool("upsert-person", payload, dbPath);
+    }
   );
 
   server.registerTool(

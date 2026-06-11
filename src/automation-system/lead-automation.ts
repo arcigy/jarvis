@@ -3,6 +3,7 @@ import { discoverLeads, type NormalizedLead } from "./lead-discovery.ts";
 import { buildSmartleadLead, type SmartleadLead, type SmartleadSchedule, type SmartleadSequence } from "./smartlead.ts";
 import { generateGeminiText, type FetchLike } from "./gemini.ts";
 import type { RuntimeEnv } from "./env.ts";
+import type { LocalPersonKind } from "./types.ts";
 
 export type ScrapedWebsiteContacts = {
   url: string;
@@ -326,6 +327,25 @@ export type SlovakRegisterLookup = {
   sourceUrl?: string;
   source: "orsr_ico" | "orsr_name" | "not_found";
   fetchedAt: string;
+};
+
+export type LocalLeadRegisterUpdatePreview = {
+  mode: "local-lead-register-update-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  register: SlovakRegisterLookup;
+  selectedDecisionMaker?: string;
+  dataPatch: Record<string, unknown>;
+  upsertPayload?: {
+    primaryEmail: string;
+    kind: LocalPersonKind;
+    displayName?: string;
+    companyName?: string;
+    status: string;
+    data: Record<string, unknown>;
+    approval: { approved: true };
+  };
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
 export type LeadCsvRow = LeadCandidateInput & {
@@ -3459,6 +3479,88 @@ export async function enrichSlovakCompanyRegister(
     sourceUrl: detailUrl,
     source: ico ? "orsr_ico" : "orsr_name",
     fetchedAt: new Date().toISOString(),
+  };
+}
+
+export async function buildLocalLeadRegisterUpdatePreview(
+  input: {
+    primaryEmail: string;
+    kind?: LocalPersonKind;
+    displayName?: string;
+    companyName?: string;
+    status?: string;
+    data?: Record<string, unknown>;
+    ico?: string;
+    officialCompanyName?: string;
+  },
+  fetchImpl: FetchLike = fetch
+): Promise<LocalLeadRegisterUpdatePreview> {
+  const primaryEmail = input.primaryEmail.trim().toLowerCase();
+  if (!primaryEmail.includes("@")) throw new Error("primaryEmail must be a valid email.");
+  const existingData = isRecord(input.data) ? input.data : {};
+  const ico = input.ico?.replace(/\s/g, "") || stringField(existingData, "ico");
+  const companyName = input.officialCompanyName?.trim() || stringField(existingData, "official_company_name") || input.companyName?.trim();
+  const register = await enrichSlovakCompanyRegister({ ico, companyName }, fetchImpl);
+  const selectedDecisionMaker = register.executives[0];
+  const split = splitName(selectedDecisionMaker);
+  const gender = inferSlovakGender(split.firstName, split.lastName);
+  const salutation = gender === "female" ? "pani" : gender === "male" ? "pan" : split.lastName ? "pan" : undefined;
+  const lastNameWithSalutation = salutation && split.lastName ? `${salutation} ${split.lastName}` : undefined;
+  const dataPatch = cleanRecord({
+    register: cleanRecord({
+      found: register.found,
+      source: register.source,
+      sourceUrl: register.sourceUrl,
+      fetchedAt: register.fetchedAt,
+      companyName: register.companyName,
+      ico: register.ico,
+      address: register.address,
+      executives: register.executives,
+    }),
+    official_company_name: register.companyName,
+    address: register.address,
+    ico: register.ico,
+    decision_maker_name: selectedDecisionMaker,
+    decision_maker_first_name: split.firstName,
+    decision_maker_last_name: split.lastName,
+    decision_maker_gender: gender,
+    last_name_with_salutation: lastNameWithSalutation,
+    greeting: lastNameWithSalutation ? `Dobry den ${lastNameWithSalutation}` : undefined,
+    orsr_verified: register.found,
+  });
+  const mergedData = { ...existingData, ...dataPatch };
+  const status: LocalLeadRegisterUpdatePreview["status"] = !ico && !companyName ? "blocked" : register.found ? "ready" : "attention";
+  const upsertPayload = register.found
+    ? {
+        primaryEmail,
+        kind: input.kind ?? "lead",
+        displayName: input.displayName,
+        companyName: register.companyName ?? input.companyName,
+        status: input.status ?? "active",
+        data: mergedData,
+        approval: { approved: true as const },
+      }
+    : undefined;
+  return {
+    mode: "local-lead-register-update-preview",
+    status,
+    summary: register.found
+      ? `Local lead register update preview: ORSR nasiel ${register.companyName ?? companyName ?? primaryEmail}, decision maker ${selectedDecisionMaker ?? "nezisteny"}. Ziadny zapis neprebehol.`
+      : `Local lead register update preview: ORSR nenasiel zhodu pre ${ico ?? companyName ?? primaryEmail}. Ziadny zapis neprebehol.`,
+    register,
+    selectedDecisionMaker,
+    dataPatch,
+    upsertPayload,
+    nextToolCalls: upsertPayload
+      ? [
+          {
+            tool: "arcigy.apply_local_lead_register_update",
+            payload: upsertPayload,
+            reason: "Po kontrole uloz ORSR enrichment do lokalnej lead/client memory osoby.",
+            approvalRequired: true,
+          },
+        ]
+      : [],
   };
 }
 
@@ -7577,6 +7679,10 @@ function primitiveCustomFields(row: Record<string, unknown>): Record<string, str
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function cleanRecord(value: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined));
 }
 
 function numberField(record: Record<string, unknown>, ...keys: string[]): number | undefined {

@@ -23,6 +23,7 @@ import {
   buildAiIntroQualityAuditPreview,
   buildAiIntroCleanupPreview,
   buildLeadBatchQaPreview,
+  buildLocalLeadRegisterUpdatePreview,
   batchScrapeWebsiteContacts,
   batchDraftLeadIntros,
   buildManualReviewPickupPlan,
@@ -197,6 +198,8 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.batch_scrape_website_contacts",
     "arcigy.build_website_scrape_quality_audit_preview",
     "arcigy.enrich_slovak_company_register",
+    "arcigy.build_local_lead_register_update_preview",
+    "arcigy.apply_local_lead_register_update",
     "arcigy.build_slovak_register_batch_preview",
     "arcigy.build_slovak_salutation_preview",
     "arcigy.score_lead_quality",
@@ -360,6 +363,7 @@ test("Jarvis capability audit maps the full requested production surface to evid
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.replace_google_sheet_rows")));
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.label_gmail_thread")));
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.send_slack_message")));
+  assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.apply_local_lead_register_update")));
   assert.ok(audit.capabilities.some((item) => item.id === "approval-safety" && item.approvalRequired.includes("arcigy.upsert_smartlead_campaign_webhook")));
   assert.doesNotMatch(JSON.stringify(audit), /AIza|GOCSPX|1\/\/|postgresql:\/\/|redis:\/\//);
 
@@ -454,6 +458,8 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.ok(paths.includes("/api/mcp/arcigy.get_gmail_lead_context"));
   assert.ok(paths.includes("/api/mcp/arcigy.get_gmail_unread_triage"));
   assert.ok(paths.includes("/api/mcp/arcigy.label_gmail_thread"));
+  assert.ok(paths.includes("/api/mcp/arcigy.build_local_lead_register_update_preview"));
+  assert.ok(paths.includes("/api/mcp/arcigy.apply_local_lead_register_update"));
   assert.ok(paths.includes("/api/mcp/arcigy.get_smartlead_campaign_webhooks"));
   assert.ok(paths.includes("/api/mcp/arcigy.upsert_smartlead_campaign_webhook"));
   const operatorBriefing = document.paths["/api/mcp/arcigy.get_operator_briefing"] as OpenApiPathFixture;
@@ -464,6 +470,8 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   const gmailLeadContext = document.paths["/api/mcp/arcigy.get_gmail_lead_context"] as OpenApiPathFixture;
   const gmailUnreadTriage = document.paths["/api/mcp/arcigy.get_gmail_unread_triage"] as OpenApiPathFixture;
   const gmailLabelThread = document.paths["/api/mcp/arcigy.label_gmail_thread"] as OpenApiPathFixture;
+  const localLeadRegisterPreview = document.paths["/api/mcp/arcigy.build_local_lead_register_update_preview"] as OpenApiPathFixture;
+  const localLeadRegisterApply = document.paths["/api/mcp/arcigy.apply_local_lead_register_update"] as OpenApiPathFixture;
   const smartleadWebhooks = document.paths["/api/mcp/arcigy.get_smartlead_campaign_webhooks"] as OpenApiPathFixture;
   const smartleadWebhookUpsert = document.paths["/api/mcp/arcigy.upsert_smartlead_campaign_webhook"] as OpenApiPathFixture;
   const contractGenerate = document.paths["/api/mcp/arcigy.generate_contract_documents"] as OpenApiPathFixture;
@@ -479,6 +487,9 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.equal(gmailLabelThread.post["x-arcigy-requiresApproval"], true);
   assert.equal(gmailLabelThread.post.requestBody.content["application/json"].examples.quickStart.value.labelName, "Jarvis/Handled");
   assert.equal(gmailLabelThread.post.requestBody.content["application/json"].examples.quickStart.value.approval.approved, true);
+  assert.equal(localLeadRegisterPreview.post.requestBody.content["application/json"].examples.quickStart.value.primaryEmail, "lead@example.com");
+  assert.equal(localLeadRegisterApply.post["x-arcigy-requiresApproval"], true);
+  assert.equal(localLeadRegisterApply.post.requestBody.content["application/json"].examples.quickStart.value.approval.approved, true);
   assert.equal(smartleadWebhooks.post.requestBody.content["application/json"].examples.quickStart.value.campaignId, "123456");
   assert.equal(smartleadWebhookUpsert.post["x-arcigy-requiresApproval"], true);
   assert.equal(smartleadWebhookUpsert.post.requestBody.content["application/json"].examples.quickStart.value.approval.approved, true);
@@ -536,6 +547,7 @@ test("remote MCP smoke checks every response for bearer token leaks", async () =
       url.endsWith("/api/mcp/arcigy.upsert_smartlead_campaign_webhook") ||
       url.endsWith("/api/mcp/arcigy.update_client_need_status") ||
       url.endsWith("/api/mcp/arcigy.export_local_memory_snapshot") ||
+      url.endsWith("/api/mcp/arcigy.apply_local_lead_register_update") ||
       url.endsWith("/api/mcp/arcigy.export_leads_csv") ||
       url.endsWith("/api/mcp/arcigy.label_gmail_thread") ||
       url.endsWith("/api/mcp/arcigy.send_slack_message") ||
@@ -1806,6 +1818,8 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_leadgen_daily_report" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_leadgen_evening_summary" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.select_next_niche" && call.approvalRequired === false));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_local_lead_register_update_preview" && call.approvalRequired === false));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.apply_local_lead_register_update" && call.approvalRequired === true));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.preview_smartlead_lead_sync" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_campaign_webhooks" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.upsert_smartlead_campaign_webhook" && call.approvalRequired === true));
@@ -5180,6 +5194,46 @@ test("Slovak register enrichment parses ORSR detail without live network", async
   assert.equal(result.ico, "12345678");
   assert.ok(result.executives.includes("Jan Novak"));
   assert.equal(result.source, "orsr_ico");
+});
+
+test("local lead register update preview prepares approval-gated JSON patch", async () => {
+  const fetchImpl = async (url: string | URL | Request) => {
+    const target = String(url);
+    if (target.includes("hladaj_ico")) {
+      return {
+        ok: true,
+        status: 200,
+        text: async () => '<html><a href="vypis.asp?ID=123&SID=2&P=1">Aktualny</a></html>',
+      } as Response;
+    }
+    if (target.includes("vypis.asp")) {
+      return {
+        ok: true,
+        status: 200,
+        text: async () =>
+          "<html><body>Obchodne meno: Arcigy s. r. o. Sidlo: Hlavna 1, Bratislava ICO: 12345678 Statutarny organ: Jan Novak Spolocnici:</body></html>",
+      } as Response;
+    }
+    throw new Error(`Unexpected URL: ${target}`);
+  };
+
+  const preview = await buildLocalLeadRegisterUpdatePreview(
+    {
+      primaryEmail: "Lead@Example.com",
+      companyName: "Arcigy s. r. o.",
+      ico: "12345678",
+      data: { source: "manual-review" },
+    },
+    fetchImpl as typeof fetch
+  );
+
+  assert.equal(preview.status, "ready");
+  assert.equal(preview.upsertPayload?.primaryEmail, "lead@example.com");
+  assert.equal(preview.upsertPayload?.data.source, "manual-review");
+  assert.equal(preview.upsertPayload?.data.orsr_verified, true);
+  assert.equal(preview.upsertPayload?.data.decision_maker_name, "Jan Novak");
+  assert.equal(preview.upsertPayload?.approval.approved, true);
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.apply_local_lead_register_update" && call.approvalRequired));
 });
 
 test("integration diagnostics run live read-only checks with mocked providers", async () => {
