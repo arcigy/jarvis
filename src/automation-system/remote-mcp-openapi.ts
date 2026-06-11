@@ -990,6 +990,27 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       maxNextCalls: 30,
     };
   }
+  if (toolName === "arcigy.build_smartlead_workspace_diagnostic_preview") {
+    return {
+      endpointChecks: [
+        { url: "https://server.smartlead.ai/api/v1/campaigns", authMode: "api_key_query", status: 200, ok: true, count: 2 },
+        { url: "https://api.smartlead.ai/v1/campaigns", authMode: "api_key_query", status: 404, ok: false, error: "not_found" },
+      ],
+      campaigns: [
+        { id: "123456", name: "Kuchyne SK", status: "ACTIVE", total_sent_count: 240, unique_replied_count: 14, positive_replies: 5, sequence_count: 3, email_account_count: 2, webhook_count: 0, bounce_rate: 2.5 },
+        { id: "789000", name: "Autoservisy BA", status: "DRAFT", total_sent_count: 0, sequence_count: 0, email_account_count: 0 },
+      ],
+      localCampaigns: [{ campaignId: "123456", nicheSlug: "kuchyne", nicheName: "Kuchynske studia" }],
+      sequences: [{ campaignId: "123456", sequenceCount: 3, usesCompanyName: true, unresolvedVariables: ["company_name"] }],
+      webhooks: [{ campaignId: "123456", count: 0, hasReplyWebhook: false, hasCategoryWebhook: false }],
+      senderAccounts: [
+        { id: "acct-1", email: "andrej@arcigy.group", status: "active", warmupStatus: "active", dailyLimit: 40, sentToday: 12, bounceRate: 1.2, reputationScore: 92 },
+        { id: "acct-2", email: "old@arcigy.group", status: "inactive", warmupStatus: "paused", dailyLimit: 30, sentToday: 30, bounceRate: 4.1, reputationScore: 62 },
+      ],
+      expectedMinimumActive: 1,
+      maxNextCalls: 30,
+    };
+  }
   if (toolName === "arcigy.build_smartlead_campaign_backup_plan") {
     return {
       createdAt: "2026-06-10T12:00:00.000Z",

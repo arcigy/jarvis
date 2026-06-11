@@ -182,6 +182,7 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.build_smartlead_sender_capacity_preview`: checks sender accounts, warmup/reputation/limits, calculates safe daily capacity, and prepares a campaign configure payload without writing.
 - `arcigy.build_smartlead_deliverability_guard_preview`: checks campaign delivery metrics plus sender capacity and recommends continue, reduced daily limit, or pause before more uploads.
 - `arcigy.build_smartlead_campaign_audit_preview`: audits existing Smartlead campaigns for activity, local niche mapping, sequences, senders, webhooks, variables, deliverability, and safe follow-up MCP calls without writing.
+- `arcigy.build_smartlead_workspace_diagnostic_preview`: builds a read-only Smartlead workspace diagnostic from endpoint checks, campaign snapshots, sender accounts, sequences, and webhooks, replacing old diagnostic/check-content/list-active scripts without leaking API keys.
 - `arcigy.build_smartlead_campaign_backup_plan`: prepares a read-only Smartlead backup manifest, protected campaign classification, fetch endpoints, and delete safety gates before risky campaign changes.
 - `arcigy.build_smartlead_campaign_delete_safety_preview`: reviews Smartlead delete candidates after backup, blocks protected campaigns, requires backup evidence, and prepares a manual DELETE runbook without deleting.
 - `arcigy.build_smartlead_campaign_restore_plan`: normalizes Smartlead backup JSON into approval-gated create/configure/add-leads restore payloads without writing to Smartlead.

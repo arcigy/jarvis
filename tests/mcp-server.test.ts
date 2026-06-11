@@ -144,6 +144,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(names.includes("arcigy.build_smartlead_sender_capacity_preview"));
   assert.ok(names.includes("arcigy.build_smartlead_deliverability_guard_preview"));
   assert.ok(names.includes("arcigy.build_smartlead_campaign_audit_preview"));
+  assert.ok(names.includes("arcigy.build_smartlead_workspace_diagnostic_preview"));
   assert.ok(names.includes("arcigy.build_smartlead_campaign_backup_plan"));
   assert.ok(names.includes("arcigy.build_smartlead_campaign_delete_safety_preview"));
   assert.ok(names.includes("arcigy.build_smartlead_campaign_restore_plan"));
@@ -480,6 +481,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_campaign_webhooks" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_email_accounts" && call.body.requestedDailyLimit === 80 && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_smartlead_campaign_audit_preview" && call.approvalRequired === false && Array.isArray(call.body.campaigns)));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_smartlead_workspace_diagnostic_preview" && call.approvalRequired === false && Array.isArray(call.body.endpointChecks)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_smartlead_message_history_audit_preview" && call.approvalRequired === false && Array.isArray(call.body.leads)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_smartlead_local_reconciliation_preview" && call.approvalRequired === false && Array.isArray(call.body.localLeads)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_company_short_name_preview" && call.approvalRequired === false && Array.isArray(call.body.leads)));

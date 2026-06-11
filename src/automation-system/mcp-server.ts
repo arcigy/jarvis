@@ -94,6 +94,7 @@ import {
   buildSmartleadSenderCapacityPreview,
   buildSmartleadDeliverabilityGuardPreview,
   buildSmartleadCampaignAuditPreview,
+  buildSmartleadWorkspaceDiagnosticPreview,
   buildSmartleadMessageHistoryAuditPreview,
   buildColdOutreachCsvImportPreview,
   buildFullLeadgenPipelineRunbookPreview,
@@ -3963,6 +3964,66 @@ export function createJarvisMcpServer(): McpServer {
     async (input) => jsonResult(buildSmartleadCampaignAuditPreview({
       ...input,
       campaigns: input.campaigns as Parameters<typeof buildSmartleadCampaignAuditPreview>[0]["campaigns"],
+    }))
+  );
+
+  server.registerTool(
+    "arcigy.build_smartlead_workspace_diagnostic_preview",
+    {
+      title: "Build Smartlead workspace diagnostic preview",
+      description: "Read-only Smartlead workspace diagnostic from endpoint checks, campaign snapshots, sender accounts, sequences and webhooks. Replaces old diagnostic/check-content/list-active scripts without leaking API keys or writing.",
+      inputSchema: {
+        endpointChecks: z.array(z.object({
+          url: z.string().optional(),
+          authMode: z.string().optional(),
+          status: z.union([z.string(), z.number()]).optional(),
+          ok: z.boolean().optional(),
+          error: z.string().optional(),
+          count: z.number().optional(),
+        })).optional(),
+        campaigns: z.array(z.record(z.string(), z.unknown())).optional(),
+        localCampaigns: z.array(z.object({
+          campaignId: z.union([z.string(), z.number()]).optional(),
+          smartleadCampaignId: z.union([z.string(), z.number()]).optional(),
+          nicheSlug: z.string().optional(),
+          nicheName: z.string().optional(),
+          owner: z.string().optional(),
+        })).optional(),
+        sequences: z.array(z.object({
+          campaignId: z.union([z.string(), z.number()]).optional(),
+          sequences: z.array(z.unknown()).optional(),
+          sequenceCount: z.number().optional(),
+          usesCompanyName: z.boolean().optional(),
+          unresolvedVariables: z.array(z.string()).optional(),
+          missingSignature: z.boolean().optional(),
+          missingPersonalizedIntro: z.boolean().optional(),
+        })).optional(),
+        webhooks: z.array(z.object({
+          campaignId: z.union([z.string(), z.number()]).optional(),
+          count: z.number().optional(),
+          eventTypes: z.array(z.string()).optional(),
+          hasReplyWebhook: z.boolean().optional(),
+          hasCategoryWebhook: z.boolean().optional(),
+        })).optional(),
+        senderAccounts: z.array(z.record(z.string(), z.unknown())).optional(),
+        expectedMinimumActive: z.number().int().min(0).default(1),
+        includeCampaignAudit: z.boolean().default(true),
+        includeSenderAudit: z.boolean().default(true),
+        includeWebhookAudit: z.boolean().default(true),
+        includeDeliverabilityGuard: z.boolean().default(true),
+        maxNextCalls: z.number().int().min(1).max(100).default(30),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildSmartleadWorkspaceDiagnosticPreview({
+      ...input,
+      campaigns: input.campaigns as Parameters<typeof buildSmartleadWorkspaceDiagnosticPreview>[0]["campaigns"],
+      senderAccounts: input.senderAccounts as Parameters<typeof buildSmartleadWorkspaceDiagnosticPreview>[0]["senderAccounts"],
     }))
   );
 

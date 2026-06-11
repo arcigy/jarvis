@@ -594,6 +594,30 @@ export type SmartleadCampaignAuditPreview = {
   warnings: string[];
 };
 
+export type SmartleadWorkspaceDiagnosticPreview = {
+  mode: "smartlead-workspace-diagnostic-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  operatorBrief: string;
+  totals: {
+    endpointChecks: number;
+    endpointReady: number;
+    campaigns: number;
+    activeCampaigns: number;
+    sent: number;
+    replies: number;
+    draftCampaigns: number;
+    needsCampaignAudit: number;
+    senderAccounts: number;
+    senderIssues: number;
+  };
+  endpointDiagnostics: Array<{ url?: string; authMode?: string; status?: number | string; ok: boolean; issue?: string; nextAction: string }>;
+  campaigns: Array<{ campaignId?: string | number; name?: string; status?: string; sent: number; replies: number; issues: string[]; nextAction: string }>;
+  senderAccounts: Array<{ id?: string | number; email?: string; status?: string; warmupStatus?: string; dailyLimit?: number; issues: string[]; nextAction: string }>;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+  warnings: string[];
+};
+
 export type SmartleadMessageHistoryAuditPreview = {
   mode: "smartlead-message-history-audit-preview";
   status: "ready" | "attention" | "blocked";
@@ -6125,6 +6149,178 @@ export function buildSmartleadCampaignAuditPreview(input: {
     operatorBrief,
     totals,
     campaigns,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls).slice(0, maxNextCalls),
+    warnings,
+  };
+}
+
+export function buildSmartleadWorkspaceDiagnosticPreview(input: {
+  endpointChecks?: Array<{ url?: string; authMode?: string; status?: number | string; ok?: boolean; error?: string; count?: number }>;
+  campaigns?: Parameters<typeof buildSmartleadCampaignAuditPreview>[0]["campaigns"];
+  localCampaigns?: Parameters<typeof buildSmartleadCampaignAuditPreview>[0]["localCampaigns"];
+  sequences?: Parameters<typeof buildSmartleadCampaignAuditPreview>[0]["sequences"];
+  webhooks?: Parameters<typeof buildSmartleadCampaignAuditPreview>[0]["webhooks"];
+  senderAccounts?: Array<Record<string, unknown> & { id?: string | number; email?: string; status?: string; warmupStatus?: string; warmup_status?: string; dailyLimit?: number; daily_limit?: number; sentToday?: number; sent_today?: number; bounceRate?: number; bounce_rate?: number; reputationScore?: number; reputation_score?: number }>;
+  expectedMinimumActive?: number;
+  includeCampaignAudit?: boolean;
+  includeSenderAudit?: boolean;
+  includeWebhookAudit?: boolean;
+  includeDeliverabilityGuard?: boolean;
+  maxNextCalls?: number;
+}): SmartleadWorkspaceDiagnosticPreview {
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 30), 1), 100);
+  const expectedMinimumActive = Math.max(Math.trunc(input.expectedMinimumActive ?? 1), 0);
+  const endpointDiagnostics = (input.endpointChecks ?? []).map((check) => {
+    const ok = check.ok === true || (typeof check.status === "number" && check.status >= 200 && check.status < 300);
+    const issue = ok ? undefined : check.error ?? `endpoint_status_${check.status ?? "unknown"}`;
+    const nextAction = ok
+      ? `Endpoint ${check.url ?? "Smartlead"} odpoveda; pouzi ho na campaign/status fetch.`
+      : "Skontroluj SMARTLEAD_API_KEY, endpoint base URL a auth mode; nevypisuj token ani hex dump.";
+    return { url: check.url, authMode: check.authMode, status: check.status, ok, issue, nextAction };
+  });
+  const campaignAudit = buildSmartleadCampaignAuditPreview({
+    campaigns: input.campaigns,
+    localCampaigns: input.localCampaigns,
+    sequences: input.sequences,
+    webhooks: input.webhooks,
+    senderAccounts: [],
+    includeStatsRefresh: true,
+    includeContentQa: input.includeCampaignAudit !== false,
+    includeWebhookAudit: input.includeWebhookAudit !== false,
+    includeSenderAudit: false,
+    maxNextCalls,
+  });
+  const campaigns = campaignAudit.campaigns.map((campaign) => ({
+    campaignId: campaign.campaignId,
+    name: campaign.name,
+    status: campaign.status,
+    sent: campaign.sent,
+    replies: campaign.replies,
+    issues: campaign.issues,
+    nextAction: campaign.nextAction,
+  }));
+  const senderAccounts = (input.senderAccounts ?? []).map((account) => {
+    const dailyLimit = numberField(account, "dailyLimit", "daily_limit");
+    const sentToday = numberField(account, "sentToday", "sent_today") ?? 0;
+    const bounceRate = numberField(account, "bounceRate", "bounce_rate") ?? 0;
+    const reputationScore = numberField(account, "reputationScore", "reputation_score");
+    const status = account.status ?? stringField(account, "status");
+    const warmupStatus = account.warmupStatus ?? account.warmup_status ?? stringField(account, "warmup_status", "warmupStatus");
+    const issues: string[] = [];
+    if (!account.email && !stringField(account, "from_email", "sender_email")) issues.push("missing_email");
+    if (status && !/active|connected|ready/i.test(status)) issues.push("inactive_sender");
+    if (warmupStatus && !/active|ready|enabled|ok|warming/i.test(warmupStatus)) issues.push("warmup_attention");
+    if (dailyLimit !== undefined && sentToday >= dailyLimit) issues.push("daily_limit_used");
+    if (bounceRate >= 3) issues.push("sender_bounce_attention");
+    if (reputationScore !== undefined && reputationScore < 70) issues.push("low_reputation_score");
+    const nextAction = issues.length
+      ? "Audit sender warmup, limits, bounce rate and capacity before more uploads."
+      : "Sender account looks usable; include it in capacity planning.";
+    return {
+      id: account.id ?? stringField(account, "id"),
+      email: account.email ?? stringField(account, "from_email", "sender_email"),
+      status,
+      warmupStatus,
+      dailyLimit,
+      issues,
+      nextAction,
+    };
+  });
+
+  const nextToolCalls: SmartleadWorkspaceDiagnosticPreview["nextToolCalls"] = [];
+  nextToolCalls.push({
+    tool: "arcigy.get_smartlead_campaign_status",
+    payload: {},
+    reason: "Fetch current Smartlead campaigns before diagnosing workspace drift.",
+    approvalRequired: false,
+  });
+  if (input.includeSenderAudit !== false) {
+    nextToolCalls.push({
+      tool: "arcigy.get_smartlead_email_accounts",
+      payload: { includeInactive: true },
+      reason: "Read sender accounts, status, warmup and limits for workspace-level capacity.",
+      approvalRequired: false,
+    });
+  }
+  if (input.includeCampaignAudit !== false) {
+    nextToolCalls.push({
+      tool: "arcigy.build_smartlead_campaign_audit_preview",
+      payload: {
+        campaigns: input.campaigns ?? [],
+        localCampaigns: input.localCampaigns ?? [],
+        sequences: input.sequences ?? [],
+        webhooks: input.webhooks ?? [],
+      },
+      reason: "Run detailed campaign content/sender/webhook audit after workspace diagnosis.",
+      approvalRequired: false,
+    });
+  }
+  for (const campaign of campaigns.filter((item) => item.campaignId).slice(0, Math.min(10, maxNextCalls))) {
+    if (input.includeWebhookAudit !== false && campaign.issues.includes("missing_webhook")) {
+      nextToolCalls.push({
+        tool: "arcigy.get_smartlead_campaign_webhooks",
+        payload: { campaignId: campaign.campaignId },
+        reason: "Read campaign webhooks before any approval-gated webhook upsert.",
+        approvalRequired: false,
+      });
+    }
+    if (input.includeDeliverabilityGuard !== false && (campaign.sent > 0 || campaign.issues.includes("deliverability_attention"))) {
+      nextToolCalls.push({
+        tool: "arcigy.build_smartlead_deliverability_guard_preview",
+        payload: { campaignId: campaign.campaignId, campaignName: campaign.name, stats: { sent: campaign.sent, replied: campaign.replies } },
+        reason: "Check deliverability and sending pressure before additional uploads.",
+        approvalRequired: false,
+      });
+    }
+  }
+  if (campaigns.some((campaign) => campaign.sent > 0)) {
+    nextToolCalls.push({
+      tool: "arcigy.build_cold_outreach_monitor_runbook_preview",
+      payload: { campaigns: campaigns.filter((campaign) => campaign.sent > 0), windowLabel: "smartlead-workspace-diagnostic" },
+      reason: "Summarize active campaigns into Jarvis cold outreach briefing style.",
+      approvalRequired: false,
+    });
+  }
+
+  const totals = {
+    endpointChecks: endpointDiagnostics.length,
+    endpointReady: endpointDiagnostics.filter((check) => check.ok).length,
+    campaigns: campaigns.length,
+    activeCampaigns: campaigns.filter((campaign) => campaign.sent > 0 || /active|running/i.test(campaign.status ?? "")).length,
+    sent: sum(campaigns.map((campaign) => campaign.sent)),
+    replies: sum(campaigns.map((campaign) => campaign.replies)),
+    draftCampaigns: campaigns.filter((campaign) => !campaign.sent && /draft|created|paused|not_started/i.test(campaign.status ?? "")).length,
+    needsCampaignAudit: campaigns.filter((campaign) => campaign.issues.length).length,
+    senderAccounts: senderAccounts.length,
+    senderIssues: senderAccounts.filter((account) => account.issues.length).length,
+  };
+  const warnings: string[] = [];
+  if (!endpointDiagnostics.length) warnings.push("No endpoint diagnostic snapshot supplied; call get_smartlead_campaign_status or integration diagnostics first.");
+  if (!campaigns.length) warnings.push("No campaign snapshot supplied; workspace campaign health is unknown.");
+  if (expectedMinimumActive > 0 && totals.activeCampaigns < expectedMinimumActive) warnings.push(`Active campaign target not reached: ${totals.activeCampaigns}/${expectedMinimumActive}.`);
+  if (totals.senderIssues) warnings.push("Some sender accounts need attention before more Smartlead uploads.");
+  const status: SmartleadWorkspaceDiagnosticPreview["status"] = (!endpointDiagnostics.length && !campaigns.length)
+    ? "blocked"
+    : endpointDiagnostics.some((check) => !check.ok) || !campaigns.length
+      ? "blocked"
+      : totals.needsCampaignAudit || totals.senderIssues || warnings.length
+        ? "attention"
+        : "ready";
+  const operatorBrief = [
+    `Smartlead workspace diagnostic: ${totals.endpointReady}/${totals.endpointChecks} endpoint checks ready.`,
+    `${totals.campaigns} kampani, ${totals.activeCampaigns} aktivnych, ${totals.sent} odoslanych emailov, ${totals.replies} odpovedi.`,
+    `${totals.needsCampaignAudit} kampani potrebuje content/sender/webhook audit a ${totals.senderIssues} senderov ma issue.`,
+    "Ziadny Smartlead update, webhook upsert, send, delete ani upload neprebehol.",
+  ].join(" ");
+  return {
+    mode: "smartlead-workspace-diagnostic-preview",
+    status,
+    summary: `Smartlead workspace diagnostic ${status}: ${totals.endpointReady}/${totals.endpointChecks} endpoints ready, ${totals.campaigns} campaigns, ${totals.activeCampaigns} active, ${totals.senderAccounts} sender accounts, ${totals.senderIssues} sender issues. Ziadny Smartlead zapis neprebehol.`,
+    operatorBrief,
+    totals,
+    endpointDiagnostics,
+    campaigns,
+    senderAccounts,
     nextToolCalls: dedupeNextToolCalls(nextToolCalls).slice(0, maxNextCalls),
     warnings,
   };

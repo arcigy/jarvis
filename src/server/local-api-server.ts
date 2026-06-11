@@ -93,6 +93,7 @@ import {
   buildSmartleadSenderCapacityPreview,
   buildSmartleadDeliverabilityGuardPreview,
   buildSmartleadCampaignAuditPreview,
+  buildSmartleadWorkspaceDiagnosticPreview,
   buildSmartleadMessageHistoryAuditPreview,
   buildColdOutreachCsvImportPreview,
   buildFullLeadgenPipelineRunbookPreview,
@@ -2420,6 +2421,25 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         includeContentQa: payload.includeContentQa !== false,
         includeWebhookAudit: payload.includeWebhookAudit !== false,
         includeSenderAudit: payload.includeSenderAudit !== false,
+        maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_smartlead_workspace_diagnostic_preview") {
+    writeJson(response, 200, {
+      result: buildSmartleadWorkspaceDiagnosticPreview({
+        endpointChecks: Array.isArray(payload.endpointChecks) ? payload.endpointChecks as Parameters<typeof buildSmartleadWorkspaceDiagnosticPreview>[0]["endpointChecks"] : undefined,
+        campaigns: Array.isArray(payload.campaigns) ? payload.campaigns as Parameters<typeof buildSmartleadWorkspaceDiagnosticPreview>[0]["campaigns"] : undefined,
+        localCampaigns: Array.isArray(payload.localCampaigns) ? payload.localCampaigns as Parameters<typeof buildSmartleadWorkspaceDiagnosticPreview>[0]["localCampaigns"] : undefined,
+        sequences: Array.isArray(payload.sequences) ? payload.sequences as Parameters<typeof buildSmartleadWorkspaceDiagnosticPreview>[0]["sequences"] : undefined,
+        webhooks: Array.isArray(payload.webhooks) ? payload.webhooks as Parameters<typeof buildSmartleadWorkspaceDiagnosticPreview>[0]["webhooks"] : undefined,
+        senderAccounts: Array.isArray(payload.senderAccounts) ? payload.senderAccounts as Parameters<typeof buildSmartleadWorkspaceDiagnosticPreview>[0]["senderAccounts"] : undefined,
+        expectedMinimumActive: typeof payload.expectedMinimumActive === "number" ? payload.expectedMinimumActive : undefined,
+        includeCampaignAudit: payload.includeCampaignAudit !== false,
+        includeSenderAudit: payload.includeSenderAudit !== false,
+        includeWebhookAudit: payload.includeWebhookAudit !== false,
+        includeDeliverabilityGuard: payload.includeDeliverabilityGuard !== false,
         maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
       }),
     });
