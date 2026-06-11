@@ -1193,6 +1193,25 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Build safe Smartlead sync runbook",
+      tool: "arcigy.build_smartlead_safe_sync_runbook_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_smartlead_safe_sync_runbook_preview"),
+      body: {
+        campaignId: "123456",
+        campaignName: "Autoservisy BA",
+        localLeads: [
+          { email: "new@example.com", first_name: "Jan", company_name: "Nova Firma", website: "https://new.example", custom_fields: { personalized_intro: "Kratke AI intro.", company_name_short: "Nova Firma" } },
+          { email: "existing@example.com", first_name: "Eva", company_name: "Existujuca Firma", website: "https://existing.example", custom_fields: { personalized_intro: "Aktualizovane intro.", company_name_short: "Existujuca" } },
+        ],
+        remoteLeads: [{ id: "sl-1", email: "existing@example.com", first_name: "Eva", company_name: "Stara Firma", website: "https://existing.example", custom_fields: { personalized_intro: "Stare intro.", company_name_short: "Stara" } }],
+        campaignSnapshot: { id: "123456", name: "Autoservisy BA", status: "ACTIVE", total_leads: 80 },
+        requirePause: true,
+        includeBackupPlan: true,
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Preview Smartlead sender capacity",
       tool: "arcigy.build_smartlead_sender_capacity_preview",
       method: "POST",

@@ -57,6 +57,7 @@ import {
   buildSmartleadInjectionPlan,
   buildSmartleadImportAuditPreview,
   buildSmartleadCampaignSyncPlanPreview,
+  buildSmartleadSafeSyncRunbookPreview,
   buildSmartleadSenderCapacityPreview,
   buildSmartleadDeliverabilityGuardPreview,
   buildColdOutreachCsvImportPreview,
@@ -2599,6 +2600,47 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildSmartleadCampaignSyncPlanPreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_smartlead_safe_sync_runbook_preview",
+    {
+      title: "Build Smartlead safe sync runbook preview",
+      description: "Compose a read-only safe runbook for syncing local prepared leads into an existing Smartlead campaign: fetch remote leads, backup, pause checklist, sync plan, approval-gated upload/update, and re-check.",
+      inputSchema: {
+        campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+        campaignName: z.string().optional(),
+        localLeads: z.array(z.object({
+          email: z.string().min(1),
+          first_name: z.string().optional(),
+          last_name: z.string().optional(),
+          company_name: z.string().optional(),
+          website: z.string().optional(),
+          custom_fields: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
+        })).min(1).max(1000),
+        remoteLeads: z.array(z.object({
+          id: z.union([z.string(), z.number()]).optional(),
+          lead_id: z.union([z.string(), z.number()]).optional(),
+          email: z.string().min(1),
+          first_name: z.string().optional(),
+          last_name: z.string().optional(),
+          company_name: z.string().optional(),
+          website: z.string().optional(),
+          custom_fields: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
+        })).optional(),
+        campaignSnapshot: z.object({}).passthrough().optional(),
+        updateExisting: z.boolean().default(true),
+        requirePause: z.boolean().default(true),
+        includeBackupPlan: z.boolean().default(true),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildSmartleadSafeSyncRunbookPreview(input as Parameters<typeof buildSmartleadSafeSyncRunbookPreview>[0]))
   );
 
   server.registerTool(

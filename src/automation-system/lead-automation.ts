@@ -431,6 +431,37 @@ export type SmartleadCampaignSyncPlanPreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type SmartleadSafeSyncRunbookPreview = {
+  mode: "smartlead-safe-sync-runbook-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  campaign: { id?: string | number | null; name?: string };
+  totals: {
+    localLeads: number;
+    remoteLeads: number;
+    missingInSmartlead: number;
+    updateExisting: number;
+    unchanged: number;
+    skipped: number;
+    approvalSteps: number;
+    manualSteps: number;
+  };
+  syncPlan: SmartleadCampaignSyncPlanPreview;
+  backupPlan?: SmartleadCampaignBackupPlan;
+  phases: Array<{
+    order: number;
+    key: string;
+    kind: "mcp" | "manual";
+    tool?: string;
+    payload?: Record<string, unknown>;
+    instruction: string;
+    status: "ready" | "attention" | "blocked" | "approval_required";
+    approvalRequired: boolean;
+  }>;
+  safetyGates: string[];
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type NicheSmartleadCampaignSetupDraft = {
   mode: "niche-smartlead-campaign-setup-draft";
   campaignName: string;
@@ -3482,6 +3513,122 @@ export function buildSmartleadCampaignSyncPlanPreview(input: {
       "Po synchronizacii znovu zavolaj arcigy.get_smartlead_campaign_leads a tento sync plan.",
     ],
     nextToolCalls: dedupeNextToolCalls(nextToolCalls),
+  };
+}
+
+export function buildSmartleadSafeSyncRunbookPreview(input: {
+  campaignId?: string | number | null;
+  campaignName?: string;
+  localLeads: SmartleadLead[];
+  remoteLeads?: Array<SmartleadLead & { id?: string | number; lead_id?: string | number }>;
+  campaignSnapshot?: SmartleadCampaignBackupPlanCampaign;
+  updateExisting?: boolean;
+  requirePause?: boolean;
+  includeBackupPlan?: boolean;
+}): SmartleadSafeSyncRunbookPreview {
+  const campaignId = input.campaignId ?? input.campaignSnapshot?.id ?? null;
+  const syncPlan = buildSmartleadCampaignSyncPlanPreview({
+    campaignId,
+    localLeads: input.localLeads,
+    remoteLeads: input.remoteLeads,
+    updateExisting: input.updateExisting,
+  });
+  const backupPlan = input.includeBackupPlan === false
+    ? undefined
+    : buildSmartleadCampaignBackupPlan({
+        campaigns: [{
+          ...(input.campaignSnapshot ?? {}),
+          id: campaignId ?? input.campaignSnapshot?.id,
+          name: input.campaignName ?? input.campaignSnapshot?.name ?? "Smartlead campaign sync target",
+          leads: input.remoteLeads,
+        }],
+        protectedCampaignIds: campaignId ? [campaignId] : undefined,
+        includeDeletePlan: false,
+        note: "Pre-sync backup plan generated before Smartlead lead sync.",
+      });
+  const phases: SmartleadSafeSyncRunbookPreview["phases"] = [];
+  const pushMcpPhase = (
+    tool: string,
+    payload: Record<string, unknown>,
+    instruction: string,
+    approvalRequired = false,
+    status: SmartleadSafeSyncRunbookPreview["phases"][number]["status"] = approvalRequired ? "approval_required" : "ready"
+  ) => {
+    phases.push({ order: phases.length + 1, key: `${phases.length + 1}-${tool.replace(/^arcigy\./, "")}`, kind: "mcp", tool, payload, instruction, status, approvalRequired });
+  };
+  const pushManualPhase = (key: string, instruction: string, status: SmartleadSafeSyncRunbookPreview["phases"][number]["status"] = "attention") => {
+    phases.push({ order: phases.length + 1, key, kind: "manual", instruction, status, approvalRequired: false });
+  };
+  if (campaignId) {
+    pushMcpPhase("arcigy.get_smartlead_campaign_leads", { campaignId, offset: 0, limit: 100 }, "Najprv nacitaj remote leady z kampane a az potom porovnaj sync plan.");
+  } else {
+    pushManualPhase("missing-campaign-id", "Dopln Smartlead campaignId pred syncom.", "blocked");
+  }
+  if (backupPlan) {
+    pushMcpPhase("arcigy.build_smartlead_campaign_backup_plan", { campaigns: backupPlan.campaigns, protectedCampaignIds: campaignId ? [campaignId] : [], includeDeletePlan: false }, "Priprav backup manifest pred akoukolvek zmenou kampane.");
+  }
+  if (input.requirePause !== false) {
+    pushManualPhase("pause-campaign", "Pred update/upload krokmi pauzni kampan v Smartlead UI alebo schval interny status endpoint mimo MCP.");
+  }
+  pushMcpPhase(
+    "arcigy.build_smartlead_campaign_sync_plan_preview",
+    { campaignId, localLeads: input.localLeads, remoteLeads: input.remoteLeads ?? [], updateExisting: input.updateExisting !== false },
+    "Po nacitani remote leadov znovu prepocitaj missing/update/unchanged rozdelenie."
+  );
+  if (syncPlan.addLeadsApprovalPayload) {
+    pushMcpPhase("arcigy.add_leads_to_smartlead_campaign", syncPlan.addLeadsApprovalPayload as unknown as Record<string, unknown>, "Uploadni iba missing leady po explicitnom schvaleni.", true);
+  }
+  for (const payload of syncPlan.manualUpdateApprovalPayloads) {
+    pushManualPhase(`manual-update-${String(payload.leadId)}`, `Manualne aktualizuj Smartlead lead ${String(payload.leadId)} v kampani ${String(payload.campaignId)} po kontrole changedFields.`);
+  }
+  if (input.requirePause !== false) {
+    pushManualPhase("resume-campaign", "Po uspesnom re-checku znovu spusti kampan v Smartlead UI.");
+  }
+  if (campaignId) {
+    pushMcpPhase("arcigy.get_smartlead_campaign_leads", { campaignId, offset: 0, limit: 100 }, "Po synci nacitaj kampan znovu a over, ze missing/update rozdiely zmizli.");
+  }
+  const approvalSteps = phases.filter((phase) => phase.approvalRequired).length;
+  const manualSteps = phases.filter((phase) => phase.kind === "manual").length;
+  const status: SmartleadSafeSyncRunbookPreview["status"] =
+    !campaignId || syncPlan.status === "blocked"
+      ? "blocked"
+      : syncPlan.totals.missingInSmartlead || syncPlan.totals.updateExisting || manualSteps
+        ? "attention"
+        : "ready";
+  const nextToolCalls = dedupeNextToolCalls(phases
+    .filter((phase): phase is SmartleadSafeSyncRunbookPreview["phases"][number] & { tool: string; payload: Record<string, unknown> } => phase.kind === "mcp" && Boolean(phase.tool && phase.payload))
+    .map((phase) => ({
+      tool: phase.tool,
+      payload: phase.payload,
+      reason: phase.instruction,
+      approvalRequired: phase.approvalRequired,
+    })));
+  return {
+    mode: "smartlead-safe-sync-runbook-preview",
+    status,
+    summary: `Smartlead safe sync runbook ${status}: ${syncPlan.totals.missingInSmartlead} missing upload, ${syncPlan.totals.updateExisting} update, ${syncPlan.totals.unchanged} unchanged, ${approvalSteps} approval krokov. Ziadny Smartlead ani DB zapis neprebehol.`,
+    campaign: { id: campaignId, name: input.campaignName ?? input.campaignSnapshot?.name },
+    totals: {
+      localLeads: syncPlan.totals.localLeads,
+      remoteLeads: syncPlan.totals.remoteLeads,
+      missingInSmartlead: syncPlan.totals.missingInSmartlead,
+      updateExisting: syncPlan.totals.updateExisting,
+      unchanged: syncPlan.totals.unchanged,
+      skipped: syncPlan.totals.skipped,
+      approvalSteps,
+      manualSteps,
+    },
+    syncPlan,
+    backupPlan,
+    phases,
+    safetyGates: [
+      "Pred sync krokom maj aktualny remote lead export zo Smartlead.",
+      "Pred upload/update krokmi pauzni kampan alebo explicitne potvrd, ze je bezpecne menit beziacu kampan.",
+      "Schvaluj iba add_leads payload pre missingInSmartlead a manual update payloady po kontrole changedFields.",
+      "Po synci znovu zavolaj get_smartlead_campaign_leads a tento safe sync runbook.",
+      "Lokalne sent_to_smartlead oznacuj az po potvrdenom remote re-checku.",
+    ],
+    nextToolCalls,
   };
 }
 

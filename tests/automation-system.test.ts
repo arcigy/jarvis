@@ -57,6 +57,7 @@ import {
   buildSmartleadInjectionPlan,
   buildSmartleadImportAuditPreview,
   buildSmartleadCampaignSyncPlanPreview,
+  buildSmartleadSafeSyncRunbookPreview,
   buildSmartleadSenderCapacityPreview,
   buildSmartleadDeliverabilityGuardPreview,
   buildDailyLeadgenRunbook,
@@ -206,6 +207,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.build_smartlead_injection_plan",
     "arcigy.build_smartlead_import_audit_preview",
     "arcigy.build_smartlead_campaign_sync_plan_preview",
+    "arcigy.build_smartlead_safe_sync_runbook_preview",
     "arcigy.build_smartlead_sender_capacity_preview",
     "arcigy.build_smartlead_deliverability_guard_preview",
     "arcigy.build_smartlead_campaign_backup_plan",
@@ -1493,7 +1495,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 122 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 123 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -4535,6 +4537,34 @@ test("Smartlead campaign sync plan separates missing updates and unchanged leads
   assert.ok(preview.updateExisting[0].changedFields.includes("company_name"));
   assert.ok(preview.updateExisting[0].changedFields.includes("custom_fields.personalized_intro"));
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.add_leads_to_smartlead_campaign" && call.approvalRequired));
+  assert.match(preview.summary, /Ziadny Smartlead ani DB zapis/);
+});
+
+test("Smartlead safe sync runbook wraps sync plan with backup pause and re-check steps", () => {
+  const preview = buildSmartleadSafeSyncRunbookPreview({
+    campaignId: "123456",
+    campaignName: "Autoservisy BA",
+    localLeads: [
+      { email: "new@example.com", first_name: "Jan", company_name: "Nova Firma", website: "https://new.example", custom_fields: { personalized_intro: "Kratke AI intro.", company_name_short: "Nova Firma" } },
+      { email: "existing@example.com", first_name: "Eva", company_name: "Existujuca Firma", website: "https://existing.example", custom_fields: { personalized_intro: "Aktualizovane intro.", company_name_short: "Existujuca" } },
+    ],
+    remoteLeads: [
+      { id: "sl-1", email: "existing@example.com", first_name: "Eva", company_name: "Stara Firma", website: "https://existing.example", custom_fields: { personalized_intro: "Stare intro.", company_name_short: "Stara" } },
+    ],
+    campaignSnapshot: { id: "123456", name: "Autoservisy BA", status: "ACTIVE", total_leads: 80 },
+  });
+
+  assert.equal(preview.mode, "smartlead-safe-sync-runbook-preview");
+  assert.equal(preview.status, "attention");
+  assert.equal(preview.totals.missingInSmartlead, 1);
+  assert.equal(preview.totals.updateExisting, 1);
+  assert.equal(preview.totals.approvalSteps, 1);
+  assert.equal(preview.syncPlan.mode, "smartlead-campaign-sync-plan-preview");
+  assert.equal(preview.backupPlan?.mode, "smartlead-campaign-backup-plan");
+  assert.ok(preview.phases.some((phase) => phase.key === "pause-campaign" && phase.kind === "manual"));
+  assert.ok(preview.phases.some((phase) => phase.tool === "arcigy.add_leads_to_smartlead_campaign" && phase.approvalRequired));
+  assert.ok(preview.phases.some((phase) => phase.tool === "arcigy.get_smartlead_campaign_leads"));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_smartlead_campaign_sync_plan_preview" && !call.approvalRequired));
   assert.match(preview.summary, /Ziadny Smartlead ani DB zapis/);
 });
 
