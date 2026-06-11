@@ -43,6 +43,7 @@ import {
   buildLeadRepairQueuePreview,
   buildPhoneEnrichmentQueuePreview,
   buildLeadgenStatusBoardPreview,
+  buildLeadgenDbStatusPreview,
   buildGoogleSheetSyncPreview,
   buildWebsiteScrapeQualityAuditPreview,
   buildSlovakRegisterBatchPreview,
@@ -251,6 +252,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.build_lead_enrichment_merge_preview",
     "arcigy.build_leadgen_gap_report",
     "arcigy.build_leadgen_status_board_preview",
+    "arcigy.build_leadgen_db_status_preview",
     "arcigy.build_google_sheet_sync_preview",
     "arcigy.build_leadgen_campaign_pipeline_preview",
     "arcigy.build_lead_source_import_queue_preview",
@@ -1901,6 +1903,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.preview_smartlead_lead_sync" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_email_accounts" && call.body.requestedDailyLimit === 80 && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.get_smartlead_campaign_webhooks" && call.approvalRequired === false));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_leadgen_db_status_preview" && call.approvalRequired === false && Array.isArray(call.body.blacklistDomains)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.upsert_smartlead_campaign_webhook" && call.approvalRequired === true));
   assert.ok(pack.quickStartCalls.some((call) => call.label === "Spustit remote MCP smoke proof"));
   assert.ok(pack.quickStartCalls.some((call) => call.label === "Ziskat najnovsiu production verification evidence"));
@@ -3553,6 +3556,49 @@ test("leadgen status board summarizes DB export and proposes exact next steps", 
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_smartlead_injection_plan" && !call.approvalRequired));
   assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.export_leads_csv" && call.approvalRequired));
   assert.match(preview.summary, /Ziadny zapis ani upload/);
+});
+
+test("leadgen DB status preview summarizes pipeline state with resume and blacklist", () => {
+  const preview = buildLeadgenDbStatusPreview({
+    sourceName: "local-leadgen-db",
+    csvText: [
+      "company,campaign_tag,primary_email,website,sent_to_smartlead,verification_status",
+      "Ready Studio,kuchyne,jan@ready.sk,https://ready.sk,false,verified",
+      "Needs Email,kuchyne,,https://needs-email.sk,false,",
+      "Needs Verification,autoservisy,info@auto.sk,https://auto.sk,false,",
+      "Already Sent,autoservisy,sent@auto.sk,https://sent-auto.sk,true,verified",
+    ].join("\n"),
+    niches: [
+      { slug: "kuchyne", name: "Kuchynske studia", campaignId: "123456", resume: { regionIndex: 2, nextRegion: "Trnava" } },
+      { slug: "dentisti", name: "Dentisti", stats: { total: 0 } },
+    ],
+    resumeStates: [{ key: "kuchyne", regionIndex: 2, updatedAt: "2026-06-10T12:00:00Z" }],
+    blacklistDomains: ["https://blocked.sk/path", "blocked.sk"],
+    minEnrichedPercent: 70,
+    minVerifiedPercent: 40,
+  });
+
+  assert.equal(preview.mode, "leadgen-db-status-preview");
+  assert.equal(preview.status, "attention");
+  assert.equal(preview.totals.niches, 3);
+  assert.equal(preview.totals.totalLeads, 4);
+  assert.equal(preview.totals.enriched, 3);
+  assert.equal(preview.totals.inSmartlead, 1);
+  assert.equal(preview.totals.verified, 2);
+  assert.equal(preview.totals.pendingEnrich, 1);
+  assert.equal(preview.totals.blacklistDomains, 1);
+  const kuchyne = preview.niches.find((niche) => niche.slug === "kuchyne");
+  assert.equal(kuchyne?.status, "needs_enrich");
+  assert.equal(kuchyne?.resumeRegionIndex, 2);
+  assert.equal(kuchyne?.nextRegion, "Trnava");
+  const autoservisy = preview.niches.find((niche) => niche.slug === "autoservisy");
+  assert.equal(autoservisy?.status, "ready_to_inject");
+  const dentisti = preview.niches.find((niche) => niche.slug === "dentisti");
+  assert.equal(dentisti?.status, "empty");
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_leadgen_execution_queue_preview" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_smartlead_injection_plan" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.build_leadgen_status_board_preview" && !call.approvalRequired));
+  assert.match(preview.summary, /Ziadny DB zapis ani upload/);
 });
 
 test("Google Sheet sync preview maps lead exports to replace payload without writing", () => {

@@ -117,6 +117,7 @@ export type JarvisMcpToolName =
   | "arcigy.build_lead_enrichment_merge_preview"
   | "arcigy.build_leadgen_gap_report"
   | "arcigy.build_leadgen_status_board_preview"
+  | "arcigy.build_leadgen_db_status_preview"
   | "arcigy.build_google_sheet_sync_preview"
   | "arcigy.build_leadgen_campaign_pipeline_preview"
   | "arcigy.build_lead_source_import_queue_preview"
@@ -758,6 +759,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.build_leadgen_status_board_preview",
       description: "Z CSV alebo leadov vytvori read-only status board po niche/campaign: ready pre Smartlead, bez emailu, bez AI intra, bez telefonu, uz odoslane a repair kroky.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_leadgen_db_status_preview",
+      description: "Z DB exportu, CSV alebo agregovanych niche stats vytvori leadgen DB status: enriched, Smartlead, verified, pending enrich, blacklist, resume state a dalsie MCP kroky bez zapisu.",
       requiresApproval: false,
     },
     {

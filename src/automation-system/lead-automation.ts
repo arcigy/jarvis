@@ -243,6 +243,48 @@ export type LeadgenStatusBoardPreview = {
   nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
 };
 
+export type LeadgenDbStatusPreview = {
+  mode: "leadgen-db-status-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  source: { name?: string; parsedFromCsv: number; nicheFilter?: string };
+  totals: {
+    niches: number;
+    totalLeads: number;
+    enriched: number;
+    inSmartlead: number;
+    verified: number;
+    pendingEnrich: number;
+    failed: number;
+    blacklistDomains: number;
+    resumeStates: number;
+    avgEnrichedPercent: number;
+    avgVerifiedPercent: number;
+  };
+  niches: Array<{
+    slug: string;
+    name: string;
+    campaignId?: string | number | null;
+    total: number;
+    enriched: number;
+    enrichedPercent: number;
+    inSmartlead: number;
+    smartleadPercent: number;
+    verified: number;
+    verifiedPercent: number;
+    pendingEnrich: number;
+    failed: number;
+    resumeRegionIndex?: number;
+    nextRegion?: string;
+    updatedAt?: string;
+    status: "ready_to_inject" | "needs_enrich" | "needs_verification" | "sent" | "empty";
+    nextAction: string;
+  }>;
+  resumeStates: Array<{ key: string; regionIndex?: number; updatedAt?: string }>;
+  blacklistDomains: string[];
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type LeadBatchQaPreview = {
   mode: "lead-batch-qa-preview";
   status: "ready" | "attention" | "blocked";
@@ -3175,6 +3217,256 @@ export function buildLeadgenStatusBoardPreview(input: {
     source: { name: input.sourceName, parsedFromCsv: parsed?.leads.length ?? 0, groupBy },
     totals,
     groups,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls),
+  };
+}
+
+export function buildLeadgenDbStatusPreview(input: {
+  leads?: Array<LeadCandidateInput & {
+    id?: string;
+    raw?: Record<string, string>;
+    nicheSlug?: string;
+    nicheId?: string;
+    nicheName?: string;
+    campaignTag?: string;
+    campaign_tag?: string;
+    campaignId?: string | number | null;
+    primary_email?: string;
+    verificationStatus?: string;
+    verification_status?: string;
+    sentToSmartlead?: boolean;
+    sent_to_smartlead?: boolean;
+    smartleadStatus?: string;
+    smartlead_status?: string;
+    ico?: string;
+    official_company_name?: string;
+  }>;
+  csvText?: string;
+  delimiter?: "," | ";";
+  sourceName?: string;
+  niches?: Array<{
+    slug: string;
+    name?: string;
+    campaignId?: string | number | null;
+    stats?: {
+      total?: number;
+      enriched?: number;
+      inSmartlead?: number;
+      in_smartlead?: number;
+      sentToSmartlead?: number;
+      verified?: number;
+      pendingEnrich?: number;
+      pending_enrich?: number;
+      failed?: number;
+    };
+    resume?: { regionIndex?: number; region_index?: number; nextRegion?: string; updatedAt?: string };
+  }>;
+  resumeStates?: Array<{
+    key: string;
+    regionIndex?: number;
+    region_index?: number;
+    value?: { regionIndex?: number; region_index?: number };
+    updatedAt?: string;
+    updated_at?: string;
+  }>;
+  blacklistDomains?: string[];
+  nicheFilter?: string;
+  minEnrichedPercent?: number;
+  minVerifiedPercent?: number;
+  maxNextCalls?: number;
+}): LeadgenDbStatusPreview {
+  const parsed = input.csvText?.trim() ? parseLeadsCsv({ csvText: input.csvText, delimiter: input.delimiter }) : undefined;
+  const leads = [...(input.leads ?? []), ...(parsed?.leads ?? [])] as NonNullable<typeof input.leads>;
+  const minEnrichedPercent = Math.min(Math.max(Math.trunc(input.minEnrichedPercent ?? 70), 0), 100);
+  const minVerifiedPercent = Math.min(Math.max(Math.trunc(input.minVerifiedPercent ?? 40), 0), 100);
+  const maxNextCalls = Math.min(Math.max(Math.trunc(input.maxNextCalls ?? 30), 1), 100);
+  const nicheFilter = input.nicheFilter ? slugify(input.nicheFilter) : undefined;
+  type LeadgenDbNicheStats = {
+    slug: string;
+    name: string;
+    campaignId?: string | number | null;
+    total: number;
+    enriched: number;
+    inSmartlead: number;
+    verified: number;
+    pendingEnrich: number;
+    failed: number;
+    leads: LeadCandidateInput[];
+    resumeRegionIndex?: number;
+    nextRegion?: string;
+    updatedAt?: string;
+  };
+  const statsBySlug = new Map<string, LeadgenDbNicheStats>();
+  const getStats = (slug: string, name = slug, campaignId?: string | number | null) => {
+    const key = slugify(slug) || "orphan";
+    const current = statsBySlug.get(key);
+    if (current) {
+      if (name && current.name === key) current.name = name;
+      if (campaignId !== undefined) current.campaignId = campaignId;
+      return current;
+    }
+    const created: LeadgenDbNicheStats = { slug: key, name: name || key, campaignId, total: 0, enriched: 0, inSmartlead: 0, verified: 0, pendingEnrich: 0, failed: 0, leads: [] };
+    statsBySlug.set(key, created);
+    return created;
+  };
+
+  for (const niche of input.niches ?? []) {
+    const stats = getStats(niche.slug, niche.name ?? niche.slug, niche.campaignId);
+    const explicit = niche.stats ?? {};
+    stats.total += explicit.total ?? 0;
+    stats.enriched += explicit.enriched ?? 0;
+    stats.inSmartlead += explicit.inSmartlead ?? explicit.in_smartlead ?? explicit.sentToSmartlead ?? 0;
+    stats.verified += explicit.verified ?? 0;
+    stats.pendingEnrich += explicit.pendingEnrich ?? explicit.pending_enrich ?? 0;
+    stats.failed += explicit.failed ?? 0;
+    stats.resumeRegionIndex = niche.resume?.regionIndex ?? niche.resume?.region_index ?? stats.resumeRegionIndex;
+    stats.nextRegion = niche.resume?.nextRegion ?? stats.nextRegion;
+    stats.updatedAt = niche.resume?.updatedAt ?? stats.updatedAt;
+  }
+
+  for (const lead of leads) {
+    const group = leadgenStatusGroup({
+      ...lead,
+      campaignTag: lead.campaignTag ?? lead.campaign_tag ?? leadgenStatusField(lead, "campaign_tag"),
+    }, "niche");
+    const stats = getStats(group.key, stringField(lead as Record<string, unknown>, "nicheName", "niche_name") ?? group.label, group.campaignId);
+    const email = lead.email ?? lead.primary_email ?? leadgenStatusField(lead, "primary_email", "email", "smartlead_email");
+    const verificationStatus = (lead.verificationStatus ?? lead.verification_status ?? leadgenStatusField(lead, "verification_status", "verificationStatus") ?? "").toLowerCase();
+    const smartleadStatus = (lead.smartleadStatus ?? lead.smartlead_status ?? leadgenStatusField(lead, "smartlead_status", "smartlead_statuses") ?? "").toLowerCase();
+    const sent = lead.sentToSmartlead === true
+      || lead.sent_to_smartlead === true
+      || leadgenStatusBoolean(lead, "sent_to_smartlead", "cold_email_sent")
+      || /sent|opened|replied|completed|paused/.test(smartleadStatus);
+    const failed = verificationStatus === "failed" || verificationStatus === "rejected" || /bounced|blocked|unsubscribed|failed/.test(smartleadStatus);
+    const verified = verificationStatus === "verified" || verificationStatus === "ok" || Boolean(lead.ico ?? lead.official_company_name ?? leadgenStatusField(lead, "ico", "official_company_name", "orsr_verified"));
+    stats.total += 1;
+    if (email) stats.enriched += 1;
+    if (sent) stats.inSmartlead += 1;
+    if (verified) stats.verified += 1;
+    if (!email && !failed) stats.pendingEnrich += 1;
+    if (failed) stats.failed += 1;
+    stats.leads.push({ ...lead, email });
+  }
+
+  for (const state of input.resumeStates ?? []) {
+    const slug = slugify(state.key.replace(/^resume[_:-]?/i, "")) || slugify(state.key);
+    const stats = getStats(slug, slug);
+    stats.resumeRegionIndex = state.regionIndex ?? state.region_index ?? state.value?.regionIndex ?? state.value?.region_index ?? stats.resumeRegionIndex;
+    stats.updatedAt = state.updatedAt ?? state.updated_at ?? stats.updatedAt;
+  }
+
+  const blacklistDomains = unique((input.blacklistDomains ?? []).map((domain) => normalizeDomain(domain)).filter(Boolean));
+  const niches = [...statsBySlug.values()]
+    .filter((stats) => !nicheFilter || stats.slug === nicheFilter || slugify(stats.name) === nicheFilter)
+    .map((stats) => {
+      const enrichedPercent = percent(stats.enriched, stats.total);
+      const smartleadPercent = percent(stats.inSmartlead, stats.total);
+      const verifiedPercent = percent(stats.verified, stats.total);
+      const status: LeadgenDbStatusPreview["niches"][number]["status"] = stats.total === 0
+        ? "empty"
+        : stats.inSmartlead >= stats.total
+          ? "sent"
+          : stats.pendingEnrich > 0 || enrichedPercent < minEnrichedPercent
+            ? "needs_enrich"
+            : verifiedPercent < minVerifiedPercent
+              ? "needs_verification"
+              : "ready_to_inject";
+      const nextAction = status === "empty"
+        ? "Spust discovery alebo import leadov pre tuto niche."
+        : status === "sent"
+          ? "Kampan je uz nahrata v Smartlead; sleduj replies a suppression."
+          : status === "needs_enrich"
+            ? "Doplni emaily/contact scrape a AI enrichment pre pending leady."
+            : status === "needs_verification"
+              ? "Over firmy/emaily pred Smartlead importom."
+              : "Priprav Smartlead injection plan a approval payload.";
+      return {
+        slug: stats.slug,
+        name: stats.name,
+        campaignId: stats.campaignId,
+        total: stats.total,
+        enriched: stats.enriched,
+        enrichedPercent,
+        inSmartlead: stats.inSmartlead,
+        smartleadPercent,
+        verified: stats.verified,
+        verifiedPercent,
+        pendingEnrich: stats.pendingEnrich,
+        failed: stats.failed,
+        resumeRegionIndex: stats.resumeRegionIndex,
+        nextRegion: stats.nextRegion,
+        updatedAt: stats.updatedAt,
+        status,
+        nextAction,
+      };
+    })
+    .sort((a, b) => b.total - a.total || a.slug.localeCompare(b.slug));
+
+  const totals = {
+    niches: niches.length,
+    totalLeads: sum(niches.map((niche) => niche.total)),
+    enriched: sum(niches.map((niche) => niche.enriched)),
+    inSmartlead: sum(niches.map((niche) => niche.inSmartlead)),
+    verified: sum(niches.map((niche) => niche.verified)),
+    pendingEnrich: sum(niches.map((niche) => niche.pendingEnrich)),
+    failed: sum(niches.map((niche) => niche.failed)),
+    blacklistDomains: blacklistDomains.length,
+    resumeStates: input.resumeStates?.length ?? niches.filter((niche) => niche.resumeRegionIndex !== undefined).length,
+    avgEnrichedPercent: percent(sum(niches.map((niche) => niche.enriched)), sum(niches.map((niche) => niche.total))),
+    avgVerifiedPercent: percent(sum(niches.map((niche) => niche.verified)), sum(niches.map((niche) => niche.total))),
+  };
+
+  const nextToolCalls: LeadgenDbStatusPreview["nextToolCalls"] = [];
+  const attentionNiches = niches.filter((niche) => niche.status === "needs_enrich" || niche.status === "needs_verification" || niche.status === "empty").slice(0, maxNextCalls);
+  const readyNiches = niches.filter((niche) => niche.status === "ready_to_inject").slice(0, maxNextCalls);
+  if (attentionNiches.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_leadgen_execution_queue_preview",
+      payload: { niches: attentionNiches.map((niche) => ({ slug: niche.slug, name: niche.name, campaignId: niche.campaignId, currentRegionIndex: niche.resumeRegionIndex })), maxNiches: attentionNiches.length },
+      reason: "Niche s pending enrichment alebo prazdnym stavom priprav na dalsi scrape/discovery beh.",
+      approvalRequired: false,
+    });
+  }
+  if (niches.some((niche) => niche.status === "needs_verification")) {
+    nextToolCalls.push({
+      tool: "arcigy.build_lead_validation_scorecard_preview",
+      payload: { leads: leads.slice(0, maxNextCalls) },
+      reason: "Pred Smartleadom skontroluj scorecard a verification status pre problemove leady.",
+      approvalRequired: false,
+    });
+  }
+  if (readyNiches.length) {
+    const readyLeads = readyNiches.flatMap((niche) => statsBySlug.get(niche.slug)?.leads ?? []).filter((lead) => lead.email).slice(0, maxNextCalls);
+    nextToolCalls.push({
+      tool: "arcigy.build_smartlead_injection_plan",
+      payload: { leads: readyLeads, campaignId: readyNiches[0]?.campaignId, batchSize: Math.min(Math.max(readyLeads.length, 1), 50) },
+      reason: "Niche ready_to_inject maju emaily a verifikaciu; priprav Smartlead batch bez uploadu.",
+      approvalRequired: false,
+    });
+  }
+  if (leads.length) {
+    nextToolCalls.push({
+      tool: "arcigy.build_leadgen_status_board_preview",
+      payload: { leads: leads.slice(0, maxNextCalls), sourceName: input.sourceName, groupBy: "niche" },
+      reason: "Otvor detailny per-lead status board pre repair, AI intra a Smartlead next kroky.",
+      approvalRequired: false,
+    });
+  }
+
+  const status: LeadgenDbStatusPreview["status"] = totals.niches === 0 ? "blocked" : niches.some((niche) => niche.status === "needs_enrich" || niche.status === "needs_verification" || niche.status === "empty") ? "attention" : "ready";
+  return {
+    mode: "leadgen-db-status-preview",
+    status,
+    summary: `Leadgen DB status ${status}: ${totals.totalLeads} leadov v ${totals.niches} niches, ${totals.enriched} enriched, ${totals.inSmartlead} v Smartlead, ${totals.verified} verified, ${totals.pendingEnrich} pending enrich, ${totals.blacklistDomains} blacklist domen. Ziadny DB zapis ani upload neprebehol.`,
+    source: { name: input.sourceName, parsedFromCsv: parsed?.leads.length ?? 0, nicheFilter: input.nicheFilter },
+    totals,
+    niches,
+    resumeStates: (input.resumeStates ?? []).map((state) => ({
+      key: state.key,
+      regionIndex: state.regionIndex ?? state.region_index ?? state.value?.regionIndex ?? state.value?.region_index,
+      updatedAt: state.updatedAt ?? state.updated_at,
+    })),
+    blacklistDomains,
     nextToolCalls: dedupeNextToolCalls(nextToolCalls),
   };
 }
@@ -8324,6 +8616,15 @@ function numberField(record: Record<string, unknown>, ...keys: string[]): number
     if (typeof value === "string" && value.trim() && Number.isFinite(Number(value))) return Number(value);
   }
   return undefined;
+}
+
+function sum(values: number[]): number {
+  return values.reduce((total, value) => total + value, 0);
+}
+
+function percent(value: number, total: number): number {
+  if (!total) return 0;
+  return Math.round((value / total) * 100);
 }
 
 function arrayLengthField(record: Record<string, unknown>, ...keys: string[]): number | undefined {

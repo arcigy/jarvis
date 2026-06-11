@@ -26,6 +26,7 @@ import {
   buildNicheLeadgenPlan,
   buildLeadgenGapReport,
   buildLeadgenStatusBoardPreview,
+  buildLeadgenDbStatusPreview,
   buildGoogleSheetSyncPreview,
   buildLeadgenCampaignPipelinePreview,
   buildLeadgenAutopilotBatchPreview,
@@ -3546,6 +3547,83 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildLeadgenStatusBoardPreview(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_leadgen_db_status_preview",
+    {
+      title: "Build leadgen DB status preview",
+      description: "Create a read-only leadgen DB status from CSV, lead rows, or aggregated niche stats. Summarizes enriched, Smartlead, verified, pending enrichment, blacklist domains, resume state, and exact next MCP calls.",
+      inputSchema: {
+        leads: z.array(pipelineLeadSchema.extend({
+          id: z.string().optional(),
+          raw: z.record(z.string(), z.string()).optional(),
+          nicheSlug: z.string().optional(),
+          nicheId: z.string().optional(),
+          nicheName: z.string().optional(),
+          campaignTag: z.string().optional(),
+          campaign_tag: z.string().optional(),
+          campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+          primary_email: z.string().optional(),
+          verificationStatus: z.string().optional(),
+          verification_status: z.string().optional(),
+          sentToSmartlead: z.boolean().optional(),
+          sent_to_smartlead: z.boolean().optional(),
+          smartleadStatus: z.string().optional(),
+          smartlead_status: z.string().optional(),
+          ico: z.string().optional(),
+          official_company_name: z.string().optional(),
+        }).passthrough()).optional(),
+        csvText: z.string().optional(),
+        delimiter: z.enum([",", ";"]).optional(),
+        sourceName: z.string().optional(),
+        niches: z.array(z.object({
+          slug: z.string(),
+          name: z.string().optional(),
+          campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+          stats: z.object({
+            total: z.number().int().min(0).optional(),
+            enriched: z.number().int().min(0).optional(),
+            inSmartlead: z.number().int().min(0).optional(),
+            in_smartlead: z.number().int().min(0).optional(),
+            sentToSmartlead: z.number().int().min(0).optional(),
+            verified: z.number().int().min(0).optional(),
+            pendingEnrich: z.number().int().min(0).optional(),
+            pending_enrich: z.number().int().min(0).optional(),
+            failed: z.number().int().min(0).optional(),
+          }).optional(),
+          resume: z.object({
+            regionIndex: z.number().int().min(0).optional(),
+            region_index: z.number().int().min(0).optional(),
+            nextRegion: z.string().optional(),
+            updatedAt: z.string().optional(),
+          }).optional(),
+        })).optional(),
+        resumeStates: z.array(z.object({
+          key: z.string(),
+          regionIndex: z.number().int().min(0).optional(),
+          region_index: z.number().int().min(0).optional(),
+          value: z.object({
+            regionIndex: z.number().int().min(0).optional(),
+            region_index: z.number().int().min(0).optional(),
+          }).optional(),
+          updatedAt: z.string().optional(),
+          updated_at: z.string().optional(),
+        })).optional(),
+        blacklistDomains: z.array(z.string()).optional(),
+        nicheFilter: z.string().optional(),
+        minEnrichedPercent: z.number().int().min(0).max(100).default(70),
+        minVerifiedPercent: z.number().int().min(0).max(100).default(40),
+        maxNextCalls: z.number().int().min(1).max(100).default(30),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildLeadgenDbStatusPreview(input))
   );
 
   server.registerTool(

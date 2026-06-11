@@ -870,6 +870,17 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       csvText: "company,campaign_tag,email,website,phone,icebreaker_sentence,sent_to_smartlead,verification_status\nReady Studio,kuchyne,jan@ready.sk,https://ready.sk,+421 900 111 222,Vsimol som si vase realizacie kuchyn.,false,verified\nNeeds Email,kuchyne,,https://needs-email.sk,,,false,\nNeeds Intro,kuchyne,info@needs-intro.sk,https://needs-intro.sk,+421 900 222 333,,false,\nAlready Sent,kuchyne,sent@ready.sk,https://sent.sk,+421 900 333 444,Vsimol som si showroom.,true,verified\nOrphan Lead,,orphan@example.com,https://orphan.sk,,,false,failed",
     };
   }
+  if (toolName === "arcigy.build_leadgen_db_status_preview") {
+    return {
+      sourceName: "local-leadgen-db",
+      csvText: "company,campaign_tag,primary_email,website,sent_to_smartlead,verification_status\nReady Studio,kuchyne,jan@ready.sk,https://ready.sk,false,verified\nNeeds Email,kuchyne,,https://needs-email.sk,false,\nAlready Sent,autoservisy,sent@auto.sk,https://auto.sk,true,verified",
+      niches: [{ slug: "kuchyne", name: "Kuchynske studia", campaignId: "123456", resume: { regionIndex: 2, nextRegion: "Trnava" } }],
+      resumeStates: [{ key: "kuchyne", regionIndex: 2, updatedAt: "2026-06-10T12:00:00Z" }],
+      blacklistDomains: ["example-blacklist.sk"],
+      minEnrichedPercent: 70,
+      minVerifiedPercent: 40,
+    };
+  }
   if (toolName === "arcigy.build_google_sheet_sync_preview") {
     return {
       sourceName: "db-to-google-sheets",

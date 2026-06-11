@@ -25,6 +25,7 @@ import {
   buildNicheLeadgenPlan,
   buildLeadgenGapReport,
   buildLeadgenStatusBoardPreview,
+  buildLeadgenDbStatusPreview,
   buildGoogleSheetSyncPreview,
   buildLeadgenCampaignPipelinePreview,
   buildLeadgenAutopilotBatchPreview,
@@ -2257,6 +2258,24 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         defaultCampaignId: typeof payload.defaultCampaignId === "string" || typeof payload.defaultCampaignId === "number" || payload.defaultCampaignId === null ? payload.defaultCampaignId : undefined,
         offer: optionalString(payload.offer),
         language: payload.language === "en" ? "en" : "sk",
+        maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_leadgen_db_status_preview") {
+    writeJson(response, 200, {
+      result: buildLeadgenDbStatusPreview({
+        leads: Array.isArray(payload.leads) ? payload.leads as Parameters<typeof buildLeadgenDbStatusPreview>[0]["leads"] : undefined,
+        csvText: optionalString(payload.csvText),
+        delimiter: payload.delimiter === ";" ? ";" : payload.delimiter === "," ? "," : undefined,
+        sourceName: optionalString(payload.sourceName),
+        niches: Array.isArray(payload.niches) ? payload.niches as Parameters<typeof buildLeadgenDbStatusPreview>[0]["niches"] : undefined,
+        resumeStates: Array.isArray(payload.resumeStates) ? payload.resumeStates as Parameters<typeof buildLeadgenDbStatusPreview>[0]["resumeStates"] : undefined,
+        blacklistDomains: Array.isArray(payload.blacklistDomains) ? payload.blacklistDomains.map(String) : undefined,
+        nicheFilter: optionalString(payload.nicheFilter),
+        minEnrichedPercent: typeof payload.minEnrichedPercent === "number" ? payload.minEnrichedPercent : undefined,
+        minVerifiedPercent: typeof payload.minVerifiedPercent === "number" ? payload.minVerifiedPercent : undefined,
         maxNextCalls: typeof payload.maxNextCalls === "number" ? payload.maxNextCalls : undefined,
       }),
     });

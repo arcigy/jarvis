@@ -137,6 +137,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(names.includes("arcigy.build_lead_enrichment_merge_preview"));
   assert.ok(names.includes("arcigy.build_leadgen_gap_report"));
   assert.ok(names.includes("arcigy.build_leadgen_status_board_preview"));
+  assert.ok(names.includes("arcigy.build_leadgen_db_status_preview"));
   assert.ok(names.includes("arcigy.build_google_sheet_sync_preview"));
   assert.ok(names.includes("arcigy.build_leadgen_campaign_pipeline_preview"));
   assert.ok(names.includes("arcigy.build_lead_source_import_queue_preview"));
@@ -479,6 +480,7 @@ test("Jarvis MCP server lists and calls automation tools", async () => {
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_showcase_reply_preview" && call.approvalRequired === false && call.body.leadEmail === "lead@example.com"));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.send_approved_outreach_reply" && call.approvalRequired === true));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_google_sheet_sync_preview" && call.approvalRequired === false && typeof call.body.csvText === "string"));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_leadgen_db_status_preview" && call.approvalRequired === false && Array.isArray(call.body.resumeStates)));
   assert.ok(
     pack.quickStartCalls.some(
       (call) => call.tool === "arcigy.draft_contract_intake" && call.approvalRequired === false && typeof call.body.brief === "string"
