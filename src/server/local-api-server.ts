@@ -62,6 +62,7 @@ import {
   buildManualReviewPickupPlan,
   buildManualReviewQueue,
   buildSmartleadCampaignLaunchPreview,
+  buildBulkSmartleadUploadQueuePreview,
   buildSmartleadCampaignQaPreview,
   buildSmartleadCampaignHandoffPackagePreview,
   buildSmartleadCampaignBackupPlan,
@@ -2107,6 +2108,18 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         niche: (payload.niche ?? {}) as Parameters<typeof buildSmartleadInjectionPlan>[0]["niche"],
         leads: (payload.leads ?? []) as Parameters<typeof buildSmartleadInjectionPlan>[0]["leads"],
         batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_bulk_smartlead_upload_queue_preview") {
+    writeJson(response, 200, {
+      result: buildBulkSmartleadUploadQueuePreview({
+        campaigns: (payload.campaigns ?? []) as Parameters<typeof buildBulkSmartleadUploadQueuePreview>[0]["campaigns"],
+        batchSize: typeof payload.batchSize === "number" ? payload.batchSize : undefined,
+        defaultDailyLimit: typeof payload.defaultDailyLimit === "number" ? payload.defaultDailyLimit : undefined,
+        globalMaxUploads: typeof payload.globalMaxUploads === "number" ? payload.globalMaxUploads : undefined,
+        includeCampaignSetupDrafts: payload.includeCampaignSetupDrafts !== false,
       }),
     });
     return;

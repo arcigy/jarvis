@@ -64,6 +64,7 @@ import {
   buildSmartleadSequenceVariableRepairPreview,
   buildCompanyShortNamePreview,
   buildSmartleadCampaignHandoffPackagePreview,
+  buildBulkSmartleadUploadQueuePreview,
   buildSmartleadCampaignBackupPlan,
   buildSmartleadCampaignRestorePlan,
   buildSmartleadInjectionPlan,
@@ -247,6 +248,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.build_lead_batch_qa_preview",
     "arcigy.preview_manual_review_pickup",
     "arcigy.build_smartlead_injection_plan",
+    "arcigy.build_bulk_smartlead_upload_queue_preview",
     "arcigy.build_smartlead_import_audit_preview",
     "arcigy.build_smartlead_campaign_sync_plan_preview",
     "arcigy.build_smartlead_local_reconciliation_preview",
@@ -507,6 +509,7 @@ test("remote MCP OpenAPI schema exposes secret-safe action operations", () => {
   assert.ok(paths.includes("/api/mcp/arcigy.build_lead_identity_repair_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_lead_validation_scorecard_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_company_short_name_preview"));
+  assert.ok(paths.includes("/api/mcp/arcigy.build_bulk_smartlead_upload_queue_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.build_ai_icebreaker_writeback_preview"));
   assert.ok(paths.includes("/api/mcp/arcigy.get_smartlead_campaign_webhooks"));
   assert.ok(paths.includes("/api/mcp/arcigy.upsert_smartlead_campaign_webhook"));
@@ -1918,6 +1921,7 @@ test("remote MCP connection pack includes secret-safe readiness attention queue"
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_lead_identity_repair_preview" && call.approvalRequired === false));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_lead_validation_scorecard_preview" && call.approvalRequired === false && call.body.minScore === 70));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_company_short_name_preview" && call.approvalRequired === false && Array.isArray(call.body.leads)));
+  assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_bulk_smartlead_upload_queue_preview" && call.approvalRequired === false && Array.isArray(call.body.campaigns)));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_ai_icebreaker_writeback_preview" && call.approvalRequired === false && typeof call.body.resultJsonText === "string"));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.build_flagged_lead_review_preview" && call.approvalRequired === false && typeof call.body.csvText === "string"));
   assert.ok(pack.quickStartCalls.some((call) => call.tool === "arcigy.lookup_public_email_profile" && call.body.email === "jan.novak@example.com" && call.approvalRequired === false));
@@ -3126,6 +3130,43 @@ test("manual review pickup builds Smartlead injection and campaign setup drafts"
   assert.equal(launch.approvalPayloads.addLeads?.leads[0].email, "lead@example.com");
   assert.ok(launch.nextToolCalls.some((call) => call.tool === "arcigy.configure_smartlead_campaign" && call.approvalRequired));
   assert.ok(launch.nextToolCalls.some((call) => call.tool === "arcigy.add_leads_to_smartlead_campaign" && call.approvalRequired));
+});
+
+test("bulk Smartlead upload queue plans multiple campaign uploads without writing", () => {
+  const preview = buildBulkSmartleadUploadQueuePreview({
+    campaigns: [
+      {
+        niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456" },
+        priority: 1,
+        dailyLimit: 5,
+        alreadySentToday: 3,
+        leads: [
+          { email: "lead1@example.com", decisionMakerName: "Jan Novak", companyName: "Auto Demo", website: "https://auto.example", personalizedIntro: "Kratke AI intro." },
+          { email: "lead2@example.com", decisionMakerName: "Eva Hruba", companyName: "Auto Demo 2", website: "https://auto2.example", personalizedIntro: "Kratke AI intro." },
+          { email: "sent@example.com", companyName: "Sent", sentToSmartlead: true },
+        ],
+      },
+      {
+        niche: { id: "niche-2", slug: "kuchyne", name: "Kuchynske studia" },
+        priority: 2,
+        leads: [{ email: "eva@example.com", decisionMakerName: "Eva Hruba", companyName: "Kuchyne Demo", website: "https://kuchyne.example", personalizedIntro: "Kratke AI intro." }],
+      },
+    ],
+    batchSize: 1,
+    globalMaxUploads: 10,
+  });
+
+  assert.equal(preview.mode, "bulk-smartlead-upload-queue-preview");
+  assert.equal(preview.status, "attention");
+  assert.equal(preview.totals.campaigns, 2);
+  assert.equal(preview.totals.queuedCampaigns, 1);
+  assert.equal(preview.totals.uploadLeads, 3);
+  assert.equal(preview.queue[0].uploadLeads, 2);
+  assert.equal(preview.queue[0].injectionPlan.batches.length, 2);
+  assert.equal(preview.approvalPayloads[0].campaignId, "123456");
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.add_leads_to_smartlead_campaign" && call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.draft_niche_smartlead_campaign_setup" && !call.approvalRequired));
+  assert.match(preview.summary, /Ziadny upload ani zapis/);
 });
 
 test("Smartlead import audit separates new duplicate and existing leads before upload", () => {

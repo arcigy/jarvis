@@ -63,6 +63,7 @@ import {
   buildManualReviewPickupPlan,
   buildManualReviewQueue,
   buildSmartleadCampaignLaunchPreview,
+  buildBulkSmartleadUploadQueuePreview,
   buildSmartleadCampaignQaPreview,
   buildSmartleadCampaignHandoffPackagePreview,
   buildSmartleadCampaignBackupPlan,
@@ -3211,6 +3212,42 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(buildSmartleadInjectionPlan(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_bulk_smartlead_upload_queue_preview",
+    {
+      title: "Build bulk Smartlead upload queue preview",
+      description: "Plan approval-gated Smartlead lead uploads across multiple campaigns with priorities, daily limits, prepared lead validation, and campaign setup fallbacks without uploading.",
+      inputSchema: {
+        campaigns: z.array(z.object({
+          niche: z.object({
+            id: z.string().optional(),
+            slug: z.string().optional(),
+            name: z.string().min(1),
+            campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+            smartleadCampaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+          }),
+          leads: z.array(manualReviewPickupLeadSchema).min(0),
+          priority: z.number().int().min(1).max(99).optional(),
+          dailyLimit: z.number().int().min(1).max(500).optional(),
+          alreadySentToday: z.number().int().min(0).optional(),
+          maxUpload: z.number().int().min(0).max(500).optional(),
+          paused: z.boolean().default(false),
+        })).min(1).max(50),
+        batchSize: z.number().int().min(1).max(100).default(50),
+        defaultDailyLimit: z.number().int().min(1).max(500).default(50),
+        globalMaxUploads: z.number().int().min(1).max(5000).default(500),
+        includeCampaignSetupDrafts: z.boolean().default(true),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildBulkSmartleadUploadQueuePreview(input))
   );
 
   server.registerTool(

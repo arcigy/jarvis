@@ -163,6 +163,7 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.build_lead_batch_qa_preview`: runs a pre-Smartlead lead batch QA pass for blocked source domains, low-quality emails, company short names, cleaned AI intros, and repair next steps without DB writes.
 - `arcigy.preview_manual_review_pickup`: previews manual-review-pickup by filtering reviewed unsent leads, qualifying them, grouping by niche, and preparing injection plans without writes.
 - `arcigy.build_smartlead_injection_plan`: prepares Smartlead `lead_list` batches and the approval payload for `arcigy.add_leads_to_smartlead_campaign` without uploading.
+- `arcigy.build_bulk_smartlead_upload_queue_preview`: plans approval-gated Smartlead uploads across multiple campaigns with priorities, daily limits, prepared lead validation, and campaign setup fallbacks without uploading.
 - `arcigy.build_smartlead_import_audit_preview`: compares prepared Smartlead leads against existing campaign leads, separates new/duplicate/already-imported records, and prepares a safe approval payload without uploading.
 - `arcigy.build_smartlead_campaign_sync_plan_preview`: compares local prepared leads with remote Smartlead campaign leads, separates missing uploads, existing updates, and unchanged leads, and prepares approval payloads without writing.
 - `arcigy.build_smartlead_local_reconciliation_preview`: compares local lead sent/reply fields with Smartlead remote leads or sync updates and prepares a local patch plan without DB writes.

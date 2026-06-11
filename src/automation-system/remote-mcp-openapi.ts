@@ -736,6 +736,26 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
       leads: [{ email: "lead@example.com", decisionMakerName: "Jan Novak", companyName: "Modelova Firma", website: "https://example.com", personalizedIntro: "Kratke AI intro." }],
     };
   }
+  if (toolName === "arcigy.build_bulk_smartlead_upload_queue_preview") {
+    return {
+      campaigns: [
+        {
+          niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456" },
+          priority: 1,
+          dailyLimit: 30,
+          alreadySentToday: 8,
+          leads: [{ email: "lead@example.com", decisionMakerName: "Jan Novak", companyName: "Modelova Firma", website: "https://example.com", personalizedIntro: "Kratke AI intro." }],
+        },
+        {
+          niche: { id: "niche-2", slug: "kuchyne", name: "Kuchynske studia" },
+          priority: 2,
+          leads: [{ email: "eva@example.com", decisionMakerName: "Eva Hruba", companyName: "Kuchyne Demo", website: "https://kuchyne.example", personalizedIntro: "Kratke AI intro." }],
+        },
+      ],
+      batchSize: 50,
+      globalMaxUploads: 100,
+    };
+  }
   if (toolName === "arcigy.build_smartlead_import_audit_preview") {
     return {
       campaignId: "123456",

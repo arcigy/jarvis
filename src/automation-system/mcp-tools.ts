@@ -106,6 +106,7 @@ export type JarvisMcpToolName =
   | "arcigy.build_lead_batch_qa_preview"
   | "arcigy.preview_manual_review_pickup"
   | "arcigy.build_smartlead_injection_plan"
+  | "arcigy.build_bulk_smartlead_upload_queue_preview"
   | "arcigy.build_smartlead_import_audit_preview"
   | "arcigy.build_smartlead_campaign_sync_plan_preview"
   | "arcigy.build_smartlead_local_reconciliation_preview"
@@ -710,6 +711,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.build_smartlead_injection_plan",
       description: "Pripravi Smartlead lead_list batche a approval payload pre upload leadov do existujucej kampane bez odoslania.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_bulk_smartlead_upload_queue_preview",
+      description: "Naplánuje approval-gated Smartlead uploady napriec viac kampanami s prioritami, dennymi limitmi a setup fallbackmi bez uploadu.",
       requiresApproval: false,
     },
     {

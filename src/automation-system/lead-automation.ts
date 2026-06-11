@@ -656,6 +656,39 @@ export type SmartleadInjectionPlan = {
   summary: string;
 };
 
+export type BulkSmartleadUploadQueuePreview = {
+  mode: "bulk-smartlead-upload-queue-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  totals: {
+    campaigns: number;
+    queuedCampaigns: number;
+    skippedCampaigns: number;
+    inputLeads: number;
+    eligibleLeads: number;
+    uploadLeads: number;
+    skippedLeads: number;
+    approvalPayloads: number;
+  };
+  queue: Array<{
+    order: number;
+    priority: number;
+    status: "ready" | "attention" | "blocked";
+    reason: string;
+    niche: { id?: string; slug: string; name: string; campaignId?: string | number | null };
+    dailyLimit: number;
+    alreadySentToday: number;
+    remainingToday: number;
+    inputLeads: number;
+    uploadLeads: number;
+    skippedLeads: number;
+    injectionPlan: SmartleadInjectionPlan;
+  }>;
+  approvalPayloads: Array<NonNullable<SmartleadInjectionPlan["addLeadsApprovalPayload"]>>;
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+  warnings: string[];
+};
+
 export type SmartleadImportAuditPreview = {
   mode: "smartlead-import-audit-preview";
   summary: string;
@@ -5119,6 +5152,128 @@ export function buildSmartleadInjectionPlan(input: {
     summary: campaignId
       ? `Injection plan: ${prepared.leadList.length} leadov do kampane ${campaignId} v ${batches.length} batchoch. Odoslanie vyzaduje schvaleny add_leads payload.`
       : `Injection plan: ${prepared.leadList.length} leadov pre novu kampan ${campaignName}. Najprv vytvor alebo prirad Smartlead campaignId.`,
+  };
+}
+
+export function buildBulkSmartleadUploadQueuePreview(input: {
+  campaigns: Array<{
+    niche: { id?: string; slug?: string; name: string; campaignId?: string | number | null; smartleadCampaignId?: string | number | null };
+    leads: ManualReviewPickupLead[];
+    priority?: number;
+    dailyLimit?: number;
+    alreadySentToday?: number;
+    maxUpload?: number;
+    paused?: boolean;
+  }>;
+  batchSize?: number;
+  defaultDailyLimit?: number;
+  globalMaxUploads?: number;
+  includeCampaignSetupDrafts?: boolean;
+}): BulkSmartleadUploadQueuePreview {
+  const batchSize = Math.min(Math.max(Math.trunc(input.batchSize ?? 50), 1), 100);
+  const defaultDailyLimit = Math.min(Math.max(Math.trunc(input.defaultDailyLimit ?? 50), 1), 500);
+  let globalRemaining = Math.min(Math.max(Math.trunc(input.globalMaxUploads ?? 500), 1), 5000);
+  const warnings: string[] = [];
+  const sorted = input.campaigns
+    .map((campaign, index) => ({ ...campaign, index, priority: Math.min(Math.max(Math.trunc(campaign.priority ?? 50), 1), 99) }))
+    .sort((a, b) => a.priority - b.priority || a.index - b.index);
+
+  const queue: BulkSmartleadUploadQueuePreview["queue"] = [];
+  const nextToolCalls: BulkSmartleadUploadQueuePreview["nextToolCalls"] = [];
+
+  for (const item of sorted) {
+    const slug = item.niche.slug?.trim() || slugify(item.niche.name);
+    const campaignId = item.niche.campaignId ?? item.niche.smartleadCampaignId ?? null;
+    const dailyLimit = Math.min(Math.max(Math.trunc(item.dailyLimit ?? defaultDailyLimit), 1), 500);
+    const alreadySentToday = Math.max(Math.trunc(item.alreadySentToday ?? 0), 0);
+    const remainingToday = Math.max(dailyLimit - alreadySentToday, 0);
+    const campaignMax = Math.min(Math.max(Math.trunc(item.maxUpload ?? remainingToday), 0), remainingToday, globalRemaining);
+    const eligibleLeads = uniqueByLeadIdentity(item.leads.filter((lead) => !lead.sentToSmartlead && !lead.sent_to_smartlead));
+    const uploadCandidates = eligibleLeads.slice(0, campaignMax);
+    const niche = { id: item.niche.id, slug, name: item.niche.name, campaignId };
+    const injectionPlan = buildSmartleadInjectionPlan({ niche, leads: uploadCandidates, batchSize });
+    const skippedLeads = Math.max(item.leads.length - injectionPlan.totals.prepared, 0) + injectionPlan.totals.skipped;
+    let status: BulkSmartleadUploadQueuePreview["queue"][number]["status"] = "ready";
+    let reason = `${injectionPlan.totals.prepared} leadov pripravenych na approval upload.`;
+    if (item.paused) {
+      status = "blocked";
+      reason = "Campaign is paused in the input.";
+    } else if (!slug || !item.niche.name.trim()) {
+      status = "blocked";
+      reason = "Missing niche name/slug.";
+    } else if (!campaignId) {
+      status = "attention";
+      reason = "Missing Smartlead campaignId; create or map campaign before upload.";
+    } else if (remainingToday <= 0 || globalRemaining <= 0) {
+      status = "attention";
+      reason = "Daily/global upload capacity is exhausted.";
+    } else if (injectionPlan.totals.prepared <= 0) {
+      status = "attention";
+      reason = "No prepared leads passed Smartlead validation.";
+    }
+    if (status === "ready" && injectionPlan.totals.prepared > 0) {
+      globalRemaining = Math.max(globalRemaining - injectionPlan.totals.prepared, 0);
+    }
+    queue.push({
+      order: queue.length + 1,
+      priority: item.priority,
+      status,
+      reason,
+      niche,
+      dailyLimit,
+      alreadySentToday,
+      remainingToday,
+      inputLeads: item.leads.length,
+      uploadLeads: injectionPlan.totals.prepared,
+      skippedLeads,
+      injectionPlan,
+    });
+    if (injectionPlan.addLeadsApprovalPayload && status === "ready") {
+      nextToolCalls.push({
+        tool: "arcigy.add_leads_to_smartlead_campaign",
+        payload: injectionPlan.addLeadsApprovalPayload as unknown as Record<string, unknown>,
+        reason: `Po schvaleni uploadni ${injectionPlan.totals.prepared} leadov do kampane ${campaignId}.`,
+        approvalRequired: true,
+      });
+    } else if (!campaignId && input.includeCampaignSetupDrafts !== false) {
+      nextToolCalls.push({
+        tool: "arcigy.draft_niche_smartlead_campaign_setup",
+        payload: { niche: { id: item.niche.id, slug, name: item.niche.name } },
+        reason: `Campaign ${item.niche.name} nema Smartlead campaignId; priprav setup pred uploadom.`,
+        approvalRequired: false,
+      });
+    }
+  }
+
+  const approvalPayloads = queue
+    .map((item) => item.injectionPlan.addLeadsApprovalPayload)
+    .filter((payload): payload is NonNullable<SmartleadInjectionPlan["addLeadsApprovalPayload"]> => Boolean(payload));
+  const totals = {
+    campaigns: input.campaigns.length,
+    queuedCampaigns: queue.filter((item) => item.status === "ready").length,
+    skippedCampaigns: queue.filter((item) => item.status !== "ready").length,
+    inputLeads: input.campaigns.reduce((sum, item) => sum + item.leads.length, 0),
+    eligibleLeads: queue.reduce((sum, item) => sum + item.injectionPlan.totals.input, 0),
+    uploadLeads: queue.reduce((sum, item) => sum + item.uploadLeads, 0),
+    skippedLeads: queue.reduce((sum, item) => sum + item.skippedLeads, 0),
+    approvalPayloads: approvalPayloads.length,
+  };
+  if (queue.some((item) => !item.niche.campaignId)) warnings.push("Some campaigns are missing Smartlead campaignId.");
+  if (queue.some((item) => item.status === "blocked")) warnings.push("At least one campaign is blocked and should not be uploaded.");
+  const status: BulkSmartleadUploadQueuePreview["status"] = totals.queuedCampaigns === 0
+    ? "blocked"
+    : warnings.length || totals.skippedCampaigns > 0
+      ? "attention"
+      : "ready";
+  return {
+    mode: "bulk-smartlead-upload-queue-preview",
+    status,
+    summary: `Bulk Smartlead upload queue ${status}: ${totals.uploadLeads} leadov v ${totals.queuedCampaigns}/${totals.campaigns} kampaniach, ${totals.approvalPayloads} approval payloadov. Ziadny upload ani zapis neprebehol.`,
+    totals,
+    queue,
+    approvalPayloads,
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls),
+    warnings,
   };
 }
 
