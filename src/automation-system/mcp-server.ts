@@ -65,6 +65,7 @@ import {
   draftNicheSmartleadCampaignSetup,
   draftLeadIntro,
   draftSmartleadCampaignSequence,
+  buildSmartleadSequenceWorkPacketPreview,
   enrichWebsiteLeadsPreview,
   enrichSlovakCompanyRegister,
   filterBlacklistedLeads,
@@ -2226,6 +2227,36 @@ export function createJarvisMcpServer(): McpServer {
       },
     },
     async (input) => jsonResult(draftSmartleadCampaignSequence(input))
+  );
+
+  server.registerTool(
+    "arcigy.build_smartlead_sequence_work_packet_preview",
+    {
+      title: "Build Smartlead sequence work packet preview",
+      description: "Prepare an AI work packet for Smartlead campaign sequences, validate returned sequence JSON, and prepare QA, rendering, repair, and approval-gated configure next steps without writing.",
+      inputSchema: {
+        niche: z.object({
+          id: z.string().optional(),
+          slug: z.string().optional(),
+          name: z.string().min(1),
+          campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+        }),
+        offer: z.string().optional(),
+        painPoint: z.string().optional(),
+        language: z.enum(["sk", "en"]).default("sk"),
+        customInstructions: z.string().optional(),
+        completedSequences: z.array(smartleadSequenceSchema).optional(),
+        sampleLeads: z.array(z.object({}).passthrough()).optional(),
+        campaignId: z.union([z.string(), z.number(), z.null()]).optional(),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      },
+    },
+    async (input) => jsonResult(buildSmartleadSequenceWorkPacketPreview(input as Parameters<typeof buildSmartleadSequenceWorkPacketPreview>[0]))
   );
 
   const manualReviewPickupLeadSchema = z.object({

@@ -173,6 +173,7 @@ const capabilityDefinitions: CapabilityDefinition[] = [
       "arcigy.build_region_expansion_queue_preview",
       "arcigy.select_next_niche",
       "arcigy.draft_smartlead_campaign_sequence",
+      "arcigy.build_smartlead_sequence_work_packet_preview",
       "arcigy.preview_smartlead_email_rendering",
       "arcigy.build_smartlead_sequence_variable_repair_preview",
       "arcigy.build_lead_batch_qa_preview",

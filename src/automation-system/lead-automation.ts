@@ -460,6 +460,34 @@ export type NicheSmartleadCampaignSetupDraft = {
   summary: string;
 };
 
+export type SmartleadSequenceWorkPacketPreview = {
+  mode: "smartlead-sequence-work-packet-preview";
+  status: "ready" | "attention" | "blocked";
+  summary: string;
+  source: {
+    niche: { id?: string; slug: string; name: string; campaignId?: string | number | null };
+    language: "sk" | "en";
+    offer?: string;
+    painPoint?: string;
+    customInstructions?: string;
+  };
+  totals: {
+    baselineSequences: number;
+    completedSequences: number;
+    acceptedSequences: number;
+    rejectedSequences: number;
+    variants: number;
+    issues: number;
+  };
+  baselineSequences: SmartleadSequence[];
+  markdownTask: string;
+  expectedJson: { sequences: SmartleadSequence[] };
+  completedItems: Array<{ sequenceNumber: number; status: "valid" | "invalid"; issues: string[]; sequence?: SmartleadSequence }>;
+  acceptedSequences: SmartleadSequence[];
+  configureCampaignApprovalPayload?: { campaignId: string | number; sequences: SmartleadSequence[]; approval: { approved: true } };
+  nextToolCalls: Array<{ tool: string; payload: Record<string, unknown>; reason: string; approvalRequired: boolean }>;
+};
+
 export type SmartleadCampaignLaunchPreview = {
   mode: "smartlead-campaign-launch-preview";
   summary: string;
@@ -3453,6 +3481,107 @@ export function buildSmartleadCampaignSyncPlanPreview(input: {
       "Manual update payloady pouzi iba po kontrole changedFields a po explicitnom schvaleni.",
       "Po synchronizacii znovu zavolaj arcigy.get_smartlead_campaign_leads a tento sync plan.",
     ],
+    nextToolCalls: dedupeNextToolCalls(nextToolCalls),
+  };
+}
+
+export function buildSmartleadSequenceWorkPacketPreview(input: {
+  niche: { id?: string; slug?: string; name: string; campaignId?: string | number | null };
+  offer?: string;
+  painPoint?: string;
+  language?: "sk" | "en";
+  customInstructions?: string;
+  completedSequences?: SmartleadSequence[];
+  sampleLeads?: PreparedSmartleadLeadInput[];
+  campaignId?: string | number | null;
+}): SmartleadSequenceWorkPacketPreview {
+  const language = input.language ?? "sk";
+  const niche = {
+    id: input.niche.id,
+    slug: input.niche.slug?.trim() || slugify(input.niche.name),
+    name: input.niche.name,
+    campaignId: input.campaignId ?? input.niche.campaignId ?? null,
+  };
+  const baseline = draftSmartleadCampaignSequence({ niche: niche.name, offer: input.offer, painPoint: input.painPoint, language }).sequences;
+  const completedItems = (input.completedSequences ?? []).map((sequence) => {
+    const issues = smartleadSequenceIssues(sequence);
+    return {
+      sequenceNumber: Math.trunc(sequence.seq_number || 0),
+      status: issues.length ? "invalid" as const : "valid" as const,
+      issues,
+      sequence: normalizeSequencePreview(sequence),
+    };
+  });
+  const acceptedSequences = completedItems
+    .filter((item) => item.status === "valid" && item.sequence)
+    .map((item) => item.sequence as SmartleadSequence)
+    .sort((a, b) => a.seq_number - b.seq_number);
+  const campaignId = niche.campaignId ?? undefined;
+  const configureCampaignApprovalPayload = campaignId && acceptedSequences.length
+    ? { campaignId, sequences: acceptedSequences, approval: { approved: true as const } }
+    : undefined;
+  const sequencesForChecks = acceptedSequences.length ? acceptedSequences : baseline;
+  const nextToolCalls: SmartleadSequenceWorkPacketPreview["nextToolCalls"] = [
+    {
+      tool: "arcigy.draft_smartlead_campaign_sequence",
+      payload: { niche: niche.name, offer: input.offer, painPoint: input.painPoint, language },
+      reason: "Vytvor deterministicky fallback sequence draft, ak AI este nevratila validny JSON.",
+      approvalRequired: false,
+    },
+    {
+      tool: "arcigy.build_smartlead_campaign_qa_preview",
+      payload: { campaignId: campaignId ?? "SMARTLEAD_CAMPAIGN_ID", campaignName: `${niche.slug}_SK`, sequences: sequencesForChecks },
+      reason: "Skontroluj sekvencie pred configure/create kampan krokom.",
+      approvalRequired: false,
+    },
+  ];
+  if (input.sampleLeads?.length) {
+    nextToolCalls.push({
+      tool: "arcigy.preview_smartlead_email_rendering",
+      payload: { leads: input.sampleLeads.slice(0, 5), sequences: sequencesForChecks },
+      reason: "Vyrenderuj sekvenciu na vzorke leadov a odhal chybajuce premenne.",
+      approvalRequired: false,
+    });
+  }
+  if (campaignId && acceptedSequences.length) {
+    nextToolCalls.push(
+      {
+        tool: "arcigy.build_smartlead_sequence_variable_repair_preview",
+        payload: { campaignId, sequences: acceptedSequences },
+        reason: "Normalizuj subject premenne pred configure kampan approvalom.",
+        approvalRequired: false,
+      },
+      {
+        tool: "arcigy.configure_smartlead_campaign",
+        payload: configureCampaignApprovalPayload as unknown as Record<string, unknown>,
+        reason: "Nahraj validovane AI sekvencie do existujucej Smartlead kampane az po schvaleni.",
+        approvalRequired: true,
+      }
+    );
+  }
+  const issueCount = completedItems.reduce((sum, item) => sum + item.issues.length, 0);
+  const totals = {
+    baselineSequences: baseline.length,
+    completedSequences: input.completedSequences?.length ?? 0,
+    acceptedSequences: acceptedSequences.length,
+    rejectedSequences: completedItems.filter((item) => item.status === "invalid").length,
+    variants: acceptedSequences.reduce((sum, sequence) => sum + sequence.seq_variants.length, 0),
+    issues: issueCount,
+  };
+  const status: SmartleadSequenceWorkPacketPreview["status"] =
+    totals.completedSequences === 0 ? "attention" : totals.acceptedSequences === 0 ? "blocked" : totals.issues > 0 ? "attention" : "ready";
+  return {
+    mode: "smartlead-sequence-work-packet-preview",
+    status,
+    summary: `Smartlead sequence work packet ${status}: ${totals.acceptedSequences}/${totals.completedSequences} AI sekvencii validnych, ${totals.issues} issue, ${campaignId ? "configure payload pripraveny" : "campaignId chyba"}. Ziadny zapis do Smartlead neprebehol.`,
+    source: { niche, language, offer: input.offer, painPoint: input.painPoint, customInstructions: input.customInstructions },
+    totals,
+    baselineSequences: baseline,
+    markdownTask: buildSmartleadSequenceMarkdownTask({ niche, offer: input.offer, painPoint: input.painPoint, language, customInstructions: input.customInstructions, baseline }),
+    expectedJson: { sequences: baseline },
+    completedItems,
+    acceptedSequences,
+    configureCampaignApprovalPayload,
     nextToolCalls: dedupeNextToolCalls(nextToolCalls),
   };
 }
@@ -6829,6 +6958,77 @@ function normalizePipelineLead(
       source: lead.source ?? defaultSource,
       context_preview: contextPreview ? redactSensitiveText(contextPreview).slice(0, 1200) : undefined,
     },
+  };
+}
+
+function buildSmartleadSequenceMarkdownTask(input: {
+  niche: { slug: string; name: string; campaignId?: string | number | null };
+  offer?: string;
+  painPoint?: string;
+  language: "sk" | "en";
+  customInstructions?: string;
+  baseline: SmartleadSequence[];
+}): string {
+  return [
+    `# Smartlead sequence task - ${input.niche.name}`,
+    "",
+    "Vytvor alebo uprav 3-krokovu cold email sekvenciu pre Smartlead.",
+    "",
+    "## Kontext",
+    `- Niche: ${input.niche.name}`,
+    `- Slug: ${input.niche.slug}`,
+    `- Jazyk: ${input.language}`,
+    input.offer ? `- Offer: ${input.offer}` : "- Offer: navrhni kratko podla niche",
+    input.painPoint ? `- Pain point: ${input.painPoint}` : "- Pain point: navrhni podla niche",
+    input.customInstructions ? `- Instrukcie: ${input.customInstructions}` : "- Instrukcie: drz profesionalny, kratky, neprehypovany ton",
+    "",
+    "## Pravidla",
+    "- Vrat cisty JSON bez markdownu.",
+    "- Presne 3 sekvencie: delay 0, 3 a 5 dni.",
+    "- Kazda sekvencia musi mat aspon variant A.",
+    "- Pouzi premennu {{personalized_intro}} aspon v prvom emaile.",
+    "- Pouzi %signature% na konci kazdeho emailu.",
+    "- Nepouzivaj tvrdenia, ze sme uz nieco spravili alebo odoslali.",
+    "- Neuvadzaj ziadne API kluce, tokeny ani interne URL.",
+    "",
+    "## JSON format",
+    "```json",
+    JSON.stringify({ sequences: input.baseline }, null, 2),
+    "```",
+  ].join("\n");
+}
+
+function smartleadSequenceIssues(sequence: SmartleadSequence): string[] {
+  const issues: string[] = [];
+  if (!Number.isFinite(sequence.seq_number) || sequence.seq_number < 1) issues.push("missing_seq_number");
+  const delay = sequence.seq_delay_details?.delay_in_days;
+  if (!Number.isFinite(delay) || delay < 0) issues.push("invalid_delay");
+  if (!sequence.seq_variants?.length) issues.push("missing_variants");
+  for (const variant of sequence.seq_variants ?? []) {
+    const subject = variant.subject?.trim() ?? "";
+    const body = variant.email_body?.replace(/\s+/g, " ").trim() ?? "";
+    if (!variant.variant_label?.trim()) issues.push("missing_variant_label");
+    if (sequence.seq_number === 1 && !subject) issues.push("missing_first_subject");
+    if (!body) issues.push("missing_body");
+    if (body.length > 1800) issues.push("body_too_long");
+    if (!body.includes("%signature%")) issues.push("missing_signature");
+  }
+  const allText = (sequence.seq_variants ?? []).map((variant) => `${variant.subject ?? ""} ${variant.email_body ?? ""}`).join(" ");
+  if (sequence.seq_number === 1 && !allText.includes("{{personalized_intro}}")) issues.push("missing_personalized_intro_variable");
+  if (/(api[_ -]?key|bearer token|oauth|database_url|password)/i.test(allText)) issues.push("secret_like_text");
+  if (/(odoslal som|poslal som|uploadol som|sent this|i sent)/i.test(allText)) issues.push("claims_action_executed");
+  return unique(issues);
+}
+
+function normalizeSequencePreview(sequence: SmartleadSequence): SmartleadSequence {
+  return {
+    seq_number: Math.max(1, Math.trunc(sequence.seq_number || 1)),
+    seq_delay_details: { delay_in_days: Math.max(0, Math.trunc(sequence.seq_delay_details?.delay_in_days ?? 0)) },
+    seq_variants: (sequence.seq_variants ?? []).map((variant, index) => ({
+      variant_label: variant.variant_label?.trim() || String.fromCharCode(65 + index),
+      subject: variant.subject?.trim() ?? "",
+      email_body: variant.email_body?.trim() ?? "",
+    })),
   };
 }
 

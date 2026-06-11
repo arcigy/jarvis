@@ -528,6 +528,20 @@ function examplePayloadForTool(toolName: string): Record<string, unknown> {
     };
   }
   if (toolName === "arcigy.draft_smartlead_campaign_sequence") return { niche: "autoservisy", painPoint: "manualne riesenie dopytov", offer: "AI asistent na odpovede a follow-up", language: "sk" };
+  if (toolName === "arcigy.build_smartlead_sequence_work_packet_preview") {
+    return {
+      niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456" },
+      offer: "AI asistent na odpovede a follow-up",
+      painPoint: "manualne riesenie zmeskanych dopytov",
+      language: "sk",
+      completedSequences: [
+        { seq_number: 1, seq_delay_details: { delay_in_days: 0 }, seq_variants: [{ variant_label: "A", subject: "Rychla otazka k {{company_name_short}}", email_body: "<p>{{personalized_intro}}</p><p>Riesite dnes dopyty a follow-up manualne?</p><p>%signature%</p>" }] },
+        { seq_number: 2, seq_delay_details: { delay_in_days: 3 }, seq_variants: [{ variant_label: "A", subject: "", email_body: "<p>Len sa pripominam, vieme zautomatizovat odpovede na dopyty bez zmeny vasho webu.</p><p>%signature%</p>" }] },
+        { seq_number: 3, seq_delay_details: { delay_in_days: 5 }, seq_variants: [{ variant_label: "A", subject: "", email_body: "<p>Ak to nie je aktualne, necham to tak. Ak ano, poslem kratky navrh.</p><p>%signature%</p>" }] },
+      ],
+      sampleLeads: [{ email: "jan@example.com", companyName: "Modelova Firma", firstName: "Jan", personalizedIntro: "Vsimol som si vase servisne sluzby.", customFields: { company_name_short: "Modelova Firma" } }],
+    };
+  }
   if (toolName === "arcigy.preview_smartlead_email_rendering") {
     return {
       leads: [{ email: "jan.novak@example.com", company_name: "Modelova Firma", website: "example.com", custom_fields: { personalized_intro: "Kratke AI intro." } }],

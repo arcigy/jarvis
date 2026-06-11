@@ -77,6 +77,7 @@ export type JarvisMcpToolName =
   | "arcigy.build_leadgen_execution_queue_preview"
   | "arcigy.build_region_expansion_queue_preview"
   | "arcigy.draft_smartlead_campaign_sequence"
+  | "arcigy.build_smartlead_sequence_work_packet_preview"
   | "arcigy.preview_smartlead_email_rendering"
   | "arcigy.build_smartlead_sequence_variable_repair_preview"
   | "arcigy.build_lead_batch_qa_preview"
@@ -529,6 +530,11 @@ export function listJarvisMcpTools(): JarvisMcpTool[] {
     {
       name: "arcigy.draft_smartlead_campaign_sequence",
       description: "Vytvori draft Smartlead email sequence struktury s variantmi a follow-upom bez zapisu do Smartlead.",
+      requiresApproval: false,
+    },
+    {
+      name: "arcigy.build_smartlead_sequence_work_packet_preview",
+      description: "Pripravi AI work packet pre tvorbu Smartlead sekvencii, validuje vratene sekvencie a navrhne QA/repair/configure kroky bez zapisu.",
       requiresApproval: false,
     },
     {

@@ -134,6 +134,7 @@ The MCP panel now runs an automatic preflight watch every two minutes. It shows 
 - `arcigy.build_leadgen_execution_queue_preview`: prioritizes today's leadgen work across niches, regions, quotas, discovery, enrichment, and Smartlead handoff without executing.
 - `arcigy.build_region_expansion_queue_preview`: expands niches across capital/all-Slovakia/custom regions, skips visited regions, and prepares discovery/execution queues without executing.
 - `arcigy.draft_smartlead_campaign_sequence`: drafts a Smartlead-compatible email sequence with variants and empty-subject follow-up without writing to Smartlead.
+- `arcigy.build_smartlead_sequence_work_packet_preview`: prepares an AI work packet for Smartlead sequences, validates returned JSON, and proposes QA/render/repair/configure steps without writing.
 - `arcigy.preview_smartlead_email_rendering`: renders Smartlead sequence variants for selected leads, substitutes variables, and reports unresolved placeholders without sending.
 - `arcigy.build_smartlead_sequence_variable_repair_preview`: rewrites Smartlead sequence subjects from `company_name` to `company_name_short` and prepares an approval-gated configure payload without writing.
 - `arcigy.build_lead_batch_qa_preview`: runs a pre-Smartlead lead batch QA pass for blocked source domains, low-quality emails, company short names, cleaned AI intros, and repair next steps without DB writes.

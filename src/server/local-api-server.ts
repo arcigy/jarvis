@@ -64,6 +64,7 @@ import {
   draftNicheSmartleadCampaignSetup,
   draftLeadIntro,
   draftSmartleadCampaignSequence,
+  buildSmartleadSequenceWorkPacketPreview,
   enrichWebsiteLeadsPreview,
   enrichSlovakCompanyRegister,
   filterBlacklistedLeads,
@@ -1702,6 +1703,21 @@ async function routeMcpTool(name: string, request: IncomingMessage, response: Se
         offer: optionalString(payload.offer),
         painPoint: optionalString(payload.painPoint),
         language: payload.language === "en" ? "en" : "sk",
+      }),
+    });
+    return;
+  }
+  if (name === "arcigy.build_smartlead_sequence_work_packet_preview") {
+    writeJson(response, 200, {
+      result: buildSmartleadSequenceWorkPacketPreview({
+        niche: (payload.niche ?? {}) as Parameters<typeof buildSmartleadSequenceWorkPacketPreview>[0]["niche"],
+        offer: optionalString(payload.offer),
+        painPoint: optionalString(payload.painPoint),
+        language: payload.language === "en" ? "en" : "sk",
+        customInstructions: optionalString(payload.customInstructions),
+        completedSequences: Array.isArray(payload.completedSequences) ? payload.completedSequences as Parameters<typeof buildSmartleadSequenceWorkPacketPreview>[0]["completedSequences"] : undefined,
+        sampleLeads: Array.isArray(payload.sampleLeads) ? payload.sampleLeads as Parameters<typeof buildSmartleadSequenceWorkPacketPreview>[0]["sampleLeads"] : undefined,
+        campaignId: (payload.campaignId ?? null) as string | number | null,
       }),
     });
     return;

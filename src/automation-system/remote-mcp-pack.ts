@@ -1030,6 +1030,25 @@ function buildQuickStartCalls(baseUrl: string): RemoteMcpConnectionPack["quickSt
       approvalRequired: false,
     },
     {
+      label: "Build Smartlead sequence AI work packet",
+      tool: "arcigy.build_smartlead_sequence_work_packet_preview",
+      method: "POST",
+      url: toolUrl("arcigy.build_smartlead_sequence_work_packet_preview"),
+      body: {
+        niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456" },
+        offer: "AI asistent na odpovede a follow-up",
+        painPoint: "manualne riesenie zmeskanych dopytov",
+        language: "sk",
+        completedSequences: [
+          { seq_number: 1, seq_delay_details: { delay_in_days: 0 }, seq_variants: [{ variant_label: "A", subject: "Rychla otazka k {{company_name_short}}", email_body: "<p>{{personalized_intro}}</p><p>Riesite dnes dopyty a follow-up manualne?</p><p>%signature%</p>" }] },
+          { seq_number: 2, seq_delay_details: { delay_in_days: 3 }, seq_variants: [{ variant_label: "A", subject: "", email_body: "<p>Len sa pripominam, vieme zautomatizovat odpovede na dopyty bez zmeny vasho webu.</p><p>%signature%</p>" }] },
+          { seq_number: 3, seq_delay_details: { delay_in_days: 5 }, seq_variants: [{ variant_label: "A", subject: "", email_body: "<p>Ak to nie je aktualne, necham to tak. Ak ano, poslem kratky navrh.</p><p>%signature%</p>" }] },
+        ],
+        sampleLeads: [{ email: "jan@example.com", companyName: "Modelova Firma", firstName: "Jan", personalizedIntro: "Vsimol som si vase servisne sluzby.", customFields: { company_name_short: "Modelova Firma" } }],
+      },
+      approvalRequired: false,
+    },
+    {
       label: "Preview rendered Smartlead emails",
       tool: "arcigy.preview_smartlead_email_rendering",
       method: "POST",

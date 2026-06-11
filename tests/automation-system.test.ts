@@ -62,6 +62,7 @@ import {
   buildDailyLeadgenRunbook,
   buildFullLeadgenPipelineRunbookPreview,
   buildLeadCsvMappingPreview,
+  buildSmartleadSequenceWorkPacketPreview,
   dedupeLeadCandidates,
   draftNicheSmartleadCampaignSetup,
   draftLeadIntro,
@@ -197,6 +198,7 @@ test("MCP tools expose the requested automation surface", () => {
     "arcigy.build_leadgen_execution_queue_preview",
     "arcigy.build_region_expansion_queue_preview",
     "arcigy.draft_smartlead_campaign_sequence",
+    "arcigy.build_smartlead_sequence_work_packet_preview",
     "arcigy.preview_smartlead_email_rendering",
     "arcigy.build_smartlead_sequence_variable_repair_preview",
     "arcigy.build_lead_batch_qa_preview",
@@ -1491,7 +1493,7 @@ test("remote MCP smoke requires fresh release proof for ready production evidenc
     if (url.endsWith("/api/mcp/arcigy.get_system_health")) return responseJson({ result: { integrations: [] } });
     if (url.endsWith("/api/mcp/arcigy.jarvis_voice_event")) {
       const speakText =
-        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 121 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
+        "Jarvis capability audit je ready. Coverage: 9/9 skupin ready, 0 attention, 0 blocked. MCP: 122 toolov, 12 schvalovacich zamkov, 7 lokalnych zapisov. Evidence: ready, fresh=true, clean=true, gates=37.";
       return responseJson({ result: { session: { state: "idle", lastResponse: speakText }, shouldStopRecording: true, speakText } });
     }
     if (url.endsWith("/api/mcp/arcigy.get_production_verification_evidence")) {
@@ -4546,6 +4548,30 @@ test("niche plan and Smartlead sequence drafts follow leadgen conventions", () =
   assert.equal(sequence.sequences[1].seq_variants[0].subject, "");
   assert.ok(sequence.requiredVariables.includes("{{personalized_intro}}"));
   assert.ok(sequence.sequences[0].seq_variants[0].email_body.includes("%signature%"));
+});
+
+test("Smartlead sequence work packet validates AI JSON before configure approval", () => {
+  const preview = buildSmartleadSequenceWorkPacketPreview({
+    niche: { id: "niche-1", slug: "autoservisy", name: "Autoservisy", campaignId: "123456" },
+    offer: "AI follow-up system",
+    painPoint: "manualne dopyty",
+    completedSequences: [
+      { seq_number: 1, seq_delay_details: { delay_in_days: 0 }, seq_variants: [{ variant_label: "A", subject: "Rychla otazka k {{company_name_short}}", email_body: "<p>{{personalized_intro}}</p><p>Riesite dopyty manualne?</p><p>%signature%</p>" }] },
+      { seq_number: 2, seq_delay_details: { delay_in_days: 3 }, seq_variants: [{ variant_label: "A", subject: "", email_body: "<p>Len sa pripominam k AI follow-up systemu.</p><p>%signature%</p>" }] },
+      { seq_number: 3, seq_delay_details: { delay_in_days: 5 }, seq_variants: [{ variant_label: "A", subject: "", email_body: "<p>Ak to nie je aktualne, necham to tak.</p><p>%signature%</p>" }] },
+    ],
+    sampleLeads: [{ email: "jan@example.com", companyName: "Modelova Firma", personalizedIntro: "Vsimol som si vas servis.", customFields: { company_name_short: "Modelova Firma" } }],
+  });
+
+  assert.equal(preview.mode, "smartlead-sequence-work-packet-preview");
+  assert.equal(preview.status, "ready");
+  assert.equal(preview.totals.acceptedSequences, 3);
+  assert.equal(preview.totals.issues, 0);
+  assert.equal(preview.configureCampaignApprovalPayload?.campaignId, "123456");
+  assert.match(preview.markdownTask, /Vrat cisty JSON/);
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.preview_smartlead_email_rendering" && !call.approvalRequired));
+  assert.ok(preview.nextToolCalls.some((call) => call.tool === "arcigy.configure_smartlead_campaign" && call.approvalRequired));
+  assert.match(preview.summary, /Ziadny zapis do Smartlead/);
 });
 
 test("Smartlead email rendering preview substitutes lead variables without sending", () => {
